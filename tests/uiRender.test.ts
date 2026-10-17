@@ -294,3 +294,54 @@ test('render: przycisk Wczytaj starsze gdy listing uciety', () => {
   assert.deepEqual(calls, [{ name: 'older', args: ['wyslane'] }]);
   off();
 });
+
+// --- Fala 7c: struktura wierszy pod nowoczesny wyglad -----------------------
+
+test('render: wiersz listu ma kolumny nadawcy, tematu i daty', () => {
+  const s = new MailUiStore();
+  const { container, off } = mount(s);
+  s.applyMailbox('odebrane', {
+    kind: 'lista',
+    header: { box: 'odebrane', truncated: false },
+    entries: [
+      entry({
+        date: {
+          raw: 'N, 21 XII 2025, 01:15:04',
+          weekday: 'N',
+          day: 21,
+          month: 12,
+          year: 2025,
+          time: '01:15:04',
+        },
+      }),
+    ],
+  });
+  const row = container.querySelector('.arkmail-entry')!;
+  assert.ok(row.querySelector('.arkmail-entry-party')?.textContent?.includes('Foo'));
+  assert.ok(row.querySelector('.arkmail-entry-subject')?.textContent?.includes('Perly'));
+  assert.ok(row.querySelector('.arkmail-entry-date')?.textContent?.includes('21 XII 2025'));
+  off();
+});
+
+test('render: naglowek listu z wyroznionym tematem i wierszem meta', () => {
+  const s = new MailUiStore();
+  const { container, off } = mount(s);
+  s.openLetter('odebrane', {
+    number: 3,
+    from: 'Foo',
+    subject: 'Perly',
+    to: 'Gracz',
+    cc: null,
+    date: 'N, 21 XII 2025, 01:15:04',
+    body: ['czesc'],
+  });
+  assert.ok(
+    container.querySelector('.arkmail-letter-subject')?.textContent?.includes('Perly'),
+    'temat wyrozniony osobno',
+  );
+  const meta = container.querySelector('.arkmail-letter-meta')?.textContent ?? '';
+  assert.ok(meta.includes('Foo'), 'meta ma nadawce');
+  assert.ok(meta.includes('Gracz'), 'meta ma adresata');
+  assert.ok(meta.includes('21 XII 2025'), 'meta ma date');
+  off();
+});

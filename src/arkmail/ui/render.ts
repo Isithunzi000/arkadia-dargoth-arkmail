@@ -158,15 +158,26 @@ export function mountMailUi(
       return pane;
     }
     for (const e of view.entries) {
+      // Wiersz w stylu nowoczesnej poczty: numer | nadawca | temat | data.
       const row = doc.createElement('div');
       row.className = 'arkmail-entry' + (e.isRead ? '' : ' arkmail-unread');
       row.setAttribute('data-number', String(e.number));
-      const dateTxt = e.date ? ` [${e.date.raw}]` : '';
-      row.textContent = `${e.number}. ${e.subject} `;
+      const num = doc.createElement('span');
+      num.className = 'arkmail-entry-num';
+      num.textContent = `${e.number}.`;
+      row.appendChild(num);
       const party = doc.createElement('span');
       party.className = 'arkmail-entry-party';
-      party.textContent = `— ${e.party}${dateTxt}`;
+      party.textContent = e.party || '—';
       row.appendChild(party);
+      const subject = doc.createElement('span');
+      subject.className = 'arkmail-entry-subject';
+      subject.textContent = e.subject + (e.forwarded ? ' (forwardowany)' : '');
+      row.appendChild(subject);
+      const date = doc.createElement('span');
+      date.className = 'arkmail-entry-date';
+      date.textContent = e.date ? e.date.raw : '';
+      row.appendChild(date);
       row.addEventListener('click', () => handlers.onOpenLetter(state.activeBox, e.number));
       pane.appendChild(row);
     }
@@ -190,11 +201,17 @@ export function mountMailUi(
     }
     const head = doc.createElement('div');
     head.className = 'arkmail-letter-head';
-    head.textContent =
+    const subj = doc.createElement('div');
+    subj.className = 'arkmail-letter-subject';
+    subj.textContent = l.subject;
+    head.appendChild(subj);
+    const meta = doc.createElement('div');
+    meta.className = 'arkmail-letter-meta';
+    meta.textContent =
       `List ${l.number} — Od: ${l.from} — Do: ${l.to}` +
       (l.cc ? ` — DW: ${l.cc}` : '') +
-      (l.date ? ` — ${l.date}` : '') +
-      ` — Temat: ${l.subject}`;
+      (l.date ? ` — ${l.date}` : '');
+    head.appendChild(meta);
     pane.appendChild(head);
     const body = doc.createElement('div');
     body.className = 'arkmail-letter-body';
@@ -349,8 +366,16 @@ export function mountMailUi(
     for (const c of state.contacts) {
       const row = doc.createElement('div');
       row.className = 'arkmail-contact';
-      const stats = `(odebrane: ${c.lettersReceived}, wyslane: ${c.lettersSent})`;
-      row.textContent = `${c.name} ${stats}${c.mailAlias ? ` alias: ${c.mailAlias}` : ''}`;
+      const name = doc.createElement('span');
+      name.className = 'arkmail-contact-name';
+      name.textContent = c.name;
+      row.appendChild(name);
+      const stats = doc.createElement('span');
+      stats.className = 'arkmail-contact-stats';
+      stats.textContent =
+        `(odebrane: ${c.lettersReceived}, wyslane: ${c.lettersSent})` +
+        (c.mailAlias ? ` alias: ${c.mailAlias}` : '');
+      row.appendChild(stats);
       pane.appendChild(row);
     }
     return pane;
@@ -374,7 +399,13 @@ export function mountMailUi(
         ...rows.map((l) => {
           const row = doc.createElement('div');
           row.className = 'arkmail-arch-entry';
-          row.textContent = `${l.number}. ${l.subject} — ${l.party} [${l.box}]`;
+          const subj = doc.createElement('span');
+          subj.textContent = `${l.number}. ${l.subject}`;
+          row.appendChild(subj);
+          const meta = doc.createElement('span');
+          meta.className = 'arkmail-arch-meta';
+          meta.textContent = `— ${l.party} [${l.box}]`;
+          row.appendChild(meta);
           return row;
         }),
       );
