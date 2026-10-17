@@ -136,8 +136,12 @@ Licznik w nawiasie kwadratowym, imiona po przecinku, ostatni separator ` i `.
 ## Limit 50 i archiwum
 
 Serwer pokazuje max 50 najnowszych (`prezentowane jest pierwsze 50`).
-Starsze: `listy <skrzynka> przed <data>` — ArkMail paginuje wstecz
-i buduje lokalne archiwum (IndexedDB) poza limitem.
+Starsze: `listy <skrzynka> przed <d> <miesiac rzymski> <yyyy>`
+(zweryfikowane w logach: `listy wyslane przed 9 iii 2026`) — ArkMail
+paginuje wstecz i buduje lokalne archiwum poza limitem.
+Trwalosc: localStorage per postac (`arkmail.<postac>.<klucz>`) — listy
+to krotkie teksty, limit ~5 MB wystarcza na tysiace; IndexedDB
+swiadomie odlozone (prostszy kontrakt, w pelni testowalny).
 
 ## Reguły dla portów (WWW / Mudlet)
 
