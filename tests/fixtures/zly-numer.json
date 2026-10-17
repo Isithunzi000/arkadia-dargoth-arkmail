@@ -1,0 +1,31 @@
+{
+  "name": "zly-numer",
+  "opis": "Blad pagera: Zly numer listu: 4.",
+  "zrodlo": "session_1766262715076.html",
+  "lines": [
+    {
+      "cls": "mail",
+      "text": "  \\_/_ _______________________________________________________________/ "
+    },
+    {
+      "cls": "mail",
+      "text": "[1-3 adefFhHmnqrsRux.!?-+<>] (aktualny: 3) -- "
+    },
+    {
+      "cls": "mail",
+      "text": "Zly numer listu: 4."
+    },
+    {
+      "cls": "mail",
+      "text": "[1-3 adefFhHmnqrsRux.!?-+<>] (aktualny: 3) -- "
+    },
+    {
+      "cls": "command",
+      "text": "→ q"
+    },
+    {
+      "cls": "prompt",
+      "text": "> "
+    }
+  ]
+}

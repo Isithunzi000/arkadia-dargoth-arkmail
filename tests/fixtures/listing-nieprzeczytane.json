@@ -1,0 +1,87 @@
+{
+  "name": "listing-nieprzeczytane",
+  "opis": "Listing nieprzeczytanych (brak *R*) + przeczytanie listu 1 + wyjscie q",
+  "zrodlo": "session_1766262715076.html",
+  "lines": [
+    {
+      "cls": "mail",
+      "text": "Listy nieprzeczytane:"
+    },
+    {
+      "cls": "mail",
+      "text": " 1. Temat: Elementy rozbitego szkielka"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Foo                        N, 21 XII 2025, 01:15:04"
+    },
+    {
+      "cls": "",
+      "text": ""
+    },
+    {
+      "cls": "",
+      "text": "           X---E    "
+    },
+    {
+      "cls": "",
+      "text": ""
+    },
+    {
+      "cls": "command",
+      "text": "→ list 1"
+    },
+    {
+      "cls": "mail",
+      "text": "List : 1"
+    },
+    {
+      "cls": "mail",
+      "text": "Od   : Foo"
+    },
+    {
+      "cls": "mail",
+      "text": "Temat: Elementy rozbitego szkielka"
+    },
+    {
+      "cls": "mail",
+      "text": "Data : N, 21 XII 2025, 01:15:04"
+    },
+    {
+      "cls": "mail",
+      "text": "Hej,"
+    },
+    {
+      "cls": "mail",
+      "text": "nie moge sie doczekac, az mi opowiesz. Mam rozumiec, ze udaliscie sie do Nuln?"
+    },
+    {
+      "cls": "mail",
+      "text": "No i w ktorej kwestii mialam racje, na bogow, tak wiele pytan, tak malo odpowiedzi."
+    },
+    {
+      "cls": "mail",
+      "text": "Ide teraz w gory. Daj znac, jak Cie najdzie, zeby uchylic rabka."
+    },
+    {
+      "cls": "mail",
+      "text": "af"
+    },
+    {
+      "cls": "mail",
+      "text": "[1-1 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- "
+    },
+    {
+      "cls": "other",
+      "text": "Jestes zmeczony."
+    },
+    {
+      "cls": "command",
+      "text": "→ q"
+    },
+    {
+      "cls": "prompt",
+      "text": "> "
+    }
+  ]
+}

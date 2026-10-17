@@ -1,0 +1,103 @@
+{
+  "name": "listing-odebrane-male",
+  "opis": "Puste nieprzeczytane, maly listing odebranych (3 listy, *R*, data z godzina), przeczytanie listu 1, pager prompt, wyjscie q",
+  "zrodlo": "session_1766439839339.html",
+  "lines": [
+    {
+      "cls": "mail",
+      "text": "Nie masz zadnych nieprzeczytanych listow."
+    },
+    {
+      "cls": "command",
+      "text": "→ listy odebrane"
+    },
+    {
+      "cls": "prompt",
+      "text": "> "
+    },
+    {
+      "cls": "mail",
+      "text": "Listy odebrane:"
+    },
+    {
+      "cls": "mail",
+      "text": " 3. *R* Temat: Elementy rozbitego szkielka"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Foo                        N, 21 XII 2025, 01:15:04"
+    },
+    {
+      "cls": "mail",
+      "text": " 2. *R* Temat: Rozbite szkielka tworzace calosc"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05"
+    },
+    {
+      "cls": "mail",
+      "text": " 1. *R* Temat: --"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12"
+    },
+    {
+      "cls": "command",
+      "text": "→ list 1"
+    },
+    {
+      "cls": "mail",
+      "text": "List : 1"
+    },
+    {
+      "cls": "mail",
+      "text": "Od   : Corge"
+    },
+    {
+      "cls": "mail",
+      "text": "Temat: --"
+    },
+    {
+      "cls": "mail",
+      "text": "Do   : Gracz i Baz"
+    },
+    {
+      "cls": "mail",
+      "text": "Data : Wt, 23 XII 2025, 00:11:12"
+    },
+    {
+      "cls": "mail",
+      "text": "Ciao!"
+    },
+    {
+      "cls": "mail",
+      "text": "Grazie za wiesci."
+    },
+    {
+      "cls": "mail",
+      "text": "Po pierwsze, skad pomysl, ze to moze byc dla nas interesujace?"
+    },
+    {
+      "cls": "mail",
+      "text": "Po wtore, czy bylbys zainteresowany drobnym, ale dobrze platnym, zleceniem?"
+    },
+    {
+      "cls": "mail",
+      "text": "Corge Galli"
+    },
+    {
+      "cls": "mail",
+      "text": "[1-3 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- "
+    },
+    {
+      "cls": "other",
+      "text": "Jestes wyczerpany."
+    },
+    {
+      "cls": "command",
+      "text": "→ q"
+    }
+  ]
+}

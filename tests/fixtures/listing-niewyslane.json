@@ -1,0 +1,31 @@
+{
+  "name": "listing-niewyslane",
+  "opis": "Listing niewyslanych: Odbiorcy zamiast Nadawcy",
+  "zrodlo": "session_1766262715076.html",
+  "lines": [
+    {
+      "cls": "mail",
+      "text": "Listy niewyslane:"
+    },
+    {
+      "cls": "mail",
+      "text": " 2. Temat: Elementy rozbitego szkielka"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Foo                                  N, 21 XII 2025, 00:20:12"
+    },
+    {
+      "cls": "mail",
+      "text": " 1. Temat: Opowiesci, zabawa i utracone wspomnienia"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Xyzzy                                 N, 21 XII 2025, 00:31:18"
+    },
+    {
+      "cls": "command",
+      "text": "→ w"
+    }
+  ]
+}

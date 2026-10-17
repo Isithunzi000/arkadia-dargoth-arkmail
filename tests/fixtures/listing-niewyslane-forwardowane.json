@@ -1,0 +1,87 @@
+{
+  "name": "listing-niewyslane-forwardowane",
+  "opis": "Niewyslane z '(forwardowany)' + poczatek listing odebranych 50 (pojedyncze odstepy)",
+  "zrodlo": "session_1768158676240.html",
+  "lines": [
+    {
+      "cls": "command",
+      "text": "→ listy niewyslane"
+    },
+    {
+      "cls": "prompt",
+      "text": "> "
+    },
+    {
+      "cls": "mail",
+      "text": "Listy niewyslane:"
+    },
+    {
+      "cls": "mail",
+      "text": " 2. Temat: zalakowany pergamin (forwardowany)"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                     N, 11 I 2026, 21:55:14"
+    },
+    {
+      "cls": "mail",
+      "text": " 1. Temat: karteczka z rosomakiem (forwardowany)"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                     N, 11 I 2026, 21:55:57"
+    },
+    {
+      "cls": "command",
+      "text": "→ listy odebrane"
+    },
+    {
+      "cls": "prompt",
+      "text": "> "
+    },
+    {
+      "cls": "mail",
+      "text": "Listy odebrane (prezentowane jest pierwsze 50):"
+    },
+    {
+      "cls": "mail",
+      "text": "50. *R* Temat: Skrawek papieru"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                           Sr, 7 I 2026, 02:07:56"
+    },
+    {
+      "cls": "mail",
+      "text": "49. *R* Temat: Niewyprawiona skora goblina"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                           Sr, 7 I 2026, 02:13:37"
+    },
+    {
+      "cls": "mail",
+      "text": "48. *R* Temat: Skrawek papieru"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                           Sr, 7 I 2026, 02:14:24"
+    },
+    {
+      "cls": "mail",
+      "text": "47. *R* Temat: karteczka"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Foo                         Sr, 7 I 2026, 02:31:22"
+    },
+    {
+      "cls": "mail",
+      "text": "46. *R* Temat: Mokry skrawek papieru"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                           Sr, 7 I 2026, 03:44:15"
+    }
+  ]
+}

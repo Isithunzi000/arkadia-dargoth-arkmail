@@ -1,0 +1,207 @@
+{
+  "name": "list-gotowy-do-wyslania",
+  "opis": "Edytor poza urzedem: numeracja linii + 'List jest gotowy do wyslania.' (kolejka do niewyslanych)",
+  "zrodlo": "session_1766262715076.html",
+  "lines": [
+    {
+      "cls": "other",
+      "text": "Otaczajaca statek mgla klebi sie i przyprawia o uczucie bezruchu, jak gdyby okret zawieszony byl w miejscu poza Czasem."
+    },
+    {
+      "cls": "other",
+      "text": "Gesta mgla opada tak szybko, jak uprzednio podniosla sie, zas wokol az po horyzont znow jestes w stanie dostrzec granatowe wody oceanu."
+    },
+    {
+      "cls": "other",
+      "text": "Statek przecina granatowe fale oceanu."
+    },
+    {
+      "cls": "command",
+      "text": "→ napisz list"
+    },
+    {
+      "cls": "command",
+      "text": "→ Foo"
+    },
+    {
+      "cls": "command",
+      "text": "→ Elementy rozbitego szkielka"
+    },
+    {
+      "cls": "mail",
+      "text": "Adresat: Temat: DW: "
+    },
+    {
+      "cls": "command",
+      "text": "→  _____________________________________________________________________  "
+    },
+    {
+      "cls": "command",
+      "text": "→  / _\\                                                                 \\ "
+    },
+    {
+      "cls": "command",
+      "text": "→ |/ >|                                                                 | "
+    },
+    {
+      "cls": "command",
+      "text": "→  |\\_/__________________________________________________________________/"
+    },
+    {
+      "cls": "command",
+      "text": "→  \\.                                                                 ./  "
+    },
+    {
+      "cls": "command",
+      "text": "→  |                                                                  |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |     Foo                                                      |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |                                                                  |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |     Nic nie dzieje sie bez powodu. Chyba...                      |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |     Spotkalem  jednego  jegomoscia,  ktory mnie rozpoznal. Byl   |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |     towarzyszem  broni  ojca  jakis  czas.  Widzial  mnie jako   |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |     mlodzika,  ale ponoc wygladam jak skora zdarta z ojca. Tak   |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |     udalo  mu sie mnie rozpoznac. Zadalem mu mnostwo pytan, on   |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |     udzielil  odpowiedzi,  aczkolwiek nie wszystkie tajemnice,   |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |     czy watpliwosci zostaly rozwiane.                            |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |     Udalismy  sie  wspolnie  tam,  gdzie wszystko sie zaczelo.   |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |     Pamiec powoli wraca.                                         |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |     Pewnie  Ciebie  ucieszy  fakt,  ze  mialas  racje w jednej   |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |     kwestii.                                                     |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |                                                                  |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |     Cwicz  duzo  z  kijkiem, najlepiej oburacz, co by z wprawy   |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |     nie wyjsc.                                                   |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |                                                                  |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |     Caluje w nosek                                               |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |     ~Gracz~                                                      |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |  ________________________________________________________________|   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |/\\                                                                  \\ "
+    },
+    {
+      "cls": "command",
+      "text": "→  \\_|                                                                   |"
+    },
+    {
+      "cls": "command",
+      "text": "→   \\_/_ _______________________________________________________________/ "
+    },
+    {
+      "cls": "command",
+      "text": "→ **"
+    },
+    {
+      "cls": "editor.mail",
+      "text": "Wpisz ~?, zeby uzyskac pomoc, lub **, by zakonczyc edycje."
+    },
+    {
+      "cls": "editor.mail",
+      "text": " 1]"
+    },
+    {
+      "cls": "editor.mail",
+      "text": " 2] 3] 4] 5] 6] 7]"
+    },
+    {
+      "cls": "editor.mail",
+      "text": " 8] 9]10]11]12]13]14]15]"
+    },
+    {
+      "cls": "editor.mail",
+      "text": "16]17]18]19]20]21]22]23]24]25]26]27]28]29]30]List jest gotowy do wyslania."
+    },
+    {
+      "cls": "prompt",
+      "text": "> "
+    },
+    {
+      "cls": "other",
+      "text": "Woda, wszedzie wokol tylko woda... monotonny krajobraz rozciaga sie az po horyzont."
+    },
+    {
+      "cls": "prompt",
+      "text": "> "
+    },
+    {
+      "cls": "other",
+      "text": "Statek przecina granatowe fale oceanu."
+    },
+    {
+      "cls": "other",
+      "text": "Statek kolysze sie lagodnie, plynac wraz z silnym pradem oceanicznym."
+    },
+    {
+      "cls": "other",
+      "text": "Statek przecina granatowe fale oceanu."
+    },
+    {
+      "cls": "other",
+      "text": "Statek kolysze sie lagodnie, plynac wraz z silnym pradem oceanicznym."
+    },
+    {
+      "cls": "other",
+      "text": "Okret zbliza sie do brzegu, wplywajac na spokojne wody zatoki Urbimo."
+    }
+  ]
+}

@@ -1,0 +1,95 @@
+{
+  "name": "kasowanie",
+  "opis": "Pager: d 1 -> Zaznaczono -> q -> Kasuje listy... Kasuje: 1. + puste niewyslane",
+  "zrodlo": "session_1766852565008.html",
+  "lines": [
+    {
+      "cls": "mail",
+      "text": " |       |                                                            | "
+    },
+    {
+      "cls": "mail",
+      "text": " |       |   Dzisiaj  w  nocy  Belleteyn. Minotaur choc martwy        | "
+    },
+    {
+      "cls": "mail",
+      "text": " |       |   pomoze nam troche.                                       | "
+    },
+    {
+      "cls": "mail",
+      "text": " |       |                                                            | "
+    },
+    {
+      "cls": "mail",
+      "text": " |       |   Jak zwykle pelen zagadek i dziwnych tresci               | "
+    },
+    {
+      "cls": "mail",
+      "text": " |       |   Caluje w nosek                                           | "
+    },
+    {
+      "cls": "mail",
+      "text": " |       |   ~Gracz~                                                  | "
+    },
+    {
+      "cls": "mail",
+      "text": " |       |                                                            /   "
+    },
+    {
+      "cls": "mail",
+      "text": " |       |------------------------------------------------------------\\' "
+    },
+    {
+      "cls": "mail",
+      "text": " \\       |                                                               "
+    },
+    {
+      "cls": "mail",
+      "text": " \\.___./                                                                 "
+    },
+    {
+      "cls": "mail",
+      "text": "[1-1 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- "
+    },
+    {
+      "cls": "command",
+      "text": "→ d 1"
+    },
+    {
+      "cls": "mail",
+      "text": "Zaznaczono do skasowania: 1."
+    },
+    {
+      "cls": "mail",
+      "text": "[1-1 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- "
+    },
+    {
+      "cls": "command",
+      "text": "→ q"
+    },
+    {
+      "cls": "mail",
+      "text": "Kasuje listy..."
+    },
+    {
+      "cls": "mail",
+      "text": "Kasuje: 1."
+    },
+    {
+      "cls": "prompt",
+      "text": "> "
+    },
+    {
+      "cls": "command",
+      "text": "→ listy niewyslane"
+    },
+    {
+      "cls": "prompt",
+      "text": "> "
+    },
+    {
+      "cls": "mail",
+      "text": "Nie masz zadnych niewyslanych listow."
+    }
+  ]
+}

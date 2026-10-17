@@ -1,0 +1,67 @@
+{
+  "name": "forward-dialog-bledy",
+  "opis": "Pager: f bar -> DW: subdialog, bledy adresata, pusta linia konczy, 'List jest gotowy do wyslania.', powrot pagera",
+  "zrodlo": "session_1768158676240.html",
+  "lines": [
+    {
+      "cls": "mail",
+      "text": " +--------------------------------------------------------------------+ "
+    },
+    {
+      "cls": "mail",
+      "text": "[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 23) -- "
+    },
+    {
+      "cls": "command",
+      "text": "→ f bar"
+    },
+    {
+      "cls": "mail",
+      "text": "DW: "
+    },
+    {
+      "cls": "command",
+      "text": "→ q"
+    },
+    {
+      "cls": "mail",
+      "text": "Nie ma takiego adresata (gracza, aliasu): q."
+    },
+    {
+      "cls": "mail",
+      "text": "DW: "
+    },
+    {
+      "cls": "command",
+      "text": "→ listy wyslane"
+    },
+    {
+      "cls": "mail",
+      "text": "Nie ma takiego adresata (gracza, aliasu): listy i wyslane."
+    },
+    {
+      "cls": "mail",
+      "text": "DW: "
+    },
+    {
+      "cls": "mail",
+      "text": "List jest gotowy do wyslania."
+    },
+    {
+      "cls": "mail",
+      "text": "[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 23) -- "
+    },
+    {
+      "cls": "other",
+      "text": "Siedzacy na twoim prawym ramieniu Kruk kracze rozdzierajaco."
+    },
+    {
+      "cls": "command",
+      "text": "→ q"
+    },
+    {
+      "cls": "prompt",
+      "text": "> "
+    }
+  ]
+}

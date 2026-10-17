@@ -1,0 +1,127 @@
+{
+  "name": "compose-pelny",
+  "opis": "Pelna sekwencja: napisz list, pipelined adresat/temat, echo Adresat: Temat: DW:, ramka pergamin2, **, numeracja, pomyslnie wyslany",
+  "zrodlo": "session_1766185077541.html",
+  "lines": [
+    {
+      "cls": "command",
+      "text": "→ napisz list"
+    },
+    {
+      "cls": "command",
+      "text": "→ Garply"
+    },
+    {
+      "cls": "command",
+      "text": "→ Perly"
+    },
+    {
+      "cls": "mail",
+      "text": "Adresat: Temat: DW: "
+    },
+    {
+      "cls": "command",
+      "text": "→  _____________________________________________________________________  "
+    },
+    {
+      "cls": "command",
+      "text": "→  / _\\                                                                 \\ "
+    },
+    {
+      "cls": "command",
+      "text": "→ |/ >|                                                                 | "
+    },
+    {
+      "cls": "command",
+      "text": "→  |\\_/__________________________________________________________________/"
+    },
+    {
+      "cls": "command",
+      "text": "→  \\.                                                                 ./  "
+    },
+    {
+      "cls": "command",
+      "text": "→  |                                                                  |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |     Szanowny kolego bracie Zniwiarzu,                            |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |                                                                  |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |     Zgodnie   z   Nasza  ustna  umowa  zawarta  dnia  gnomiego   |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |     dzisiejszego  w  karczmie w Novigradzie, na oczach elfki i   |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |     karczmarza,  wlasciciela  tegoz przybytku, pisze do Ciebie   |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |     ten o to pergamin.                                           |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |                                                                  |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |     Niech Ci Morr blogoslawi do samego konca                     |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |                                                                  |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |     ~Gracz                                                       |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |  ________________________________________________________________|   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |/\\                                                                  \\ "
+    },
+    {
+      "cls": "command",
+      "text": "→  \\_|                                                                   |"
+    },
+    {
+      "cls": "command",
+      "text": "→   \\_/_ _______________________________________________________________/ "
+    },
+    {
+      "cls": "command",
+      "text": "→ **"
+    },
+    {
+      "cls": "editor.mail",
+      "text": "Wpisz ~?, zeby uzyskac pomoc, lub **, by zakonczyc edycje."
+    },
+    {
+      "cls": "editor.mail",
+      "text": " 1]"
+    },
+    {
+      "cls": "editor.mail",
+      "text": " 2] 3] 4] 5] 6] 7] 8] 9]10]11]12]13]"
+    },
+    {
+      "cls": "editor.mail",
+      "text": "14]15]16]17]18]19]20]21]List zostal pomyslnie wyslany."
+    },
+    {
+      "cls": "prompt",
+      "text": "> "
+    }
+  ]
+}

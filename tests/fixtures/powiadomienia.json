@@ -1,0 +1,31 @@
+{
+  "name": "powiadomienia",
+  "opis": "Powiadomienia pocztowe (klasy notification.mail i other); prefix '[ POCZTA ]' dokleja klient, parser ma tolerowac",
+  "zrodlo": "agregat z mail_anchors.txt",
+  "lines": [
+    {
+      "cls": "notification.mail",
+      "text": " [ POCZTA ] Masz nowa poczte od Foo."
+    },
+    {
+      "cls": "notification.mail",
+      "text": " [ POCZTA ] Masz nowa poczte od Bar."
+    },
+    {
+      "cls": "notification.mail",
+      "text": " [ POCZTA ] Masz nowa poczte od Wibble."
+    },
+    {
+      "cls": "other",
+      "text": "Goniec przyniosl nowa partie listow."
+    },
+    {
+      "cls": "other",
+      "text": "Wysylasz Kruk na poczte."
+    },
+    {
+      "cls": "other",
+      "text": "Wysylasz Kruka na poczte."
+    }
+  ]
+}

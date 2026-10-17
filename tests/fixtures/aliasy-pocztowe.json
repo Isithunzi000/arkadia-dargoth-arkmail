@@ -1,0 +1,95 @@
+{
+  "name": "aliasy-pocztowe",
+  "opis": "Wydruk zdefiniowanych aliasow pocztowych",
+  "zrodlo": "session_1770479989737.html",
+  "lines": [
+    {
+      "cls": "other",
+      "text": "PATRZ TEZ"
+    },
+    {
+      "cls": "other",
+      "text": "    ?kto, ?napisz, ?przeczytaj, ?list, ?notatnik"
+    },
+    {
+      "cls": "prompt",
+      "text": "> "
+    },
+    {
+      "cls": "command",
+      "text": "→ aliasy pocztowe"
+    },
+    {
+      "cls": "mail",
+      "text": "Posiadasz nastepujace zdefiniowane aliasy pocztowe:"
+    },
+    {
+      "cls": "mail",
+      "text": "\tpoltorak: Bar"
+    },
+    {
+      "cls": "prompt",
+      "text": "> "
+    },
+    {
+      "cls": "comm",
+      "text": "Smukly kruczowlosy elf (Tsches NPC) mowi do siebie: Ciekawe kiedy otworza gildie bardow..."
+    },
+    {
+      "cls": "command",
+      "text": "→ kppomoc"
+    },
+    {
+      "cls": "other",
+      "text": "Nazwa klubu: Hanza Kwiecisty Poltorak"
+    },
+    {
+      "cls": "other",
+      "text": "Symbol klubu: teczowa spinka w ksztalcie morskiej muszli"
+    },
+    {
+      "cls": "other",
+      "text": "Przywodca: Gracz"
+    },
+    {
+      "cls": "other",
+      "text": "Zastepca przywodcy: Bar"
+    },
+    {
+      "cls": "other",
+      "text": "Szeregowi czlonkowie: brak"
+    },
+    {
+      "cls": "other",
+      "text": "Komendy:"
+    },
+    {
+      "cls": "other",
+      "text": "    * kpprzekaz <komu> przywodztwo - przekazanie komus wladzy nad klubem"
+    },
+    {
+      "cls": "other",
+      "text": "    * kpzapros <kogo> - zaproszenie kogos do klubu"
+    },
+    {
+      "cls": "other",
+      "text": "    * kpwyrzuc <kogo> - wyrzucenie kogos z klubu"
+    },
+    {
+      "cls": "other",
+      "text": "    * kpawansuj <kogo> - awansowanie czlonka klubu na zastepce przywodcy"
+    },
+    {
+      "cls": "other",
+      "text": "    * kpzdegraduj <kogo> - odebranie komus pozycji zastepcy przywodcy"
+    },
+    {
+      "cls": "other",
+      "text": "    * kpinfo [edytuj] <temat> - wyswietlenie lub edycja dodatkowych"
+    },
+    {
+      "cls": "other",
+      "text": "        informacji o klubie"
+    }
+  ]
+}
