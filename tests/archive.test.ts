@@ -109,13 +109,15 @@ test('archiwum: zakres dat wlacznie (odDaty/doDaty)', () => {
   assert.equal(filterLetters(letters, { doDaty: '2025-12-22' }).length, 0);
 });
 
-test('paginacja: komenda listy <skrzynka> przed <d> <m rzymski> <y>', () => {
+test('paginacja: komenda listy <skrzynka> przed <d> <M RZYMSKI> <y>', () => {
+  // Serwer wymaga WIELKIEJ litery miesiaca (log 2026-10-17: "Data zostala
+  // podana w zlym formacie. Przykladowy format to: 13 X 2007.").
   assert.equal(
     olderListingCommand('wyslane', date('Cz, 9 III 2026, 12:00:00')),
-    'listy wyslane przed 9 iii 2026',
+    'listy wyslane przed 9 III 2026',
   );
   assert.equal(
     olderListingCommand('odebrane', date('Wt, 23 XII 2025, 00:11:12')),
-    'listy odebrane przed 23 xii 2025',
+    'listy odebrane przed 23 XII 2025',
   );
 });

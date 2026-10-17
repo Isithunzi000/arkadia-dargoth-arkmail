@@ -30,7 +30,7 @@ import {
   upsertLetters,
   type ArchiveLetter,
 } from "./core/archive";
-import { MailboxSession } from "./core/session/mailbox";
+import { MailboxSession, type MailboxEntry } from "./core/session/mailbox";
 import { PagerSession } from "./core/session/pager";
 import { EditorSession } from "./core/session/editor";
 import { SessionLock } from "./core/sessionLock";
@@ -148,7 +148,25 @@ export async function init(api: PluginApi) {
   /** Paginacja wstecz: jedna starsza strona listingow do archiwum. */
   const loadOlder = (box: MailBox): void => {
     const view = ui.state.boxes[box];
-    const oldest = [...(view?.entries ?? [])].reverse().find((e) => e.date);
+    // Listing idzie od NAJSTARSZEGO listu (gora) do najnowszego (dol) -
+    // date graniczna bierzemy z najstarszego wpisu (minimum po dacie,
+    // odporne na kolejnosc wpisow). Dowod: log sesji 2026-10-17.
+    let oldest: MailboxEntry | null = null;
+    for (const e of view?.entries ?? []) {
+      if (!e.date) continue;
+      if (
+        !oldest ||
+        e.date.year < oldest.date!.year ||
+        (e.date.year === oldest.date!.year &&
+          (e.date.month < oldest.date!.month ||
+            (e.date.month === oldest.date!.month &&
+              (e.date.day < oldest.date!.day ||
+                (e.date.day === oldest.date!.day &&
+                  e.date.time < oldest.date!.time)))))
+      ) {
+        oldest = e;
+      }
+    }
     if (!oldest?.date) {
       notify(api, "Brak daty do paginacji - najpierw pobierz skrzynke.");
       return;
