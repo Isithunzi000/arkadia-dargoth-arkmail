@@ -29,7 +29,7 @@ Po załadowaniu: alias `/arkmail` (otwiera/zamyka okno), pozycja
   (w tym trzy pergaminy), szerokość linii 20–120 i żywy podgląd —
   ramka i justowanie stają się fizyczną treścią listu, dokładnie jak
   w oficjalnym kliencie. Pusty list nie wylatuje.
-- **Kontakty** — scalane z bazy znanych osób klienta i korespondencji;
+- **Kontakty** — wyłącznie nadawcy i adresaci z pobranych listowań;
   liczniki odebranych/wysłanych i data ostatniego kontaktu.
 - **Archiwum** — lokalne, per postać; filtry po temacie.
 - Powiadomienie `[ POCZTA ] Masz nowa poczte od ...` odświeża skrzynki
