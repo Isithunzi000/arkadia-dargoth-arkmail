@@ -98,6 +98,10 @@
     {
       "cls": "command",
       "text": "→ q"
+    },
+    {
+      "cls": "prompt",
+      "text": "> "
     }
   ]
 }

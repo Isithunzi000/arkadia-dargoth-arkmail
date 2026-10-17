@@ -26,6 +26,22 @@
     {
       "cls": "command",
       "text": "→ w"
+    },
+    {
+      "cls": "room.short",
+      "text": "Wejscie na targ."
+    },
+    {
+      "cls": "room.exits",
+      "text": "Sa tutaj cztery widoczne wyjscia: poludniowy-wschod, polnocny-wschod, zachod i wschod."
+    },
+    {
+      "cls": "room.contents.living",
+      "text": "Zielonooka przejeta dziewczyna."
+    },
+    {
+      "cls": "prompt",
+      "text": "> "
     }
   ]
 }
