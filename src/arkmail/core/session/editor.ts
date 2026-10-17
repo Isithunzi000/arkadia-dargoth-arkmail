@@ -13,6 +13,7 @@ import {
   parseMailError,
 } from '../protocol/parser.js';
 import type { MailError } from '../protocol/types.js';
+import { isEchoLine } from './lines.js';
 import type { ProtoLine, Transport } from './transport.js';
 import type { SessionOptions } from './mailbox.js';
 
@@ -80,7 +81,9 @@ export class EditorSession {
       };
 
       const unsub = this.transport.subscribe((line: ProtoLine) => {
-        if (done || line.cls === 'command') return;
+        // Echo wlasnych komend: po klasie albo po samej tresci
+        // (przenosnosc: zywy PluginApi nie daje klas gmcp_msgs).
+        if (done || line.cls === 'command' || isEchoLine(line.text)) return;
 
         // Blad (np. adresata) - w kazdym stanie przerywa compose.
         const err = parseMailError(line.text);

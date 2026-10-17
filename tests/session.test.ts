@@ -178,3 +178,52 @@ test('editor: literowka w adresacie - blad i przerwanie', async () => {
   if (res.error.kind === 'brak-adresata') assert.equal(res.error.adresat, 'thud');
   assert.ok(!t.sent.includes('**'), 'po bledzie adresatu nie wysylamy tresci');
 });
+
+// --- przenosnosc: zywy klient nie daje klas gmcp_msgs do triggerow ---------
+
+/** Zywy PluginApi daje triggerom sam tekst; symulacja: cls pusty wszedzie. */
+function bezKlas(lines: ProtoLine[]): ProtoLine[] {
+  return lines.map((l) => ({ cls: '', text: l.text }));
+}
+
+test('przenosnosc: mailbox dziala bez klas (prompt/echo po samej tresci)', async () => {
+  const t = new MockTransport();
+  const s = new MailboxSession(t, { timeoutMs: 500, idleMs: 40 });
+  const op = s.fetch('odebrane');
+  await t.replay(bezKlas(fromCommand(fixture('listing-odebrane-male'), 'listy odebrane')));
+  const res = await op;
+  assert.equal(res.kind, 'lista');
+  if (res.kind !== 'lista') return;
+  assert.equal(res.entries.length, 3);
+  assert.equal(res.entries[0].party, 'Foo');
+});
+
+test('przenosnosc: pager readLetter dziala bez klas', async () => {
+  const t = new MockTransport();
+  const s = new PagerSession(t, { timeoutMs: 500, idleMs: 40 });
+  const op = s.readLetter(1);
+  await t.replay(bezKlas(fixture('listing-odebrane-male')));
+  const res = await op;
+  assert.equal(res.letter.from, 'Corge');
+  assert.deepEqual(t.sent, ['przeczytaj list 1', 'q']);
+});
+
+test('przenosnosc: editor compose dziala bez klas', async () => {
+  const t = new MockTransport();
+  const s = new EditorSession(t, { timeoutMs: 500, idleMs: 40 });
+  const op = s.send({ adresat: 'Garply', temat: 'Perly', linie: ['linia1', 'linia2'] });
+  await t.replay(bezKlas(fixture('compose-pelny')));
+  const res = await op;
+  assert.equal(res.result, 'wyslany');
+});
+
+test('przenosnosc: pager konczy sie idle-flush gdy prompt nie dochodzi', async () => {
+  const t = new MockTransport();
+  const s = new PagerSession(t, { timeoutMs: 500, idleMs: 40 });
+  const bezPromptu = fixture('kasowanie').filter((l) => !(l.cls === 'prompt'));
+  const op = s.deleteLetters(1, '1');
+  await t.replay(bezKlas(bezPromptu));
+  const res = await op;
+  assert.equal(res.deleted, true);
+  assert.deepEqual(res.deletedNumbers, [1]);
+});

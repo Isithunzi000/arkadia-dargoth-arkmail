@@ -3,6 +3,10 @@
  * Pager konsumuje WSZYSTKIE linie wejscia gracza az do "q" - dlatego
  * sesja jest krotka: otworz (przeczytaj list N) -> akcja -> q -> prompt.
  * Wszystkie operacje pagerowe (delete/forward/read) dziela ten szkielet.
+ *
+ * Przenosnosc: koniec transakcji wykrywamy po klasie 'prompt' ALBO po
+ * samej tresci ("> "), a gdy prompt w ogole nie dojdzie do triggerow -
+ * idle-flush po wejsciu w stan 'closing'.
  */
 
 import {
@@ -11,6 +15,7 @@ import {
   parseMailError,
 } from '../protocol/parser.js';
 import type { MailError, PagerPrompt } from '../protocol/types.js';
+import { isEchoLine, isPromptLine } from './lines.js';
 import type { ProtoLine, Transport } from './transport.js';
 import type { SessionOptions } from './mailbox.js';
 
@@ -111,7 +116,8 @@ export class PagerSession {
    * Otwiera pager na liscie `numer`, wykonuje akcje, zamyka "q".
    * onPager: odpalane przy pierwszym pager prompt (wyslij akcje).
    * onLine: moze zwrocic 'close' -> wysylamy "q" przy najblizszym
-   * pager prompcie. Zawsze konczy sie na linii klasy 'prompt'.
+   * pager prompcie. Konczy sie na linii promptu (klasa albo tresc)
+   * albo idle-flush po "q".
    */
   private run<T>(
     numer: number,
@@ -131,11 +137,14 @@ export class PagerSession {
       let wantClose = false;
       let pagerFired = false;
       let done = false;
+      const idleMs = this.opts.idleMs ?? 600;
+      let idleTimer: ReturnType<typeof setTimeout> | null = null;
       const actions = makeActions({ send: (l) => this.transport.send(l) });
 
       const cleanup = () => {
         done = true;
         clearTimeout(timer);
+        if (idleTimer) clearTimeout(idleTimer);
         unsub();
       };
       const finish = () => {
@@ -143,16 +152,36 @@ export class PagerSession {
         resolve(build(letter, pager));
       };
 
+      /** Bezpiecznik: cisza po wyslaniu "q" = transakcja zakonczona. */
+      const armIdle = () => {
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          if (!done && state === 'closing') finish();
+        }, idleMs);
+      };
+
       const timer = setTimeout(() => {
         cleanup();
         reject(new Error(`timeout: pager session list ${numer}`));
       }, this.opts.timeoutMs);
 
+      const enterClosing = () => {
+        wantClose = false;
+        state = 'closing';
+        this.transport.send('q');
+        armIdle();
+      };
+
       const unsub = this.transport.subscribe((line: ProtoLine) => {
-        if (done || line.cls === 'command') return;
+        // Echo wlasnych komend: po klasie albo po samej tresci.
+        if (done || line.cls === 'command' || isEchoLine(line.text)) return;
 
         if (state === 'closing') {
-          if (line.cls === 'prompt') finish();
+          if (line.cls === 'prompt' || isPromptLine(line.text)) {
+            finish();
+            return;
+          }
+          armIdle();
           return;
         }
 
@@ -160,28 +189,20 @@ export class PagerSession {
         if (pp) {
           pager = pp;
           state = 'pager';
-          if (wantClose || !actions || !actions.onPager || pagerFired) {
-            if (pagerFired && wantClose) {
-              wantClose = false;
-              state = 'closing';
-              this.transport.send('q');
-              return;
-            }
-            if (!pagerFired && actions && actions.onPager) {
-              pagerFired = true;
+          if (pagerFired && wantClose) {
+            enterClosing();
+            return;
+          }
+          if (!pagerFired) {
+            pagerFired = true;
+            if (actions && actions.onPager) {
               actions.onPager();
               return;
             }
             // brak akcji: czytamy i zamykamy
-            if (!pagerFired) {
-              pagerFired = true;
-              state = 'closing';
-              this.transport.send('q');
-            }
+            enterClosing();
             return;
           }
-          pagerFired = true;
-          actions.onPager();
           return;
         }
 

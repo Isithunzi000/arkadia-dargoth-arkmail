@@ -2,7 +2,11 @@
  * MailboxSession: pobranie listing skrzynki jako transakcja.
  * Wysyla "listy <skrzynka>", zbiera wpisy do linii promptu, obsluguje
  * warianty puste ("Nie masz zadnych...", "Nie znaleziono zadnych takich...").
- * Echo wlasnych komend (klasa 'command') jest ignorowane.
+ *
+ * Przenosnosc: zywy PluginApi daje triggerom SAM tekst linii (bez klas
+ * gmcp_msgs), wiec koniec listingu wykrywamy tez po samej tresci:
+ * echo komendy ("→ ..."), prompt ("> ") oraz idle-flush (bezpiecznik,
+ * gdy prompt w ogole nie dojdzie do triggerow).
  */
 
 import {
@@ -17,10 +21,16 @@ import type {
   MailBox,
   MailDate,
 } from '../protocol/types.js';
+import { isEchoLine, isPromptLine } from './lines.js';
 import type { ProtoLine, Transport } from './transport.js';
 
 export interface SessionOptions {
   timeoutMs: number;
+  /**
+   * Idle-flush: koniec transakcji po tylu ms ciszy (bezpiecznik, gdy
+   * prompt nie dojdzie do triggerow pluginu). Domyslnie 600.
+   */
+  idleMs?: number;
 }
 
 export interface MailboxEntry extends ListingEntry {
@@ -45,15 +55,27 @@ export class MailboxSession {
       let header: ListingHeader | null = null;
       const entries: MailboxEntry[] = [];
       let done = false;
+      const idleMs = this.opts.idleMs ?? 600;
+      let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
       const cleanup = () => {
         done = true;
         clearTimeout(timer);
+        if (idleTimer) clearTimeout(idleTimer);
         unsub();
       };
       const finish = (r: MailboxResult) => {
         cleanup();
         resolve(r);
+      };
+
+      /** Bezpiecznik: cisza po naglowku = koniec listingu. */
+      const armIdle = () => {
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          if (done || !header) return;
+          finish({ kind: 'lista', header, entries });
+        }, idleMs);
       };
 
       const timer = setTimeout(() => {
@@ -65,23 +87,34 @@ export class MailboxSession {
         if (done) return;
 
         if (!header) {
-          if (line.cls === 'command') return; // echo wlasnej komendy
+          // Echo wlasnej komendy: po klasie albo po samej tresci.
+          if (line.cls === 'command' || isEchoLine(line.text)) return;
           const empty = parseEmptyListing(line.text);
           if (empty) {
             finish({ kind: 'pusta', box: empty.box, reason: empty.reason });
             return;
           }
           const h = parseListingHeader(line.text);
-          if (h) header = h;
+          if (h) {
+            header = h;
+            armIdle();
+          }
           return;
         }
 
         // Koniec listingu: prompt albo echo kolejnej komendy gracza
         // (w logach prompt bywa skonsumowany przed nastepna komenda).
-        if (line.cls === 'prompt' || line.cls === 'command') {
+        // Klasa albo sama tresc - zaleznie od tego, co daje klient.
+        if (
+          line.cls === 'prompt' ||
+          line.cls === 'command' ||
+          isPromptLine(line.text) ||
+          isEchoLine(line.text)
+        ) {
           finish({ kind: 'lista', header, entries });
           return;
         }
+        armIdle();
         const entry = parseListingEntry(line.text);
         if (entry) {
           entries.push({ ...entry, party: '', partyKind: null, date: null });
