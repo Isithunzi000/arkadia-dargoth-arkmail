@@ -1,12 +1,14 @@
 /**
  * ArkMail - kompleksowy system pocztowy dla klienta Dargoth (Arkadia MUD).
  * Alias: /arkmail (otwiera/zamyka okno). Menu wtyczek: "ArkMail".
- * Klawisz w stopce klienta: ArkMail (odpala /arkmail).
+ * Klawisz w stopce klienta: ArkMail (badge z liczba nieprzeczytanych).
  *
- * Fala 1: szkielet - rejestracja kontraktu pluginu, puste okno.
- * Kolejne fale dokladaja: rdzen protokolu poczty, adaptery, UI,
- * operacje pagerowe i archiwum. Plugin w pelni zgodny z regulaminem
- * gry - wszystkie komendy wysylane swiadomie przez gracza.
+ * Fala 4c: wiring - UI (MailUiStore + render) polaczone z sesjami
+ * protokolu przez DargothTransport i SessionLock. Powiadomienie
+ * "[ POCZTA ] Masz nowa poczte..." odswieza odebrane/nieprzeczytane.
+ * Archiwum i ustawienia trwale w localStorage per postac.
+ * Plugin w pelni zgodny z regulaminem gry - wszystkie komendy
+ * wysylane swiadomie przez gracza (klik w UI).
  */
 
 import type PluginApi from "plugin-api";
@@ -18,29 +20,221 @@ import {
   PLUGIN_AUTHOR,
   PLUGIN_DESCRIPTION,
 } from "./meta";
+import type { MailBox } from "./core/protocol/types";
+import { parseNotification } from "./core/protocol/parser";
+import { olderListingCommand } from "./core/protocol/commands";
+import { mergeContacts, type Contact } from "./core/contacts";
+import {
+  fromMailboxEntry,
+  upsertLetters,
+  type ArchiveLetter,
+} from "./core/archive";
+import { MailboxSession } from "./core/session/mailbox";
+import { PagerSession } from "./core/session/pager";
+import { EditorSession } from "./core/session/editor";
+import { SessionLock } from "./core/sessionLock";
+import { DargothTransport } from "./adapters/dargothTransport";
+import { CharStorage, type KVLike } from "./adapters/storage";
+import { notify } from "./adapters/notify";
+import { MailUiStore } from "./ui/store";
+import { mountMailUi, type MailUiHandlers } from "./ui/render";
 
 const POPUP_ID = "arkmail";
 const FOOTER_BUTTON_ID = "arkmail";
+const FOOTER_STATE = "arkmail-poczta";
 const ALIAS_REGEX = /^\/arkmail$/i;
+const SESSION_OPTS = { timeoutMs: 8000, idleMs: 400 };
+const ARCHIVE_KEY = "archiwum";
+const NOTIFY_KEY = "powiadomienia";
+
+/** localStorage moze nie istniec (testy, starsze srodowiska) - awaria do RAM. */
+function memoryKv(): KVLike {
+  const map = new Map<string, string>();
+  return {
+    getItem: (k) => (map.has(k) ? map.get(k)! : null),
+    setItem: (k, v) => void map.set(k, v),
+    removeItem: (k) => void map.delete(k),
+  };
+}
 
 let apiRef: PluginApi | null = null;
 let popup: PersistentPopupHandle | null = null;
 let menuHandle: PopupMenuEntryHandle | null = null;
 let footerHandle: FooterButtonHandle | null = null;
 let aliasId: string | null = null;
+let transport: DargothTransport | null = null;
+let store: MailUiStore | null = null;
+let unmount: (() => void) | null = null;
+let unsubBadge: (() => void) | null = null;
 
 function createContent(): HTMLDivElement {
   const root = document.createElement("div");
-  root.className = "arkmail-root";
-  const info = document.createElement("div");
-  info.className = "arkmail-placeholder";
-  info.textContent = `${PLUGIN_NAME} ${PLUGIN_VERSION} (${PLUGIN_BUILD_DATE}) - moduly pocztowe w budowie.`;
-  root.appendChild(info);
+  if (unmount) {
+    unmount();
+    unmount = null;
+  }
+  if (store && handlersRef) {
+    unmount = mountMailUi(root, store, handlersRef);
+  }
   return root;
 }
 
+let handlersRef: MailUiHandlers | null = null;
+
 export async function init(api: PluginApi) {
   apiRef = api;
+
+  const kv: KVLike = typeof localStorage !== "undefined" ? localStorage : memoryKv();
+  const storage = new CharStorage(kv);
+  transport = new DargothTransport(api);
+  const lock = new SessionLock();
+  store = new MailUiStore({
+    notifyEnabled: storage.getJSON<boolean>(NOTIFY_KEY) ?? false,
+    archive: storage.getJSON<ArchiveLetter[]>(ARCHIVE_KEY) ?? [],
+  });
+  const ui = store;
+  const mailbox = new MailboxSession(transport, SESSION_OPTS);
+  const pager = new PagerSession(transport, SESSION_OPTS);
+  const editor = new EditorSession(transport, SESSION_OPTS);
+
+  // Nazwa postaci -> przestrzen kluczy storage.
+  api.events.on("gmcp.char.info", (d) => {
+    if (d?.name) storage.setCharacter(d.name);
+  });
+
+  const rebuildContacts = (): void => {
+    const korespondencja: Array<{ name: string; direction: "in" | "out"; dateRaw?: string }> = [];
+    for (const [box, view] of Object.entries(ui.state.boxes)) {
+      const direction = box === "odebrane" || box === "nieprzeczytane" ? "in" : "out";
+      for (const e of view?.entries ?? []) {
+        if (e.party) {
+          korespondencja.push({ name: e.party, direction, dateRaw: e.date?.raw });
+        }
+      }
+    }
+    const contacts: Contact[] = mergeContacts({
+      people: [],
+      przedstawieni: [],
+      korespondencja,
+      aliasy: [],
+    });
+    ui.setContacts(contacts);
+  };
+
+  const refreshBoxes = (boxes: MailBox[]): void => {
+    void lock
+      .runExclusive(async () => {
+        for (const box of boxes) {
+          ui.setBusy(`Pobieram skrzynke ${box}...`);
+          ui.applyMailbox(box, await mailbox.fetch(box));
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        ui.setBusy(null);
+        rebuildContacts();
+      });
+  };
+
+  const persistArchive = (): void => {
+    storage.setJSON(ARCHIVE_KEY, ui.state.archive);
+  };
+
+  /** Paginacja wstecz: jedna starsza strona listingow do archiwum. */
+  const loadOlder = (box: MailBox): void => {
+    const view = ui.state.boxes[box];
+    const oldest = [...(view?.entries ?? [])].reverse().find((e) => e.date);
+    if (!oldest?.date) {
+      notify(api, "Brak daty do paginacji - najpierw pobierz skrzynke.");
+      return;
+    }
+    ui.setBusy("Wczytuje starsze listy...");
+    void lock
+      .runExclusive(async () => {
+        const res = await mailbox.fetch(box, olderListingCommand(box, oldest.date!));
+        if (res.kind === "lista") {
+          const incoming = res.entries.map((e) => fromMailboxEntry(box, e));
+          const merged = upsertLetters(ui.state.archive, incoming);
+          ui.setArchive(merged.letters);
+          persistArchive();
+          notify(api, `Archiwum: +${merged.added} starszych listow.`);
+        }
+      })
+      .catch(() => {})
+      .finally(() => ui.setBusy(null));
+  };
+
+  handlersRef = {
+    onOpenLetter: (box, number) => {
+      ui.setBusy(`Czytam list ${number}...`);
+      void lock
+        .runExclusive(async () => {
+          transport!.beginModal();
+          try {
+            const res = await pager.readLetter(number);
+            ui.openLetter(box, res.letter);
+          } finally {
+            transport!.endModal();
+          }
+        })
+        .catch(() => notify(api, "Nie udalo sie odczytac listu."))
+        .finally(() => ui.setBusy(null));
+    },
+    onSendCompose: (input) => {
+      if (!input.adresat.trim() || !input.temat.trim()) {
+        notify(api, "Adresat i temat sa wymagane.");
+        return;
+      }
+      ui.setBusy("Wysylam list...");
+      void lock
+        .runExclusive(async () => {
+          transport!.beginModal();
+          try {
+            const out = await editor.send({
+              adresat: input.adresat.trim(),
+              temat: input.temat,
+              dw: input.dw.trim() === "" ? undefined : input.dw.trim(),
+              linie: input.linie,
+            });
+            if (out.result === "wyslany") {
+              notify(api, "List zostal wyslany.");
+              refreshBoxes(["wyslane"]);
+            } else if (out.result === "gotowy") {
+              notify(api, "List odlozony w niewyslanych.");
+              refreshBoxes(["niewyslane"]);
+            } else {
+              notify(api, "Blad wysylki - sprawdz adresata.");
+            }
+          } finally {
+            transport!.endModal();
+          }
+        })
+        .catch(() => notify(api, "Blad wysylki listu."))
+        .finally(() => ui.setBusy(null));
+    },
+    onCloseLetter: () => ui.closeLetter(),
+    onRefreshBox: (box) => refreshBoxes([box]),
+    onLoadOlder: (box) => loadOlder(box),
+  };
+
+  // Powiadomienia pocztowe: odswiezenie + opcjonalny tost.
+  transport.subscribe((line) => {
+    const n = parseNotification(line.text);
+    if (!n) return;
+    if (n.kind === "nowa-poczte") {
+      if (ui.state.notifyEnabled) notify(api, `Masz nowa poczte od ${n.nadawca}.`);
+      refreshBoxes(["odebrane", "nieprzeczytane"]);
+    } else if (n.kind === "goniec") {
+      refreshBoxes(["odebrane", "nieprzeczytane"]);
+    }
+  });
+
+  // Badge na klawiszu stopki.
+  unsubBadge = ui.subscribe((s) => {
+    footerHandle?.update({ label: s.badge > 0 ? `${PLUGIN_NAME} (${s.badge})` : PLUGIN_NAME });
+    api.ui.setFooterButtonState(FOOTER_STATE, s.badge > 0);
+  });
+
   popup = await api.ui.registerPersistentPopup({
     id: POPUP_ID,
     title: PLUGIN_NAME,
@@ -63,6 +257,7 @@ export async function init(api: PluginApi) {
   footerHandle = api.ui.registerFooterButton(FOOTER_BUTTON_ID, {
     label: PLUGIN_NAME,
     command: "/arkmail",
+    state: FOOTER_STATE,
   });
 
   return {
@@ -74,6 +269,20 @@ export async function init(api: PluginApi) {
 }
 
 export async function destroy() {
+  if (unsubBadge) {
+    unsubBadge();
+    unsubBadge = null;
+  }
+  if (unmount) {
+    unmount();
+    unmount = null;
+  }
+  if (transport) {
+    transport.dispose();
+    transport = null;
+  }
+  handlersRef = null;
+  store = null;
   if (aliasId !== null && apiRef) {
     apiRef.aliases.remove(aliasId);
     aliasId = null;

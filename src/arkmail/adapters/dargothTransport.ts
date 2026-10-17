@@ -69,6 +69,18 @@ export class DargothTransport implements Transport {
     for (const command of pending) void this.api.command.send(command);
   }
 
+  /** Zdejmuje trigger i modal-guard; do wywolania w destroy() pluginu. */
+  dispose(): void {
+    this.endModal();
+    if (this.triggerArmed) {
+      this.api.triggers.removeByTag('arkmail');
+      this.triggerArmed = false;
+    }
+    this.subscribers.clear();
+    this.queue = [];
+    this.bypass.clear();
+  }
+
   private armTrigger(): void {
     if (this.triggerArmed) return;
     this.triggerArmed = true;

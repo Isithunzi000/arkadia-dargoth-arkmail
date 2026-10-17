@@ -50,7 +50,12 @@ export class MailboxSession {
     private readonly opts: SessionOptions,
   ) {}
 
-  fetch(box: MailBox): Promise<MailboxResult> {
+  /**
+   * Pobiera listing skrzynki. command: wlasna komenda (paginacja wstecz
+   * "listy <skrzynka> przed <data>", patrz protocol/commands.ts);
+   * domyslnie "listy <skrzynka>".
+   */
+  fetch(box: MailBox, command?: string): Promise<MailboxResult> {
     return new Promise((resolve, reject) => {
       let header: ListingHeader | null = null;
       const entries: MailboxEntry[] = [];
@@ -129,7 +134,7 @@ export class MailboxSession {
         }
       });
 
-      this.transport.send(`listy ${box}`);
+      this.transport.send(command ?? `listy ${box}`);
     });
   }
 }

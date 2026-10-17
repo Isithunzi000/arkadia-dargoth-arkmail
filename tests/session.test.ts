@@ -82,6 +82,16 @@ test('mailbox: niewyslane - Odbiorcy zamiast Nadawcy', async () => {
   assert.equal(res.entries[0].party, 'Foo');
 });
 
+test('mailbox: fetch z wlasna komenda (paginacja wstecz)', async () => {
+  const t = new MockTransport();
+  const s = new MailboxSession(t, OPTS);
+  const op = s.fetch('wyslane', 'listy wyslane przed 9 iii 2026');
+  assert.deepEqual(t.sent, ['listy wyslane przed 9 iii 2026']);
+  await t.replay(fromCommand(fixture('listing-wyslane-50'), 'listy wyslane'));
+  const res = await op;
+  assert.equal(res.kind, 'lista');
+});
+
 test('mailbox: timeout gdy serwer milczy', async () => {
   const t = new MockTransport();
   const s = new MailboxSession(t, { timeoutMs: 20 });

@@ -13,18 +13,26 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const REPO = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 function makeElement(tag) {
-  return {
+  const el = {
     tagName: tag.toUpperCase(),
     children: [],
     style: {},
     dataset: {},
     className: '',
     textContent: '',
+    value: '',
+    ownerDocument: null,
     appendChild(c) { this.children.push(c); return c; },
     append(...cs) { this.children.push(...cs); },
+    replaceChildren(...cs) { this.children = [...cs]; },
     setAttribute() {},
+    getAttribute() { return null; },
     addEventListener() {},
+    querySelector() { return null; },
+    querySelectorAll() { return []; },
   };
+  el.ownerDocument = { createElement: (t) => makeElement(t) };
+  return el;
 }
 
 function makeMockApi(capture) {
@@ -56,12 +64,36 @@ function makeMockApi(capture) {
       },
       registerFooterButton(id, button) {
         capture.footer = { id, button };
-        return { update() {}, remove() { capture.removed.push(['footer', id]); } };
+        return {
+          update(b) { (capture.footerUpdates = capture.footerUpdates || []).push(b); },
+          remove() { capture.removed.push(['footer', id]); },
+        };
+      },
+      setFooterButtonState(name, on) {
+        (capture.footerStates = capture.footerStates || []).push([name, on]);
       },
     },
-    events: { on() {}, off() {}, emit() {} },
+    events: {
+      on(event, listener) { (capture.listeners = capture.listeners || {})[event] = listener; },
+      off() {},
+      emit(event, ...args) { (capture.emitted = capture.emitted || []).push([event, ...args]); },
+    },
     output: { print() {} },
-    command: { send() {} },
+    command: {
+      async send(command, echo) { (capture.sent = capture.sent || []).push([command, echo]); },
+    },
+    triggers: {
+      register(pattern, cb, tag) {
+        capture.trigger = { pattern, cb, tag };
+        return { id: 'trig-1' };
+      },
+      remove() {},
+      removeByTag(tag) { (capture.removedTags = capture.removedTags || []).push(tag); },
+    },
+    commandHooks: {
+      register(cb) { capture.hook = cb; return 'hook-1'; },
+      unregister(id) { capture.removed.push(['hook', id]); return true; },
+    },
   };
 }
 
@@ -118,6 +150,76 @@ test('smoke: init rejestruje kontrakt, destroy zdejmuje rejestracje', async () =
     assert.ok(kinds.includes('menu'), 'destroy zdejmuje wpis menu');
     assert.ok(kinds.includes('footer'), 'destroy zdejmuje klawisz stopki');
     assert.ok(capture.closed >= 1, 'destroy zamyka popup');
+  } finally {
+    if (prevDoc === undefined) delete globalThis.document;
+    else globalThis.document = prevDoc;
+  }
+});
+
+// Integracja Fali 4c przez zbudowany dist: powiadomienie "[ POCZTA ]"
+// odpala odswiezenie skrzynek przez prawdziwe sesje na fixture,
+// badge trafia na klawisz stopki, destroy zdejmuje trigger.
+test('smoke: powiadomienie odswieza skrzynki i badge stopki', async () => {
+  execSync('node scripts/build.js', { cwd: REPO, stdio: 'pipe' });
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'arkmail-smoke2-'));
+  const mjs = path.join(tmp, 'arkmail.mjs');
+  fs.copyFileSync(path.join(REPO, 'dist/arkmail.js'), mjs);
+  const mod = await import(pathToFileURL(mjs).href);
+
+  const fixture = (name) =>
+    JSON.parse(fs.readFileSync(path.join(REPO, 'tests/fixtures', name + '.json'), 'utf8')).lines;
+
+  const prevDoc = globalThis.document;
+  globalThis.document = { createElement: makeElement };
+  try {
+    const capture = { removed: [] };
+    const api = makeMockApi(capture);
+    await mod.init(api);
+
+    assert.ok(capture.trigger, 'init rejestruje zbiorczy trigger linii');
+    assert.equal(capture.trigger.tag, 'arkmail');
+    assert.ok(capture.listeners?.['gmcp.char.info'], 'slucha gmcp.char.info (nazwa postaci)');
+
+    const tick = () => new Promise((r) => setImmediate(r));
+    const fire = (text, cls = '') => capture.trigger.cb({ text }, null, cls);
+    const waitFor = async (pred, what) => {
+      for (let i = 0; i < 200; i++) {
+        if (pred()) return;
+        await tick();
+      }
+      assert.fail(`timeout: ${what}`);
+    };
+
+    fire(' [ POCZTA ] Masz nowa poczte od Foo.');
+    await waitFor(
+      () => (capture.sent || []).some(([c]) => c === 'listy odebrane'),
+      'komenda listy odebrane po powiadomieniu',
+    );
+    // echo wysylki jest wyciszone (echo=false)
+    assert.ok((capture.sent || []).every(([, echo]) => echo === false), 'echo=false');
+
+    // replay listing odebranych (od echa komendy) przez prawdziwa sesje
+    const odebrane = fixture('listing-odebrane-male');
+    const idx = odebrane.findIndex((l) => l.text === '→ listy odebrane');
+    for (const l of odebrane.slice(idx)) {
+      fire(l.text, l.cls);
+      await tick();
+    }
+    await waitFor(
+      () => (capture.sent || []).some(([c]) => c === 'listy nieprzeczytane'),
+      'komenda listy nieprzeczytane po odebranych',
+    );
+    for (const l of fixture('listing-nieprzeczytane')) {
+      fire(l.text, l.cls);
+      await tick();
+    }
+    await waitFor(
+      () => (capture.footerUpdates || []).some((u) => u.label === 'ArkMail (1)'),
+      'badge stopki ArkMail (1)',
+    );
+
+    await mod.destroy();
+    assert.ok((capture.removedTags || []).includes('arkmail'), 'destroy zdejmuje trigger po tagu');
   } finally {
     if (prevDoc === undefined) delete globalThis.document;
     else globalThis.document = prevDoc;
