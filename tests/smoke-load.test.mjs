@@ -186,7 +186,7 @@ test('smoke: powiadomienie odswieza skrzynki i badge stopki', async () => {
     assert.ok(capture.trigger, 'init rejestruje zbiorczy trigger linii');
     assert.equal(capture.trigger.tag, 'arkmail');
     assert.ok(capture.listeners?.['gmcp.char.info'], 'slucha gmcp.char.info (nazwa postaci)');
-    assert.ok(capture.peopleListener, 'subskrybuje baze people (kontakty)');
+    assert.ok(!capture.peopleListener, 'kontakty tylko z listow - BEZ subskrypcji bazy people');
 
     const tick = () => new Promise((r) => setImmediate(r));
     const fire = (text, cls = '') => capture.trigger.cb({ text }, null, cls);
@@ -228,7 +228,7 @@ test('smoke: powiadomienie odswieza skrzynki i badge stopki', async () => {
 
     await mod.destroy();
     assert.ok((capture.removedTags || []).includes('arkmail'), 'destroy zdejmuje trigger po tagu');
-    assert.ok(capture.peopleOff, 'destroy odpina subskrypcje people');
+    assert.ok(!capture.peopleOff, 'nigdy nie subskrybuje people - nie ma co odpinac');
   } finally {
     if (prevDoc === undefined) delete globalThis.document;
     else globalThis.document = prevDoc;

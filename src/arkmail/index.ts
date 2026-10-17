@@ -68,7 +68,6 @@ let transport: DargothTransport | null = null;
 let store: MailUiStore | null = null;
 let unmount: (() => void) | null = null;
 let unsubBadge: (() => void) | null = null;
-let peopleUnsub: (() => void) | null = null;
 
 function createContent(): HTMLDivElement {
   const root = document.createElement("div");
@@ -108,23 +107,15 @@ export async function init(api: PluginApi) {
     if (d?.name) storage.setCharacter(d.name);
   });
 
-  /** Baza znanych osob klienta (opisy/gildie doklejane do kontaktow). */
-  let peopleList: Array<{ name: string; description?: string; guild?: string }> = [];
-
+  /**
+   * Kontakty WYLACZNIE z korespondencji (nadawcy/adresaci z pobranych
+   * listingow) - bez doklejania calej bazy znanych osob klienta.
+   * (Decyzja uzytkownika, Fala 7b: zakladka Kontakty ma pokazywac
+   * tylko osoby, z ktorymi jest realna poczta.)
+   */
   const rebuildContacts = (): void => {
-    ui.setContacts(contactsFromBoxes(ui.state.boxes, peopleList));
+    ui.setContacts(contactsFromBoxes(ui.state.boxes, []));
   };
-
-  peopleUnsub = api.people.subscribe(
-    (people: Array<{ name: string; description?: string; guild?: string }>) => {
-      peopleList = people.map((p) => ({
-        name: p.name,
-        description: p.description,
-        guild: p.guild,
-      }));
-      rebuildContacts();
-    },
-  );
 
   const refreshBoxes = (boxes: MailBox[]): void => {
     void lock
@@ -335,10 +326,6 @@ export async function init(api: PluginApi) {
 }
 
 export async function destroy() {
-  if (peopleUnsub) {
-    peopleUnsub();
-    peopleUnsub = null;
-  }
   if (unsubBadge) {
     unsubBadge();
     unsubBadge = null;
