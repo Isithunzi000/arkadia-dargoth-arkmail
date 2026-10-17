@@ -11,6 +11,7 @@ import type { MailboxEntry, MailboxResult } from '../core/session/mailbox.js';
 import type { LetterContent } from '../core/session/pager.js';
 import type { Contact } from '../core/contacts.js';
 import type { ArchiveLetter } from '../core/archive.js';
+import type { LetterTemplate } from '../core/letterRender.js';
 
 export type UiTab = 'listy' | 'list' | 'napisz' | 'kontakty' | 'archiwum';
 
@@ -38,6 +39,9 @@ export interface MailUiState {
   contacts: Contact[];
   archive: ArchiveLetter[];
   notifyEnabled: boolean;
+  /** Preferencje compose: szablon ramki i szerokosc linii (20..120). */
+  composeTemplate: LetterTemplate;
+  composeWidth: number;
 }
 
 const DEFAULT_STATE: MailUiState = {
@@ -51,6 +55,8 @@ const DEFAULT_STATE: MailUiState = {
   contacts: [],
   archive: [],
   notifyEnabled: false,
+  composeTemplate: 'plain',
+  composeWidth: 60,
 };
 
 export class MailUiStore {
@@ -118,6 +124,13 @@ export class MailUiStore {
 
   setNotifyEnabled(notifyEnabled: boolean): void {
     this.update({ notifyEnabled });
+  }
+
+  setCompose(prefs: { template?: LetterTemplate; width?: number }): void {
+    const patch: Partial<MailUiState> = {};
+    if (prefs.template !== undefined) patch.composeTemplate = prefs.template;
+    if (prefs.width !== undefined) patch.composeWidth = prefs.width;
+    this.update(patch);
   }
 
   private update(patch: Partial<MailUiState>): void {

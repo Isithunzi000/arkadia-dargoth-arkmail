@@ -9,6 +9,11 @@
 
 import type { MailBox } from '../core/protocol/types.js';
 import { filterLetters, type ArchiveFilter } from '../core/archive.js';
+import {
+  clampLineWidth,
+  renderLetter,
+  type LetterTemplate,
+} from '../core/letterRender.js';
 import type { MailUiState, MailUiStore, UiTab } from './store.js';
 import { STYLES } from './styles.js';
 
@@ -18,7 +23,18 @@ export interface MailUiHandlers {
   onCloseLetter(): void;
   onRefreshBox(box: MailBox): void;
   onLoadOlder(box: MailBox): void;
+  onDeleteLetter(box: MailBox, number: number): void;
+  onForwardLetter(box: MailBox, number: number, adresat: string): void;
 }
+
+const TEMPLATES: Array<[LetterTemplate, string]> = [
+  ['none', 'Bez ramki'],
+  ['plain', 'Prosta ramka'],
+  ['parchment', 'Pergamin'],
+  ['parchment2', 'Pergamin II'],
+  ['parchment3', 'Pergamin III'],
+  ['raw', 'Surowy (jak wpisane)'],
+];
 
 const TABS: Array<[UiTab, string]> = [
   ['listy', 'Listy'],
@@ -94,7 +110,7 @@ export function mountMailUi(
       case 'list':
         return renderList(state);
       case 'napisz':
-        return renderNapisz();
+        return renderNapisz(state);
       case 'kontakty':
         return renderKontakty(state);
       case 'archiwum':
@@ -172,6 +188,29 @@ export function mountMailUi(
     body.className = 'arkmail-letter-body';
     body.textContent = l.body.join('\n');
     pane.appendChild(body);
+
+    // Operacje pagerowe: kasowanie i przekazanie (sesje w index.ts).
+    const ops = doc.createElement('div');
+    ops.className = 'arkmail-letter-ops';
+    const del = doc.createElement('button');
+    del.className = 'arkmail-del';
+    del.textContent = 'Usuń';
+    del.addEventListener('click', () => handlers.onDeleteLetter(l.box, l.number));
+    ops.appendChild(del);
+    const fwdInput = doc.createElement('input');
+    fwdInput.setAttribute('data-field', 'forward');
+    fwdInput.setAttribute('placeholder', 'Przekaż do (gracz/alias)');
+    ops.appendChild(fwdInput);
+    const fwd = doc.createElement('button');
+    fwd.className = 'arkmail-fwd';
+    fwd.textContent = 'Przekaż';
+    fwd.addEventListener('click', () => {
+      const adresat = fwdInput.value.trim();
+      if (adresat) handlers.onForwardLetter(l.box, l.number, adresat);
+    });
+    ops.appendChild(fwd);
+    pane.appendChild(ops);
+
     if (!state.wide) {
       const back = doc.createElement('button');
       back.className = 'arkmail-older';
@@ -182,7 +221,11 @@ export function mountMailUi(
     return pane;
   };
 
-  const renderNapisz = (): HTMLElement => {
+  /** Robocza tresc compose: poza store, przetrwa pelne rerendery
+   *  (zmiana szablonu/szerokosci nie kasuje wpisanego listu). */
+  const composeDraft = { adresat: '', temat: '', dw: '', tresc: '' };
+
+  const renderNapisz = (state: MailUiState): HTMLElement => {
     const pane = doc.createElement('div');
     pane.className = 'arkmail-pane arkmail-form';
     const fields: Array<[string, string]> = [
@@ -196,25 +239,88 @@ export function mountMailUi(
       pane.appendChild(lab);
       const input = doc.createElement('input');
       input.setAttribute('data-field', field);
+      input.value = composeDraft[field as 'adresat' | 'temat' | 'dw'];
+      input.addEventListener('input', () => {
+        composeDraft[field as 'adresat' | 'temat' | 'dw'] = input.value;
+      });
       pane.appendChild(input);
     }
+
+    // Szablon ramki + szerokosc linii (trzymane w store, trwale).
+    const labSz = doc.createElement('label');
+    labSz.textContent = 'Szablon';
+    pane.appendChild(labSz);
+    const sel = doc.createElement('select');
+    sel.setAttribute('data-field', 'szablon');
+    for (const [value, label] of TEMPLATES) {
+      const opt = doc.createElement('option');
+      opt.setAttribute('value', value);
+      opt.textContent = label;
+      sel.appendChild(opt);
+    }
+    sel.value = state.composeTemplate;
+    sel.addEventListener('change', () => {
+      store.setCompose({ template: sel.value as LetterTemplate });
+    });
+    pane.appendChild(sel);
+
+    const labW = doc.createElement('label');
+    labW.textContent = 'Szerokość linii (20-120)';
+    pane.appendChild(labW);
+    const width = doc.createElement('input');
+    width.setAttribute('data-field', 'szerokosc');
+    width.value = String(state.composeWidth);
+    width.addEventListener('change', () => {
+      const parsed = Number.parseInt(width.value, 10);
+      store.setCompose({
+        width: Number.isFinite(parsed) ? clampLineWidth(parsed) : 60,
+      });
+    });
+    pane.appendChild(width);
+
     const lab = doc.createElement('label');
     lab.textContent = 'Treść';
     pane.appendChild(lab);
     const tresc = doc.createElement('textarea');
     tresc.setAttribute('data-field', 'tresc');
+    tresc.value = composeDraft.tresc;
     pane.appendChild(tresc);
+
+    const labP = doc.createElement('label');
+    labP.textContent = 'Podgląd (tak list wyjedzie do gry)';
+    pane.appendChild(labP);
+    const preview = doc.createElement('pre');
+    preview.className = 'arkmail-preview';
+    pane.appendChild(preview);
+
+    const repaint = () => {
+      const st = store.state;
+      preview.textContent = renderLetter(
+        tresc.value,
+        st.composeTemplate,
+        st.composeWidth,
+      ).lines.join('\n');
+    };
+    tresc.addEventListener('input', () => {
+      composeDraft.tresc = tresc.value;
+      repaint();
+    });
+    repaint();
+
     const send = doc.createElement('button');
     send.className = 'arkmail-send';
     send.textContent = 'Wyślij';
     send.addEventListener('click', () => {
+      const st = store.state;
+      const rendered = renderLetter(tresc.value, st.composeTemplate, st.composeWidth);
+      if (!rendered.hasContent) return; // pusty list nie wylatuje
       const val = (f: string) =>
         (pane.querySelector(`[data-field="${f}"]`) as HTMLInputElement | HTMLTextAreaElement).value;
       handlers.onSendCompose({
         adresat: val('adresat'),
         temat: val('temat'),
         dw: val('dw'),
-        linie: val('tresc').split('\n'),
+        linie: rendered.lines,
       });
     });
     pane.appendChild(send);

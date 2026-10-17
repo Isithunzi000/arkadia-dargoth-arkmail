@@ -23,6 +23,7 @@ import {
 import type { MailBox } from "./core/protocol/types";
 import { parseNotification } from "./core/protocol/parser";
 import { olderListingCommand } from "./core/protocol/commands";
+import type { LetterTemplate } from "./core/letterRender";
 import { mergeContacts, type Contact } from "./core/contacts";
 import {
   fromMailboxEntry,
@@ -46,6 +47,7 @@ const ALIAS_REGEX = /^\/arkmail$/i;
 const SESSION_OPTS = { timeoutMs: 8000, idleMs: 400 };
 const ARCHIVE_KEY = "archiwum";
 const NOTIFY_KEY = "powiadomienia";
+const COMPOSE_KEY = "compose";
 
 /** localStorage moze nie istniec (testy, starsze srodowiska) - awaria do RAM. */
 function memoryKv(): KVLike {
@@ -88,9 +90,12 @@ export async function init(api: PluginApi) {
   const storage = new CharStorage(kv);
   transport = new DargothTransport(api);
   const lock = new SessionLock();
+  const composePrefs = storage.getJSON<{ template?: LetterTemplate; width?: number }>(COMPOSE_KEY);
   store = new MailUiStore({
     notifyEnabled: storage.getJSON<boolean>(NOTIFY_KEY) ?? false,
     archive: storage.getJSON<ArchiveLetter[]>(ARCHIVE_KEY) ?? [],
+    composeTemplate: composePrefs?.template ?? "plain",
+    composeWidth: composePrefs?.width ?? 60,
   });
   const ui = store;
   const mailbox = new MailboxSession(transport, SESSION_OPTS);
@@ -215,6 +220,47 @@ export async function init(api: PluginApi) {
     onCloseLetter: () => ui.closeLetter(),
     onRefreshBox: (box) => refreshBoxes([box]),
     onLoadOlder: (box) => loadOlder(box),
+    onDeleteLetter: (box, number) => {
+      ui.setBusy(`Kasuje list ${number}...`);
+      void lock
+        .runExclusive(async () => {
+          transport!.beginModal();
+          try {
+            const res = await pager.deleteLetters(number, String(number));
+            if (res.deleted) {
+              notify(api, `List ${number} oznaczony do skasowania.`);
+              ui.closeLetter();
+              refreshBoxes([box]);
+            } else {
+              notify(api, "Nie udalo sie skasowac listu.");
+            }
+          } finally {
+            transport!.endModal();
+          }
+        })
+        .catch(() => notify(api, "Blad kasowania listu."))
+        .finally(() => ui.setBusy(null));
+    },
+    onForwardLetter: (box, number, adresat) => {
+      ui.setBusy(`Przekazuje list ${number}...`);
+      void lock
+        .runExclusive(async () => {
+          transport!.beginModal();
+          try {
+            const res = await pager.forwardLetter(number, adresat);
+            if (res.queued) {
+              notify(api, "List przekazany - czeka w niewyslanych.");
+              refreshBoxes(["niewyslane"]);
+            } else {
+              notify(api, "Blad przekazania - sprawdz adresata.");
+            }
+          } finally {
+            transport!.endModal();
+          }
+        })
+        .catch(() => notify(api, "Blad przekazania listu."))
+        .finally(() => ui.setBusy(null));
+    },
   };
 
   // Powiadomienia pocztowe: odswiezenie + opcjonalny tost.
@@ -233,6 +279,7 @@ export async function init(api: PluginApi) {
   unsubBadge = ui.subscribe((s) => {
     footerHandle?.update({ label: s.badge > 0 ? `${PLUGIN_NAME} (${s.badge})` : PLUGIN_NAME });
     api.ui.setFooterButtonState(FOOTER_STATE, s.badge > 0);
+    storage.setJSON(COMPOSE_KEY, { template: s.composeTemplate, width: s.composeWidth });
   });
 
   popup = await api.ui.registerPersistentPopup({

@@ -100,6 +100,15 @@ test('ui: busy ustawia i czysci opis operacji', () => {
   assert.equal(s.state.busy, null);
 });
 
+test('ui: preferencje compose (szablon, szerokosc)', () => {
+  const s = new MailUiStore();
+  assert.equal(s.state.composeTemplate, 'plain');
+  assert.equal(s.state.composeWidth, 60);
+  s.setCompose({ template: 'parchment', width: 80 });
+  assert.equal(s.state.composeTemplate, 'parchment');
+  assert.equal(s.state.composeWidth, 80);
+});
+
 test('ui: kontakty i archiwum trafiaja do stanu', () => {
   const s = new MailUiStore();
   s.setContacts([{ name: 'Foo', sources: ['korespondencja'], lettersReceived: 2, lettersSent: 1 }]);

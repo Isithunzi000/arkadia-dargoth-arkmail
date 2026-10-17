@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
 
 import { mountMailUi, type MailUiHandlers } from '../src/arkmail/ui/render';
+import { renderLetter } from '../src/arkmail/core/letterRender';
 import { MailUiStore } from '../src/arkmail/ui/store';
 import type { MailboxEntry } from '../src/arkmail/core/session/mailbox';
 import type { ArchiveLetter } from '../src/arkmail/core/archive';
@@ -57,6 +58,8 @@ function mount(store: MailUiStore, handlers: Partial<MailUiHandlers> = {}) {
     onCloseLetter: rec('close'),
     onRefreshBox: rec('refresh'),
     onLoadOlder: rec('older'),
+    onDeleteLetter: rec('del'),
+    onForwardLetter: rec('fwd'),
     ...handlers,
   });
   return { container, calls, off };
@@ -133,16 +136,28 @@ test('render: badge w etykiecie zakladki Listy', () => {
   off();
 });
 
-test('render: formularz compose zbiera pola i linie tresci', () => {
+test('render: formularz compose zbiera pola; linie przechodza przez renderer', () => {
   const s = new MailUiStore({ tab: 'napisz' });
   const { container, calls, off } = mount(s);
   (container.querySelector('[data-field="adresat"]') as unknown as HTMLInputElement).value = 'Garply';
   (container.querySelector('[data-field="temat"]') as unknown as HTMLInputElement).value = 'Perly';
   (container.querySelector('[data-field="dw"]') as unknown as HTMLInputElement).value = 'Foo';
-  (container.querySelector('[data-field="tresc"]') as unknown as HTMLTextAreaElement).value = 'linia1\nlinia2';
+  const tresc = container.querySelector('[data-field="tresc"]') as unknown as HTMLTextAreaElement;
+  tresc.value = 'linia1\nlinia2';
+  fireEvent(tresc, 'input');
   click(container.querySelector('.arkmail-send')!);
   assert.deepEqual(calls, [
-    { name: 'send', args: [{ adresat: 'Garply', temat: 'Perly', dw: 'Foo', linie: ['linia1', 'linia2'] }] },
+    {
+      name: 'send',
+      args: [
+        {
+          adresat: 'Garply',
+          temat: 'Perly',
+          dw: 'Foo',
+          linie: renderLetter('linia1\nlinia2', 'plain', 60).lines,
+        },
+      ],
+    },
   ]);
   off();
 });
@@ -168,6 +183,86 @@ test('render: filtr archiwum po temacie - lokalny, bez store', () => {
   assert.equal(rows.length, 1);
   assert.ok(rows[0].textContent?.includes('Rachunek'));
   assert.equal(input.value, 'rach', 'input nie jest nadpisywany przy filtrze');
+  off();
+});
+
+// --- Fala 5b: szablony + podglad compose, operacje pagerowe -----------------
+
+const fireEvent = (el: unknown, name: string) =>
+  (el as { dispatchEvent(e: unknown): void }).dispatchEvent(new window.Event(name));
+
+test('render: compose ma wybor szablonu (6) i szerokosc (domyslnie 60)', () => {
+  const s = new MailUiStore({ tab: 'napisz' });
+  const { container, off } = mount(s);
+  const sel = container.querySelector('[data-field="szablon"]')!;
+  const options = [...sel.querySelectorAll('option')].map((o) => o.getAttribute('value'));
+  assert.deepEqual(options, ['none', 'plain', 'parchment', 'parchment2', 'parchment3', 'raw']);
+  assert.equal((sel as unknown as HTMLSelectElement).value, 'plain');
+  assert.equal(
+    (container.querySelector('[data-field="szerokosc"]') as unknown as HTMLInputElement).value,
+    '60',
+  );
+  off();
+});
+
+test('render: podglad ramki reaguje na tresc i zmiane szablonu', async () => {
+  const s = new MailUiStore({ tab: 'napisz' });
+  const { container, off } = mount(s);
+  const tresc = container.querySelector('[data-field="tresc"]') as unknown as HTMLTextAreaElement;
+  tresc.value = 'Witaj w Arkadii';
+  fireEvent(tresc, 'input');
+  await new Promise((r) => setImmediate(r));
+  let preview = container.querySelector('.arkmail-preview')!.textContent!;
+  assert.ok(preview.includes('Witaj'), 'podglad zawiera tresc');
+  assert.ok(preview.includes('|'), 'domyslny szablon plain daje ramke');
+
+  const sel = container.querySelector('[data-field="szablon"]') as unknown as HTMLSelectElement;
+  sel.value = 'none';
+  fireEvent(sel, 'change');
+  await new Promise((r) => setImmediate(r));
+  preview = container.querySelector('.arkmail-preview')!.textContent!;
+  assert.equal(preview.trim(), 'Witaj w Arkadii', 'none: sama tresc, bez ramki');
+  off();
+});
+
+test('render: wysylka przekazuje wyrenderowane linie (ramka w tresci)', () => {
+  const s = new MailUiStore({ tab: 'napisz' });
+  const { container, calls, off } = mount(s);
+  const tresc = container.querySelector('[data-field="tresc"]') as unknown as HTMLTextAreaElement;
+  tresc.value = 'Witaj';
+  fireEvent(tresc, 'input');
+  (container.querySelector('[data-field="adresat"]') as unknown as HTMLInputElement).value = 'Garply';
+  (container.querySelector('[data-field="temat"]') as unknown as HTMLInputElement).value = 'Perly';
+  (container.querySelector('[data-field="szerokosc"]') as unknown as HTMLInputElement).value = '20';
+  fireEvent(container.querySelector('[data-field="szerokosc"]'), 'change');
+  click(container.querySelector('.arkmail-send'));
+  assert.equal(calls.length, 1);
+  const linie = (calls[0].args[0] as { linie: string[] }).linie;
+  assert.deepEqual(linie, renderLetter('Witaj', 'plain', 20).lines);
+  off();
+});
+
+test('render: pusta tresc nie wywołuje wysylki', () => {
+  const s = new MailUiStore({ tab: 'napisz' });
+  const { container, calls, off } = mount(s);
+  (container.querySelector('[data-field="adresat"]') as unknown as HTMLInputElement).value = 'Garply';
+  (container.querySelector('[data-field="temat"]') as unknown as HTMLInputElement).value = 'Perly';
+  click(container.querySelector('.arkmail-send'));
+  assert.deepEqual(calls, []);
+  off();
+});
+
+test('render: widok listu ma Usun i Przekaz z polem adresata', () => {
+  const s = new MailUiStore();
+  const { container, calls, off } = mount(s);
+  s.openLetter('odebrane', {
+    number: 3, from: 'Foo', subject: 'Perly', to: 'Gracz', cc: null, date: null, body: ['czesc'],
+  });
+  click(container.querySelector('.arkmail-del'));
+  assert.deepEqual(calls[0], { name: 'del', args: ['odebrane', 3] });
+  (container.querySelector('[data-field="forward"]') as unknown as HTMLInputElement).value = 'Bar';
+  click(container.querySelector('.arkmail-fwd'));
+  assert.deepEqual(calls[1], { name: 'fwd', args: ['odebrane', 3, 'Bar'] });
   off();
 });
 
