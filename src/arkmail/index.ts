@@ -24,7 +24,7 @@ import type { MailBox } from "./core/protocol/types";
 import { parseNotification } from "./core/protocol/parser";
 import { olderListingCommand } from "./core/protocol/commands";
 import type { LetterTemplate } from "./core/letterRender";
-import { mergeContacts, type Contact } from "./core/contacts";
+import { contactsFromBoxes } from "./core/contacts";
 import {
   fromMailboxEntry,
   upsertLetters,
@@ -68,6 +68,7 @@ let transport: DargothTransport | null = null;
 let store: MailUiStore | null = null;
 let unmount: (() => void) | null = null;
 let unsubBadge: (() => void) | null = null;
+let peopleUnsub: (() => void) | null = null;
 
 function createContent(): HTMLDivElement {
   const root = document.createElement("div");
@@ -107,24 +108,23 @@ export async function init(api: PluginApi) {
     if (d?.name) storage.setCharacter(d.name);
   });
 
+  /** Baza znanych osob klienta (opisy/gildie doklejane do kontaktow). */
+  let peopleList: Array<{ name: string; description?: string; guild?: string }> = [];
+
   const rebuildContacts = (): void => {
-    const korespondencja: Array<{ name: string; direction: "in" | "out"; dateRaw?: string }> = [];
-    for (const [box, view] of Object.entries(ui.state.boxes)) {
-      const direction = box === "odebrane" || box === "nieprzeczytane" ? "in" : "out";
-      for (const e of view?.entries ?? []) {
-        if (e.party) {
-          korespondencja.push({ name: e.party, direction, dateRaw: e.date?.raw });
-        }
-      }
-    }
-    const contacts: Contact[] = mergeContacts({
-      people: [],
-      przedstawieni: [],
-      korespondencja,
-      aliasy: [],
-    });
-    ui.setContacts(contacts);
+    ui.setContacts(contactsFromBoxes(ui.state.boxes, peopleList));
   };
+
+  peopleUnsub = api.people.subscribe(
+    (people: Array<{ name: string; description?: string; guild?: string }>) => {
+      peopleList = people.map((p) => ({
+        name: p.name,
+        description: p.description,
+        guild: p.guild,
+      }));
+      rebuildContacts();
+    },
+  );
 
   const refreshBoxes = (boxes: MailBox[]): void => {
     void lock
@@ -280,6 +280,7 @@ export async function init(api: PluginApi) {
     footerHandle?.update({ label: s.badge > 0 ? `${PLUGIN_NAME} (${s.badge})` : PLUGIN_NAME });
     api.ui.setFooterButtonState(FOOTER_STATE, s.badge > 0);
     storage.setJSON(COMPOSE_KEY, { template: s.composeTemplate, width: s.composeWidth });
+    storage.setJSON(NOTIFY_KEY, s.notifyEnabled);
   });
 
   popup = await api.ui.registerPersistentPopup({
@@ -316,6 +317,10 @@ export async function init(api: PluginApi) {
 }
 
 export async function destroy() {
+  if (peopleUnsub) {
+    peopleUnsub();
+    peopleUnsub = null;
+  }
   if (unsubBadge) {
     unsubBadge();
     unsubBadge = null;

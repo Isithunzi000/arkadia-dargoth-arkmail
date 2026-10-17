@@ -136,6 +136,18 @@ export function mountMailUi(
     }
     pane.appendChild(boxes);
 
+    // Przelacznik powiadomien o nowej poczcie (trwale w storage).
+    const notifyRow = doc.createElement('label');
+    notifyRow.className = 'arkmail-dim';
+    const chk = doc.createElement('input');
+    chk.setAttribute('type', 'checkbox');
+    chk.className = 'arkmail-notify-toggle';
+    chk.checked = state.notifyEnabled;
+    chk.addEventListener('click', () => store.setNotifyEnabled(!store.state.notifyEnabled));
+    notifyRow.appendChild(chk);
+    notifyRow.appendChild(doc.createTextNode(' Powiadom o nowej poczcie (tost)'));
+    pane.appendChild(notifyRow);
+
     const view = state.boxes[state.activeBox];
     if (!view) {
       pane.appendChild(dim('Skrzynka nie zaladowana - kliknij jej nazwe, aby pobrac.'));

@@ -266,6 +266,19 @@ test('render: widok listu ma Usun i Przekaz z polem adresata', () => {
   off();
 });
 
+test('render: przelacznik powiadomien w panelu Listy', () => {
+  const s = new MailUiStore();
+  const { container, off } = mount(s);
+  const toggle = container.querySelector('.arkmail-notify-toggle') as unknown as HTMLInputElement;
+  assert.ok(toggle, 'przelacznik istnieje');
+  assert.equal(toggle.checked, false);
+  click(toggle);
+  assert.equal(s.state.notifyEnabled, true);
+  const toggle2 = container.querySelector('.arkmail-notify-toggle') as unknown as HTMLInputElement;
+  assert.equal(toggle2.checked, true, 'stan odzwierciedlony po rerenderze');
+  off();
+});
+
 test('render: przycisk Wczytaj starsze gdy listing uciety', () => {
   const s = new MailUiStore();
   const { container, calls, off } = mount(s);

@@ -31,7 +31,10 @@ function makeElement(tag) {
     querySelector() { return null; },
     querySelectorAll() { return []; },
   };
-  el.ownerDocument = { createElement: (t) => makeElement(t) };
+  el.ownerDocument = {
+    createElement: (t) => makeElement(t),
+    createTextNode: (t) => ({ textContent: t }),
+  };
   return el;
 }
 
@@ -93,6 +96,10 @@ function makeMockApi(capture) {
     commandHooks: {
       register(cb) { capture.hook = cb; return 'hook-1'; },
       unregister(id) { capture.removed.push(['hook', id]); return true; },
+    },
+    people: {
+      subscribe(listener) { capture.peopleListener = listener; return () => { capture.peopleOff = true; }; },
+      getAll: () => [],
     },
   };
 }
@@ -179,6 +186,7 @@ test('smoke: powiadomienie odswieza skrzynki i badge stopki', async () => {
     assert.ok(capture.trigger, 'init rejestruje zbiorczy trigger linii');
     assert.equal(capture.trigger.tag, 'arkmail');
     assert.ok(capture.listeners?.['gmcp.char.info'], 'slucha gmcp.char.info (nazwa postaci)');
+    assert.ok(capture.peopleListener, 'subskrybuje baze people (kontakty)');
 
     const tick = () => new Promise((r) => setImmediate(r));
     const fire = (text, cls = '') => capture.trigger.cb({ text }, null, cls);
@@ -220,6 +228,7 @@ test('smoke: powiadomienie odswieza skrzynki i badge stopki', async () => {
 
     await mod.destroy();
     assert.ok((capture.removedTags || []).includes('arkmail'), 'destroy zdejmuje trigger po tagu');
+    assert.ok(capture.peopleOff, 'destroy odpina subskrypcje people');
   } finally {
     if (prevDoc === undefined) delete globalThis.document;
     else globalThis.document = prevDoc;

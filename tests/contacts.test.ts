@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { mergeContacts, type ContactInput } from '../src/arkmail/core/contacts';
+import { mergeContacts, contactsFromBoxes, type ContactInput } from '../src/arkmail/core/contacts';
 
 function input(partial: Partial<ContactInput>): ContactInput {
   return { people: [], przedstawieni: [], korespondencja: [], aliasy: [], ...partial };
@@ -102,4 +102,45 @@ test('pelny obraz z logow: 28 przedstawionych + korespondencja + aliasy', () => 
   assert.deepEqual(gen.sources.sort(), ['korespondencja', 'przedstawieni']);
   const gw = out.find((c) => c.name === 'Bar')!;
   assert.equal(gw.mailAlias, 'poltorak');
+});
+
+test('contactsFromBoxes: korespondencja z listingow + baza people', () => {
+  const boxes = {
+    odebrane: {
+      entries: [
+        { number: 3, isRead: true, subject: 'Perly', forwarded: false,
+          party: 'Foo', partyKind: 'nadawca' as const,
+          date: { raw: 'Wt, 23 XII 2025, 00:11:12', weekday: 'Wt', day: 23, month: 12, year: 2025, time: '00:11:12' } },
+      ],
+    },
+    wyslane: {
+      entries: [
+        { number: 5, isRead: true, subject: 'Re: Perly', forwarded: false,
+          party: 'Garply', partyKind: 'odbiorcy' as const, date: null },
+      ],
+    },
+  };
+  const out = contactsFromBoxes(boxes, [
+    { name: 'Foo', description: 'mag z gildii', guild: 'CK' },
+  ]);
+  const af = out.find((c) => c.name === 'Foo')!;
+  assert.deepEqual(af.sources.sort(), ['korespondencja', 'people']);
+  assert.equal(af.description, 'mag z gildii');
+  assert.equal(af.guild, 'CK');
+  assert.equal(af.lettersReceived, 1);
+  const bl = out.find((c) => c.name === 'Garply')!;
+  assert.equal(bl.lettersSent, 1);
+  assert.deepEqual(bl.sources, ['korespondencja']);
+});
+
+test('contactsFromBoxes: wpis bez party jest pomijany', () => {
+  const out = contactsFromBoxes({
+    odebrane: {
+      entries: [
+        { number: 1, isRead: false, subject: 'X', forwarded: false,
+          party: '', partyKind: null, date: null },
+      ],
+    },
+  }, []);
+  assert.deepEqual(out, []);
 });

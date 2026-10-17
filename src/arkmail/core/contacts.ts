@@ -14,6 +14,9 @@
  * Dopasowanie miedzy zrodlami: case-insensitive po imieniu.
  */
 
+import type { MailBox } from './protocol/types.js';
+import type { MailboxEntry } from './session/mailbox.js';
+
 export type ContactSource = 'people' | 'przedstawieni' | 'korespondencja' | 'alias';
 
 export interface Contact {
@@ -27,6 +30,30 @@ export interface Contact {
   lettersReceived: number;
   lettersSent: number;
   lastContactRaw?: string;
+}
+
+/**
+ * Kontakty z zaladowanych listingow (korespondencja) + baza people
+ * klienta. Kierunek po skrzynce: odebrane/nieprzeczytane = 'in'.
+ * Wpisy bez strony listu (party === '') sa pomijane.
+ */
+export function contactsFromBoxes(
+  boxes: Partial<Record<MailBox, { entries: MailboxEntry[] }>>,
+  people: ContactInput['people'],
+): Contact[] {
+  const korespondencja: ContactInput['korespondencja'] = [];
+  for (const [box, view] of Object.entries(boxes)) {
+    const direction = box === 'odebrane' || box === 'nieprzeczytane' ? 'in' : 'out';
+    for (const e of view?.entries ?? []) {
+      if (!e.party) continue;
+      korespondencja.push({
+        name: e.party,
+        direction,
+        dateRaw: e.date?.raw,
+      });
+    }
+  }
+  return mergeContacts({ people, przedstawieni: [], korespondencja, aliasy: [] });
 }
 
 export interface ContactInput {
