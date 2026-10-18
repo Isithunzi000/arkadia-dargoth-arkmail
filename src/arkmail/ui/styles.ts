@@ -26,7 +26,6 @@ const DANGER = '#b04a42'; // kasowanie
 
 export const STYLES = `
 .arkmail-root {
-  container-type: inline-size;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -218,6 +217,7 @@ export const STYLES = `
 
 /* --- widok listu --- */
 .arkmail-letter-head {
+  position: relative;
   background: ${BG};
   border: 1px solid ${BORDER};
   border-radius: 8px;
@@ -317,15 +317,20 @@ export const STYLES = `
 .arkmail-root .arkmail-ghost-typed { visibility: hidden; white-space: pre; }
 .arkmail-root .arkmail-ghost-rest { color: ${FG_DIM}; white-space: pre; }
 
-/* --- podzial lista|list na szerokim popupie --- */
-.arkmail-split { display: block; }
-@container (min-width: 900px) {
-  .arkmail-split {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 10px;
-    flex: 1;
-    min-height: 0;
-  }
+/* --- podzial lista|list na szerokim popupie (Fala 10) ---
+   Uklad sterowany WYLACZNIE klasa .arkmail-wide z JS (ResizeObserver,
+   prog 900px) - zero @container, jedno zrodlo prawdy, testowalne. */
+.arkmail-wide .arkmail-split {
+  display: grid;
+  grid-template-columns: minmax(280px, 2fr) minmax(0, 3fr);
+  gap: 10px;
+  flex: 1;
+  min-height: 0;
+}
+.arkmail-root .arkmail-letter-close {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  padding: 2px 10px;
 }
 `;

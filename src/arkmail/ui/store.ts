@@ -96,8 +96,19 @@ export class MailUiStore {
     this.update({ tab });
   }
 
+  /**
+   * Flip szerokosci w trakcie czytania nie gubi listu (Fala 10):
+   * wide->waski przenosi otwarty list do pelnego panelu (zakladka
+   * 'list'), waski->wide wraca do podzialu (zakladka 'listy').
+   * Bez otwartego listu zakladka zostaje jak jest.
+   */
   setWide(wide: boolean): void {
-    this.update({ wide });
+    const patch: Partial<MailUiState> = { wide };
+    if (this.current.letter) {
+      if (!wide && this.current.tab === 'listy') patch.tab = 'list';
+      else if (wide && this.current.tab === 'list') patch.tab = 'listy';
+    }
+    this.update(patch);
   }
 
   setActiveBox(box: MailBox): void {

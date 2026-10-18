@@ -92,6 +92,34 @@ test('ui: openLetter na szerokim zostaje w podziale (tab bez zmian)', () => {
   assert.ok(s.state.letter);
 });
 
+test('ui: setWide(false) w trakcie czytania przenosi list do zakladki list', () => {
+  const s = new MailUiStore();
+  s.setWide(true);
+  s.openLetter('odebrane', letter());
+  assert.equal(s.state.tab, 'listy');
+  s.setWide(false);
+  assert.equal(s.state.wide, false);
+  assert.equal(s.state.tab, 'list', 'na waskim czytany list ma pelny panel');
+  assert.ok(s.state.letter, 'list nie ginie przy flipie');
+});
+
+test('ui: setWide(true) w trakcie czytania wraca do podzialu', () => {
+  const s = new MailUiStore();
+  s.openLetter('odebrane', letter());
+  assert.equal(s.state.tab, 'list');
+  s.setWide(true);
+  assert.equal(s.state.tab, 'listy', 'na szerokim list wraca do podzialu');
+  assert.ok(s.state.letter, 'list nie ginie przy flipie');
+});
+
+test('ui: setWide bez otwartego listu nie rusza zakladki', () => {
+  const s = new MailUiStore({ tab: 'kontakty' });
+  s.setWide(true);
+  assert.equal(s.state.tab, 'kontakty');
+  s.setWide(false);
+  assert.equal(s.state.tab, 'kontakty');
+});
+
 test('ui: busy ustawia i czysci opis operacji', () => {
   const s = new MailUiStore();
   s.setBusy('Czytam list 3...');

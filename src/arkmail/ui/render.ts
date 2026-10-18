@@ -123,7 +123,9 @@ export function mountMailUi(
     root.className = 'arkmail-root' + (state.wide ? ' arkmail-wide' : '');
     const nodes: Node[] = [renderTabs(state)];
     if (state.busy !== null) nodes.push(renderBusy(state.busy));
-    if (state.wide && state.tab === 'listy' && state.letter) {
+    // Fala 10: na szerokim zakladka 'listy' to ZAWSZE split (klasyczny
+    // klient poczty) - bez otwartego listu prawy panel ma placeholder.
+    if (state.wide && state.tab === 'listy') {
       const split = doc.createElement('div');
       split.className = 'arkmail-split';
       split.appendChild(renderListy(state));
@@ -342,11 +344,24 @@ export function mountMailUi(
     pane.className = 'arkmail-pane';
     const l = state.letter;
     if (!l) {
-      pane.appendChild(dim('Nie otwarto zadnego listu.'));
+      // W split (wide) to placeholder prawego panelu; solo (waski) to
+      // pusta zakladka 'list'.
+      pane.appendChild(
+        dim(state.wide ? 'Wybierz list z listy, aby go przeczytac.' : 'Nie otwarto zadnego listu.'),
+      );
       return pane;
     }
     const head = doc.createElement('div');
     head.className = 'arkmail-letter-head';
+    if (state.wide) {
+      // W podziale lista jest zawsze widoczna po lewej - zamiast przycisku
+      // powrotu ("Zamknij list") jest Zamknij czyszczace podglad.
+      const close = doc.createElement('button');
+      close.className = 'arkmail-letter-close';
+      close.textContent = 'Zamknij';
+      close.addEventListener('click', () => handlers.onCloseLetter());
+      head.appendChild(close);
+    }
     const subj = doc.createElement('div');
     subj.className = 'arkmail-letter-subject';
     subj.textContent = l.subject;
