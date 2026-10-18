@@ -54,6 +54,9 @@ const SESSION_OPTS = { timeoutMs: 8000, idleMs: 400 };
 /** Bezpieczniki petli "Wczytaj wszystkie" (Fala 8e): twardy limit stron
  *  na jedno klikniecie i pauza miedzy stronami (grzecznosc wobec serwera). */
 export const LOAD_ALL_MAX_PAGES = 40;
+/** Prog szerokosci popupu dla ukladu dwupanelowego (Fala 10): >= 900px
+ *  lista z lewej + podglad z prawej, nizej jeden panel (komorka). */
+export const WIDE_MIN_WIDTH = 900;
 export const LOAD_ALL_PACE_MS = 400;
 /**
  * Kontekst listingu serwera (Fala 9a): kazde pobranie listingu
@@ -85,6 +88,7 @@ let transport: DargothTransport | null = null;
 let store: MailUiStore | null = null;
 let unmount: (() => void) | null = null;
 let unsubBadge: (() => void) | null = null;
+let wideObserver: ResizeObserver | null = null;
 
 function createContent(): HTMLDivElement {
   const root = document.createElement("div");
@@ -92,8 +96,23 @@ function createContent(): HTMLDivElement {
     unmount();
     unmount = null;
   }
+  if (wideObserver) {
+    wideObserver.disconnect();
+    wideObserver = null;
+  }
   if (store && handlersRef) {
     unmount = mountMailUi(root, store, handlersRef);
+    // Szerokosc popupu -> uklad (Fala 10): >= WIDE_MIN_WIDTH dwa panele,
+    // nizej jeden. ResizeObserver strzela od razu po observe, wiec uklad
+    // startuje poprawny. Srodowisko bez ResizeObserver zostaje na waskim.
+    if (typeof ResizeObserver !== "undefined") {
+      const s = store;
+      wideObserver = new ResizeObserver((entries) => {
+        const w = entries[0]?.contentRect.width ?? 0;
+        s.setWide(w >= WIDE_MIN_WIDTH);
+      });
+      wideObserver.observe(root);
+    }
   }
   return root;
 }
@@ -528,8 +547,10 @@ export async function init(api: PluginApi) {
   popup = await api.ui.registerPersistentPopup({
     id: POPUP_ID,
     title: PLUGIN_NAME,
-    initialWidth: 480,
-    initialHeight: 640,
+    // Start: na normalnym ekranie dwupanelowy, na komorce waski (80vw).
+    // Rozmiar ustawiony przez gracza zawsze wygrywa z tymi wartosciami.
+    initialWidth: "min(1100px, 80vw)",
+    initialHeight: "min(700px, 70vh)",
     createContent,
   });
 
@@ -566,6 +587,10 @@ export async function destroy() {
   if (unmount) {
     unmount();
     unmount = null;
+  }
+  if (wideObserver) {
+    wideObserver.disconnect();
+    wideObserver = null;
   }
   if (transport) {
     transport.dispose();
