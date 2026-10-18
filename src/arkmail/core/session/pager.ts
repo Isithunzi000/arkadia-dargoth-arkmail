@@ -10,7 +10,7 @@
  */
 
 import {
-  isPagerPrompt,
+  extractPagerPrompt,
   parseLetterHeaderLine,
   parseMailError,
 } from '../protocol/parser.js';
@@ -48,8 +48,10 @@ export interface ForwardResult {
 type State = 'letter' | 'pager' | 'dw-subdialog' | 'closing' | 'recovering';
 
 /** Odrzucenie komendy przez OBCY pager (sierota po timeoutcie sesji,
- *  log 2026-10-18): pager konsumuje wszystko az do "q". */
-const PAGER_REJECTION_RE = /^Nie ma takiej komendy\./;
+ *  log 2026-10-18): pager konsumuje wszystko az do "q".
+ *  Fala 12a: bez kotwic - klient skleja odrzucenie z promptem pagera
+ *  w jednej linii ("[1-50 ...] -- Nie ma takiej komendy. ..."). */
+const PAGER_REJECTION_RE = /Nie ma takiej komendy\./;
 
 /** Szkielet transakcji pagerowej; handler akcji podpiety miedzy
  *  otwarciem a zamknieciem. */
@@ -140,16 +142,22 @@ export class PagerSession {
       let headersDone = false;
       let wantClose = false;
       let pagerFired = false;
+      /** Fala 12a: akcja odpalona z idle-completion (prompt nie doszedl). */
+      let idleOpened = false;
       let retried = false;
       let done = false;
       const idleMs = this.opts.idleMs ?? 600;
       let idleTimer: ReturnType<typeof setTimeout> | null = null;
+      let quietTimer: ReturnType<typeof setTimeout> | null = null;
+      let graceTimer: ReturnType<typeof setTimeout> | null = null;
       const actions = makeActions({ send: (l) => this.transport.send(l) });
 
       const cleanup = () => {
         done = true;
         clearTimeout(timer);
         if (idleTimer) clearTimeout(idleTimer);
+        if (quietTimer) clearTimeout(quietTimer);
+        if (graceTimer) clearTimeout(graceTimer);
         unsub();
       };
       const finish = () => {
@@ -165,14 +173,67 @@ export class PagerSession {
         }, idleMs);
       };
 
+      /**
+       * Fala 12a: cisza po naglowku "Data:" = body kompletne, nawet gdy
+       * prompt pagera nie dojdzie jako linia (klient trzyma linie bez
+       * znaku nowej linii - log 2026-10-18, odczyt wisial do timeoutu).
+       * Protokol gry ZAWSZE otwiera pager po odczycie, wiec przy ciszy
+       * dzialamy tak, jakby prompt przyszedl: odpalamy akcje albo
+       * zamykamy "q". Cisza w stanie 'pager' z wantClose/idleOpened
+       * tez domyka - drugi prompt pagera bywa rownie niewidoczny.
+       */
+      const onQuiet = () => {
+        if (done) return;
+        if (state === 'letter' && headersDone) {
+          state = 'pager';
+          pagerFired = true;
+          idleOpened = true;
+          if (actions && actions.onPager) {
+            actions.onPager();
+            armQuiet(); // potwierdzenie akcji albo domkniecie po ciszy
+          } else {
+            enterClosing();
+          }
+          return;
+        }
+        if (state === 'pager' && (wantClose || idleOpened)) enterClosing();
+      };
+      const armQuiet = () => {
+        if (quietTimer) clearTimeout(quietTimer);
+        quietTimer = setTimeout(onQuiet, idleMs);
+      };
+
+      /**
+       * Fala 12a: timeout najpierw UBIA ewentualny pager ("q" + krotka
+       * grace na jego domkniecie), dopiero potem reject. Sierocy pager
+       * konsumowalby kolejne komendy gracza ("Nie ma takiej komendy").
+       * Prompt gry w grace = serwer jednak odpowiedzial -> finish().
+       */
       const timer = setTimeout(() => {
-        cleanup();
-        reject(new Error(`timeout: pager session list ${numer}`));
+        if (state === 'closing') {
+          cleanup();
+          reject(new Error(`timeout: pager session list ${numer}`));
+          return;
+        }
+        state = 'closing';
+        wantClose = false;
+        idleOpened = false;
+        try {
+          this.transport.send('q');
+        } catch {
+          /* transport martwy - i tak porzucamy sesje */
+        }
+        graceTimer = setTimeout(() => {
+          cleanup();
+          reject(new Error(`timeout: pager session list ${numer}`));
+        }, Math.max(idleMs, 400));
       }, this.opts.timeoutMs);
 
       const enterClosing = () => {
         wantClose = false;
+        idleOpened = false;
         state = 'closing';
+        if (quietTimer) clearTimeout(quietTimer);
         this.transport.send('q');
         armIdle();
       };
@@ -212,8 +273,11 @@ export class PagerSession {
           return;
         }
 
-        const pp = isPagerPrompt(line.text);
+        // Fala 12a: extractPagerPrompt znajduje tez prompt sklejony
+        // z inna trescia w jednej linii (isPagerPrompt bylby slepy).
+        const pp = extractPagerPrompt(line.text);
         if (pp) {
+          if (quietTimer) clearTimeout(quietTimer);
           pager = pp;
           state = 'pager';
           if (pagerFired && wantClose) {
@@ -244,6 +308,9 @@ export class PagerSession {
             else if (h.field === 'data') {
               letter.date = h.value;
               headersDone = true;
+              // Body moze byc puste (pusta linia i koniec) - cisza po
+              // naglowkach tez ma domknac sesje (prompt nie musi dojsc).
+              armQuiet();
             }
             return;
           }
@@ -252,6 +319,7 @@ export class PagerSession {
 
         if (state === 'letter') {
           letter.body.push(line.text);
+          armQuiet(); // kazda linia body odracza idle-completion
           return;
         }
 
@@ -260,6 +328,7 @@ export class PagerSession {
           const verdict = actions.onLine(line);
           if (verdict === 'close') wantClose = true;
         }
+        armQuiet(); // cisza po akcji tez domyka (drugi prompt bywa niewidoczny)
       });
 
       this.transport.send(`przeczytaj list ${numer}`);

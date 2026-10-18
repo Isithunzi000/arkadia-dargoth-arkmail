@@ -21,7 +21,7 @@ import {
   PLUGIN_DESCRIPTION,
 } from "./meta";
 import type { MailBox } from "./core/protocol/types";
-import { parseNotification, isPagerPrompt } from "./core/protocol/parser";
+import { parseNotification, extractPagerPrompt } from "./core/protocol/parser";
 import { isEchoLine } from "./core/session/lines";
 import {
   olderListingCommand,
@@ -395,6 +395,13 @@ export async function init(api: PluginApi) {
 
   handlersRef = {
     onOpenLetter: (box, entry) => {
+      // Fala 12a: sesje modalne NIE kolejkuja klikow - w trakcie wiszacej
+      // operacji kolejna komenda odczytu wpadalaby w sierocy pager
+      // ("Nie ma takiej komendy", log 2026-10-18). Komunikat zamiast kolejki.
+      if (lock.locked) {
+        notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+        return;
+      }
       ui.setBusy(`Czytam list: ${entry.subject}...`);
       void lock
         .runExclusive(async () => {
@@ -428,6 +435,11 @@ export async function init(api: PluginApi) {
     onSendCompose: (input) => {
       if (!input.adresat.trim() || !input.temat.trim()) {
         notify(api, "Adresat i temat sa wymagane.");
+        return;
+      }
+      // Fala 12a: jak przy odczycie - zero cichego kolejkowania sesji.
+      if (lock.locked) {
+        notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
         return;
       }
       ui.setBusy("Wysylam list...");
@@ -489,6 +501,11 @@ export async function init(api: PluginApi) {
     },
     onClearSearch: (box) => ui.clearSearch(box),
     onDeleteLetter: (box, entry) => {
+      // Fala 12a: zero cichego kolejkowania sesji modalnych.
+      if (lock.locked) {
+        notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+        return;
+      }
       ui.setBusy(`Kasuje list: ${entry.subject}...`);
       void lock
         .runExclusive(async () => {
@@ -512,6 +529,11 @@ export async function init(api: PluginApi) {
         .finally(() => ui.setBusy(null));
     },
     onForwardLetter: (box, entry, adresat) => {
+      // Fala 12a: zero cichego kolejkowania sesji modalnych.
+      if (lock.locked) {
+        notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+        return;
+      }
       ui.setBusy(`Przekazuje list: ${entry.subject}...`);
       void lock
         .runExclusive(async () => {
@@ -539,10 +561,12 @@ export async function init(api: PluginApi) {
   // (blokada sesji wolna) = pager otwarty na serwerze bez naszej kontroli
   // (np. timeout sesji przed wyslaniem "q"). Taki pager konsumuje
   // WSZYSTKIE komendy gracza - zamykamy go automatycznym "q".
+  // Fala 12a: extractPagerPrompt - prompt sklejony z inna trescia
+  // (np. z odrzuceniem pagera w jednej linii) tez wyzwala straznika.
   let lastWatchdogQ = 0;
   transport.subscribe((line) => {
     if (line.cls === "command" || isEchoLine(line.text)) return;
-    if (!isPagerPrompt(line.text)) return;
+    if (!extractPagerPrompt(line.text)) return;
     if (lock.locked) return; // legalna sesja pagerowa pod blokada
     const now = Date.now();
     if (now - lastWatchdogQ < 2000) return; // cooldown: jedno q na serie

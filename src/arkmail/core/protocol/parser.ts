@@ -147,6 +147,18 @@ export function isPagerPrompt(text: string): PagerPrompt | null {
   return { lo: Number(m[1]), hi: Number(m[2]), current: Number(m[3]) };
 }
 
+// Wariant bez kotwic (Fala 12a): klient trzyma linie bez znaku nowej
+// linii i skleja prompt pagera z nastepna trescia w jednej linii
+// (log 2026-10-18: "[1-50 ...] -- Nie ma takiej komendy. ...").
+const PAGER_PROMPT_ANYWHERE_RE = /\[(\d+)-(\d+) [a-zA-Z.!?+<>\-]+\] \(aktualny: (\d+)\) --/;
+
+/** Wyszukuje prompt pagera GDZIEKOLWIEK w linii (toleruje sklejenia). */
+export function extractPagerPrompt(text: string): PagerPrompt | null {
+  const m = text.match(PAGER_PROMPT_ANYWHERE_RE);
+  if (!m) return null;
+  return { lo: Number(m[1]), hi: Number(m[2]), current: Number(m[3]) };
+}
+
 // --- aliasy pocztowe ------------------------------------------------------------
 
 const ALIASES_HEADER = 'Posiadasz nastepujace zdefiniowane aliasy pocztowe:';
