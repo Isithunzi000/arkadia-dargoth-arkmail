@@ -204,3 +204,47 @@ test('wczytaj wszystkie: Przerwij zatrzymuje petle miedzy stronami', async () =>
     await stopHarness();
   }
 });
+
+// --- Fala 9d: straznik mielenia - strona bez nowych wpisow zatrzymuje petle --
+
+test('wczytaj wszystkie: strona bez nowych wpisow zatrzymuje petle', async () => {
+  const h = await startHarness();
+  const { f, waitFor } = h;
+  try {
+    await loadTruncatedBox(h);
+    click(h, '.arkmail-older-all');
+    await waitFor(
+      () => f.sent.some((c) => c.startsWith('listy odebrane przed')),
+      'komenda petli 1',
+    );
+    const cmd = () => f.sent.filter((c) => c === 'listy odebrane przed 22 XII 2025').length;
+
+    // Strona z listami TEGO SAMEGO dnia co najstarszy widoczny (21 XII):
+    // wpisy sa nowe, ale kotwica (najstarsza data + 1 dzien) NIE cofa sie.
+    f.fire('Wybrane listy odebrane (prezentowane jest pierwsze 50):', 'mail');
+    f.fire(' 3. *R* Temat: ranny jeden', 'mail');
+    f.fire('Nadawca: Bar                          N, 21 XII 2025, 00:45:00', 'mail');
+    f.fire(' 2. *R* Temat: ranny dwa', 'mail');
+    f.fire('Nadawca: Bar                          N, 21 XII 2025, 00:30:00', 'mail');
+    f.fire('> ', 'prompt');
+    await waitRt(() => cmd() === 2, 'komenda petli 2 (ta sama kotwica)');
+
+    // Serwer zwraca TA SAMA strone (50 najnowszych <= kotwicy juz znamy):
+    // zero nowych wpisow = koniec sensownej roboty, petla ma STAC mimo
+    // suffixu uciecia (ogon ponad 50 listow jednego dnia - znane
+    // ograniczenie, do ktorego sluzy szukanie).
+    f.fire('Wybrane listy odebrane (prezentowane jest pierwsze 50):', 'mail');
+    f.fire(' 3. *R* Temat: ranny jeden', 'mail');
+    f.fire('Nadawca: Bar                          N, 21 XII 2025, 00:45:00', 'mail');
+    f.fire(' 2. *R* Temat: ranny dwa', 'mail');
+    f.fire('Nadawca: Bar                          N, 21 XII 2025, 00:30:00', 'mail');
+    f.fire('> ', 'prompt');
+    await waitRt(() => notifyText(f, 'Wczytano wszystkie: +2 listow (2 stron)'), 'notify konca');
+
+    // Pacing by minal kilka razy - zadna kolejna komenda nie wylatuje.
+    await new Promise((r) => setTimeout(r, 1200));
+    assert.equal(cmd(), 2, 'petla stanela na stronie bez nowych wpisow');
+  } finally {
+    await stopHarness();
+  }
+});

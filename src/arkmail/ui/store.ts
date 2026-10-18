@@ -120,9 +120,10 @@ export class MailUiStore {
    * stron jest wzgledna i kotwica (+1 dzien) daje nakladanie.
    * truncated=false oznacza koniec starszych (przycisk znika).
    */
-  appendMailboxPage(box: MailBox, entries: MailboxEntry[], truncated: boolean): void {
+  /** Dokleja strone starszych wpisow; zwraca liczbe NOWYCH (po dedup). */
+  appendMailboxPage(box: MailBox, entries: MailboxEntry[], truncated: boolean): number {
     const view = this.current.boxes[box];
-    if (!view) return;
+    if (!view) return 0;
     const key = (e: MailboxEntry): string =>
       [e.party, e.subject, e.forwarded ? 'f' : '', e.date?.raw ?? ''].join('|');
     const known = new Set(view.entries.map(key));
@@ -134,6 +135,7 @@ export class MailUiStore {
     };
     const boxes = { ...this.current.boxes, [box]: next };
     this.update({ boxes, badge: computeBadge(boxes) });
+    return fresh.length;
   }
 
   setBusy(label: string | null): void {

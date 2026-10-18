@@ -326,7 +326,7 @@ export async function init(api: PluginApi) {
             let more = false;
             if (res.kind === "lista") {
               stampEntries(res.entries);
-              ui.appendMailboxPage(box, res.entries, res.header.truncated);
+              const freshCount = ui.appendMailboxPage(box, res.entries, res.header.truncated);
               const merged = upsertLetters(
                 ui.state.archive,
                 res.entries.map((e) => fromMailboxEntry(box, e)),
@@ -334,7 +334,11 @@ export async function init(api: PluginApi) {
               ui.setArchive(merged.letters);
               persistArchive();
               added += merged.added;
-              more = res.header.truncated;
+              // Fala 9d (straznik mielenia): strona bez NOWYCH wpisow =
+              // kotwica stoi w miejscu (np. ogon ponad 50 listow jednego
+              // dnia) - dalsze strony bylyby identyczne, petla staje mimo
+              // suffixu uciecia.
+              more = res.header.truncated && freshCount > 0;
             } else {
               ui.appendMailboxPage(box, [], false);
             }
