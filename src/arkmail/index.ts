@@ -253,7 +253,7 @@ export async function init(api: PluginApi) {
     const view = ui.state.boxes[box];
     const oldest = oldestEntry(view?.entries ?? []);
     if (!oldest?.date) {
-      notify(api, "Brak daty do paginacji - najpierw pobierz skrzynke.");
+      notify(api, "Nie mozna wczytac starszych - najpierw pobierz skrzynke.");
       return;
     }
     // Kotwica: najstarsza data + 1 dzien ("przed" wyklucza caly dzien
@@ -270,14 +270,14 @@ export async function init(api: PluginApi) {
           const merged = upsertLetters(ui.state.archive, incoming);
           ui.setArchive(merged.letters);
           persistArchive();
-          notify(api, `Archiwum: +${merged.added} starszych listow.`);
+          notify(api, `Wczytano starsze listy (nowych: ${merged.added}).`);
         } else {
           ui.appendMailboxPage(box, [], false);
           notify(api, "Brak starszych listow.");
         }
       })
       .catch((err: unknown) =>
-        notify(api, `Blad paginacji: ${err instanceof Error ? err.message : String(err)}`),
+        notify(api, `Blad wczytywania starszych: ${err instanceof Error ? err.message : String(err)}`),
       )
       .finally(() => ui.setBusy(null));
   };
@@ -348,14 +348,14 @@ export async function init(api: PluginApi) {
             await sleepOrCancel(LOAD_ALL_PACE_MS, flag);
           }
           if (flag.cancelled) {
-            notify(api, `Przerwiano: +${added} listow (${pages} stron).`);
+            notify(api, `Przerwiano (listow: ${added}, stron: ${pages}).`);
           } else if (pages >= LOAD_ALL_MAX_PAGES && ui.state.boxes[box]?.truncated) {
             notify(
               api,
-              `Limit ${LOAD_ALL_MAX_PAGES} stron: +${added} listow - kliknij ponownie, aby kontynuowac.`,
+              `Limit ${LOAD_ALL_MAX_PAGES} stron (listow: ${added}) - kliknij ponownie, aby kontynuowac.`,
             );
           } else {
-            notify(api, `Wczytano wszystkie: +${added} listow (${pages} stron).`);
+            notify(api, `Wczytano wszystkie (listow: ${added}, stron: ${pages}).`);
           }
         } finally {
           loadAllFlag = null;
@@ -447,7 +447,7 @@ export async function init(api: PluginApi) {
             );
             ui.setArchive(merged.letters);
             persistArchive();
-            notify(api, `Wyniki szukania: ${res.entries.length} listow.`);
+            notify(api, `Wyniki szukania (listow: ${res.entries.length}).`);
           } else {
             notify(api, "Brak pasujacych listow.");
           }

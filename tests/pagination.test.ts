@@ -67,7 +67,7 @@ test('paginacja: wczytaj starsze dokleja strone "Wybrane" do widoku i archiwum',
     f.fire('Nadawca: Waldo                          N, 14 XII 2025, 10:00:00', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(() => content.querySelectorAll('.arkmail-entry').length === 4, 'merge strony');
-    await waitFor(() => notifyText(f, 'Archiwum: +1'), 'notify o dopisaniu starszych do archiwum');
+    await waitFor(() => notifyText(f, 'nowych: 1'), 'notify o dopisaniu starszych do archiwum');
 
     // Klik 2: kotwica = 14 XII + 1 dzien = 15 XII 2025.
     click(h, '.arkmail-older');
@@ -156,7 +156,7 @@ test('wczytaj wszystkie: petla stron az do konca (kotwica przesuwa sie co strone
     f.fire('Nadawca: Baz                          Pn, 1 XII 2025, 09:00:00', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(
-      () => notifyText(f, 'Wczytano wszystkie: +2 listow (2 stron)'),
+      () => notifyText(f, 'Wczytano wszystkie (listow: 2, stron: 2)'),
       'notify podsumowania petli',
     );
     assert.equal(content.querySelectorAll('.arkmail-entry').length, 5, '3 + 2 wpisy po merge');
@@ -187,7 +187,7 @@ test('wczytaj wszystkie: Przerwij zatrzymuje petle miedzy stronami', async () =>
     await waitRt(() => textOf(h, '.arkmail-older-all').includes('Przerwij'), 'Przerwij w petli');
 
     click(h, '.arkmail-older-all'); // = Przerwij
-    await waitRt(() => notifyText(f, 'Przerwiano: +1 listow (1 stron)'), 'notify przerwania');
+    await waitRt(() => notifyText(f, 'Przerwiano (listow: 1, stron: 1)'), 'notify przerwania');
 
     // Pacing by minal - komendy paginacji nie leca dalej.
     await new Promise((r) => setTimeout(r, 500));
@@ -239,7 +239,7 @@ test('wczytaj wszystkie: strona bez nowych wpisow zatrzymuje petle', async () =>
     f.fire(' 2. *R* Temat: ranny dwa', 'mail');
     f.fire('Nadawca: Bar                          N, 21 XII 2025, 00:30:00', 'mail');
     f.fire('> ', 'prompt');
-    await waitRt(() => notifyText(f, 'Wczytano wszystkie: +2 listow (2 stron)'), 'notify konca');
+    await waitRt(() => notifyText(f, 'Wczytano wszystkie (listow: 2, stron: 2)'), 'notify konca');
 
     // Pacing by minal kilka razy - zadna kolejna komenda nie wylatuje.
     await new Promise((r) => setTimeout(r, 1200));

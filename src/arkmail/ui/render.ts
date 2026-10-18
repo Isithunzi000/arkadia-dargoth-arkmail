@@ -61,8 +61,8 @@ const TABS: Array<[UiTab, string]> = [
 const BOXES: Array<[MailBox, string]> = [
   ['odebrane', 'Odebrane'],
   ['nieprzeczytane', 'Nieprzeczytane'],
-  ['wyslane', 'Wysłane'],
-  ['niewyslane', 'Niewysłane'],
+  ['wyslane', 'Wyslane'],
+  ['niewyslane', 'Niewyslane'],
 ];
 
 export function mountMailUi(
@@ -115,7 +115,7 @@ export function mountMailUi(
   const renderBusy = (label: string): HTMLElement => {
     const el = doc.createElement('div');
     el.className = 'arkmail-busy';
-    el.textContent = `Operacja pocztowa w toku: ${label}`;
+    el.textContent = `${label}`;
     return el;
   };
 
@@ -155,7 +155,7 @@ export function mountMailUi(
       const refresh = doc.createElement('button');
       refresh.className = 'arkmail-refresh';
       refresh.setAttribute('data-box', box);
-      refresh.setAttribute('title', `Odśwież: ${label}`);
+      refresh.setAttribute('title', `Odswiez: ${label}`);
       refresh.textContent = '↻';
       refresh.addEventListener('click', () => handlers.onRefreshBox(box));
       boxes.appendChild(refresh);
@@ -171,7 +171,7 @@ export function mountMailUi(
     chk.checked = state.notifyEnabled;
     chk.addEventListener('click', () => store.setNotifyEnabled(!store.state.notifyEnabled));
     notifyRow.appendChild(chk);
-    notifyRow.appendChild(doc.createTextNode(' Powiadom o nowej poczcie (tost)'));
+    notifyRow.appendChild(doc.createTextNode(' Powiadom o nowej poczcie'));
     pane.appendChild(notifyRow);
 
     // Pasek szukania serwerowego (komenda "listy" z filtrami, skladnia
@@ -313,10 +313,13 @@ export function mountMailUi(
     head.appendChild(subj);
     const meta = doc.createElement('div');
     meta.className = 'arkmail-letter-meta';
-    meta.textContent =
-      `List ${l.number} — Od: ${l.from} — Do: ${l.to}` +
-      (l.cc ? ` — DW: ${l.cc}` : '') +
-      (l.date ? ` — ${l.date}` : '');
+    // Fala 9e: czytelne pary pole-wartosc; serwerowy numer listu nic
+    // nie mowi graczowi (kontekstowy), puste "Do" pomijamy (list na DW).
+    const parts = [`Od: ${l.from}`];
+    if (l.to) parts.push(`Do: ${l.to}`);
+    if (l.cc) parts.push(`DW: ${l.cc}`);
+    if (l.date) parts.push(l.date);
+    meta.textContent = parts.join(' | ');
     head.appendChild(meta);
     pane.appendChild(head);
     const body = doc.createElement('div');
@@ -331,7 +334,7 @@ export function mountMailUi(
     const source = l.source;
     const del = doc.createElement('button');
     del.className = 'arkmail-del';
-    del.textContent = 'Usuń';
+    del.textContent = 'Usun';
     if (source) {
       del.addEventListener('click', () => handlers.onDeleteLetter(l.box, source));
     } else {
@@ -341,12 +344,12 @@ export function mountMailUi(
     ops.appendChild(del);
     const fwdInput = doc.createElement('input');
     fwdInput.setAttribute('data-field', 'forward');
-    fwdInput.setAttribute('placeholder', 'Przekaż do (gracz/alias)');
+    fwdInput.setAttribute('placeholder', 'Przekaz do (gracz lub alias)');
     if (!source) fwdInput.setAttribute('disabled', '');
     ops.appendChild(fwdInput);
     const fwd = doc.createElement('button');
     fwd.className = 'arkmail-fwd';
-    fwd.textContent = 'Przekaż';
+    fwd.textContent = 'Przekaz';
     if (source) {
       fwd.addEventListener('click', () => {
         const adresat = fwdInput.value.trim();
@@ -413,7 +416,7 @@ export function mountMailUi(
     pane.appendChild(sel);
 
     const labW = doc.createElement('label');
-    labW.textContent = 'Szerokość linii (20-120)';
+    labW.textContent = 'Szerokosc linii (20-120)';
     pane.appendChild(labW);
     const width = doc.createElement('input');
     width.setAttribute('data-field', 'szerokosc');
@@ -427,7 +430,7 @@ export function mountMailUi(
     pane.appendChild(width);
 
     const lab = doc.createElement('label');
-    lab.textContent = 'Treść';
+    lab.textContent = 'Tresc';
     pane.appendChild(lab);
     const tresc = doc.createElement('textarea');
     tresc.setAttribute('data-field', 'tresc');
@@ -435,7 +438,7 @@ export function mountMailUi(
     pane.appendChild(tresc);
 
     const labP = doc.createElement('label');
-    labP.textContent = 'Podgląd (tak list wyjedzie do gry)';
+    labP.textContent = 'Podglad (tak list zostanie wyslany)';
     pane.appendChild(labP);
     const preview = doc.createElement('pre');
     preview.className = 'arkmail-preview';
@@ -457,7 +460,7 @@ export function mountMailUi(
 
     const send = doc.createElement('button');
     send.className = 'arkmail-send';
-    send.textContent = 'Wyślij';
+    send.textContent = 'Wyslij';
     send.addEventListener('click', () => {
       const st = store.state;
       const rendered = renderLetter(tresc.value, st.composeTemplate, st.composeWidth);
@@ -578,8 +581,8 @@ export function mountMailUi(
       ['', 'Wszystkie skrzynki'],
       ['odebrane', 'Odebrane'],
       ['nieprzeczytane', 'Nieprzeczytane'],
-      ['wyslane', 'Wysłane'],
-      ['niewyslane', 'Niewysłane'],
+      ['wyslane', 'Wyslane'],
+      ['niewyslane', 'Niewyslane'],
     ];
     for (const [value, label] of SKR_OPTS) {
       const o = doc.createElement('option');
@@ -613,7 +616,10 @@ export function mountMailUi(
           row.appendChild(subj);
           const meta = doc.createElement('span');
           meta.className = 'arkmail-arch-meta';
-          meta.textContent = `— ${l.party} [${l.box}]`;
+          // Fala 9e: "od/do" zamiast nawiasow technicznych; skrzynka
+          // po ludzku, z kierunkiem strony listu.
+          const dir = l.box === 'odebrane' || l.box === 'nieprzeczytane' ? 'od' : 'do';
+          meta.textContent = `${dir} ${l.party} | ${l.box}`;
           row.appendChild(meta);
           return row;
         }),
