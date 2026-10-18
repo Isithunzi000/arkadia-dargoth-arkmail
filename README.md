@@ -21,10 +21,16 @@ Po załadowaniu: alias `/arkmail` (otwiera/zamyka okno), pozycja
 
 ## Możliwości
 
-- **Listy** — cztery skrzynki, wyróżnienie nieprzeczytanych, przycisk
-  "Wczytaj starsze" (paginacja `listy <skrzynka> przed <data>`) albo
-  "Wczytaj wszystkie" — pętla stron do końca archiwum (limit 40 stron,
-  pauza 400 ms między stronami, przycisk zamienia się w "Przerwij").
+- **Listy** — cztery skrzynki (od najnowszych), wyróżnienie
+  nieprzeczytanych, odświeżanie per skrzynka, przycisk "Wczytaj starsze"
+  (paginacja `listy <skrzynka> przed <data>`) albo "Wczytaj wszystkie" —
+  pętla stron do końca archiwum (limit 40 stron, pauza 400 ms między
+  stronami, przycisk zamienia się w "Przerwij").
+- **Szukaj** — pasek nad listą korzysta z serwerowej składni `?listy`:
+  osoba (`od`/`do` dobrane do skrzynki), zakres dat (włączny, z kalendarza),
+  temat i treść — argumenty można łączyć. Wyniki pokazują się z banerem
+  i przyciskiem "Wyczyść", który przywraca pełny widok bez odpytywania
+  serwera; trafienia lądują też w lokalnym archiwum.
 - **List** — nagłówek i treść; operacje Usuń i Przekaż (subdialog DW
   obsługiwany automatycznie, błędy adresata zgłaszane tostem).
 - **Napisz list** — adresat / temat / DW / treść, sześć szablonów ramki
@@ -36,7 +42,9 @@ Po załadowaniu: alias `/arkmail` (otwiera/zamyka okno), pozycja
   duplikaty scalane bez względu na wielkość liter; liczniki
   odebranych/wysłanych i data ostatniego kontaktu; filtr (nazwa/alias)
   i sortowanie (nazwa, liczba listów, ostatni kontakt).
-- **Archiwum** — lokalne, per postać; filtry po temacie.
+- **Archiwum** — lokalne, per postać; każde pobrane listowanie, wynik
+  szukania i otwarty list dopisują się do cache; filtry: osoba, skrzynka,
+  zakres dat, temat i treść.
 - Powiadomienie `[ POCZTA ] Masz nowa poczte od ...` odświeża skrzynki
   i badge; opcjonalny tost (przełącznik w panelu Listy).
 
