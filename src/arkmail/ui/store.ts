@@ -37,6 +37,8 @@ export interface MailUiState {
   busy: string | null;
   /** petla "Wczytaj wszystkie" w toku: skrzynka + liczba pobranych stron */
   loadAll: { box: MailBox; pages: number } | null;
+  /** tryb wynikow szukania serwerowego: skrzynka + opis zapytania */
+  search: { box: MailBox; label: string } | null;
   letter: OpenLetter | null;
   contacts: Contact[];
   archive: ArchiveLetter[];
@@ -54,6 +56,7 @@ const DEFAULT_STATE: MailUiState = {
   badge: 0,
   busy: null,
   loadAll: null,
+  search: null,
   letter: null,
   contacts: [],
   archive: [],
@@ -65,6 +68,8 @@ const DEFAULT_STATE: MailUiState = {
 export class MailUiStore {
   private current: MailUiState;
   private readonly listeners = new Set<(s: MailUiState) => void>();
+  /** Schowek pelnych widokow skrzynek na czas trybu wynikow szukania. */
+  private readonly stashedViews: Partial<Record<MailBox, BoxView>> = {};
 
   constructor(initial?: Partial<MailUiState>) {
     this.current = { ...DEFAULT_STATE, ...initial };
@@ -131,6 +136,48 @@ export class MailUiStore {
 
   setLoadAll(loadAll: { box: MailBox; pages: number } | null): void {
     this.update({ loadAll });
+  }
+
+  setSearch(search: { box: MailBox; label: string } | null): void {
+    this.update({ search });
+  }
+
+  /**
+   * Wpisy wynikow szukania ZASTEPUJA widok skrzynki; pelny widok
+   * chowany jest do schowka (pierwszy raz na skrzynke - powtorne
+   * szukanie nie nadpisuje schowka wynikami). Przywrocenie przez
+   * clearSearch - bez strzalu do serwera.
+   */
+  applySearchResults(box: MailBox, result: MailboxResult): void {
+    if (!(box in this.stashedViews)) {
+      const current = this.current.boxes[box];
+      if (current) this.stashedViews[box] = current;
+    }
+    this.applyMailbox(box, result);
+  }
+
+  /** Przywraca schowany pelny widok skrzynki i konczy tryb szukania. */
+  clearSearch(box: MailBox): void {
+    const stashed = this.stashedViews[box];
+    delete this.stashedViews[box];
+    const patch: Partial<MailUiState> = { search: null };
+    if (stashed) {
+      const boxes = { ...this.current.boxes, [box]: stashed };
+      patch.boxes = boxes;
+      patch.badge = computeBadge(boxes);
+    }
+    this.update(patch);
+  }
+
+  /**
+   * Kasuje tryb szukania BEZ przywracania schowka - dla swiezego
+   * refresha skrzynki (nowy listing i tak nadpisze widok).
+   */
+  clearSearchBoxes(boxes: MailBox[]): void {
+    for (const b of boxes) delete this.stashedViews[b];
+    if (this.current.search && boxes.includes(this.current.search.box)) {
+      this.update({ search: null });
+    }
   }
 
   /** Otwiera list: waski -> zakladka 'list', szeroki -> zostaje w podziale. */

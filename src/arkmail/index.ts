@@ -22,7 +22,12 @@ import {
 } from "./meta";
 import type { MailBox } from "./core/protocol/types";
 import { parseNotification } from "./core/protocol/parser";
-import { olderListingCommand, nextDay } from "./core/protocol/commands";
+import {
+  olderListingCommand,
+  nextDay,
+  searchListingCommand,
+  searchDescription,
+} from "./core/protocol/commands";
 import type { LetterTemplate } from "./core/letterRender";
 import { contactsFromBoxes } from "./core/contacts";
 import {
@@ -123,6 +128,9 @@ export async function init(api: PluginApi) {
   };
 
   const refreshBoxes = (boxes: MailBox[]): void => {
+    // Swiezy listing nadpisuje widok - tryb wynikow szukania na tych
+    // skrzynkach przestaje obowiazywac (bez przywracania schowka).
+    ui.clearSearchBoxes(boxes);
     void lock
       .runExclusive(async () => {
         for (const box of boxes) {
@@ -353,6 +361,32 @@ export async function init(api: PluginApi) {
     onRefreshBox: (box) => refreshBoxes([box]),
     onLoadOlder: (box) => loadOlder(box),
     onLoadAll: (box) => loadAll(box),
+    onSearch: (box, query) => {
+      ui.setBusy(`Szukam w skrzynce ${box}...`);
+      void lock
+        .runExclusive(async () => {
+          const res = await mailbox.fetch(box, searchListingCommand(box, query));
+          ui.setSearch({ box, label: searchDescription(box, query) });
+          ui.applySearchResults(box, res);
+          if (res.kind === "lista") {
+            // Cache (jak przy kazdym listingu): wyniki tez do archiwum.
+            const merged = upsertLetters(
+              ui.state.archive,
+              res.entries.map((e) => fromMailboxEntry(box, e)),
+            );
+            ui.setArchive(merged.letters);
+            persistArchive();
+            notify(api, `Wyniki szukania: ${res.entries.length} listow.`);
+          } else {
+            notify(api, "Brak pasujacych listow.");
+          }
+        })
+        .catch((err: unknown) =>
+          notify(api, `Blad szukania: ${err instanceof Error ? err.message : String(err)}`),
+        )
+        .finally(() => ui.setBusy(null));
+    },
+    onClearSearch: (box) => ui.clearSearch(box),
     onDeleteLetter: (box, number) => {
       ui.setBusy(`Kasuje list ${number}...`);
       void lock

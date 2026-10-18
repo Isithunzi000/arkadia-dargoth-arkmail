@@ -60,6 +60,8 @@ function mount(store: MailUiStore, handlers: Partial<MailUiHandlers> = {}) {
     onRefreshBox: rec('refresh'),
     onLoadOlder: rec('older'),
     onLoadAll: rec('all'),
+    onSearch: rec('search'),
+    onClearSearch: rec('clear-search'),
     onDeleteLetter: rec('del'),
     onForwardLetter: rec('fwd'),
     ...handlers,
@@ -514,5 +516,92 @@ test('render: kontakty - filtr i sort lokalne (bez store), wiersz z data', () =>
     ['Grault', 'Garply', 'Bar'],
     'filtr i sort nie ruszaja store (lokalne, jak filtr archiwum)',
   );
+  off();
+});
+
+// --- Fala 8g: pasek szukania serwerowego w zakladce Listy ---------------------
+
+test('render: pasek szukania komponuje zapytanie z pol (daty ISO -> DateYMD)', () => {
+  const s = new MailUiStore();
+  s.applyMailbox('odebrane', {
+    kind: 'lista',
+    header: { box: 'odebrane', truncated: false },
+    entries: [entry()],
+  });
+  const { container, calls, off } = mount(s);
+  const set = (sel: string, v: string) => {
+    const el = container.querySelector(sel) as unknown as HTMLInputElement;
+    el.value = v;
+    fireEvent(el, 'input');
+  };
+  assert.ok(container.querySelector('[data-search="osoba"]'), 'pole osoby');
+  assert.ok(container.querySelector('[data-search="temat"]'), 'pole tematu');
+  assert.ok(container.querySelector('[data-search="odDaty"]'), 'pole od daty');
+  assert.ok(container.querySelector('[data-search="doDaty"]'), 'pole do daty');
+  set('[data-search="osoba"]', 'Bar');
+  set('[data-search="temat"]', 'perly');
+  set('[data-search="odDaty"]', '2026-04-01');
+  set('[data-search="doDaty"]', '2026-04-30');
+  click(container.querySelector('.arkmail-search-go')!);
+  assert.deepEqual(calls, [
+    {
+      name: 'search',
+      args: [
+        'odebrane',
+        {
+          osoba: 'Bar',
+          odDaty: { day: 1, month: 4, year: 2026 },
+          doDaty: { day: 30, month: 4, year: 2026 },
+          temat: 'perly',
+        },
+      ],
+    },
+  ]);
+  off();
+});
+
+test('render: puste zapytanie nie strzela (Szukaj bez pol = brak akcji)', () => {
+  const s = new MailUiStore();
+  s.applyMailbox('odebrane', {
+    kind: 'lista',
+    header: { box: 'odebrane', truncated: false },
+    entries: [entry()],
+  });
+  const { container, calls, off } = mount(s);
+  click(container.querySelector('.arkmail-search-go')!);
+  assert.deepEqual(calls, [], 'puste pola = brak onSearch');
+  off();
+});
+
+test('render: tryb wynikow - banner z opisem, Wyczysc, paginacja schowana', () => {
+  const s = new MailUiStore();
+  s.applyMailbox('wyslane', {
+    kind: 'lista',
+    header: { box: 'wyslane', truncated: true },
+    entries: [entry()],
+  });
+  s.setActiveBox('wyslane');
+  s.setSearch({ box: 'wyslane', label: 'wyslane, adresat: Bar' });
+  const { container, calls, off } = mount(s);
+  const banner = container.querySelector('.arkmail-search-banner');
+  assert.ok(banner, 'banner wynikow widoczny');
+  assert.ok(banner!.textContent?.includes('wyslane, adresat: Bar'), 'banner z opisem zapytania');
+  assert.ok(!container.querySelector('.arkmail-older'), 'paginacja schowana w trybie wynikow');
+  assert.ok(!container.querySelector('.arkmail-older-all'));
+  click(container.querySelector('.arkmail-search-clear')!);
+  assert.deepEqual(calls, [{ name: 'clear-search', args: ['wyslane'] }]);
+  off();
+});
+
+test('render: szukanie na innej skrzynce nie pokazuje bannera tutaj', () => {
+  const s = new MailUiStore();
+  s.applyMailbox('odebrane', {
+    kind: 'lista',
+    header: { box: 'odebrane', truncated: false },
+    entries: [entry()],
+  });
+  s.setSearch({ box: 'wyslane', label: 'wyslane, adresat: Bar' });
+  const { container, off } = mount(s);
+  assert.ok(!container.querySelector('.arkmail-search-banner'), 'banner tylko na szukanej skrzynce');
   off();
 });

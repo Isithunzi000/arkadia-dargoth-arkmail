@@ -43,3 +43,71 @@ export function nextDay(date: DateYMD): DateYMD {
   if (date.month < 12) return { day: 1, month: date.month + 1, year: date.year };
   return { day: 1, month: 1, year: date.year + 1 };
 }
+
+// --- Szukanie serwerowe (Fala 8g, skladnia ?listy z helpu w grze) ------------
+
+/**
+ * Zapytanie szukania z UI. Daty sa WLACZNE (tak mysli uzytkownik);
+ * budowniczy komendy przelicza je na granice serwera.
+ */
+export interface ListingSearch {
+  /** Nadawca (odebrane/nieprzeczytane) albo adresat (wyslane/niewyslane). */
+  osoba?: string;
+  odDaty?: DateYMD;
+  doDaty?: DateYMD;
+  temat?: string;
+  tresc?: string;
+}
+
+const SENDER_BOXES: ReadonlySet<MailBox> = new Set(['odebrane', 'nieprzeczytane']);
+
+const datePart = (d: DateYMD): string => `${d.day} ${ROMAN_MONTHS[d.month - 1]} ${d.year}`;
+
+/**
+ * Komenda "listy" z filtrami serwera. Kolejnosc: osoba -> daty ->
+ * temat -> tresc (help: temat lub tresc zawsze jako ostatni z nich).
+ * "przed" wyklucza dzien graniczny (dowod paginacji), wiec dla wlacznej
+ * daty koncowej wysylamy przed nastepny dzien. Dolna granica "po"
+ * przechodzi doslownie (zakladamy wlacznosc - do weryfikacji w grze,
+ * patrz docs/PROTOCOL.md).
+ */
+export function searchListingCommand(box: MailBox, q: ListingSearch): string {
+  const parts = [`listy ${box}`];
+  if (q.osoba) parts.push(SENDER_BOXES.has(box) ? `od ${q.osoba}` : `do ${q.osoba}`);
+  if (q.odDaty) parts.push(`po ${datePart(q.odDaty)}`);
+  if (q.doDaty) parts.push(`przed ${datePart(nextDay(q.doDaty))}`);
+  if (q.temat) parts.push(`o temacie ${q.temat}`);
+  if (q.tresc) parts.push(`o tresci ${q.tresc}`);
+  return parts.join(' ');
+}
+
+const ISO_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/** Pole input type="date" ("YYYY-MM-DD") -> DateYMD; null gdy smieci
+ *  (walidacja kalendarza gregorianskiego jak na serwerze). */
+export function fromISODate(iso: string): DateYMD | null {
+  const m = iso.match(ISO_RE);
+  if (!m) return null;
+  const date = { year: Number(m[1]), month: Number(m[2]), day: Number(m[3]) };
+  try {
+    // nextDay rzuca RangeError dla dat spoza kalendarza (np. 30 II).
+    nextDay(date);
+  } catch {
+    return null;
+  }
+  return date;
+}
+
+const isoOf = (d: DateYMD): string =>
+  `${d.year}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
+
+/** Opis zapytania do bannera wynikow (czytelny, po polsku). */
+export function searchDescription(box: MailBox, q: ListingSearch): string {
+  const parts: string[] = [box];
+  if (q.osoba) parts.push(`${SENDER_BOXES.has(box) ? 'nadawca' : 'adresat'}: ${q.osoba}`);
+  if (q.odDaty) parts.push(`od dnia: ${isoOf(q.odDaty)}`);
+  if (q.doDaty) parts.push(`do dnia: ${isoOf(q.doDaty)}`);
+  if (q.temat) parts.push(`temat: "${q.temat}"`);
+  if (q.tresc) parts.push(`tresc: "${q.tresc}"`);
+  return parts.join(', ');
+}

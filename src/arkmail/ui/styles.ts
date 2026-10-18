@@ -189,6 +189,28 @@ export const STYLES = `
 
 .arkmail-root .arkmail-older { margin-top: 8px; width: 100%; }
 .arkmail-older-row { display: flex; gap: 6px; margin-top: 8px; }
+.arkmail-search-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto auto auto;
+  gap: 6px;
+  margin: 8px 0;
+  align-items: center;
+}
+.arkmail-search-row input[type='date'] { color-scheme: dark; }
+.arkmail-search-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: ${BG_RAISED};
+  border: 1px solid ${ACCENT};
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  color: ${FG};
+  font-size: 12px;
+}
+.arkmail-root .arkmail-search-clear { flex: none; padding: 2px 10px; }
 .arkmail-older-row .arkmail-older { margin-top: 0; flex: 1; }
 .arkmail-root .arkmail-older-all { flex: 1; }
 .arkmail-root button.arkmail-older-all { margin-top: 8px; width: 100%; }

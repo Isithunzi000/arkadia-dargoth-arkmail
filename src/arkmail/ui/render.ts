@@ -8,6 +8,7 @@
  */
 
 import type { MailBox } from '../core/protocol/types.js';
+import { fromISODate, type ListingSearch } from '../core/protocol/commands.js';
 import { filterLetters, type ArchiveFilter } from '../core/archive.js';
 import { viewContacts, type ContactSort } from '../core/contacts.js';
 import {
@@ -26,6 +27,10 @@ export interface MailUiHandlers {
   onLoadOlder(box: MailBox): void;
   /** Start petli "Wczytaj wszystkie"; w trakcie petli = Przerwij. */
   onLoadAll(box: MailBox): void;
+  /** Szukanie serwerowe (komenda "listy" z filtrami). */
+  onSearch(box: MailBox, query: ListingSearch): void;
+  /** Koniec trybu wynikow szukania (restore pelnego widoku, bez refetchu). */
+  onClearSearch(box: MailBox): void;
   onDeleteLetter(box: MailBox, number: number): void;
   onForwardLetter(box: MailBox, number: number, adresat: string): void;
 }
@@ -161,6 +166,61 @@ export function mountMailUi(
     notifyRow.appendChild(doc.createTextNode(' Powiadom o nowej poczcie (tost)'));
     pane.appendChild(notifyRow);
 
+    // Pasek szukania serwerowego (komenda "listy" z filtrami, skladnia
+    // ?listy). Pola niekontrolowane (bez rerendera przy pisaniu);
+    // puste zapytanie nie strzela.
+    const searchRow = doc.createElement('div');
+    searchRow.className = 'arkmail-search-row';
+    const mkSearch = (key: string, placeholder: string, type = 'text') => {
+      const input = doc.createElement('input');
+      input.setAttribute('data-search', key);
+      input.setAttribute('type', type);
+      input.setAttribute('placeholder', placeholder);
+      return input;
+    };
+    const sOsoba = mkSearch('osoba', 'Osoba');
+    const sTemat = mkSearch('temat', 'Temat');
+    const sOd = mkSearch('odDaty', 'Od dnia', 'date');
+    const sDo = mkSearch('doDaty', 'Do dnia', 'date');
+    const go = doc.createElement('button');
+    go.className = 'arkmail-search-go';
+    go.textContent = 'Szukaj';
+    go.addEventListener('click', () => {
+      const osoba = (sOsoba as HTMLInputElement).value.trim();
+      const temat = (sTemat as HTMLInputElement).value.trim();
+      const odDaty = fromISODate((sOd as HTMLInputElement).value) ?? undefined;
+      const doDaty = fromISODate((sDo as HTMLInputElement).value) ?? undefined;
+      const query: ListingSearch = {
+        ...(osoba !== '' ? { osoba } : {}),
+        ...(odDaty ? { odDaty } : {}),
+        ...(doDaty ? { doDaty } : {}),
+        ...(temat !== '' ? { temat } : {}),
+      };
+      if (Object.keys(query).length === 0) return;
+      handlers.onSearch(state.activeBox, query);
+    });
+    searchRow.appendChild(sOsoba);
+    searchRow.appendChild(sTemat);
+    searchRow.appendChild(sOd);
+    searchRow.appendChild(sDo);
+    searchRow.appendChild(go);
+    pane.appendChild(searchRow);
+
+    // Tryb wynikow: banner z opisem zapytania + Wyczysc (restore pelnego
+    // widoku z pamieci, bez strzalu do serwera).
+    const searchMode = state.search && state.search.box === state.activeBox ? state.search : null;
+    if (searchMode) {
+      const banner = doc.createElement('div');
+      banner.className = 'arkmail-search-banner';
+      banner.appendChild(doc.createTextNode(`Wyniki szukania: ${searchMode.label}`));
+      const clear = doc.createElement('button');
+      clear.className = 'arkmail-search-clear';
+      clear.textContent = 'Wyczysc';
+      clear.addEventListener('click', () => handlers.onClearSearch(state.activeBox));
+      banner.appendChild(clear);
+      pane.appendChild(banner);
+    }
+
     const view = state.boxes[state.activeBox];
     if (!view) {
       pane.appendChild(dim('Skrzynka nie zaladowana - kliknij jej nazwe, aby pobrac.'));
@@ -195,7 +255,10 @@ export function mountMailUi(
       row.addEventListener('click', () => handlers.onOpenLetter(state.activeBox, e.number));
       pane.appendChild(row);
     }
-    if (state.loadAll && state.loadAll.box === state.activeBox) {
+    if (searchMode) {
+      // Wyniki szukania sa renumerowane wewnatrz selekcji - paginacja
+      // wstecz nie ma tu sensu (kotwica liczona z pelnego listingu).
+    } else if (state.loadAll && state.loadAll.box === state.activeBox) {
       // Petla "Wczytaj wszystkie" w toku na tej skrzynce: jedyny przycisk
       // to Przerwij z numerem biezacej strony.
       const cancel = doc.createElement('button');

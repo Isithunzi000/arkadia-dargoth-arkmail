@@ -57,6 +57,56 @@ Nie masz zadnych niewyslanych listow.
 Nie znaleziono zadnych takich wyslanych listow.        <- filtr bez trafien
 ```
 
+## Szukanie po stronie serwera (`?listy`)
+
+Pelna skladnia z pomocy w grze (`?listy`, przechwycona 2026-04):
+
+```
+listy [nieprzeczytane/otrzymane/wyslane/niewyslane]
+      [do kogo] [od kogo]
+      [dzis|wczoraj|przedwczoraj | dnia data | przed data | po data]
+      [o temacie temat] [o tresci tresc]
+```
+
+- Argumenty mozna **dowolnie laczyc**, ale `o temacie` / `o tresci` zawsze
+  jako **ostatni** z nich (serwer parsuje reszte linii jako wartosc).
+- Za kazdym razem zwracane jest **do 50 najnowszych** pasujacych listow.
+- `data` = `<d> <miesiac rzymski> <yyyy>` (np. `7 III 2002`); serwer waliduje
+  kalendarz (30 II odrzuci).
+- Pomoc mowi `otrzymane`, ale `odebrane` tez dziala (zweryfikowane w logach);
+  ArkMail uzywa nazw skrzynek `odebrane|wyslane|niewyslane|nieprzeczytane`.
+- `do [kogo]` = adresat (skrzynki wyslane/niewyslane), `od [kogo]` = nadawca
+  (odebrane/nieprzeczytane). Serwer i tak akceptuje obie formy, ArkMail
+  dobiera wlasciwa po skrzynce.
+- Przyklady z pomocy (kanoniczne):
+  `listy wyslane do alvina przed 7 III 2002 o temacie pomoc`,
+  `listy otrzymane od alvina po 28 V 2005`.
+
+### Semantyka granic dat (zweryfikowane w logach)
+
+- `przed <data>` jest **dzienno-granularne i WYLACZNE**: list z dnia
+  granicznego NIE wchodzi w wynik. Wlaczny koniec zakresu w UI
+  realizujemy wysylajac `przed <dzien po>` (ArkMail liczy kolejny dzien
+  kalendarzowo — funkcja `nextDay`).
+- `po <data>` ArkMail wysyla **doslownie** (bez przesuniecia) — semantyka
+  wlaczna/wylaczna tej granicy: **do weryfikacji w grze**.
+- `dzis|wczoraj|przedwczoraj` i `dnia <data>` sa alternatywa dla pary
+  `po`/`przed` — ArkMail uzywa wylacznie `po`/`przed` (deterministyczne).
+
+### Wynik szukania
+
+```
+**Wybrane listy** odebrane:          <- naglowek przefiltrowanego listingu
+ 1. *R* Temat: ...                   <- wpisy PRZENUMEROWANE od 1
+```
+
+- Naglowek to `**Wybrane listy** <skrzynka>` (+ suffix odcinajacy, odmienia
+  sie z liczba — dopasowujemy luzno, `pierwsz`).
+- Numery sa **renumerowane** w kontekscie wyniku — NIE odnosza sie do
+  numerow pelnego listingu. Dlatego wyniki szukania w ArkMail nie maja
+  paginacji ani wczytywania starszych; otwarcie listu dziala w kontekscie
+  ostatniego (przefiltrowanego) listingu.
+
 ## List (`przeczytaj list N`)
 
 ```

@@ -159,3 +159,34 @@ test('setLoadAll: stan petli wczytywania wszystkich (skrzynka + strona)', () => 
   s.setLoadAll(null);
   assert.equal(s.state.loadAll, null);
 });
+
+// --- Fala 8g: tryb wynikow szukania (stash pelnego widoku) --------------------
+
+test('search: applySearchResults chowa pelny widok, clearSearch go przywraca', () => {
+  const s = new MailUiStore();
+  s.applyMailbox('odebrane', lista('odebrane', [{ subject: 'A' }, { subject: 'B' }]));
+  s.setSearch({ box: 'odebrane', label: 'odebrane, nadawca: Bar' });
+  s.applySearchResults('odebrane', lista('odebrane', [{ subject: 'A' }]));
+  assert.equal(s.state.boxes.odebrane!.entries.length, 1, 'widok = wyniki szukania');
+  assert.equal(s.state.search?.box, 'odebrane');
+  assert.equal(s.state.search?.label, 'odebrane, nadawca: Bar');
+
+  // Powtorne szukanie na tej samej skrzynce NIE nadpisuje schowka wynikami.
+  s.applySearchResults('odebrane', lista('odebrane', []));
+  assert.equal(s.state.boxes.odebrane!.entries.length, 0);
+  s.clearSearch('odebrane');
+  assert.equal(s.state.boxes.odebrane!.entries.length, 2, 'przywrocony PELNY widok (bez refetchu)');
+  assert.equal(s.state.boxes.odebrane!.entries[0].subject, 'A');
+  assert.equal(s.state.search, null);
+});
+
+test('search: clearSearchBoxes kasuje szukanie bez przywracania (swiezy refresh nadpisuje)', () => {
+  const s = new MailUiStore();
+  s.applyMailbox('odebrane', lista('odebrane', [{ subject: 'A' }]));
+  s.setSearch({ box: 'odebrane', label: 'x' });
+  s.applySearchResults('odebrane', lista('odebrane', []));
+  s.clearSearchBoxes(['odebrane']);
+  assert.equal(s.state.search, null, 'szukanie skasowane');
+  s.applyMailbox('odebrane', lista('odebrane', [{ subject: 'NOWY' }]));
+  assert.equal(s.state.boxes.odebrane!.entries[0].subject, 'NOWY', 'refresh pisze po czystym widoku');
+});
