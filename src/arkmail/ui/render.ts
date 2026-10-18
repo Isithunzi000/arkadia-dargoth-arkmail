@@ -51,9 +51,11 @@ const TEMPLATES: Array<[LetterTemplate, string]> = [
   ['raw', 'Surowy (jak wpisane)'],
 ];
 
+// Fala 11b: 'list' NIE jest zakladka - to wewnetrzny stan widoku
+// (otwarty list). Na pasku "Listy" obok "List" mylilo gracza; powrot
+// z widoku listu robi 'Zamknij list' (waski) albo 'Zamknij' (wide).
 const TABS: Array<[UiTab, string]> = [
   ['listy', 'Listy'],
-  ['list', 'List'],
   ['napisz', 'Napisz list'],
   ['kontakty', 'Kontakty'],
   ['archiwum', 'Archiwum'],
@@ -82,6 +84,74 @@ export function mountMailUi(
   const archFilter: ArchiveFilter = {};
   /** Filtr i sort kontaktow: lokalne (poza store) - ten sam powod co wyzej. */
   const contactView: { filter: string; sort: ContactSort } = { filter: '', sort: 'nazwa' };
+  /** Draft pol szukajki: lokalny (jak filtr archiwum) - rerender nie kasuje
+   *  wpisanego zapytania. */
+  const searchDraft: Record<string, string> = { osoba: '', temat: '', odDaty: '', doDaty: '' };
+
+  // Fala 11c: migawka widoku na czas pelnego rerenderu. Bez niej kazda
+  // zmiana store (strona loadAll co ~400 ms, merge notyfikacji) niszczyla
+  // DOM i gubila focus/karet/scroll - litera po literze wywalalo z pola.
+  interface ViewSnap {
+    focusKey: string | null;
+    /** Wartosc aktywnego pola: draft aktualizuje sie na 'input', ale
+     *  wpis bez zdarzenia (i tak trafia tu zawsze najswiezszy tekst z DOM). */
+    focusValue: string | null;
+    caret: [number, number] | null;
+    scroll: Record<string, number>;
+  }
+  const focusKeyOf = (el: Element | null): string | null => {
+    if (!el || typeof (el as HTMLElement).getAttribute !== 'function') return null;
+    if (!root.contains(el)) return null;
+    for (const attr of ['data-search', 'data-field', 'data-filter']) {
+      const v = (el as HTMLElement).getAttribute(attr);
+      if (v !== null) return `[${attr}="${v}"]`;
+    }
+    return null;
+  };
+  const snapshotView = (): ViewSnap => {
+    const snap: ViewSnap = { focusKey: null, focusValue: null, caret: null, scroll: {} };
+    const active = doc.activeElement as Element | null;
+    const key = focusKeyOf(active);
+    if (key) {
+      snap.focusKey = key;
+      snap.focusValue = (active as HTMLInputElement).value ?? null;
+      const inp = active as HTMLInputElement;
+      try {
+        if (typeof inp.selectionStart === 'number') {
+          snap.caret = [inp.selectionStart, inp.selectionEnd ?? inp.selectionStart];
+        }
+      } catch {
+        /* np. input[type=date] bez karetki */
+      }
+    }
+    for (const pane of Array.from(root.querySelectorAll('[data-pane-key]'))) {
+      const k = (pane as HTMLElement).getAttribute('data-pane-key');
+      if (k !== null) snap.scroll[k] = (pane as HTMLElement).scrollTop;
+    }
+    return snap;
+  };
+  const restoreView = (snap: ViewSnap): void => {
+    for (const pane of Array.from(root.querySelectorAll('[data-pane-key]'))) {
+      const k = (pane as HTMLElement).getAttribute('data-pane-key');
+      if (k !== null && snap.scroll[k] !== undefined) {
+        (pane as HTMLElement).scrollTop = snap.scroll[k];
+      }
+    }
+    if (snap.focusKey) {
+      const el = root.querySelector(snap.focusKey) as HTMLInputElement | null;
+      if (el) {
+        if (snap.focusValue !== null) el.value = snap.focusValue;
+        el.focus();
+        if (snap.caret) {
+          try {
+            el.setSelectionRange(snap.caret[0], snap.caret[1]);
+          } catch {
+            /* input[type=date] */
+          }
+        }
+      }
+    }
+  };
 
   // Fala 9g: zrodla ghost-podpowiedzi, liczone na biezaco ze store.
   // Pola osobowe: kontakty (najswiezsze najpierw) + ich aliasy.
@@ -120,7 +190,9 @@ export function mountMailUi(
   };
 
   const render = (state: MailUiState) => {
+    const snap = snapshotView();
     root.className = 'arkmail-root' + (state.wide ? ' arkmail-wide' : '');
+    composePreview = null; // nowe drzewo = nowy <pre> podgladu
     const nodes: Node[] = [renderTabs(state)];
     if (state.busy !== null) nodes.push(renderBusy(state.busy));
     // Fala 10: na szerokim zakladka 'listy' to ZAWSZE split (klasyczny
@@ -131,10 +203,19 @@ export function mountMailUi(
       split.appendChild(renderListy(state));
       split.appendChild(renderList(state));
       nodes.push(split);
+    } else if (state.wide && state.tab === 'napisz') {
+      // Fala 11d: compose dwupanelowy - formularz z lewej, zywy podglad
+      // wysylanego listu z prawej (konwencja podgladu /list w kliencie).
+      const split = doc.createElement('div');
+      split.className = 'arkmail-split arkmail-split-compose';
+      split.appendChild(renderNapisz(state));
+      split.appendChild(renderComposePreview());
+      nodes.push(split);
     } else {
       nodes.push(renderPane(state));
     }
     root.replaceChildren(...nodes);
+    restoreView(snap);
   };
 
   const renderTabs = (state: MailUiState): HTMLElement => {
@@ -176,6 +257,8 @@ export function mountMailUi(
   const renderListy = (state: MailUiState): HTMLElement => {
     const pane = doc.createElement('div');
     pane.className = 'arkmail-pane';
+    // Klucz panelu dla migawki scrolla (Fala 11c).
+    pane.setAttribute('data-pane-key', `listy:${state.activeBox}`);
     const boxes = doc.createElement('div');
     boxes.className = 'arkmail-boxes';
     for (const [box, label] of BOXES) {
@@ -185,21 +268,44 @@ export function mountMailUi(
       btn.textContent = label;
       btn.addEventListener('click', () => {
         store.setActiveBox(box);
-        // Fala 9b: pobieramy tylko przy pierwszym wejsciu na skrzynke;
-        // wczytane strony zostaja (reczne odswiezanie = przycisk obok).
-        if (!state.boxes[box]) handlers.onRefreshBox(box);
+        // Fala 11e: klik w skrzynke ZAWSZE odswieza najnowsza strone
+        // (replace) - gracz nie moze utknac na nieodswiezonym cache.
+        handlers.onRefreshBox(box);
       });
       boxes.appendChild(btn);
-      // Osobny przycisk odswiezania danej skrzynki (bez zmiany zakladki).
-      const refresh = doc.createElement('button');
-      refresh.className = 'arkmail-refresh';
-      refresh.setAttribute('data-box', box);
-      refresh.setAttribute('title', `Odswiez: ${label}`);
-      refresh.textContent = '↻';
-      refresh.addEventListener('click', () => handlers.onRefreshBox(box));
-      boxes.appendChild(refresh);
     }
     pane.appendChild(boxes);
+
+    // Fala 11e: zbiorcze operacje na AKTYWNEJ skrzynce (zamiast
+    // per-skrzynka): Odswiez + Wczytaj wszystkie/Przerwij.
+    const ops = doc.createElement('div');
+    ops.className = 'arkmail-box-ops';
+    const refreshAll = doc.createElement('button');
+    refreshAll.className = 'arkmail-refresh-global';
+    refreshAll.textContent = 'Odswiez';
+    refreshAll.addEventListener('click', () => handlers.onRefreshBox(state.activeBox));
+    ops.appendChild(refreshAll);
+    const view0 = state.boxes[state.activeBox];
+    const searchMode0 = state.search && state.search.box === state.activeBox ? state.search : null;
+    const loopHere = state.loadAll !== null && state.loadAll.box === state.activeBox;
+    const loadAllBtn = doc.createElement('button');
+    loadAllBtn.className = 'arkmail-older-all';
+    loadAllBtn.textContent = loopHere
+      ? `Przerwij (strona ${state.loadAll!.pages})`
+      : 'Wczytaj wszystkie';
+    // Wylaczony, gdy nie ma czego doczytywac: tryb wynikow, skrzynka
+    // pusta/niezaladowana lub w calosci, petla na innej skrzynce.
+    const nothingToLoad =
+      !loopHere &&
+      (searchMode0 !== null ||
+        !view0 ||
+        view0.empty !== null ||
+        !view0.truncated ||
+        state.loadAll !== null);
+    if (nothingToLoad) loadAllBtn.setAttribute('disabled', '');
+    loadAllBtn.addEventListener('click', () => handlers.onLoadAll(state.activeBox));
+    ops.appendChild(loadAllBtn);
+    pane.appendChild(ops);
 
     // Przelacznik powiadomien o nowej poczcie (trwale w storage).
     const notifyRow = doc.createElement('label');
@@ -223,6 +329,11 @@ export function mountMailUi(
       input.setAttribute('data-search', key);
       input.setAttribute('type', type);
       input.setAttribute('placeholder', placeholder);
+      // Draft lokalny (Fala 11c): rerender store nie kasuje wpisanej frazy.
+      input.value = searchDraft[key] ?? '';
+      input.addEventListener('input', () => {
+        searchDraft[key] = input.value;
+      });
       return input;
     };
     const sOsoba = mkSearch('osoba', 'Osoba');
@@ -312,29 +423,15 @@ export function mountMailUi(
     if (searchMode) {
       // Wyniki szukania sa renumerowane wewnatrz selekcji - paginacja
       // wstecz nie ma tu sensu (kotwica liczona z pelnego listingu).
-    } else if (state.loadAll && state.loadAll.box === state.activeBox) {
-      // Petla "Wczytaj wszystkie" w toku na tej skrzynce: jedyny przycisk
-      // to Przerwij z numerem biezacej strony.
-      const cancel = doc.createElement('button');
-      cancel.className = 'arkmail-older-all';
-      cancel.textContent = `Przerwij (strona ${state.loadAll.pages})`;
-      cancel.addEventListener('click', () => handlers.onLoadAll(state.activeBox));
-      pane.appendChild(cancel);
     } else if (view.truncated && !state.loadAll) {
-      // Petla na innej skrzynce chowa przyciski paginacji (blokada sesji).
-      const row = doc.createElement('div');
-      row.className = 'arkmail-older-row';
+      // Fala 11e: na dole tylko Wczytaj starsze; zbiorcze Wczytaj
+      // wszystkie/Przerwij siedzi na pasku nad lista. Petla na innej
+      // skrzynce chowa paginacje (blokada sesji).
       const btn = doc.createElement('button');
       btn.className = 'arkmail-older';
       btn.textContent = 'Wczytaj starsze';
       btn.addEventListener('click', () => handlers.onLoadOlder(state.activeBox));
-      row.appendChild(btn);
-      const all = doc.createElement('button');
-      all.className = 'arkmail-older-all';
-      all.textContent = 'Wczytaj wszystkie';
-      all.addEventListener('click', () => handlers.onLoadAll(state.activeBox));
-      row.appendChild(all);
-      pane.appendChild(row);
+      pane.appendChild(btn);
     }
     return pane;
   };
@@ -343,6 +440,9 @@ export function mountMailUi(
     const pane = doc.createElement('div');
     pane.className = 'arkmail-pane';
     const l = state.letter;
+    // Klucz per list (Fala 11c): inny list = inny klucz = scroll od gory;
+    // ten sam list przy tle-rerenderze zachowuje pozycje.
+    pane.setAttribute('data-pane-key', l ? `list:${l.box}:${l.number}` : 'list:brak');
     if (!l) {
       // W split (wide) to placeholder prawego panelu; solo (waski) to
       // pusta zakladka 'list'.
@@ -432,9 +532,40 @@ export function mountMailUi(
    *  (zmiana szablonu/szerokosci nie kasuje wpisanego listu). */
   const composeDraft = { adresat: '', temat: '', dw: '', tresc: '' };
 
+  // Fala 11d: podglad compose w wide to OSOBNY prawy panel (jak /list
+  // w kliencie), wiec <pre> zyje poza formularzem - referencja i repaint
+  // wspoldzielone miedzy panelami.
+  let composePreview: HTMLPreElement | null = null;
+  const repaintCompose = (): void => {
+    if (!composePreview) return;
+    const st = store.state;
+    composePreview.textContent = renderLetter(
+      composeDraft.tresc,
+      st.composeTemplate,
+      st.composeWidth,
+    ).lines.join('\n');
+  };
+
+  /** Prawy panel compose w wide: zywy podglad wysylanego listu. */
+  const renderComposePreview = (): HTMLElement => {
+    const pane = doc.createElement('div');
+    pane.className = 'arkmail-pane';
+    pane.setAttribute('data-pane-key', 'napisz:podglad');
+    const lab = doc.createElement('label');
+    lab.textContent = 'Podglad (tak list zostanie wyslany)';
+    pane.appendChild(lab);
+    const pre = doc.createElement('pre');
+    pre.className = 'arkmail-preview';
+    pane.appendChild(pre);
+    composePreview = pre;
+    repaintCompose();
+    return pane;
+  };
+
   const renderNapisz = (state: MailUiState): HTMLElement => {
     const pane = doc.createElement('div');
     pane.className = 'arkmail-pane arkmail-form';
+    pane.setAttribute('data-pane-key', 'napisz');
     const fields: Array<[string, string]> = [
       ['adresat', 'Adresat'],
       ['temat', 'Temat'],
@@ -496,26 +627,22 @@ export function mountMailUi(
     tresc.value = composeDraft.tresc;
     pane.appendChild(tresc);
 
-    const labP = doc.createElement('label');
-    labP.textContent = 'Podglad (tak list zostanie wyslany)';
-    pane.appendChild(labP);
-    const preview = doc.createElement('pre');
-    preview.className = 'arkmail-preview';
-    pane.appendChild(preview);
-
-    const repaint = () => {
-      const st = store.state;
-      preview.textContent = renderLetter(
-        tresc.value,
-        st.composeTemplate,
-        st.composeWidth,
-      ).lines.join('\n');
-    };
+    // Podglad: waski - pod forma w tym samym panelu; wide - osobny
+    // prawy panel (renderComposePreview, Fala 11d).
+    if (!state.wide) {
+      const labP = doc.createElement('label');
+      labP.textContent = 'Podglad (tak list zostanie wyslany)';
+      pane.appendChild(labP);
+      const preview = doc.createElement('pre');
+      preview.className = 'arkmail-preview';
+      pane.appendChild(preview);
+      composePreview = preview;
+      repaintCompose();
+    }
     tresc.addEventListener('input', () => {
       composeDraft.tresc = tresc.value;
-      repaint();
+      repaintCompose();
     });
-    repaint();
 
     const send = doc.createElement('button');
     send.className = 'arkmail-send';
@@ -540,12 +667,14 @@ export function mountMailUi(
   const renderKontakty = (state: MailUiState): HTMLElement => {
     const pane = doc.createElement('div');
     pane.className = 'arkmail-pane';
+    pane.setAttribute('data-pane-key', 'kontakty');
     // Filtr i sort sa lokalne (poza store, jak filtr archiwum):
     // repaint dotyczy tylko listy, input nie traci fokusu przy pisaniu.
     const controls = doc.createElement('div');
     controls.className = 'arkmail-contact-controls';
     const input = doc.createElement('input');
     input.className = 'arkmail-contact-filter';
+    input.setAttribute('data-filter', 'kontakty');
     input.setAttribute('placeholder', 'Filtr: nazwa lub alias');
     input.value = contactView.filter;
     const sel = doc.createElement('select');
@@ -589,6 +718,14 @@ export function mountMailUi(
             last.textContent = c.lastContactRaw;
             row.appendChild(last);
           }
+          // Fala 11h: klik w kontakt -> zakladka Listy + szukanie
+          // serwerowe po tej osobie na aktywnej skrzynce.
+          row.setAttribute('title', 'Pokaz listy tej osoby');
+          row.addEventListener('click', () => {
+            searchDraft.osoba = c.name;
+            store.setTab('listy');
+            handlers.onSearch(store.state.activeBox, { osoba: c.name });
+          });
           return row;
         }),
       );
@@ -617,6 +754,7 @@ export function mountMailUi(
   const renderArchiwum = (state: MailUiState): HTMLElement => {
     const pane = doc.createElement('div');
     pane.className = 'arkmail-pane';
+    pane.setAttribute('data-pane-key', 'archiwum');
     // Wszystkie filtry lokalne (poza store): repaint tylko listy,
     // input nie traci fokusu przy pisaniu.
     const controls = doc.createElement('div');

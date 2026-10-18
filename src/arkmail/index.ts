@@ -21,7 +21,8 @@ import {
   PLUGIN_DESCRIPTION,
 } from "./meta";
 import type { MailBox } from "./core/protocol/types";
-import { parseNotification } from "./core/protocol/parser";
+import { parseNotification, isPagerPrompt } from "./core/protocol/parser";
+import { isEchoLine } from "./core/session/lines";
 import {
   olderListingCommand,
   nextDay,
@@ -92,6 +93,11 @@ let wideObserver: ResizeObserver | null = null;
 
 function createContent(): HTMLDivElement {
   const root = document.createElement("div");
+  // Fala 11c: lancuch wysokosci od popupu (klient daje .plugin-popup-content
+  // flex:1 min-height:0) - bez tego .arkmail-root height:100% nie trzyma
+  // i panele nie scrolluja sie niezaleznie.
+  root.style.height = "100%";
+  root.style.minHeight = "0";
   if (unmount) {
     unmount();
     unmount = null;
@@ -407,6 +413,11 @@ export async function init(api: PluginApi) {
             ]);
             ui.setArchive(merged.letters);
             persistArchive();
+            // Fala 11f: po odczycie swiezy listing skrzynki - znacznik
+            // przeczytania i badge to prawda serwerowa (plugin niczego
+            // nie zaznacza lokalnie). W trybie wynikow szukania pomijamy:
+            // refresh czysci selekcje i wywalilby gracza z wynikow.
+            if (ui.state.search?.box !== box) refreshBoxes([box]);
           } finally {
             transport!.endModal();
           }
@@ -524,6 +535,21 @@ export async function init(api: PluginApi) {
     },
   };
 
+  // Fala 11g: straznik sierocych pagerow. Prompt pagera poza transakcja
+  // (blokada sesji wolna) = pager otwarty na serwerze bez naszej kontroli
+  // (np. timeout sesji przed wyslaniem "q"). Taki pager konsumuje
+  // WSZYSTKIE komendy gracza - zamykamy go automatycznym "q".
+  let lastWatchdogQ = 0;
+  transport.subscribe((line) => {
+    if (line.cls === "command" || isEchoLine(line.text)) return;
+    if (!isPagerPrompt(line.text)) return;
+    if (lock.locked) return; // legalna sesja pagerowa pod blokada
+    const now = Date.now();
+    if (now - lastWatchdogQ < 2000) return; // cooldown: jedno q na serie
+    lastWatchdogQ = now;
+    transport!.send("q");
+  });
+
   // Powiadomienia pocztowe: odswiezenie + opcjonalny tost.
   transport.subscribe((line) => {
     const n = parseNotification(line.text);
@@ -547,10 +573,11 @@ export async function init(api: PluginApi) {
   popup = await api.ui.registerPersistentPopup({
     id: POPUP_ID,
     title: PLUGIN_NAME,
-    // Start: na normalnym ekranie dwupanelowy, na komorce waski (80vw).
-    // Rozmiar ustawiony przez gracza zawsze wygrywa z tymi wartosciami.
-    initialWidth: "min(1100px, 80vw)",
-    initialHeight: "min(700px, 70vh)",
+    // Start: szeroki dwupanelowy na normalnym ekranie, waski na komorce
+    // (85vw). Rozmiar ustawiony przez gracza zawsze wygrywa z tymi
+    // wartosciami - po zmianie domyslnego pomocny jest reset rozmiaru.
+    initialWidth: "min(1400px, 85vw)",
+    initialHeight: "min(850px, 80vh)",
     createContent,
   });
 

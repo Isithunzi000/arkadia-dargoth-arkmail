@@ -147,6 +147,48 @@ test('pager: zly numer listu w pagerze nie wywraca sesji', async () => {
   assert.deepEqual(t.sent.at(-1), 'q');
 });
 
+// --- Fala 11g: odbudowa po sierocym pagerze ---------------------------------
+// Log sesji 2026-10-18: pager po stronie serwera zostal otwarty (timeout
+// sesji bez q) i ODRZUCAL kolejne komendy: 'Nie ma takiej komendy. Wpisz
+// "?"...' + powtorka promptu pagera. Odczyt musi: q -> prompt -> ponowic
+// komende (raz). Podwojne odrzucenie = blad.
+
+const ORPHAN_REJECTION: ProtoLine[] = [
+  {
+    cls: 'mail',
+    text: 'Nie ma takiej komendy. Wpisz "?", zeby uzyskac pomoc albo "q", zeby wyjsc.',
+  },
+  { cls: 'mail', text: '[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ' },
+  { cls: 'prompt', text: '> ' },
+];
+
+test('pager recovery: sierocy pager odrzuca komende - q i ponowienie', async () => {
+  const t = new MockTransport();
+  const s = new PagerSession(t, OPTS);
+  const op = s.readLetter(1);
+  assert.deepEqual(t.sent, ['przeczytaj list 1']);
+  await t.replay(ORPHAN_REJECTION);
+  // Po odrzuceniu: zamkniecie sieroty (q) i ponowienie odczytu.
+  assert.deepEqual(t.sent, ['przeczytaj list 1', 'q', 'przeczytaj list 1']);
+  await t.replay(fixture('listing-odebrane-male'));
+  const res = await op;
+  assert.equal(res.letter.from, 'Corge');
+  assert.equal(res.letter.number, 1);
+  assert.deepEqual(t.sent.at(-1), 'q');
+});
+
+test('pager recovery: podwojne odrzucenie konczy sie bledem', async () => {
+  const t = new MockTransport();
+  const s = new PagerSession(t, OPTS);
+  const op = s.readLetter(1);
+  await t.replay(ORPHAN_REJECTION);
+  const assertion = assert.rejects(op, /pager/i); // handler przed replay
+  await t.replay(ORPHAN_REJECTION); // ponowiona komenda tez odrzucona
+  await assertion;
+  // Kazde odrzucenie zamknelismy q (sierota nie zostaje po nas).
+  assert.deepEqual(t.sent, ['przeczytaj list 1', 'q', 'przeczytaj list 1', 'q']);
+});
+
 // --- EditorSession ----------------------------------------------------------
 
 test('editor: compose pipelined - wyslany w urzedzie', async () => {

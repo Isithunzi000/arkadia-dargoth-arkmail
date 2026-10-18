@@ -36,8 +36,8 @@ test('wide-watch: ResizeObserver ustawia uklad, startowy rozmiar dwupanelowy', a
   try {
     const h = await startHarness();
     const cfg = h.f.popupConfig as unknown as { initialWidth: string; initialHeight: string };
-    assert.equal(cfg.initialWidth, 'min(1100px, 80vw)', 'start: dwa panele na normalnym');
-    assert.equal(cfg.initialHeight, 'min(700px, 70vh)');
+    assert.equal(cfg.initialWidth, 'min(1400px, 85vw)', 'start: szeroki, dwupanelowy');
+    assert.equal(cfg.initialHeight, 'min(850px, 80vh)');
     assert.equal(FakeRO.instances.length, 1, 'obserwator podpiety pod kontener popupu');
     const ro = FakeRO.instances[0]!;
     assert.equal(ro.observed.length, 1);

@@ -1,10 +1,11 @@
 /**
- * Pamiec widoku skrzynek (Fala 9b).
+ * Odswiezanie skrzynek (Fala 11e; zastepuje "pamiec skrzynek" z Fali 9b).
  *
- * Przelaczenie zakladki NIE moze kasowac wczytanych stron: fetch tylko
- * przy pierwszym wejsciu na skrzynke (brak widoku). Powiadomienie o nowej
- * poczcie SCALA swieza strone z widokiem (dokleja nowe, zostawia wczytane
- * strony); pelna wymiana widoku tylko z przycisku odswiez i po operacjach.
+ * Klik w skrzynke ZAWSZE pobiera najnowsza strone z serwera (replace) -
+ * gracz nie moze utknac na nieodswiezonym cache i przegapic nowych
+ * listow. Wczytane starsze strony zostaja do nastepnego kliku (replace
+ * kasuje je swieza strona). Powiadomienie o nowej poczcie dalej SCALA
+ * swieza strone z widokiem (dokleja nowe, zostawia wczytane strony).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -42,16 +43,15 @@ function mount(store: MailUiStore) {
   return { container, calls };
 }
 
-test('zakladki: klik w pusta skrzynke pobiera, klik w zaladowana - nie', () => {
+test('zakladki: klik w skrzynke ZAWSZE odswieza najnowsza strone', () => {
   const s = new MailUiStore();
   const { container, calls } = mount(s);
   const boxTab = (box: string) =>
     (container.querySelector(`[data-box="${box}"]`) as { dispatchEvent(e: unknown): void })
       .dispatchEvent(new window.Event('click'));
-  // Pierwsze wejscie na skrzynke bez widoku -> pobierz.
+  // Pusta czy zaladowana - kazdy klik strzela refresh (najnowsze 50).
   boxTab('odebrane');
   boxTab('wyslane');
-  // Widok zaladowany: kolejne kliki NIE pobieraja.
   s.applyMailbox('wyslane', {
     kind: 'lista',
     header: { box: 'wyslane', truncated: false },
@@ -62,7 +62,8 @@ test('zakladki: klik w pusta skrzynke pobiera, klik w zaladowana - nie', () => {
   const refreshCalls = calls.filter((c) => c.name === 'refresh');
   assert.deepEqual(
     refreshCalls.map((c) => c.args),
-    [['odebrane'], ['wyslane']],
+    [['odebrane'], ['wyslane'], ['wyslane'], ['wyslane']],
+    'klik w zaladowana skrzynke tez odswieza',
   );
 });
 
@@ -80,7 +81,7 @@ async function loadOlderPage(h: Harness): Promise<void> {
   await waitFor(() => h.content.querySelectorAll('.arkmail-entry').length === 5, '5 wierszy');
 }
 
-test('zakladki: powrot na wczytana skrzynke zachowuje wszystkie strony', async () => {
+test('zakladki: powrot na skrzynke odswieza najnowsza strone (replace)', async () => {
   const h = await startHarness();
   const { f, waitFor, content } = h;
   try {
@@ -88,19 +89,29 @@ test('zakladki: powrot na wczytana skrzynke zachowuje wszystkie strony', async (
     await loadOlderPage(h);
     const listingsBefore = f.sent.filter((c) => c === 'listy odebrane').length;
 
-    // Odejscie na wyslane (pierwsza wizyta -> fetch) i powrot.
+    // Odejscie na wyslane (klik = fetch) i powrot (klik = REFETCH).
     click(h, '[data-box="wyslane"]');
-    await waitFor(() => f.sent.includes('listy wyslane'), 'pierwsze pobranie wyslanych');
+    await waitFor(() => f.sent.includes('listy wyslane'), 'pobranie wyslanych');
     f.fire('Nie masz zadnych wyslanych listow.', 'mail');
     await waitFor(() => !content.querySelector('.arkmail-busy'), 'koniec pobierania');
     click(h, '[data-box="odebrane"]');
+    await waitFor(
+      () => f.sent.filter((c) => c === 'listy odebrane').length === listingsBefore + 1,
+      'powrot = refetch najnowszej strony',
+    );
 
-    // Bez nowego fetchu i z kompletem 5 wierszy.
-    await waitFor(() => content.querySelectorAll('.arkmail-entry').length === 5, '5 wierszy');
-    assert.equal(
-      f.sent.filter((c) => c === 'listy odebrane').length,
-      listingsBefore,
-      'powrot bez refetchu',
+    // Replace: widok to tylko swieza strona - doczytane starsze znikaja.
+    f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
+    f.fire(' 3. *R* Temat: najstarszy', 'mail');
+    f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire(' 2. *R* Temat: srodkowy', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire(' 1. *R* Temat: najnowszy', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('> ', 'prompt');
+    await waitFor(
+      () => content.querySelectorAll('.arkmail-entry').length === 3,
+      'widok = swieza strona (3 wiersze, starsze doczytane odpadly)',
     );
   } finally {
     await stopHarness();

@@ -161,8 +161,10 @@ test('wczytaj wszystkie: petla stron az do konca (kotwica przesuwa sie co strone
     );
     assert.equal(content.querySelectorAll('.arkmail-entry').length, 5, '3 + 2 wpisy po merge');
     await waitRt(
-      () => !content.querySelector('.arkmail-older-all') && !content.querySelector('.arkmail-older'),
-      'przyciski paginacji zniknely (koniec starszych)',
+      () =>
+        !content.querySelector('.arkmail-older') &&
+        (content.querySelector('.arkmail-older-all') as HTMLButtonElement | null)?.disabled === true,
+      'paginacja zamknieta: Wczytaj starsze znika, zbiorczy wylaczony (koniec starszych)',
     );
   } finally {
     await stopHarness();

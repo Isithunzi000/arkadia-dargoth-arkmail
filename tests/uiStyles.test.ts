@@ -62,3 +62,14 @@ test('style: zakaz przezroczystego tla i dziedziczenia koloru', () => {
   assert.ok(!/background:\s*transparent/.test(STYLES), 'bez background: transparent');
   assert.ok(!/color:\s*inherit/.test(STYLES), 'bez color: inherit');
 });
+
+// Fala 11a: szukajka w wersji stosowej - 2 kolumny zamiast 5 w linii;
+// w waskiej kolumnie splitu pola tekstowe maja sensowna szerokosc.
+test('style: szukajka uklada sie stosowo, Szukaj na calej szerokosci', () => {
+  const row = ruleBody(/\.arkmail-search-row\s/);
+  assert.ok(row, 'regula .arkmail-search-row istnieje');
+  assert.match(row!, /grid-template-columns:\s*1fr\s+1fr/, 'dwie kolumny (osoba|temat, od|do)');
+  const go = ruleBody(/\.arkmail-search-row\s+\.arkmail-search-go\b/);
+  assert.ok(go, 'regula przycisku Szukaj w szukajce');
+  assert.match(go!, /grid-column:\s*1\s*\/\s*-1/, 'Szukaj rozpiety na caly wiersz');
+});

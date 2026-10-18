@@ -72,19 +72,35 @@ function mount(store: MailUiStore, handlers: Partial<MailUiHandlers> = {}) {
 const click = (el: unknown) =>
   (el as { dispatchEvent(e: unknown): void }).dispatchEvent(new window.Event('click'));
 
-test('render: piec zakladek z polskimi etykietami', () => {
+test('render: cztery zakladki z polskimi etykietami, bez List', () => {
+  // Fala 11b: 'list' to wewnetrzny stan widoku (otwarty list), nie
+  // zakladka - na pasku "Listy" i "List" obok siebie mylily gracza.
   const s = new MailUiStore();
   const { container, off } = mount(s);
   const tabs = [...container.querySelectorAll('.arkmail-tab')];
   assert.deepEqual(
     tabs.map((t) => t.getAttribute('data-tab')),
-    ['listy', 'list', 'napisz', 'kontakty', 'archiwum'],
+    ['listy', 'napisz', 'kontakty', 'archiwum'],
   );
   assert.deepEqual(
     tabs.map((t) => t.textContent),
-    ['Listy', 'List', 'Napisz list', 'Kontakty', 'Archiwum'],
+    ['Listy', 'Napisz list', 'Kontakty', 'Archiwum'],
   );
   assert.equal(container.querySelector('.arkmail-tab-active')?.getAttribute('data-tab'), 'listy');
+  off();
+});
+
+test('render: czytanie listu na waskim bez aktywnej zakladki na pasku', () => {
+  // Stan wewnetrzny 'list' nie ma przycisku na pasku - powrot przez
+  // 'Zamknij list'.
+  const s = new MailUiStore();
+  s.openLetter('odebrane', {
+    number: 1, from: 'A', subject: 'X', to: 'B', cc: null, date: null, body: ['t'],
+  });
+  const { container, off } = mount(s);
+  assert.equal(s.state.tab, 'list');
+  assert.ok(!container.querySelector('[data-tab="list"]'), 'brak zakladki List');
+  assert.ok(!container.querySelector('.arkmail-tab-active'), 'zadna zakladka nie aktywna');
   off();
 });
 
@@ -175,14 +191,17 @@ test('render: kolejnosc wierszy najnowszy -> najstarszy (serwer podaje odwrotnie
   off();
 });
 
-test('render: przycisk odswiez per skrzynka - bez zmiany aktywnej zakladki', () => {
+test('render: zbiorczy Odswiez odswieza aktywna skrzynke; bez per-skrzynka', () => {
   const s = new MailUiStore();
   const { container, calls, off } = mount(s);
-  const btn = container.querySelector('.arkmail-refresh[data-box="wyslane"]');
-  assert.ok(btn, 'przycisk odswiez przy kazdej skrzynce');
+  assert.ok(!container.querySelector('.arkmail-refresh'), 'bez przyciskow odswiez per skrzynka');
+  const btn = container.querySelector('.arkmail-refresh-global');
+  assert.ok(btn, 'zbiorczy Odswiez');
   click(btn!);
-  assert.deepEqual(calls, [{ name: 'refresh', args: ['wyslane'] }]);
-  assert.equal(s.state.activeBox, 'odebrane', 'aktywna skrzynka bez zmian');
+  assert.deepEqual(calls, [{ name: 'refresh', args: ['odebrane'] }]);
+  s.setActiveBox('wyslane');
+  click(container.querySelector('.arkmail-refresh-global')!);
+  assert.deepEqual(calls[1], { name: 'refresh', args: ['wyslane'] }, 'odswieza AKTYWNA skrzynke');
   off();
 });
 
@@ -412,7 +431,7 @@ test('render: przycisk Wczytaj starsze gdy listing uciety', () => {
   off();
 });
 
-test('render: Wczytaj wszystkie obok Wczytaj starsze; w petli Przerwij ze strona', () => {
+test('render: zbiorcze Wczytaj wszystkie; w petli Przerwij ze strona', () => {
   const s = new MailUiStore();
   const { container, calls, off } = mount(s);
   s.applyMailbox('wyslane', {
@@ -421,30 +440,49 @@ test('render: Wczytaj wszystkie obok Wczytaj starsze; w petli Przerwij ze strona
     entries: [entry()],
   });
   s.setActiveBox('wyslane');
-  const all = container.querySelector('.arkmail-older-all');
-  assert.ok(all, 'przycisk Wczytaj wszystkie przy truncated');
+  const all = container.querySelector('.arkmail-older-all') as HTMLButtonElement | null;
+  assert.ok(all, 'zbiorczy Wczytaj wszystkie');
+  assert.ok(!all!.disabled, 'aktywny przy truncated');
   assert.ok(all!.textContent?.includes('Wczytaj wszystkie'));
   click(all!);
   assert.deepEqual(calls, [{ name: 'all', args: ['wyslane'] }]);
 
   // Petla w toku na tej skrzynce: przycisk zamienia sie w Przerwij ze strona.
   s.setLoadAll({ box: 'wyslane', pages: 3 });
-  const cancel = container.querySelector('.arkmail-older-all');
-  assert.ok(cancel!.textContent?.includes('Przerwij'), 'w petli: Przerwij');
-  assert.ok(cancel!.textContent?.includes('3'), 'pokazuje biezaca strone');
-  assert.ok(!container.querySelector('.arkmail-older'), 'pojedynczy przycisk schowany w petli');
-  click(cancel!);
+  const cancel = container.querySelector('.arkmail-older-all') as unknown as HTMLButtonElement;
+  assert.ok(cancel.textContent?.includes('Przerwij'), 'w petli: Przerwij');
+  assert.ok(cancel.textContent?.includes('3'), 'pokazuje biezaca strone');
+  assert.ok(!container.querySelector('.arkmail-older'), 'Wczytaj starsze schowane w petli');
+  click(cancel);
   assert.deepEqual(calls[1], { name: 'all', args: ['wyslane'] }, 'klik w Przerwij tez wola onLoadAll');
 
-  // Petla na INNEJ skrzynce: przyciski paginacji schowane.
+  // Petla na INNEJ skrzynce: zbiorczy wylaczony, Wczytaj starsze schowane.
   s.setLoadAll({ box: 'odebrane', pages: 1 });
-  assert.ok(!container.querySelector('.arkmail-older-all'), 'petla gdzie indziej: bez przyciskow');
+  const dis = container.querySelector('.arkmail-older-all') as unknown as HTMLButtonElement;
+  assert.ok(dis, 'zbiorczy zostaje na pasku');
+  assert.ok(dis.disabled, 'petla gdzie indziej: wylaczony');
   assert.ok(!container.querySelector('.arkmail-older'));
 
-  // Koniec petli, dalej truncated: oba przyciski wracaja.
+  // Koniec petli, dalej truncated: oba aktywne.
   s.setLoadAll(null);
   assert.ok(container.querySelector('.arkmail-older'));
-  assert.ok(container.querySelector('.arkmail-older-all'));
+  assert.ok(
+    !(container.querySelector('.arkmail-older-all') as unknown as HTMLButtonElement).disabled,
+  );
+  off();
+});
+
+test('render: zbiorcze Wczytaj wszystkie wylaczone, gdy skrzynka w calosci', () => {
+  const s = new MailUiStore();
+  const { container, off } = mount(s);
+  s.applyMailbox('odebrane', {
+    kind: 'lista',
+    header: { box: 'odebrane', truncated: false },
+    entries: [entry()],
+  });
+  const all = container.querySelector('.arkmail-older-all') as HTMLButtonElement | null;
+  assert.ok(all, 'przycisk zostaje na pasku');
+  assert.ok(all!.disabled, 'nie ma czego doczytywac - wylaczony');
   off();
 });
 
@@ -620,7 +658,8 @@ test('render: tryb wynikow - banner z opisem, Wyczysc, paginacja schowana', () =
   assert.ok(banner, 'banner wynikow widoczny');
   assert.ok(banner!.textContent?.includes('wyslane, adresat: Bar'), 'banner z opisem zapytania');
   assert.ok(!container.querySelector('.arkmail-older'), 'paginacja schowana w trybie wynikow');
-  assert.ok(!container.querySelector('.arkmail-older-all'));
+  const allBtn = container.querySelector('.arkmail-older-all') as HTMLButtonElement | null;
+  assert.ok(!allBtn || allBtn.disabled, 'Wczytaj wszystkie wylaczone w trybie wynikow');
   click(container.querySelector('.arkmail-search-clear')!);
   assert.deepEqual(calls, [{ name: 'clear-search', args: ['wyslane'] }]);
   off();

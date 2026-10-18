@@ -29,6 +29,9 @@ export const STYLES = `
   display: flex;
   flex-direction: column;
   height: 100%;
+  /* Fala 11c: panele scrolluja sie niezaleznie (overflow:auto na
+     .arkmail-pane); root nie rosnie poza popup i nie scrolluje calosci. */
+  overflow: hidden;
   box-sizing: border-box;
   padding: 10px;
   gap: 8px;
@@ -134,15 +137,12 @@ export const STYLES = `
   font-weight: 600;
 }
 .arkmail-root .arkmail-box-active:hover { background: ${ACCENT}; color: ${ACCENT_FG}; }
-.arkmail-root .arkmail-refresh {
-  border-radius: 999px;
-  padding: 3px 8px;
-  background: ${BG};
-  color: ${FG_DIM};
-  border: 1px solid ${BORDER};
-  line-height: 1;
-}
-.arkmail-root .arkmail-refresh:hover { color: ${FG}; background: ${BG_RAISED}; }
+
+/* Fala 11e: zbiorcze operacje na aktywnej skrzynce (zamiast ↻ per box). */
+.arkmail-box-ops { display: flex; gap: 6px; margin-bottom: 8px; }
+.arkmail-box-ops button { flex: 1; }
+.arkmail-root button:disabled { opacity: 0.45; cursor: default; }
+.arkmail-root button:disabled:hover { background: ${BG_RAISED}; }
 
 /* --- wiersze listow: nadawca | temat | data --- */
 .arkmail-entry {
@@ -188,13 +188,16 @@ export const STYLES = `
 
 .arkmail-root .arkmail-older { margin-top: 8px; width: 100%; }
 .arkmail-older-row { display: flex; gap: 6px; margin-top: 8px; }
+/* Fala 11a: szukajka stosowo (2 kolumny), nie 5 w linii - w waskiej
+   kolumnie splitu pola tekstowe zachowuja sensowna szerokosc. */
 .arkmail-search-row {
   display: grid;
-  grid-template-columns: 1fr 1fr auto auto auto;
+  grid-template-columns: 1fr 1fr;
   gap: 6px;
   margin: 8px 0;
   align-items: center;
 }
+.arkmail-search-row .arkmail-search-go { grid-column: 1 / -1; }
 .arkmail-search-row input[type='date'] { color-scheme: dark; }
 .arkmail-search-banner {
   display: flex;
@@ -283,6 +286,8 @@ export const STYLES = `
   border-radius: 6px;
   border-bottom: 1px solid ${BG};
 }
+/* Fala 11h: wiersz kontaktu klikalny (skok do listow tej osoby). */
+.arkmail-contact { cursor: pointer; }
 .arkmail-contact:hover, .arkmail-arch-entry:hover { background: ${BG_RAISED}; }
 .arkmail-contact-name { color: ${FG}; font-weight: 600; }
 .arkmail-contact-stats, .arkmail-arch-meta { color: ${FG_DIM}; font-size: 12px; }
@@ -326,6 +331,10 @@ export const STYLES = `
   gap: 10px;
   flex: 1;
   min-height: 0;
+}
+/* Fala 11d: compose - formularz szerszy, podglad wezszy. */
+.arkmail-wide .arkmail-split-compose {
+  grid-template-columns: minmax(0, 3fr) minmax(280px, 2fr);
 }
 .arkmail-root .arkmail-letter-close {
   position: absolute;

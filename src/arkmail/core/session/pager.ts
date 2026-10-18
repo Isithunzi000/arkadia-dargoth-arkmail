@@ -45,7 +45,11 @@ export interface ForwardResult {
   error: MailError | null;
 }
 
-type State = 'letter' | 'pager' | 'dw-subdialog' | 'closing';
+type State = 'letter' | 'pager' | 'dw-subdialog' | 'closing' | 'recovering';
+
+/** Odrzucenie komendy przez OBCY pager (sierota po timeoutcie sesji,
+ *  log 2026-10-18): pager konsumuje wszystko az do "q". */
+const PAGER_REJECTION_RE = /^Nie ma takiej komendy\./;
 
 /** Szkielet transakcji pagerowej; handler akcji podpiety miedzy
  *  otwarciem a zamknieciem. */
@@ -136,6 +140,7 @@ export class PagerSession {
       let headersDone = false;
       let wantClose = false;
       let pagerFired = false;
+      let retried = false;
       let done = false;
       const idleMs = this.opts.idleMs ?? 600;
       let idleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -182,6 +187,28 @@ export class PagerSession {
             return;
           }
           armIdle();
+          return;
+        }
+
+        // Fala 11g: odbudowa po odrzuceniu przez sierocy pager. Czekamy
+        // na prompt gry po naszym "q" i ponawiamy komende odczytu.
+        if (state === 'recovering') {
+          if (line.cls === 'prompt' || isPromptLine(line.text)) {
+            state = 'letter';
+            this.transport.send(`przeczytaj list ${numer}`);
+          }
+          return;
+        }
+        if (state === 'letter' && !headersDone && PAGER_REJECTION_RE.test(line.text)) {
+          // Kazde odrzucenie zamykamy "q" - sierota nie zostaje po nas.
+          this.transport.send('q');
+          if (retried) {
+            cleanup();
+            reject(new Error(`pager session list ${numer}: odrzucono przez sierocy pager`));
+            return;
+          }
+          retried = true;
+          state = 'recovering';
           return;
         }
 

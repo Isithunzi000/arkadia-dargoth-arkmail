@@ -141,9 +141,20 @@ test('re-kotwiczenie: kasowanie po zmianie kontekstu uzywa swiezego numeru', asy
     replayLetter(h, 1);
     await waitFor(() => !!h.content.querySelector('.arkmail-del'), 'widok listu z Usun');
 
-    // Nowa poczta w tle: refresh NADPISUJE kontekst listingu serwera.
+    // Fala 11f: po odczycie plugin odswieza skrzynke - ten refresh
+    // NADPISUJE kontekst listingu serwera (stampEntries).
+    await waitFor(
+      () => f.sent.filter((c) => c === 'listy odebrane').length === 2,
+      'refresh po odczycie (11f)',
+    );
+    replayFreshListing(h);
+
+    // Nowa poczta w tle: kolejny refresh (merge).
     f.fire(' [ POCZTA ] Masz nowa poczte od Foo.');
-    await waitFor(() => f.sent.filter((c) => c === 'listy odebrane').length === 2, 'refresh');
+    await waitFor(
+      () => f.sent.filter((c) => c === 'listy odebrane').length === 3,
+      'refresh po powiadomieniu',
+    );
     replayFreshListing(h);
     await waitFor(
       () => f.sent.filter((c) => c === 'listy nieprzeczytane').length === 2,
