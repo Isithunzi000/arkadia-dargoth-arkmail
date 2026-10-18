@@ -146,7 +146,9 @@ export function mountMailUi(
       btn.textContent = label;
       btn.addEventListener('click', () => {
         store.setActiveBox(box);
-        handlers.onRefreshBox(box);
+        // Fala 9b: pobieramy tylko przy pierwszym wejsciu na skrzynke;
+        // wczytane strony zostaja (reczne odswiezanie = przycisk obok).
+        if (!state.boxes[box]) handlers.onRefreshBox(box);
       });
       boxes.appendChild(btn);
       // Osobny przycisk odswiezania danej skrzynki (bez zmiany zakladki).

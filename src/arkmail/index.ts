@@ -134,7 +134,14 @@ export async function init(api: PluginApi) {
     ui.setContacts(contactsFromBoxes(ui.state.boxes, []));
   };
 
-  const refreshBoxes = (boxes: MailBox[]): void => {
+  /**
+   * Pobranie skrzynek. Tryb "merge" (powiadomienie o nowej poczcie,
+   * Fala 9b): swieza strona SCALA sie z widokiem - nowe wpisy laduja
+   * na gorze, wczytane strony zostaja; znacznik uciecia zostaje
+   * zdjety tylko, gdy mamy juz komplet. Tryb "replace" (domyslny):
+   * pelna wymiana widoku (reczne odswiezenie, po operacjach).
+   */
+  const refreshBoxes = (boxes: MailBox[], mode: "replace" | "merge" = "replace"): void => {
     // Swiezy listing nadpisuje widok - tryb wynikow szukania na tych
     // skrzynkach przestaje obowiazywac (bez przywracania schowka).
     ui.clearSearchBoxes(boxes);
@@ -143,8 +150,13 @@ export async function init(api: PluginApi) {
         for (const box of boxes) {
           ui.setBusy(`Pobieram skrzynke ${box}...`);
           const res = await mailbox.fetch(box);
+          const view = mode === "merge" ? ui.state.boxes[box] : undefined;
           if (res.kind === "lista") stampEntries(res.entries);
-          ui.applyMailbox(box, res);
+          if (res.kind === "lista" && view && view.empty === null) {
+            ui.appendMailboxPage(box, res.entries, view.truncated && res.header.truncated);
+          } else {
+            ui.applyMailbox(box, res);
+          }
           if (res.kind === "lista") {
             // Cache (Fala 8f): KAZDE pobranie listingu dokleja wpisy do
             // archiwum (cicho, bez notify). Widok skrzynki NIE jest
@@ -495,9 +507,9 @@ export async function init(api: PluginApi) {
     if (!n) return;
     if (n.kind === "nowa-poczte") {
       if (ui.state.notifyEnabled) notify(api, `Masz nowa poczte od ${n.nadawca}.`);
-      refreshBoxes(["odebrane", "nieprzeczytane"]);
+      refreshBoxes(["odebrane", "nieprzeczytane"], "merge");
     } else if (n.kind === "goniec") {
-      refreshBoxes(["odebrane", "nieprzeczytane"]);
+      refreshBoxes(["odebrane", "nieprzeczytane"], "merge");
     }
   });
 
