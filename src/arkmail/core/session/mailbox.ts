@@ -24,6 +24,9 @@ import type {
 import { isEchoLine, isPromptLine } from './lines.js';
 import type { ProtoLine, Transport } from './transport.js';
 
+/** Linie-bledy serwera przerywajace transakcje (log 2026-10-17/18). */
+const MAIL_ERROR_RE = /^Data zostala podana w zlym formacie\./;
+
 export interface SessionOptions {
   timeoutMs: number;
   /**
@@ -90,6 +93,14 @@ export class MailboxSession {
 
       const unsub = this.transport.subscribe((line: ProtoLine) => {
         if (done) return;
+
+        // Linia-blad serwera (np. "Data zostala podana w zlym formacie...")
+        // konczy transakcje od razu - bez cichego czekania na timeout.
+        if (MAIL_ERROR_RE.test(line.text)) {
+          cleanup();
+          reject(new Error(line.text.trim()));
+          return;
+        }
 
         if (!header) {
           // Echo wlasnej komendy: po klasie albo po samej tresci.

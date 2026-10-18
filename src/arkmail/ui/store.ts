@@ -35,6 +35,8 @@ export interface MailUiState {
   badge: number;
   /** opis operacji pocztowej w toku (pasek); null = wolne */
   busy: string | null;
+  /** petla "Wczytaj wszystkie" w toku: skrzynka + liczba pobranych stron */
+  loadAll: { box: MailBox; pages: number } | null;
   letter: OpenLetter | null;
   contacts: Contact[];
   archive: ArchiveLetter[];
@@ -51,6 +53,7 @@ const DEFAULT_STATE: MailUiState = {
   boxes: {},
   badge: 0,
   busy: null,
+  loadAll: null,
   letter: null,
   contacts: [],
   archive: [],
@@ -99,8 +102,35 @@ export class MailUiStore {
     this.update({ boxes, badge: computeBadge(boxes) });
   }
 
+  /**
+   * Dokleja strone starszych listow (paginacja "Wybrane listy") PRZED
+   * istniejace wpisy - widok trzyma kolejnosc serwera (najstarszy
+   * pierwszy). Dedup po stronie/temacie/forwarded/dacie, bo numeracja
+   * stron jest wzgledna i kotwica (+1 dzien) daje nakladanie.
+   * truncated=false oznacza koniec starszych (przycisk znika).
+   */
+  appendMailboxPage(box: MailBox, entries: MailboxEntry[], truncated: boolean): void {
+    const view = this.current.boxes[box];
+    if (!view) return;
+    const key = (e: MailboxEntry): string =>
+      [e.party, e.subject, e.forwarded ? 'f' : '', e.date?.raw ?? ''].join('|');
+    const known = new Set(view.entries.map(key));
+    const fresh = entries.filter((e) => !known.has(key(e)));
+    const next: BoxView = {
+      entries: [...fresh, ...view.entries],
+      truncated,
+      empty: null,
+    };
+    const boxes = { ...this.current.boxes, [box]: next };
+    this.update({ boxes, badge: computeBadge(boxes) });
+  }
+
   setBusy(label: string | null): void {
     this.update({ busy: label });
+  }
+
+  setLoadAll(loadAll: { box: MailBox; pages: number } | null): void {
+    this.update({ loadAll });
   }
 
   /** Otwiera list: waski -> zakladka 'list', szeroki -> zostaje w podziale. */

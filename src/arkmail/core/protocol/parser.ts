@@ -28,7 +28,9 @@ export type { MailBox } from './types.js';
 const CLIENT_PREFIX_RE = /^\s*\[ POCZTA \]\s+/;
 
 export function stripClientPrefix(text: string): string {
-  return text.replace(CLIENT_PREFIX_RE, '').trimStart();
+  // trim() (nie trimStart): trigger klienta newMail dokleja suffix "\n\n"
+  // za linia powiadomienia - biale znaki z koncow tez musza zniknac.
+  return text.replace(CLIENT_PREFIX_RE, '').trim();
 }
 
 // --- daty ------------------------------------------------------------------
@@ -55,14 +57,17 @@ export function parseMailDate(raw: string): MailDate | null {
 
 // --- listingi ----------------------------------------------------------------
 
-const LISTING_HEADER_RE = /^Listy (nieprzeczytane|odebrane|wyslane|niewyslane)(?: \(([^)]*)\))?:$/;
+// Prefiks "Wybrane " (i mala litera "listy") dla listingow z filtrem -
+// dowod: log 2026-10-18. Suffix "(prezentowane jest ...)" deklinuje sie
+// z liczba (komentarz w poczta.ts klienta), stad luzne "pierwsz".
+const LISTING_HEADER_RE = /^(?:Wybrane )?[Ll]isty (nieprzeczytane|odebrane|wyslane|niewyslane)(?: \(([^)]*)\))?:$/;
 
 export function parseListingHeader(text: string): ListingHeader | null {
   const m = text.match(LISTING_HEADER_RE);
   if (!m) return null;
   return {
     box: m[1] as MailBox,
-    truncated: m[2] !== undefined && m[2].includes('pierwsze 50'),
+    truncated: m[2] !== undefined && m[2].includes('pierwsz'),
   };
 }
 

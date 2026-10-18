@@ -9,6 +9,7 @@
 
 import type { MailBox } from '../core/protocol/types.js';
 import { filterLetters, type ArchiveFilter } from '../core/archive.js';
+import { viewContacts, type ContactSort } from '../core/contacts.js';
 import {
   clampLineWidth,
   renderLetter,
@@ -23,6 +24,8 @@ export interface MailUiHandlers {
   onCloseLetter(): void;
   onRefreshBox(box: MailBox): void;
   onLoadOlder(box: MailBox): void;
+  /** Start petli "Wczytaj wszystkie"; w trakcie petli = Przerwij. */
+  onLoadAll(box: MailBox): void;
   onDeleteLetter(box: MailBox, number: number): void;
   onForwardLetter(box: MailBox, number: number, adresat: string): void;
 }
@@ -65,6 +68,8 @@ export function mountMailUi(
 
   /** Filtr archiwum: lokalny (poza store) - input zachowuje fokus. */
   const archFilter: ArchiveFilter = {};
+  /** Filtr i sort kontaktow: lokalne (poza store) - ten sam powod co wyzej. */
+  const contactView: { filter: string; sort: ContactSort } = { filter: '', sort: 'nazwa' };
 
   const render = (state: MailUiState) => {
     root.className = 'arkmail-root' + (state.wide ? ' arkmail-wide' : '');
@@ -133,6 +138,14 @@ export function mountMailUi(
         handlers.onRefreshBox(box);
       });
       boxes.appendChild(btn);
+      // Osobny przycisk odswiezania danej skrzynki (bez zmiany zakladki).
+      const refresh = doc.createElement('button');
+      refresh.className = 'arkmail-refresh';
+      refresh.setAttribute('data-box', box);
+      refresh.setAttribute('title', `Odśwież: ${label}`);
+      refresh.textContent = '↻';
+      refresh.addEventListener('click', () => handlers.onRefreshBox(box));
+      boxes.appendChild(refresh);
     }
     pane.appendChild(boxes);
 
@@ -157,7 +170,8 @@ export function mountMailUi(
       pane.appendChild(dim(view.empty === 'puste' ? 'Skrzynka pusta.' : 'Brak pasujacych listow.'));
       return pane;
     }
-    for (const e of view.entries) {
+    // Serwer podaje najstarszy->najnowszy; wyswietlamy najnowszy->najstarszy.
+    for (const e of [...view.entries].reverse()) {
       // Wiersz w stylu nowoczesnej poczty: numer | nadawca | temat | data.
       const row = doc.createElement('div');
       row.className = 'arkmail-entry' + (e.isRead ? '' : ' arkmail-unread');
@@ -181,12 +195,29 @@ export function mountMailUi(
       row.addEventListener('click', () => handlers.onOpenLetter(state.activeBox, e.number));
       pane.appendChild(row);
     }
-    if (view.truncated) {
+    if (state.loadAll && state.loadAll.box === state.activeBox) {
+      // Petla "Wczytaj wszystkie" w toku na tej skrzynce: jedyny przycisk
+      // to Przerwij z numerem biezacej strony.
+      const cancel = doc.createElement('button');
+      cancel.className = 'arkmail-older-all';
+      cancel.textContent = `Przerwij (strona ${state.loadAll.pages})`;
+      cancel.addEventListener('click', () => handlers.onLoadAll(state.activeBox));
+      pane.appendChild(cancel);
+    } else if (view.truncated && !state.loadAll) {
+      // Petla na innej skrzynce chowa przyciski paginacji (blokada sesji).
+      const row = doc.createElement('div');
+      row.className = 'arkmail-older-row';
       const btn = doc.createElement('button');
       btn.className = 'arkmail-older';
       btn.textContent = 'Wczytaj starsze';
       btn.addEventListener('click', () => handlers.onLoadOlder(state.activeBox));
-      pane.appendChild(btn);
+      row.appendChild(btn);
+      const all = doc.createElement('button');
+      all.className = 'arkmail-older-all';
+      all.textContent = 'Wczytaj wszystkie';
+      all.addEventListener('click', () => handlers.onLoadAll(state.activeBox));
+      row.appendChild(all);
+      pane.appendChild(row);
     }
     return pane;
   };
@@ -359,39 +390,127 @@ export function mountMailUi(
   const renderKontakty = (state: MailUiState): HTMLElement => {
     const pane = doc.createElement('div');
     pane.className = 'arkmail-pane';
-    if (state.contacts.length === 0) {
-      pane.appendChild(dim('Brak kontaktow - pojawia sie po pobraniu listingow.'));
-      return pane;
+    // Filtr i sort sa lokalne (poza store, jak filtr archiwum):
+    // repaint dotyczy tylko listy, input nie traci fokusu przy pisaniu.
+    const controls = doc.createElement('div');
+    controls.className = 'arkmail-contact-controls';
+    const input = doc.createElement('input');
+    input.className = 'arkmail-contact-filter';
+    input.setAttribute('placeholder', 'Filtr: nazwa lub alias');
+    input.value = contactView.filter;
+    const sel = doc.createElement('select');
+    sel.className = 'arkmail-contact-sort';
+    const SORT_OPTS: Array<[ContactSort, string]> = [
+      ['nazwa', 'Nazwa A-Z'],
+      ['liczba', 'Liczba listow'],
+      ['ostatni', 'Ostatni kontakt'],
+    ];
+    for (const [value, label] of SORT_OPTS) {
+      const o = doc.createElement('option');
+      o.setAttribute('value', value);
+      o.textContent = label;
+      sel.appendChild(o);
     }
-    for (const c of state.contacts) {
-      const row = doc.createElement('div');
-      row.className = 'arkmail-contact';
-      const name = doc.createElement('span');
-      name.className = 'arkmail-contact-name';
-      name.textContent = c.name;
-      row.appendChild(name);
-      const stats = doc.createElement('span');
-      stats.className = 'arkmail-contact-stats';
-      stats.textContent =
-        `(odebrane: ${c.lettersReceived}, wyslane: ${c.lettersSent})` +
-        (c.mailAlias ? ` alias: ${c.mailAlias}` : '');
-      row.appendChild(stats);
-      pane.appendChild(row);
-    }
+    sel.value = contactView.sort;
+    controls.appendChild(input);
+    controls.appendChild(sel);
+    pane.appendChild(controls);
+    const list = doc.createElement('div');
+    pane.appendChild(list);
+    const repaint = () => {
+      const rows = viewContacts(state.contacts, contactView);
+      list.replaceChildren(
+        ...rows.map((c) => {
+          const row = doc.createElement('div');
+          row.className = 'arkmail-contact';
+          const name = doc.createElement('span');
+          name.className = 'arkmail-contact-name';
+          name.textContent = c.name;
+          row.appendChild(name);
+          const stats = doc.createElement('span');
+          stats.className = 'arkmail-contact-stats';
+          stats.textContent =
+            `(odebrane: ${c.lettersReceived}, wyslane: ${c.lettersSent})` +
+            (c.mailAlias ? ` alias: ${c.mailAlias}` : '');
+          row.appendChild(stats);
+          if (c.lastContactRaw) {
+            const last = doc.createElement('span');
+            last.className = 'arkmail-contact-last';
+            last.textContent = c.lastContactRaw;
+            row.appendChild(last);
+          }
+          return row;
+        }),
+      );
+      if (rows.length === 0) {
+        list.replaceChildren(
+          dim(
+            state.contacts.length === 0
+              ? 'Brak kontaktow - pojawia sie po pobraniu listingow.'
+              : 'Filtr niczego nie trafia.',
+          ),
+        );
+      }
+    };
+    input.addEventListener('input', () => {
+      contactView.filter = input.value;
+      repaint();
+    });
+    sel.addEventListener('change', () => {
+      contactView.sort = sel.value as ContactSort;
+      repaint();
+    });
+    repaint();
     return pane;
   };
 
   const renderArchiwum = (state: MailUiState): HTMLElement => {
     const pane = doc.createElement('div');
     pane.className = 'arkmail-pane';
-    const lab = doc.createElement('label');
-    lab.textContent = 'Filtr tematu';
-    pane.appendChild(lab);
-    const input = doc.createElement('input');
-    input.setAttribute('data-filter', 'temat');
-    input.value = archFilter.temat ?? '';
+    // Wszystkie filtry lokalne (poza store): repaint tylko listy,
+    // input nie traci fokusu przy pisaniu.
+    const controls = doc.createElement('div');
+    controls.className = 'arkmail-arch-controls';
+    const mkText = (key: 'osoba' | 'temat' | 'tresc' | 'odDaty' | 'doDaty', placeholder: string, type = 'text') => {
+      const input = doc.createElement('input');
+      input.setAttribute('data-filter', key);
+      input.setAttribute('type', type);
+      input.setAttribute('placeholder', placeholder);
+      input.value = archFilter[key] ?? '';
+      input.addEventListener('input', () => {
+        archFilter[key] = input.value === '' ? undefined : input.value;
+        repaint();
+      });
+      return input;
+    };
+    controls.appendChild(mkText('osoba', 'Osoba (nadawca lub odbiorca)'));
+    const skr = doc.createElement('select');
+    skr.setAttribute('data-filter', 'skrzynka');
+    const SKR_OPTS: Array<[MailBox | '', string]> = [
+      ['', 'Wszystkie skrzynki'],
+      ['odebrane', 'Odebrane'],
+      ['nieprzeczytane', 'Nieprzeczytane'],
+      ['wyslane', 'Wysłane'],
+      ['niewyslane', 'Niewysłane'],
+    ];
+    for (const [value, label] of SKR_OPTS) {
+      const o = doc.createElement('option');
+      o.setAttribute('value', value);
+      o.textContent = label;
+      skr.appendChild(o);
+    }
+    skr.value = archFilter.skrzynka ?? '';
+    skr.addEventListener('change', () => {
+      archFilter.skrzynka = skr.value === '' ? undefined : (skr.value as MailBox);
+      repaint();
+    });
+    controls.appendChild(skr);
+    controls.appendChild(mkText('temat', 'Temat'));
+    controls.appendChild(mkText('tresc', 'Tresc listu'));
+    controls.appendChild(mkText('odDaty', 'Od daty', 'date'));
+    controls.appendChild(mkText('doDaty', 'Do daty', 'date'));
+    pane.appendChild(controls);
     const list = doc.createElement('div');
-    pane.appendChild(input);
     pane.appendChild(list);
     const repaint = () => {
       const rows = filterLetters(state.archive, archFilter);
@@ -413,10 +532,6 @@ export function mountMailUi(
         list.replaceChildren(dim('Archiwum puste albo filtr niczego nie trafia.'));
       }
     };
-    input.addEventListener('input', () => {
-      archFilter.temat = input.value === '' ? undefined : input.value;
-      repaint();
-    });
     repaint();
     return pane;
   };

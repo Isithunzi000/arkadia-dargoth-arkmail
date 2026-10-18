@@ -116,3 +116,46 @@ test('ui: kontakty i archiwum trafiaja do stanu', () => {
   assert.equal(s.state.contacts[0].name, 'Foo');
   assert.deepEqual(s.state.archive, []);
 });
+
+test('ui: appendMailboxPage dokleja starsza strone PRZED istniejace (dedup, kolejnosc serwera)', () => {
+  const s = new MailUiStore();
+  const d = (raw: string) => ({
+    raw,
+    weekday: raw.slice(0, 2),
+    day: 1,
+    month: 12,
+    year: 2025,
+    time: '10:00:00',
+  });
+  s.applyMailbox('odebrane', lista('odebrane', [
+    { number: 2, party: 'Foo', subject: 'B', date: d('Pn, 22 XII 2025, 02:20:05') },
+    { number: 1, party: 'Corge', subject: 'A', date: d('Wt, 23 XII 2025, 00:11:12') },
+  ]));
+  // strona starszych: jeden nowy (C) + duplikat istniejacego (B)
+  s.appendMailboxPage('odebrane', [
+    {
+      number: 50, isRead: true, subject: 'C', forwarded: false,
+      party: 'Waldo', partyKind: 'nadawca', date: d('N, 14 XII 2025, 10:00:00'),
+    },
+    {
+      number: 49, isRead: true, subject: 'B', forwarded: false,
+      party: 'Foo', partyKind: 'nadawca', date: d('Pn, 22 XII 2025, 02:20:05'),
+    },
+  ], true);
+  const v = s.state.boxes.odebrane!;
+  assert.equal(v.entries.length, 3);
+  assert.equal(v.entries[0].subject, 'C', 'starsza strona laduje PRZED (kolejnosc serwera: najstarszy pierwszy)');
+  assert.equal(v.entries[1].subject, 'B');
+  assert.equal(v.truncated, true, 'strona pelna - sa dalsze');
+  s.appendMailboxPage('odebrane', [], false);
+  assert.equal(s.state.boxes.odebrane!.truncated, false, 'koniec starszych - przycisk znika');
+});
+
+test('setLoadAll: stan petli wczytywania wszystkich (skrzynka + strona)', () => {
+  const s = new MailUiStore();
+  assert.equal(s.state.loadAll, null, 'domyslnie brak petli');
+  s.setLoadAll({ box: 'odebrane', pages: 2 });
+  assert.deepEqual(s.state.loadAll, { box: 'odebrane', pages: 2 });
+  s.setLoadAll(null);
+  assert.equal(s.state.loadAll, null);
+});

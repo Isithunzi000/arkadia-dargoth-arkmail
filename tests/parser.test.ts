@@ -202,3 +202,31 @@ test('przedstawieni: licznik w nawiasie, lista z "i" przed ostatnim', () => {
   assert.equal(names[27], 'Waldo');
   assert.ok(names.includes('Bar'));
 });
+
+test('powiadomienia: linia po modyfikacji triggera klienta (prefix+suffix nowych linii)', () => {
+  // Trigger klienta (newMail.ts) dokleja "\n[ POCZTA ] " z przodu i "\n\n"
+  // z tylu - kolejne triggery widza zmodyfikowany buffer. Parser musi
+  // tolerowac biale znaki na koncach linii.
+  assert.deepEqual(parseNotification('\n[ POCZTA ] Masz nowa poczte od Bar.\n\n'), {
+    kind: 'nowa-poczte',
+    nadawca: 'Bar',
+  });
+  assert.deepEqual(parseNotification('Masz nowa poczte od Bar.\n\n'), {
+    kind: 'nowa-poczte',
+    nadawca: 'Bar',
+  });
+  assert.deepEqual(parseNotification('Goniec przyniosl nowa partie listow.\n'), { kind: 'goniec' });
+});
+
+test('listing: naglowek "Wybrane listy" (strona z filtrem/paginacji)', () => {
+  // Serwer dla listingow z filtrem (przed/po/od/do/o temacie) mowi
+  // "Wybrane listy <skrzynka>" - dowod: log 2026-10-18, 9 stron.
+  assert.deepEqual(parseListingHeader('Wybrane listy wyslane (prezentowane jest pierwsze 50):'), {
+    box: 'wyslane',
+    truncated: true,
+  });
+  assert.deepEqual(parseListingHeader('Wybrane listy odebrane:'), {
+    box: 'odebrane',
+    truncated: false,
+  });
+});

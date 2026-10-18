@@ -237,3 +237,33 @@ test('przenosnosc: pager konczy sie idle-flush gdy prompt nie dochodzi', async (
   assert.equal(res.deleted, true);
   assert.deepEqual(res.deletedNumbers, [1]);
 });
+
+test('mailbox: strona "Wybrane listy" (paginacja) zbiera wpisy', async () => {
+  const t = new MockTransport();
+  const s = new MailboxSession(t, OPTS);
+  const op = s.fetch('wyslane', 'listy wyslane przed 19 IV 2026');
+  assert.deepEqual(t.sent, ['listy wyslane przed 19 IV 2026']);
+  await t.replay(fixture('listing-wyslane-wybrane-przed'));
+  const res = await op;
+  assert.equal(res.kind, 'lista');
+  if (res.kind !== 'lista') return;
+  assert.equal(res.header.box, 'wyslane');
+  assert.equal(res.header.truncated, true);
+  assert.equal(res.entries.length, 50);
+  assert.equal(res.entries[0].number, 50);
+  assert.equal(res.entries[0].party, 'Bar');
+  assert.equal(res.entries[0].date?.month, 3);
+  assert.equal(res.entries[49].date?.month, 4);
+});
+
+test('mailbox: linia-blad serwera (zly format daty) przerywa sesje od razu', async () => {
+  const t = new MockTransport();
+  const s = new MailboxSession(t, OPTS);
+  const op = s.fetch('odebrane', 'listy odebrane przed 30 II 2026');
+  const assertion = assert.rejects(op, /zlym formacie/);
+  await t.replay([
+    { cls: 'mail', text: 'Data zostala podana w zlym formacie. Przykladowy format to: 13 X 2007.' },
+    { cls: 'prompt', text: '> ' },
+  ]);
+  await assertion;
+});

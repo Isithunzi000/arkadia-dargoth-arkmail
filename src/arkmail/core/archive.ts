@@ -10,7 +10,9 @@
 
 import type { MailBox } from './protocol/types.js';
 import type { MailDate } from './protocol/types.js';
+import { parseMailDate } from './protocol/parser.js';
 import type { MailboxEntry } from './session/mailbox.js';
+import type { LetterContent } from './session/pager.js';
 
 export interface ArchiveLetter {
   /** Stabilny identyfikator: FNV-1a(box|number|party|subject|dateRaw). */
@@ -32,6 +34,10 @@ export interface ArchiveFilter {
   od?: string;
   /** Odbiorca (skrzynki wyslane/niewyslane), podciag bez wielkosci. */
   do?: string;
+  /** Strona listu w DOWOLNYM kierunku (nadawca albo odbiorca). */
+  osoba?: string;
+  /** Ograniczenie do jednej skrzynki. */
+  skrzynka?: MailBox;
   temat?: string;
   tresc?: string;
   /** "YYYY-MM-DD", wlacznie. */
@@ -60,19 +66,23 @@ function sortKeyOf(date: MailDate | null): string {
 
 export function letterId(
   box: MailBox,
-  number: number,
   party: string,
   subject: string,
+  forwarded: boolean,
   dateRaw: string | null,
 ): string {
-  return fnv1a([box, number, party, subject, dateRaw ?? ''].join('|'));
+  // Numer NIE wchodzi w ID: serwer renumeruje wpisy na stronach "Wybrane
+  // listy" (1..N selekcji), wiec ten sam list ma rozne numery zaleznie
+  // od strony/listingu. Flaga forwarded rozroznia forward oryginalu
+  // wyslany w tej samej sekundzie (log 2026-10-18).
+  return fnv1a([box, party, subject, forwarded ? 'f' : '', dateRaw ?? ''].join('|'));
 }
 
 /** List z listingu -> rekord archiwum (tresc pusta, dokleja ja pager). */
 export function fromMailboxEntry(box: MailBox, entry: MailboxEntry): ArchiveLetter {
   const dateRaw = entry.date?.raw ?? null;
   return {
-    id: letterId(box, entry.number, entry.party, entry.subject, dateRaw),
+    id: letterId(box, entry.party, entry.subject, entry.forwarded, dateRaw),
     box,
     number: entry.number,
     party: entry.party,
@@ -81,6 +91,37 @@ export function fromMailboxEntry(box: MailBox, entry: MailboxEntry): ArchiveLett
     sortKey: sortKeyOf(entry.date),
     read: entry.isRead,
     body: [],
+  };
+}
+
+/**
+ * Otwarty list (pager) -> rekord archiwum z TRESCIA. Ze znanym wpisem
+ * listingu bierzemy jego dane do id (zgodnosc flagi forwarded -> dedup
+ * z rekordem z listingu); bez wpisu (np. list otwarty z wynikow
+ * szukania) fallback: strona listu po kierunku skrzynki (Od/Do),
+ * forwarded=false. Otwarcie = przeczytany.
+ */
+export function fromOpenedLetter(
+  box: MailBox,
+  letter: LetterContent,
+  entry?: MailboxEntry,
+): ArchiveLetter {
+  if (entry) {
+    return { ...fromMailboxEntry(box, entry), read: true, body: letter.body };
+  }
+  const party = SENDER_BOXES.has(box) ? letter.from : letter.to;
+  const dateRaw = letter.date;
+  const parsed = dateRaw ? parseMailDate(dateRaw) : null;
+  return {
+    id: letterId(box, party, letter.subject, false, dateRaw),
+    box,
+    number: letter.number,
+    party,
+    subject: letter.subject,
+    dateRaw,
+    sortKey: sortKeyOf(parsed),
+    read: true,
+    body: letter.body,
   };
 }
 
@@ -140,6 +181,8 @@ export function filterLetters(
       if (!RECIPIENT_BOXES.has(l.box)) return false;
       if (!norm(l.party).includes(norm(filter.do))) return false;
     }
+    if (filter.osoba !== undefined && !norm(l.party).includes(norm(filter.osoba))) return false;
+    if (filter.skrzynka !== undefined && l.box !== filter.skrzynka) return false;
     if (filter.temat !== undefined && !norm(l.subject).includes(norm(filter.temat))) return false;
     if (filter.tresc !== undefined && !norm(l.body.join('\n')).includes(norm(filter.tresc))) return false;
     if (filter.odDaty !== undefined && l.sortKey.slice(0, 10) < filter.odDaty) return false;

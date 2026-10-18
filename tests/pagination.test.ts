@@ -1,24 +1,34 @@
 /**
- * Paginacja wstecz (Fala 7a) - integracja przez skompilowany index.ts.
+ * Paginacja wstecz (Fale 7a/8b/8e) - integracja przez skompilowany index.ts.
+ * Harness wspoldzielony: tests/harness.ts.
  *
- * Dowody z loga sesji testowej 2026-10-17:
- * 1) Serwer odrzuca mala litere miesiaca rzymskiego: "Data zostala
+ * Dowody z logow sesji testowych 2026-10-17 i 2026-10-18:
+ * 1) Serwer wymaga WIELKIEJ litery miesiaca rzymskiego: "Data zostala
  *    podana w zlym formacie. Przykladowy format to: 13 X 2007."
- *    -> komenda paginacji MUSI miec miesiac WIELKA litera.
- * 2) Listing skrzynki idzie od NAJSTARSZEGO listu (gora, najwiekszy
- *    numer) do najnowszego (dol, numer 1) -> date graniczna paginacji
- *    bierzemy z NAJSTARSZEGO widocznego wpisu, nie z ostatniego.
+ * 2) Listing skrzynki idzie od NAJSTARSZEGO listu (gora) do najnowszego
+ *    (dol, numer 1) -> kotwica paginacji to najstarszy widoczny wpis.
+ * 3) Strona z filtrem przychodzi z naglowkiem "Wybrane listy <skrzynka>"
+ *    i RENUMERUJE wpisy (1..N wewnatrz selekcji) -> ID archiwum bez
+ *    numeru, wpisy strony doklejamy PRZED istniejace (dedup).
+ * 4) "przed <data>" ma granulacje dnia i wyklucza caly dzien graniczny
+ *    -> kotwica = najstarsza data + 1 dzien (kalendarz gregorianski,
+ *    serwer odrzuca nieistniejace daty, np. 30 II).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Window } from 'happy-dom';
 
-import type PluginApi from 'plugin-api';
-import { olderListingCommand } from '../src/arkmail/core/protocol/commands';
+import { olderListingCommand, nextDay } from '../src/arkmail/core/protocol/commands';
 import { parseMailDate } from '../src/arkmail/core/protocol/parser';
-import { init, destroy } from '../src/arkmail/index';
-
-type TriggerCb = (line: { text: string }, matches: unknown, type: string) => unknown;
+import { LOAD_ALL_MAX_PAGES, LOAD_ALL_PACE_MS } from '../src/arkmail/index';
+import {
+  startHarness,
+  stopHarness,
+  loadTruncatedBox,
+  click,
+  waitRt,
+  notifyText,
+  textOf,
+} from './harness';
 
 test('paginacja: miesiac rzymski WIELKA litera (wymog serwera)', () => {
   assert.equal(
@@ -29,143 +39,168 @@ test('paginacja: miesiac rzymski WIELKA litera (wymog serwera)', () => {
     olderListingCommand('odebrane', parseMailDate('N, 21 XII 2025, 01:15:04')!),
     'listy odebrane przed 21 XII 2025',
   );
+  // kotwica paginacji: najstarsza data + 1 dzien
+  const oldest = parseMailDate('N, 21 XII 2025, 01:15:04')!;
+  assert.equal(olderListingCommand('odebrane', nextDay(oldest)), 'listy odebrane przed 22 XII 2025');
 });
 
-class FakeApi {
-  sent: string[] = [];
-  triggerCb: TriggerCb | null = null;
-  emitted: { event: string; args: unknown[] }[] = [];
-  popupConfig: { createContent: () => Promise<unknown> } | null = null;
-
-  readonly api = {
-    command: {
-      send: async (command: string) => {
-        this.sent.push(command);
-      },
-      addSuggestions: () => {},
-      removeSuggestions: () => {},
-    },
-    triggers: {
-      register: (_pattern: unknown, cb: TriggerCb, _tag?: string) => {
-        this.triggerCb = cb;
-        return { id: 'trig-1' };
-      },
-      remove: () => {},
-      removeByTag: () => {},
-    },
-    commandHooks: {
-      register: () => 'hook-1',
-      unregister: () => true,
-    },
-    events: {
-      on: () => {},
-      off: () => {},
-      emit: (event: string, ...args: unknown[]) => {
-        this.emitted.push({ event, args });
-      },
-    },
-    aliases: {
-      register: () => 'alias-1',
-      remove: () => {},
-    },
-    people: {
-      subscribe: () => () => {},
-      getAll: () => [],
-    },
-    ui: {
-      registerPersistentPopup: async (cfg: { createContent: () => Promise<unknown> }) => {
-        this.popupConfig = cfg;
-        return {
-          id: 'arkmail',
-          isOpen: false,
-          wasRestored: false,
-          isPinned: false,
-          element: null,
-          open: async () => {},
-          close: () => {},
-          onClose: () => {},
-          setTitle: () => {},
-          setBody: () => {},
-          setPinned: () => {},
-          setHeaderActions: () => {},
-        };
-      },
-      addPopupMenuEntry: () => ({ remove: () => {} }),
-      registerFooterButton: () => ({ update: () => {}, remove: () => {} }),
-      setFooterButtonState: () => {},
-    },
-  } as unknown as PluginApi;
-
-  fire(text: string, cls = ''): void {
-    this.triggerCb?.({ text }, null, cls);
-  }
-}
-
-test('paginacja: wczytaj starsze wysyla date NAJSTARSZEGO wpisu skrzynki', async () => {
-  const window = new Window();
-  const prevDoc = (globalThis as { document?: unknown }).document;
-  (globalThis as { document?: unknown }).document = window.document;
-  const f = new FakeApi();
+test('paginacja: wczytaj starsze dokleja strone "Wybrane" do widoku i archiwum', async () => {
+  const h = await startHarness();
+  const { f, waitFor, content } = h;
   try {
-    await init(f.api);
-    const content = (await f.popupConfig!.createContent()) as {
-      querySelector(s: string): unknown;
-    };
+    await loadTruncatedBox(h);
 
-    const tick = () => new Promise((r) => setImmediate(r));
-    const waitFor = async (pred: () => boolean, what: string) => {
-      for (let i = 0; i < 500; i++) {
-        if (pred()) return;
-        await tick();
-      }
-      assert.fail(`timeout: ${what}`);
-    };
-
-    // Powiadomienie o nowej poczcie odpala odswiezenie odebranych.
-    f.fire(' [ POCZTA ] Masz nowa poczte od Foo.');
-    await waitFor(() => f.sent.includes('listy odebrane'), 'komenda listy odebrane');
-
-    // Listing uciety do 50 (suffix) - gora to NAJSTARSZE listy.
-    f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
-    f.fire(' 3. *R* Temat: najstarszy', 'mail');
-    f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
-    f.fire(' 2. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
-    f.fire(' 1. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
-    f.fire('> ', 'prompt');
-    await waitFor(() => f.sent.includes('listy nieprzeczytane'), 'komenda listy nieprzeczytane');
-    f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
-    await waitFor(() => !!content.querySelector('.arkmail-older'), 'przycisk Wczytaj starsze');
-
-    const older = content.querySelector('.arkmail-older') as {
-      dispatchEvent(e: unknown): void;
-    };
-    older.dispatchEvent(new window.Event('click'));
+    // Klik 1: kotwica = najstarszy (21 XII) + 1 dzien = 22 XII 2025.
+    click(h, '.arkmail-older');
     await waitFor(
       () => f.sent.some((c) => c.startsWith('listy odebrane przed')),
       'komenda paginacji wstecz',
     );
-    const cmd = f.sent.find((c) => c.startsWith('listy odebrane przed'))!;
-    assert.equal(cmd, 'listy odebrane przed 21 XII 2025');
+    assert.equal(
+      f.sent.find((c) => c.startsWith('listy odebrane przed')),
+      'listy odebrane przed 22 XII 2025',
+    );
 
-    // Odpowiedz serwera laduje w archiwum (merge + notify).
-    f.fire('Listy odebrane:', 'mail');
+    // Pelna strona "Wybrane" (suffix) - doklejana przed istniejace wpisy.
+    f.fire('Wybrane listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire('50. *R* Temat: antyczny', 'mail');
     f.fire('Nadawca: Waldo                          N, 14 XII 2025, 10:00:00', 'mail');
     f.fire('> ', 'prompt');
+    await waitFor(() => content.querySelectorAll('.arkmail-entry').length === 4, 'merge strony');
+    await waitFor(() => notifyText(f, 'Archiwum: +1'), 'notify o dopisaniu starszych do archiwum');
+
+    // Klik 2: kotwica = 14 XII + 1 dzien = 15 XII 2025.
+    click(h, '.arkmail-older');
     await waitFor(
-      () =>
-        f.emitted.some(
-          (e) =>
-            e.event === 'notify' &&
-            String((e.args[0] as { text?: string })?.text ?? '').includes('Archiwum: +1'),
-        ),
-      'notify o dopisaniu starszych do archiwum',
+      () => f.sent.filter((c) => c.startsWith('listy odebrane przed')).length === 2,
+      'druga komenda paginacji',
+    );
+    assert.equal(
+      f.sent.filter((c) => c.startsWith('listy odebrane przed'))[1],
+      'listy odebrane przed 15 XII 2025',
+    );
+
+    // Strona niepelna (bez suffixu) = koniec starszych -> przycisk znika.
+    f.fire('Wybrane listy odebrane:', 'mail');
+    f.fire(' 9. *R* Temat: pradawny', 'mail');
+    f.fire('Nadawca: Baz                          Pn, 1 XII 2025, 09:00:00', 'mail');
+    f.fire('> ', 'prompt');
+    await waitFor(() => content.querySelectorAll('.arkmail-entry').length === 5, 'merge koncowy');
+    await waitFor(() => !content.querySelector('.arkmail-older'), 'przycisk zniknal');
+  } finally {
+    await stopHarness();
+  }
+});
+
+test('paginacja: linia-blad serwera konczy sesje z komunikatem (bez cichego timeoutu)', async () => {
+  const h = await startHarness();
+  const { f, waitFor } = h;
+  try {
+    await loadTruncatedBox(h);
+    click(h, '.arkmail-older');
+    await waitFor(
+      () => f.sent.some((c) => c.startsWith('listy odebrane przed')),
+      'komenda paginacji wstecz',
+    );
+    f.fire('Data zostala podana w zlym formacie. Przykladowy format to: 13 X 2007.', 'mail');
+    f.fire('> ', 'prompt');
+    await waitFor(() => notifyText(f, 'zlym formacie'), 'notify z komunikatem serwera');
+  } finally {
+    await stopHarness();
+  }
+});
+
+// --- Fala 8e: "Wczytaj wszystkie" - petla stron pod jedna blokada -------------
+
+test('wczytaj wszystkie: bezpieczniki petli (limit stron i pacing)', () => {
+  assert.equal(LOAD_ALL_MAX_PAGES, 40, 'twardy limit stron na jedno klikniecie');
+  assert.equal(LOAD_ALL_PACE_MS, 400, 'pauza miedzy stronami (grzecznosc wobec serwera)');
+});
+
+test('wczytaj wszystkie: petla stron az do konca (kotwica przesuwa sie co strone)', async () => {
+  const h = await startHarness();
+  const { f, waitFor, content } = h;
+  try {
+    await loadTruncatedBox(h);
+    click(h, '.arkmail-older-all');
+    await waitFor(
+      () => f.sent.some((c) => c.startsWith('listy odebrane przed')),
+      'komenda petli 1',
+    );
+    assert.equal(
+      f.sent.find((c) => c.startsWith('listy odebrane przed')),
+      'listy odebrane przed 22 XII 2025',
+    );
+
+    // Strona 1 (dalej ucieta) -> petla leci dalej po pacingu.
+    f.fire('Wybrane listy odebrane (prezentowane jest pierwsze 50):', 'mail');
+    f.fire('50. *R* Temat: antyczny', 'mail');
+    f.fire('Nadawca: Waldo                          N, 14 XII 2025, 10:00:00', 'mail');
+    f.fire('> ', 'prompt');
+    await waitRt(() => textOf(h, '.arkmail-older-all').includes('Przerwij'), 'Przerwij w petli');
+    assert.ok(textOf(h, '.arkmail-busy').includes('strona 1'), 'pasek operacji: postep (strona 1)');
+
+    await waitRt(
+      () => f.sent.filter((c) => c.startsWith('listy odebrane przed')).length === 2,
+      'komenda petli 2 (po pacingu)',
+    );
+    assert.equal(
+      f.sent.filter((c) => c.startsWith('listy odebrane przed'))[1],
+      'listy odebrane przed 15 XII 2025',
+      'kotwica przesunela sie na najstarszy znany + 1 dzien',
+    );
+
+    // Strona 2 niepelna (bez suffixu) = koniec starszych -> petla staje.
+    f.fire('Wybrane listy odebrane:', 'mail');
+    f.fire(' 9. *R* Temat: pradawny', 'mail');
+    f.fire('Nadawca: Baz                          Pn, 1 XII 2025, 09:00:00', 'mail');
+    f.fire('> ', 'prompt');
+    await waitRt(
+      () => notifyText(f, 'Wczytano wszystkie: +2 listow (2 stron)'),
+      'notify podsumowania petli',
+    );
+    assert.equal(content.querySelectorAll('.arkmail-entry').length, 5, '3 + 2 wpisy po merge');
+    await waitRt(
+      () => !content.querySelector('.arkmail-older-all') && !content.querySelector('.arkmail-older'),
+      'przyciski paginacji zniknely (koniec starszych)',
     );
   } finally {
-    await destroy();
-    if (prevDoc === undefined) delete (globalThis as { document?: unknown }).document;
-    else (globalThis as { document?: unknown }).document = prevDoc;
+    await stopHarness();
+  }
+});
+
+test('wczytaj wszystkie: Przerwij zatrzymuje petle miedzy stronami', async () => {
+  const h = await startHarness();
+  const { f, waitFor, content } = h;
+  try {
+    await loadTruncatedBox(h);
+    click(h, '.arkmail-older-all');
+    await waitFor(
+      () => f.sent.some((c) => c.startsWith('listy odebrane przed')),
+      'komenda petli 1',
+    );
+
+    f.fire('Wybrane listy odebrane (prezentowane jest pierwsze 50):', 'mail');
+    f.fire('50. *R* Temat: antyczny', 'mail');
+    f.fire('Nadawca: Waldo                          N, 14 XII 2025, 10:00:00', 'mail');
+    f.fire('> ', 'prompt');
+    await waitRt(() => textOf(h, '.arkmail-older-all').includes('Przerwij'), 'Przerwij w petli');
+
+    click(h, '.arkmail-older-all'); // = Przerwij
+    await waitRt(() => notifyText(f, 'Przerwiano: +1 listow (1 stron)'), 'notify przerwania');
+
+    // Pacing by minal - komendy paginacji nie leca dalej.
+    await new Promise((r) => setTimeout(r, 500));
+    assert.equal(
+      f.sent.filter((c) => c.startsWith('listy odebrane przed')).length,
+      1,
+      'po przerwaniu petla nie wysyla kolejnych stron',
+    );
+    await waitRt(
+      () => textOf(h, '.arkmail-older-all').includes('Wczytaj wszystkie'),
+      'przyciski paginacji wrocily (listing dalej uciety)',
+    );
+  } finally {
+    await stopHarness();
   }
 });

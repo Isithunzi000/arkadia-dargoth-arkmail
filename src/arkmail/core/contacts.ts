@@ -30,6 +30,24 @@ export interface Contact {
   lettersReceived: number;
   lettersSent: number;
   lastContactRaw?: string;
+  /** Klucz yyyymmddHHMMSS ostatniego kontaktu (z MailDate) - poprawne porownanie. */
+  lastContactKey?: number;
+}
+
+/**
+ * Dzieli strone listu na osobne osoby. Listingi lacza odbiorcow
+ * przecinkiem ('Odbiorcy: Fred, Grault', 'Odbiorcy: Plugh, Baz, Bar'
+ * - logi 2026-04/08), naglowki listow spojnikiem ' i '. Imiona postaci
+ * w Arkadii sa jednowyrazowe, wiec oba separatory sa bezpieczne.
+ * Dedup w obrebie jednej strony, kolejnosc zachowana.
+ */
+export function splitParty(party: string): string[] {
+  const out: string[] = [];
+  for (const part of party.split(/, | i /)) {
+    const name = part.trim();
+    if (name !== '' && !out.includes(name)) out.push(name);
+  }
+  return out;
 }
 
 /**
@@ -46,11 +64,16 @@ export function contactsFromBoxes(
     const direction = box === 'odebrane' || box === 'nieprzeczytane' ? 'in' : 'out';
     for (const e of view?.entries ?? []) {
       if (!e.party) continue;
-      korespondencja.push({
-        name: e.party,
-        direction,
-        dateRaw: e.date?.raw,
-      });
+      // Klucz yyyymmddHHMMSS: czas rozbija remisy tego samego dnia
+      // (logi: dwa listy 19 IV 2026 o 02:49:49 i 03:03:00).
+      const dateKey = e.date
+        ? (e.date.year * 10000 + e.date.month * 100 + e.date.day) * 1000000 +
+          Number(e.date.time.replace(/:/g, ''))
+        : undefined;
+      // Wspolny list do kilku osob liczy sie kazdej z nich osobno.
+      for (const name of splitParty(e.party)) {
+        korespondencja.push({ name, direction, dateRaw: e.date?.raw, dateKey });
+      }
     }
   }
   return mergeContacts({ people, przedstawieni: [], korespondencja, aliasy: [] });
@@ -59,7 +82,7 @@ export function contactsFromBoxes(
 export interface ContactInput {
   people: Array<{ name: string; description?: string; guild?: string }>;
   przedstawieni: string[];
-  korespondencja: Array<{ name: string; direction: 'in' | 'out'; dateRaw?: string }>;
+  korespondencja: Array<{ name: string; direction: 'in' | 'out'; dateRaw?: string; dateKey?: number }>;
   aliasy: Array<{ name: string; targets: string[] }>;
 }
 
@@ -97,10 +120,20 @@ export function mergeContacts(input: ContactInput): Contact[] {
     addSource(c, 'korespondencja');
     if (k.direction === 'in') c.lettersReceived++;
     else c.lettersSent++;
-    if (k.dateRaw && (!c.lastContactRaw || k.dateRaw > c.lastContactRaw)) {
-      // Daty roznia sie dniem tygodnia (tekstem) - porownanie surowe wystarczy
-      // dla fixture'ow; dokladne sortowanie robi parsowana MailDate w archive.
-      c.lastContactRaw = k.dateRaw;
+    if (k.dateKey !== undefined) {
+      // Klucz yyyymmddHHMMSS z MailDate: poprawne porownanie chronologiczne.
+      // Surowe stringi roznia sie dniem tygodnia i miesiacem rzymskim,
+      // wiec porownanie leksykalne myli (np. 'So, 25 IV' > 'N, 26 IV').
+      if (c.lastContactKey === undefined || k.dateKey > c.lastContactKey) {
+        c.lastContactKey = k.dateKey;
+        if (k.dateRaw) c.lastContactRaw = k.dateRaw;
+      }
+    } else if (k.dateRaw && c.lastContactKey === undefined) {
+      // Wpis bez sparsowanej daty: surowe porownanie tylko dopoki kontakt
+      // nie ma jeszcze klucza (klucz zawsze wygrywa z leksykalnym).
+      if (!c.lastContactRaw || k.dateRaw > c.lastContactRaw) {
+        c.lastContactRaw = k.dateRaw;
+      }
     }
   }
   for (const a of input.aliasy) {
@@ -117,4 +150,45 @@ export function mergeContacts(input: ContactInput): Contact[] {
   }
   out.sort((a, b) => a.name.localeCompare(b.name, 'pl'));
   return out;
+}
+
+export type ContactSort = 'nazwa' | 'liczba' | 'ostatni';
+
+/**
+ * Widok kontaktow dla UI: filtr (nazwa lub alias, case-insensitive)
+ * i sortowanie. Wejscia nie mutuje (kopia); 'nazwa' = alfabetycznie pl,
+ * 'liczba' = suma listow malejaco, 'ostatni' = klucz daty malejaco
+ * (kontakty bez daty na koncu). Remisy rozstrzyga nazwa.
+ */
+export function viewContacts(
+  contacts: Contact[],
+  opts: { filter?: string; sort?: ContactSort } = {},
+): Contact[] {
+  const f = (opts.filter ?? '').trim().toLowerCase();
+  const filtered =
+    f === ''
+      ? [...contacts]
+      : contacts.filter(
+          (c) =>
+            c.name.toLowerCase().includes(f) ||
+            (c.mailAlias !== undefined && c.mailAlias.toLowerCase().includes(f)),
+        );
+  const byName = (a: Contact, b: Contact): number => a.name.localeCompare(b.name, 'pl');
+  switch (opts.sort ?? 'nazwa') {
+    case 'liczba':
+      filtered.sort(
+        (a, b) =>
+          b.lettersReceived + b.lettersSent - (a.lettersReceived + a.lettersSent) ||
+          byName(a, b),
+      );
+      break;
+    case 'ostatni':
+      filtered.sort(
+        (a, b) => (b.lastContactKey ?? -1) - (a.lastContactKey ?? -1) || byName(a, b),
+      );
+      break;
+    default:
+      filtered.sort(byName);
+  }
+  return filtered;
 }

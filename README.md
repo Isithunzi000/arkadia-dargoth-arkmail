@@ -22,7 +22,9 @@ Po załadowaniu: alias `/arkmail` (otwiera/zamyka okno), pozycja
 ## Możliwości
 
 - **Listy** — cztery skrzynki, wyróżnienie nieprzeczytanych, przycisk
-  "Wczytaj starsze" (paginacja `listy <skrzynka> przed <data>`).
+  "Wczytaj starsze" (paginacja `listy <skrzynka> przed <data>`) albo
+  "Wczytaj wszystkie" — pętla stron do końca archiwum (limit 40 stron,
+  pauza 400 ms między stronami, przycisk zamienia się w "Przerwij").
 - **List** — nagłówek i treść; operacje Usuń i Przekaż (subdialog DW
   obsługiwany automatycznie, błędy adresata zgłaszane tostem).
 - **Napisz list** — adresat / temat / DW / treść, sześć szablonów ramki
@@ -30,7 +32,10 @@ Po załadowaniu: alias `/arkmail` (otwiera/zamyka okno), pozycja
   ramka i justowanie stają się fizyczną treścią listu, dokładnie jak
   w oficjalnym kliencie. Pusty list nie wylatuje.
 - **Kontakty** — wyłącznie nadawcy i adresaci z pobranych listowań;
-  liczniki odebranych/wysłanych i data ostatniego kontaktu.
+  listy do kilku osób (`Odbiorcy: A, B`) liczą się każdemu osobno,
+  duplikaty scalane bez względu na wielkość liter; liczniki
+  odebranych/wysłanych i data ostatniego kontaktu; filtr (nazwa/alias)
+  i sortowanie (nazwa, liczba listów, ostatni kontakt).
 - **Archiwum** — lokalne, per postać; filtry po temacie.
 - Powiadomienie `[ POCZTA ] Masz nowa poczte od ...` odświeża skrzynki
   i badge; opcjonalny tost (przełącznik w panelu Listy).

@@ -86,8 +86,13 @@ export class DargothTransport implements Transport {
     this.triggerArmed = true;
     this.api.triggers.register(
       /^/,
-      (line: AnsiAwareBuffer, _matches: RegExpMatchArray, type: string) => {
-        const proto: ProtoLine = { text: line.text, cls: type ?? '' };
+      // 4. argument (originalLine) niesie dziewiczy tekst linii z gry -
+      // system triggerow Dargoth przekazuje kolejnym callbackom buffer
+      // po cudzych modyfikacjach (np. newMail klienta dokleja prefix
+      // "\n[ POCZTA ] " i suffix "\n\n"), co lamalo dopasowania
+      // (Fala 8a, dowod: Triggers.ts TriggerCallback + newMail.ts).
+      (line: AnsiAwareBuffer, _matches: RegExpMatchArray, type: string, originalLine?: string) => {
+        const proto: ProtoLine = { text: originalLine ?? line.text, cls: type ?? '' };
         for (const cb of [...this.subscribers]) cb(proto);
         return line;
       },

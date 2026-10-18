@@ -187,3 +187,23 @@ test('notify: tost przez events.emit, opcjonalny czas wyswietlania', () => {
     { event: 'notify', args: [{ text: 'Pilne', time: 8000 }] },
   ]);
 });
+
+test('adapter: linia brana z originalLine (4. arg) gdy inny trigger ja zmodyfikowal', () => {
+  // System triggerow Dargoth przekazuje kolejnym callbackom buffer po
+  // cudzych modyfikacjach (np. newMail dokleja "\n[ POCZTA ] " i "\n\n"),
+  // ale 4. argument niesie dziewiczy tekst linii z gry (Triggers.ts:
+  // TriggerCallback(line, matches, type, originalLine)). Transport ma
+  // podawac subskrybentom tekst dziewiczy.
+  const f = new FakeApi();
+  const t = new DargothTransport(f.api);
+  const seen: ProtoLine[] = [];
+  t.subscribe((l) => seen.push(l));
+  const modified = { text: '\n[ POCZTA ] Masz nowa poczte od Bar.\n\n' };
+  (f.triggerCb as unknown as (l: unknown, m: unknown, ty: string, orig: string) => unknown)(
+    modified,
+    null,
+    '',
+    'Masz nowa poczte od Bar.',
+  );
+  assert.deepEqual(seen, [{ text: 'Masz nowa poczte od Bar.', cls: '' }]);
+});

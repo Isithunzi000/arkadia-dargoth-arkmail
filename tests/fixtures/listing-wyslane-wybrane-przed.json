@@ -1,0 +1,415 @@
+{
+  "name": "listing-wyslane-wybrane-przed",
+  "opis": "Strona 'Wybrane listy wyslane' po komendzie 'listy wyslane przed 19 IV 2026' - 50 wpisow, renumeracja 1..50 wewnatrz selekcji, koniec promptem. Prawdziwy log session_1792274237302.html (2026-10-18).",
+  "zrodlo": "session_1792274237302.html",
+  "lines": [
+    {
+      "cls": "mail",
+      "text": "Wybrane listy wyslane (prezentowane jest pierwsze 50):"
+    },
+    {
+      "cls": "mail",
+      "text": "50. Temat: -- (forwardowany)"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Sr, 25 III 2026, 19:00:20"
+    },
+    {
+      "cls": "mail",
+      "text": "49. Temat: karteczka z rosomakiem (forwardowany)"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Sr, 25 III 2026, 19:00:20"
+    },
+    {
+      "cls": "mail",
+      "text": "48. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Sr, 25 III 2026, 19:00:20"
+    },
+    {
+      "cls": "mail",
+      "text": "47. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Corge                                 Sr, 25 III 2026, 19:12:35"
+    },
+    {
+      "cls": "mail",
+      "text": "46. Temat: -- (forwardowany)"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Sr, 25 III 2026, 19:14:31"
+    },
+    {
+      "cls": "mail",
+      "text": "45. Temat: -- (forwardowany)"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Sr, 25 III 2026, 19:14:31"
+    },
+    {
+      "cls": "mail",
+      "text": "44. Temat: karteczka z rosomakiem (forwardowany)"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Sr, 25 III 2026, 19:14:31"
+    },
+    {
+      "cls": "mail",
+      "text": "43. Temat: --- (forwardowany)"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Sr, 25 III 2026, 19:14:31"
+    },
+    {
+      "cls": "mail",
+      "text": "42. Temat: -- (forwardowany)"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Sr, 25 III 2026, 19:16:40"
+    },
+    {
+      "cls": "mail",
+      "text": "41. Temat: karteczka z rosomakiem (forwardowany)"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Sr, 25 III 2026, 19:16:40"
+    },
+    {
+      "cls": "mail",
+      "text": "40. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Corge                                 Sr, 25 III 2026, 19:16:40"
+    },
+    {
+      "cls": "mail",
+      "text": "39. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Corge                                 Sr, 25 III 2026, 23:05:39"
+    },
+    {
+      "cls": "mail",
+      "text": "38. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Sr, 25 III 2026, 23:05:39"
+    },
+    {
+      "cls": "mail",
+      "text": "37. Temat: Koperta (forwardowany)"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Sr, 25 III 2026, 23:05:39"
+    },
+    {
+      "cls": "mail",
+      "text": "36. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Sr, 25 III 2026, 23:06:57"
+    },
+    {
+      "cls": "mail",
+      "text": "35. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Corge                                 Sr, 25 III 2026, 23:29:07"
+    },
+    {
+      "cls": "mail",
+      "text": "34. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Sr, 25 III 2026, 23:37:10"
+    },
+    {
+      "cls": "mail",
+      "text": "33. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Sr, 25 III 2026, 23:40:37"
+    },
+    {
+      "cls": "mail",
+      "text": "32. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Sr, 25 III 2026, 23:45:29"
+    },
+    {
+      "cls": "mail",
+      "text": "31. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Cz, 26 III 2026, 00:07:09"
+    },
+    {
+      "cls": "mail",
+      "text": "30. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Corge                                 Cz, 26 III 2026, 15:14:36"
+    },
+    {
+      "cls": "mail",
+      "text": "29. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Corge                                 Cz, 26 III 2026, 15:25:23"
+    },
+    {
+      "cls": "mail",
+      "text": "28. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Morf                                   Cz, 26 III 2026, 15:50:55"
+    },
+    {
+      "cls": "mail",
+      "text": "27. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Cz, 26 III 2026, 16:18:56"
+    },
+    {
+      "cls": "mail",
+      "text": "26. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Cz, 26 III 2026, 16:38:40"
+    },
+    {
+      "cls": "mail",
+      "text": "25. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Corge                                 Cz, 26 III 2026, 18:40:34"
+    },
+    {
+      "cls": "mail",
+      "text": "24. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Cz, 26 III 2026, 19:34:21"
+    },
+    {
+      "cls": "mail",
+      "text": "23. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Vext                                Cz, 26 III 2026, 19:38:38"
+    },
+    {
+      "cls": "mail",
+      "text": "22. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Vext                                Cz, 26 III 2026, 20:38:14"
+    },
+    {
+      "cls": "mail",
+      "text": "21. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Cz, 26 III 2026, 21:27:44"
+    },
+    {
+      "cls": "mail",
+      "text": "20. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Corge                                 Cz, 26 III 2026, 21:30:26"
+    },
+    {
+      "cls": "mail",
+      "text": "19. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Cz, 26 III 2026, 22:15:09"
+    },
+    {
+      "cls": "mail",
+      "text": "18. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Pt, 27 III 2026, 05:23:35"
+    },
+    {
+      "cls": "mail",
+      "text": "17. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Sr, 1 IV 2026, 12:26:00"
+    },
+    {
+      "cls": "mail",
+      "text": "16. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Sr, 1 IV 2026, 12:37:25"
+    },
+    {
+      "cls": "mail",
+      "text": "15. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Cz, 2 IV 2026, 00:47:41"
+    },
+    {
+      "cls": "mail",
+      "text": "14. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Cz, 2 IV 2026, 00:59:27"
+    },
+    {
+      "cls": "mail",
+      "text": "13. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                     N, 5 IV 2026, 02:09:51"
+    },
+    {
+      "cls": "mail",
+      "text": "12. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Wt, 7 IV 2026, 01:34:36"
+    },
+    {
+      "cls": "mail",
+      "text": "11. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Sr, 8 IV 2026, 00:28:11"
+    },
+    {
+      "cls": "mail",
+      "text": "10. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Sr, 8 IV 2026, 03:35:16"
+    },
+    {
+      "cls": "mail",
+      "text": " 9. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Sr, 8 IV 2026, 03:38:29"
+    },
+    {
+      "cls": "mail",
+      "text": " 8. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Cz, 9 IV 2026, 00:08:54"
+    },
+    {
+      "cls": "mail",
+      "text": " 7. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    So, 11 IV 2026, 00:48:08"
+    },
+    {
+      "cls": "mail",
+      "text": " 6. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    So, 11 IV 2026, 02:44:53"
+    },
+    {
+      "cls": "mail",
+      "text": " 5. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    So, 11 IV 2026, 06:37:43"
+    },
+    {
+      "cls": "mail",
+      "text": " 4. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    N, 12 IV 2026, 03:24:36"
+    },
+    {
+      "cls": "mail",
+      "text": " 3. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Cz, 16 IV 2026, 00:21:50"
+    },
+    {
+      "cls": "mail",
+      "text": " 2. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Cz, 16 IV 2026, 00:26:16"
+    },
+    {
+      "cls": "mail",
+      "text": " 1. Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Odbiorcy: Bar                                    Cz, 16 IV 2026, 00:31:37"
+    },
+    {
+      "cls": "prompt",
+      "text": "> "
+    }
+  ]
+}

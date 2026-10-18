@@ -10,6 +10,7 @@ import { Window } from 'happy-dom';
 
 import { mountMailUi, type MailUiHandlers } from '../src/arkmail/ui/render';
 import { renderLetter } from '../src/arkmail/core/letterRender';
+import { mergeContacts } from '../src/arkmail/core/contacts';
 import { MailUiStore } from '../src/arkmail/ui/store';
 import type { MailboxEntry } from '../src/arkmail/core/session/mailbox';
 import type { ArchiveLetter } from '../src/arkmail/core/archive';
@@ -58,6 +59,7 @@ function mount(store: MailUiStore, handlers: Partial<MailUiHandlers> = {}) {
     onCloseLetter: rec('close'),
     onRefreshBox: rec('refresh'),
     onLoadOlder: rec('older'),
+    onLoadAll: rec('all'),
     onDeleteLetter: rec('del'),
     onForwardLetter: rec('fwd'),
     ...handlers,
@@ -115,12 +117,43 @@ test('render: lista listow, nieprzeczytany wyrozniony, klik otwiera', () => {
   });
   const rows = container.querySelectorAll('.arkmail-entry');
   assert.equal(rows.length, 2);
-  assert.ok(rows[0].classList.contains('arkmail-unread'));
-  assert.ok(!rows[1].classList.contains('arkmail-unread'));
-  assert.ok(rows[0].textContent?.includes('Perly'));
-  assert.ok(rows[0].textContent?.includes('Foo'));
-  click(rows[0]);
+  // wyswietlanie najnowszy->najstarszy: wpis numer 2 (nowszy) jest pierwszy
+  assert.ok(!rows[0].classList.contains('arkmail-unread'));
+  assert.ok(rows[0].textContent?.includes('Stary'));
+  assert.ok(rows[1].classList.contains('arkmail-unread'));
+  assert.ok(rows[1].textContent?.includes('Perly'));
+  assert.ok(rows[1].textContent?.includes('Foo'));
+  click(rows[1]);
   assert.deepEqual(calls, [{ name: 'open', args: ['odebrane', 3] }]);
+  off();
+});
+
+test('render: kolejnosc wierszy najnowszy -> najstarszy (serwer podaje odwrotnie)', () => {
+  const s = new MailUiStore();
+  const { container, off } = mount(s);
+  s.applyMailbox('odebrane', {
+    kind: 'lista',
+    header: { box: 'odebrane', truncated: false },
+    entries: [entry({ number: 3, subject: 'najstarszy' }), entry({ number: 2, subject: 'srodkowy' }), entry({ number: 1, subject: 'najnowszy' })],
+  });
+  const rows = container.querySelectorAll('.arkmail-entry');
+  assert.deepEqual(
+    [...rows].map((r) => r.getAttribute('data-number')),
+    ['1', '2', '3'],
+    'wiersze od najnowszego (numer 1) do najstarszego',
+  );
+  assert.ok(rows[0].textContent?.includes('najnowszy'));
+  off();
+});
+
+test('render: przycisk odswiez per skrzynka - bez zmiany aktywnej zakladki', () => {
+  const s = new MailUiStore();
+  const { container, calls, off } = mount(s);
+  const btn = container.querySelector('.arkmail-refresh[data-box="wyslane"]');
+  assert.ok(btn, 'przycisk odswiez przy kazdej skrzynce');
+  click(btn!);
+  assert.deepEqual(calls, [{ name: 'refresh', args: ['wyslane'] }]);
+  assert.equal(s.state.activeBox, 'odebrane', 'aktywna skrzynka bez zmian');
   off();
 });
 
@@ -183,6 +216,55 @@ test('render: filtr archiwum po temacie - lokalny, bez store', () => {
   assert.equal(rows.length, 1);
   assert.ok(rows[0].textContent?.includes('Rachunek'));
   assert.equal(input.value, 'rach', 'input nie jest nadpisywany przy filtrze');
+  off();
+});
+
+test('render: archiwum - filtry osoba/skrzynka/daty/tresc (lokalne, bez store)', () => {
+  const s = new MailUiStore({ tab: 'archiwum' });
+  s.setArchive([
+    arch({ id: 'a1', box: 'odebrane', party: 'Bar', subject: 'Perly', sortKey: '2026-04-16 00:31:37', body: ['masz perly'] }),
+    arch({ id: 'b2', box: 'wyslane', party: 'Grault', subject: 'Rachunek', number: 4, sortKey: '2026-05-01 10:00:00', body: ['plac'] }),
+    arch({ id: 'c3', box: 'wyslane', party: 'Garply', subject: 'Perly sprzedam', number: 5, sortKey: '2026-03-01 09:00:00' }),
+  ]);
+  const { container, off } = mount(s);
+  const rows = () => container.querySelectorAll('.arkmail-arch-entry').length;
+  assert.equal(rows(), 3);
+
+  const osoba = container.querySelector('[data-filter="osoba"]') as unknown as HTMLInputElement;
+  assert.ok(osoba, 'filtr osoby istnieje');
+  osoba.value = 'garply';
+  fireEvent(osoba, 'input');
+  assert.equal(rows(), 1, 'osoba: tylko Garply');
+  osoba.value = '';
+  fireEvent(osoba, 'input');
+
+  const skr = container.querySelector('[data-filter="skrzynka"]') as unknown as HTMLSelectElement;
+  assert.ok(skr, 'filtr skrzynki istnieje');
+  skr.value = 'wyslane';
+  fireEvent(skr, 'change');
+  assert.equal(rows(), 2, 'skrzynka: tylko wyslane');
+  skr.value = '';
+  fireEvent(skr, 'change');
+
+  const tresc = container.querySelector('[data-filter="tresc"]') as unknown as HTMLInputElement;
+  assert.ok(tresc, 'filtr tresci istnieje');
+  tresc.value = 'perly';
+  fireEvent(tresc, 'input');
+  assert.equal(rows(), 1, 'tresc: trafia w body, nie w sam temat');
+  tresc.value = '';
+  fireEvent(tresc, 'input');
+
+  const od = container.querySelector('[data-filter="odDaty"]') as unknown as HTMLInputElement;
+  assert.ok(od, 'filtr odDaty istnieje');
+  od.value = '2026-04-01';
+  fireEvent(od, 'input');
+  assert.equal(rows(), 2, 'odDaty odcina marcowy list');
+  const doDaty = container.querySelector('[data-filter="doDaty"]') as unknown as HTMLInputElement;
+  doDaty.value = '2026-04-30';
+  fireEvent(doDaty, 'input');
+  assert.equal(rows(), 1, 'zakres dat wlacznie');
+
+  assert.equal(s.state.archive.length, 3, 'filtry nie ruszaja store');
   off();
 });
 
@@ -295,6 +377,42 @@ test('render: przycisk Wczytaj starsze gdy listing uciety', () => {
   off();
 });
 
+test('render: Wczytaj wszystkie obok Wczytaj starsze; w petli Przerwij ze strona', () => {
+  const s = new MailUiStore();
+  const { container, calls, off } = mount(s);
+  s.applyMailbox('wyslane', {
+    kind: 'lista',
+    header: { box: 'wyslane', truncated: true },
+    entries: [entry()],
+  });
+  s.setActiveBox('wyslane');
+  const all = container.querySelector('.arkmail-older-all');
+  assert.ok(all, 'przycisk Wczytaj wszystkie przy truncated');
+  assert.ok(all!.textContent?.includes('Wczytaj wszystkie'));
+  click(all!);
+  assert.deepEqual(calls, [{ name: 'all', args: ['wyslane'] }]);
+
+  // Petla w toku na tej skrzynce: przycisk zamienia sie w Przerwij ze strona.
+  s.setLoadAll({ box: 'wyslane', pages: 3 });
+  const cancel = container.querySelector('.arkmail-older-all');
+  assert.ok(cancel!.textContent?.includes('Przerwij'), 'w petli: Przerwij');
+  assert.ok(cancel!.textContent?.includes('3'), 'pokazuje biezaca strone');
+  assert.ok(!container.querySelector('.arkmail-older'), 'pojedynczy przycisk schowany w petli');
+  click(cancel!);
+  assert.deepEqual(calls[1], { name: 'all', args: ['wyslane'] }, 'klik w Przerwij tez wola onLoadAll');
+
+  // Petla na INNEJ skrzynce: przyciski paginacji schowane.
+  s.setLoadAll({ box: 'odebrane', pages: 1 });
+  assert.ok(!container.querySelector('.arkmail-older-all'), 'petla gdzie indziej: bez przyciskow');
+  assert.ok(!container.querySelector('.arkmail-older'));
+
+  // Koniec petli, dalej truncated: oba przyciski wracaja.
+  s.setLoadAll(null);
+  assert.ok(container.querySelector('.arkmail-older'));
+  assert.ok(container.querySelector('.arkmail-older-all'));
+  off();
+});
+
 // --- Fala 7c: struktura wierszy pod nowoczesny wyglad -----------------------
 
 test('render: wiersz listu ma kolumny nadawcy, tematu i daty', () => {
@@ -343,5 +461,58 @@ test('render: naglowek listu z wyroznionym tematem i wierszem meta', () => {
   assert.ok(meta.includes('Foo'), 'meta ma nadawce');
   assert.ok(meta.includes('Gracz'), 'meta ma adresata');
   assert.ok(meta.includes('21 XII 2025'), 'meta ma date');
+  off();
+});
+
+// --- Fala 8d: kontakty - filtr i sort lokalne (jak filtr archiwum) ------------
+
+test('render: kontakty - filtr i sort lokalne (bez store), wiersz z data', () => {
+  const s = new MailUiStore({ tab: 'kontakty' });
+  s.setContacts(mergeContacts({
+    people: [],
+    przedstawieni: [],
+    aliasy: [],
+    korespondencja: [
+      { name: 'Bar', direction: 'in', dateRaw: 'Cz, 16 IV 2026, 00:31:37', dateKey: 20260416 },
+      { name: 'Bar', direction: 'in' },
+      { name: 'Bar', direction: 'out' },
+      { name: 'Grault', direction: 'out', dateRaw: 'N, 19 IV 2026, 03:03:00', dateKey: 20260419 },
+      { name: 'Garply', direction: 'in' },
+      { name: 'Garply', direction: 'out' },
+    ],
+  }));
+  const { container, off } = mount(s);
+  const names = () =>
+    [...container.querySelectorAll('.arkmail-contact-name')].map((n) => n.textContent);
+  assert.deepEqual(names(), ['Grault', 'Garply', 'Bar'], 'domyslnie sort po nazwie');
+  const firstRow = container.querySelector('.arkmail-contact')!;
+  assert.ok(firstRow.textContent?.includes('wyslane: 1'), 'liczniki w wierszu');
+  assert.ok(firstRow.textContent?.includes('19 IV 2026'), 'data ostatniego kontaktu w wierszu');
+
+  const input = container.querySelector('.arkmail-contact-filter') as unknown as HTMLInputElement;
+  assert.ok(input, 'pole filtra kontaktow istnieje');
+  input.value = 'gw';
+  input.dispatchEvent(new window.Event('input') as unknown as Event);
+  assert.deepEqual(names(), ['Bar'], 'filtr zawezil liste');
+  assert.equal(input.value, 'gw', 'input zachowuje wartosc (repaint lokalny, nie rerender)');
+
+  input.value = '';
+  input.dispatchEvent(new window.Event('input') as unknown as Event);
+  assert.equal(names().length, 3, 'wyczyszczony filtr przywraca wszystkie');
+
+  const sel = container.querySelector('.arkmail-contact-sort') as unknown as HTMLSelectElement;
+  assert.ok(sel, 'select sortowania istnieje');
+  sel.value = 'liczba';
+  fireEvent(sel, 'change');
+  assert.deepEqual(names(), ['Bar', 'Garply', 'Grault'], 'sort po liczbie listow malejaco');
+  sel.value = 'ostatni';
+  fireEvent(sel, 'change');
+  assert.deepEqual(names(), ['Grault', 'Bar', 'Garply'], 'sort po ostatnim kontakcie malejaco');
+
+  assert.deepEqual(
+    s.state.contacts.map((c) => c.name),
+    ['Grault', 'Garply', 'Bar'],
+    'filtr i sort nie ruszaja store (lokalne, jak filtr archiwum)',
+  );
   off();
 });

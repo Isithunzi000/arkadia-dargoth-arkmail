@@ -135,6 +135,15 @@ export const STYLES = `
   font-weight: 600;
 }
 .arkmail-root .arkmail-box-active:hover { background: ${ACCENT}; color: ${ACCENT_FG}; }
+.arkmail-root .arkmail-refresh {
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: ${BG};
+  color: ${FG_DIM};
+  border: 1px solid ${BORDER};
+  line-height: 1;
+}
+.arkmail-root .arkmail-refresh:hover { color: ${FG}; background: ${BG_RAISED}; }
 
 /* --- wiersze listow: nadawca | temat | data --- */
 .arkmail-entry {
@@ -179,6 +188,11 @@ export const STYLES = `
 }
 
 .arkmail-root .arkmail-older { margin-top: 8px; width: 100%; }
+.arkmail-older-row { display: flex; gap: 6px; margin-top: 8px; }
+.arkmail-older-row .arkmail-older { margin-top: 0; flex: 1; }
+.arkmail-root .arkmail-older-all { flex: 1; }
+.arkmail-root button.arkmail-older-all { margin-top: 8px; width: 100%; }
+.arkmail-older-row button.arkmail-older-all { margin-top: 0; width: auto; }
 
 /* --- widok listu --- */
 .arkmail-letter-head {
@@ -250,6 +264,16 @@ export const STYLES = `
 .arkmail-contact:hover, .arkmail-arch-entry:hover { background: ${BG_RAISED}; }
 .arkmail-contact-name { color: ${FG}; font-weight: 600; }
 .arkmail-contact-stats, .arkmail-arch-meta { color: ${FG_DIM}; font-size: 12px; }
+.arkmail-contact-controls { display: flex; gap: 6px; margin-bottom: 8px; }
+.arkmail-arch-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.arkmail-arch-controls input[type='date'] { color-scheme: dark; }
+.arkmail-root .arkmail-contact-filter { flex: 1; }
+.arkmail-contact-last { color: ${FG_DIM}; font-size: 11px; white-space: nowrap; }
 
 .arkmail-notify-toggle { margin-right: 4px; }
 .arkmail-dim { color: ${FG_DIM}; }

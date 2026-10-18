@@ -22,11 +22,12 @@ import {
 } from "./meta";
 import type { MailBox } from "./core/protocol/types";
 import { parseNotification } from "./core/protocol/parser";
-import { olderListingCommand } from "./core/protocol/commands";
+import { olderListingCommand, nextDay } from "./core/protocol/commands";
 import type { LetterTemplate } from "./core/letterRender";
 import { contactsFromBoxes } from "./core/contacts";
 import {
   fromMailboxEntry,
+  fromOpenedLetter,
   upsertLetters,
   type ArchiveLetter,
 } from "./core/archive";
@@ -45,6 +46,10 @@ const FOOTER_BUTTON_ID = "arkmail";
 const FOOTER_STATE = "arkmail-poczta";
 const ALIAS_REGEX = /^\/arkmail$/i;
 const SESSION_OPTS = { timeoutMs: 8000, idleMs: 400 };
+/** Bezpieczniki petli "Wczytaj wszystkie" (Fala 8e): twardy limit stron
+ *  na jedno klikniecie i pauza miedzy stronami (grzecznosc wobec serwera). */
+export const LOAD_ALL_MAX_PAGES = 40;
+export const LOAD_ALL_PACE_MS = 400;
 const ARCHIVE_KEY = "archiwum";
 const NOTIFY_KEY = "powiadomienia";
 const COMPOSE_KEY = "compose";
@@ -122,13 +127,26 @@ export async function init(api: PluginApi) {
       .runExclusive(async () => {
         for (const box of boxes) {
           ui.setBusy(`Pobieram skrzynke ${box}...`);
-          ui.applyMailbox(box, await mailbox.fetch(box));
+          const res = await mailbox.fetch(box);
+          ui.applyMailbox(box, res);
+          if (res.kind === "lista") {
+            // Cache (Fala 8f): KAZDE pobranie listingu dokleja wpisy do
+            // archiwum (cicho, bez notify). Widok skrzynki NIE jest
+            // hydratowany z cache - numery zyja w kontekscie ostatniego
+            // listingu serwera.
+            const merged = upsertLetters(
+              ui.state.archive,
+              res.entries.map((e) => fromMailboxEntry(box, e)),
+            );
+            ui.setArchive(merged.letters);
+          }
         }
       })
       .catch(() => {})
       .finally(() => {
         ui.setBusy(null);
         rebuildContacts();
+        persistArchive();
       });
   };
 
@@ -136,14 +154,14 @@ export async function init(api: PluginApi) {
     storage.setJSON(ARCHIVE_KEY, ui.state.archive);
   };
 
-  /** Paginacja wstecz: jedna starsza strona listingow do archiwum. */
-  const loadOlder = (box: MailBox): void => {
-    const view = ui.state.boxes[box];
-    // Listing idzie od NAJSTARSZEGO listu (gora) do najnowszego (dol) -
-    // date graniczna bierzemy z najstarszego wpisu (minimum po dacie,
-    // odporne na kolejnosc wpisow). Dowod: log sesji 2026-10-17.
+  /**
+   * Najstarszy wpis widoku: listing idzie od NAJSTARSZEGO listu (gora)
+   * do najnowszego (dol), ale liczymy minimum po dacie - odporne na
+   * kolejnosc wpisow. Dowod: log sesji 2026-10-17.
+   */
+  const oldestEntry = (entries: MailboxEntry[]): MailboxEntry | null => {
     let oldest: MailboxEntry | null = null;
-    for (const e of view?.entries ?? []) {
+    for (const e of entries) {
       if (!e.date) continue;
       if (
         !oldest ||
@@ -158,23 +176,120 @@ export async function init(api: PluginApi) {
         oldest = e;
       }
     }
+    return oldest;
+  };
+
+  /** Paginacja wstecz: jedna starsza strona listingow do archiwum. */
+  const loadOlder = (box: MailBox): void => {
+    const view = ui.state.boxes[box];
+    const oldest = oldestEntry(view?.entries ?? []);
     if (!oldest?.date) {
       notify(api, "Brak daty do paginacji - najpierw pobierz skrzynke.");
       return;
     }
+    // Kotwica: najstarsza data + 1 dzien ("przed" wyklucza caly dzien
+    // graniczny; nakladanie zamiast dziur, duplikaty zdejmuje dedup).
+    const anchor = nextDay(oldest.date);
     ui.setBusy("Wczytuje starsze listy...");
     void lock
       .runExclusive(async () => {
-        const res = await mailbox.fetch(box, olderListingCommand(box, oldest.date!));
+        const res = await mailbox.fetch(box, olderListingCommand(box, anchor));
         if (res.kind === "lista") {
+          ui.appendMailboxPage(box, res.entries, res.header.truncated);
           const incoming = res.entries.map((e) => fromMailboxEntry(box, e));
           const merged = upsertLetters(ui.state.archive, incoming);
           ui.setArchive(merged.letters);
           persistArchive();
           notify(api, `Archiwum: +${merged.added} starszych listow.`);
+        } else {
+          ui.appendMailboxPage(box, [], false);
+          notify(api, "Brak starszych listow.");
         }
       })
-      .catch(() => {})
+      .catch((err: unknown) =>
+        notify(api, `Blad paginacji: ${err instanceof Error ? err.message : String(err)}`),
+      )
+      .finally(() => ui.setBusy(null));
+  };
+
+  /** Flaga biezacej petli "Wczytaj wszystkie" (jedna na raz; null = brak). */
+  let loadAllFlag: { cancelled: boolean } | null = null;
+
+  /** Pauza miedzy stronami, przerywalna flaga (plastry po 50 ms). */
+  const sleepOrCancel = async (ms: number, flag: { cancelled: boolean }): Promise<void> => {
+    const step = 50;
+    for (let t = 0; t < ms && !flag.cancelled; t += step) {
+      await new Promise((r) => setTimeout(r, Math.min(step, ms - t)));
+    }
+  };
+
+  /**
+   * Petla "Wczytaj wszystkie": kolejne strony starszych listingow pod
+   * JEDNA blokada sesji. Koniec: strona niepelna / pusta, limit stron
+   * albo Przerwij (drugi klik tego samego przycisku). Kazda strona
+   * doklejana jest przez appendMailboxPage (dedup), archiwum zapisywane
+   * po kazdej stronie.
+   */
+  const loadAll = (box: MailBox): void => {
+    if (loadAllFlag) {
+      loadAllFlag.cancelled = true;
+      return;
+    }
+    const flag = { cancelled: false };
+    loadAllFlag = flag;
+    ui.setLoadAll({ box, pages: 0 });
+    void lock
+      .runExclusive(async () => {
+        let pages = 0;
+        let added = 0;
+        try {
+          for (;;) {
+            const view = ui.state.boxes[box];
+            if (!view || !view.truncated) break;
+            if (pages >= LOAD_ALL_MAX_PAGES) break;
+            if (flag.cancelled) break;
+            const oldest = oldestEntry(view.entries);
+            if (!oldest?.date) break;
+            // Kotwica jak w loadOlder: najstarsza data + 1 dzien.
+            const res = await mailbox.fetch(box, olderListingCommand(box, nextDay(oldest.date)));
+            pages += 1;
+            let more = false;
+            if (res.kind === "lista") {
+              ui.appendMailboxPage(box, res.entries, res.header.truncated);
+              const merged = upsertLetters(
+                ui.state.archive,
+                res.entries.map((e) => fromMailboxEntry(box, e)),
+              );
+              ui.setArchive(merged.letters);
+              persistArchive();
+              added += merged.added;
+              more = res.header.truncated;
+            } else {
+              ui.appendMailboxPage(box, [], false);
+            }
+            ui.setLoadAll({ box, pages });
+            ui.setBusy(`Wczytuje wszystkie (${box}): strona ${pages}`);
+            if (!more || flag.cancelled) break;
+            await sleepOrCancel(LOAD_ALL_PACE_MS, flag);
+          }
+          if (flag.cancelled) {
+            notify(api, `Przerwiano: +${added} listow (${pages} stron).`);
+          } else if (pages >= LOAD_ALL_MAX_PAGES && ui.state.boxes[box]?.truncated) {
+            notify(
+              api,
+              `Limit ${LOAD_ALL_MAX_PAGES} stron: +${added} listow - kliknij ponownie, aby kontynuowac.`,
+            );
+          } else {
+            notify(api, `Wczytano wszystkie: +${added} listow (${pages} stron).`);
+          }
+        } finally {
+          loadAllFlag = null;
+          ui.setLoadAll(null);
+        }
+      })
+      .catch((err: unknown) =>
+        notify(api, `Blad wczytywania: ${err instanceof Error ? err.message : String(err)}`),
+      )
       .finally(() => ui.setBusy(null));
   };
 
@@ -187,6 +302,14 @@ export async function init(api: PluginApi) {
           try {
             const res = await pager.readLetter(number);
             ui.openLetter(box, res.letter);
+            // Cache (Fala 8f): tresc listu do archiwum. Wpis z listingu
+            // daje zgodnosc id (flaga forwarded); bez wpisu - naglowki.
+            const entry = ui.state.boxes[box]?.entries.find((e) => e.number === number);
+            const merged = upsertLetters(ui.state.archive, [
+              fromOpenedLetter(box, res.letter, entry),
+            ]);
+            ui.setArchive(merged.letters);
+            persistArchive();
           } finally {
             transport!.endModal();
           }
@@ -229,6 +352,7 @@ export async function init(api: PluginApi) {
     onCloseLetter: () => ui.closeLetter(),
     onRefreshBox: (box) => refreshBoxes([box]),
     onLoadOlder: (box) => loadOlder(box),
+    onLoadAll: (box) => loadAll(box),
     onDeleteLetter: (box, number) => {
       ui.setBusy(`Kasuje list ${number}...`);
       void lock
