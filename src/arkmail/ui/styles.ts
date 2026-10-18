@@ -300,6 +300,23 @@ export const STYLES = `
 .arkmail-notify-toggle { margin-right: 4px; }
 .arkmail-dim { color: ${FG_DIM}; }
 
+/* --- ghost-podpowiedzi (Fala 9g): wyszarzona sugestia za kursorem --- */
+.arkmail-root .arkmail-ghost-wrap { position: relative; display: block; min-width: 0; }
+.arkmail-root .arkmail-ghost-wrap > input { width: 100%; box-sizing: border-box; }
+/* wrap przejmuje rozciaganie inputa w wierszu operacji listu (flex) */
+.arkmail-root .arkmail-letter-ops .arkmail-ghost-wrap { flex: 1; }
+.arkmail-root .arkmail-ghost {
+  position: absolute;
+  inset: 0;
+  /* padding inputu (5px 8px) + jego border (1px) = tekst 1:1 nad polem */
+  padding: 6px 9px;
+  overflow: hidden;
+  pointer-events: none;
+  white-space: pre;
+}
+.arkmail-root .arkmail-ghost-typed { visibility: hidden; white-space: pre; }
+.arkmail-root .arkmail-ghost-rest { color: ${FG_DIM}; white-space: pre; }
+
 /* --- podzial lista|list na szerokim popupie --- */
 .arkmail-split { display: block; }
 @container (min-width: 900px) {

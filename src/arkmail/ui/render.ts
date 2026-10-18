@@ -19,6 +19,7 @@ import {
 } from '../core/letterRender.js';
 import type { MailUiState, MailUiStore, UiTab } from './store.js';
 import { STYLES } from './styles.js';
+import { attachGhost, type GhostSource } from './ghost.js';
 
 export interface MailUiHandlers {
   /**
@@ -81,6 +82,42 @@ export function mountMailUi(
   const archFilter: ArchiveFilter = {};
   /** Filtr i sort kontaktow: lokalne (poza store) - ten sam powod co wyzej. */
   const contactView: { filter: string; sort: ContactSort } = { filter: '', sort: 'nazwa' };
+
+  // Fala 9g: zrodla ghost-podpowiedzi, liczone na biezaco ze store.
+  // Pola osobowe: kontakty (najswiezsze najpierw) + ich aliasy.
+  // Dedup bez wielkosci liter; wygrywa forma kanoniczna ze zrodla.
+  const personSource: GhostSource = () => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    const push = (v: string | undefined): void => {
+      if (!v) return;
+      const k = v.toLowerCase();
+      if (seen.has(k)) return;
+      seen.add(k);
+      out.push(v);
+    };
+    const contacts = [...store.state.contacts].sort(
+      (a, b) => (b.lastContactKey ?? -1) - (a.lastContactKey ?? -1),
+    );
+    for (const c of contacts) {
+      push(c.name);
+      push(c.mailAlias);
+    }
+    return out;
+  };
+  // Pola tematu: tematy z archiwum (archiwum jest najnowsze->najstarsze).
+  const subjectSource: GhostSource = () => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const l of store.state.archive) {
+      if (!l.subject) continue;
+      const k = l.subject.toLowerCase();
+      if (seen.has(k)) continue;
+      seen.add(k);
+      out.push(l.subject);
+    }
+    return out;
+  };
 
   const render = (state: MailUiState) => {
     root.className = 'arkmail-root' + (state.wide ? ' arkmail-wide' : '');
@@ -213,6 +250,9 @@ export function mountMailUi(
     searchRow.appendChild(sDo);
     searchRow.appendChild(go);
     pane.appendChild(searchRow);
+    // Ghost-podpowiedzi (Fala 9g) - po appendChild, wrap wymaga rodzica.
+    attachGhost(doc, sOsoba as HTMLInputElement, personSource);
+    attachGhost(doc, sTemat as HTMLInputElement, subjectSource);
 
     // Tryb wynikow: banner z opisem zapytania + Wyczysc (restore pelnego
     // widoku z pamieci, bez strzalu do serwera).
@@ -347,6 +387,7 @@ export function mountMailUi(
     fwdInput.setAttribute('placeholder', 'Przekaz do (gracz lub alias)');
     if (!source) fwdInput.setAttribute('disabled', '');
     ops.appendChild(fwdInput);
+    attachGhost(doc, fwdInput, personSource);
     const fwd = doc.createElement('button');
     fwd.className = 'arkmail-fwd';
     fwd.textContent = 'Przekaz';
@@ -395,6 +436,9 @@ export function mountMailUi(
         composeDraft[field as 'adresat' | 'temat' | 'dw'] = input.value;
       });
       pane.appendChild(input);
+      // Ghost (Fala 9g): adresat/DW -> kontakty+aliasy, temat -> archiwum.
+      if (field === 'temat') attachGhost(doc, input, subjectSource);
+      else attachGhost(doc, input, personSource);
     }
 
     // Szablon ramki + szerokosc linii (trzymane w store, trwale).
@@ -574,7 +618,9 @@ export function mountMailUi(
       });
       return input;
     };
-    controls.appendChild(mkText('osoba', 'Osoba (nadawca lub odbiorca)'));
+    const aOsoba = mkText('osoba', 'Osoba (nadawca lub odbiorca)');
+    controls.appendChild(aOsoba);
+    attachGhost(doc, aOsoba, personSource);
     const skr = doc.createElement('select');
     skr.setAttribute('data-filter', 'skrzynka');
     const SKR_OPTS: Array<[MailBox | '', string]> = [
@@ -596,7 +642,9 @@ export function mountMailUi(
       repaint();
     });
     controls.appendChild(skr);
-    controls.appendChild(mkText('temat', 'Temat'));
+    const aTemat = mkText('temat', 'Temat');
+    controls.appendChild(aTemat);
+    attachGhost(doc, aTemat, subjectSource);
     controls.appendChild(mkText('tresc', 'Tresc listu'));
     controls.appendChild(mkText('odDaty', 'Od daty', 'date'));
     controls.appendChild(mkText('doDaty', 'Do daty', 'date'));
