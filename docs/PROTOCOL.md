@@ -119,7 +119,10 @@ Data : Wt, 23 XII 2025, 00:11:12
 [1-3 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) --          <- pager prompt
 ```
 
-Opcjonalny nagłówek `DW   : ...`. Treść kończy się pager promptem.
+Opcjonalny nagłówek `DW   : ...`. Nagłówek `Do   :` BYWA PUSTY (list do
+siebie wysłany z samym DW — log 2026-10-18). List wysłany z DW ląduje
+u odbiorców DW w odebranych (Od: nadawca, Do: ktoś inny, DW: my).
+Treść kończy się pager promptem.
 
 ## Pager
 
@@ -130,6 +133,44 @@ Opcjonalny nagłówek `DW   : ...`. Treść kończy się pager promptem.
   błędny adresat: `Nie ma takiego adresata (gracza, aliasu): <x>.` (lowercase!)
   i prompt `DW: ` wraca. Sukces: `List jest gotowy do wyslania.` i powrót pagera.
 - Błędy: `Zly numer listu: 4.`, `Zadne listy nie zostaly wybrane.`
+
+### Pelna pomoc pagera (`?` w trakcie czytania, log 2026-10-18)
+
+Serwer nazywa pager **"edytorem poczty"** (naglowek pomocy: "Komendy
+dostepne w edytorze poczty"). Komplet komend:
+
+```
+x lub q     wyjscie z pagera
+h [<kogo>]  naglowki wszystkich listow / listow od <kogo> (dopelniacz!)
+H [<kogo>]  naglowki nieprzeczytanych / od <kogo>
+r [<num>]   odpowiedz na aktualny list [lub <num>]
+R [<num>]   odpowiedz z cytowaniem tresci
+m           nowy list
+f/F [<num>] <imie>   forward (F: z edycja)
+d/u [<przedzial>]    zaznacz/odznacz do skasowania (przedzial np. "1,9,5-7")
+-/+ [<przedzial>]    oznacz nieprzeczytany / przeczytany
+a <imie>    doslij ostatnio wyslany list
+e           skasuj WSZYSTKIE zaznaczone
+.           pokaz aktualny list
+<num>       pokaz list <num>
+<           poprzedni list
+> lub ENTER nastepny list (pusta linia = nastepny; log 2026-10-18)
+n [<num>]   zapisz tresc jako notatke
+!<komenda>  wykonaj komende spoza pagera (dziala nawet w trakcie pisania)
+?           ta pomoc
+```
+
+- Prompt zawiera litere **`s`, ktorej pomoc nie dokumentuje** —
+  nieudokumentowane, nie uzywac.
+- Po potwierdzeniach akcji (`d`, ...) serwer WRACA do promptu pagera —
+  sesja ArkMail wysyla `q` dopiero na powrocie promptu, nie na samej
+  linii potwierdzenia.
+- Kontekst numerow: `przeczytaj list N` i komendy pagerowe rozumieja N
+  wzgledem OSTATNIEGO listingu (`listy ...`); kazdy listing (pelny,
+  stronicowany, filtrowany) ma wlasna numeracje 1..N (1 = najnowszy
+  z selekcji). ArkMail pokazuje graczowi wlasne numery ciagle, a przed
+  operacja pagerowa re-kotwiczy wpis na swiezym listingu po dacie
+  (Fala 9a).
 
 ## Compose (`napisz list`)
 

@@ -25,7 +25,12 @@ Po załadowaniu: alias `/arkmail` (otwiera/zamyka okno), pozycja
   nieprzeczytanych, odświeżanie per skrzynka, przycisk "Wczytaj starsze"
   (paginacja `listy <skrzynka> przed <data>`) albo "Wczytaj wszystkie" —
   pętla stron do końca archiwum (limit 40 stron, pauza 400 ms między
-  stronami, przycisk zamienia się w "Przerwij").
+  stronami, przycisk zamienia się w "Przerwij"). Numery na liście są
+  ciągłe 1..N; raz wczytane strony zostają przy przełączaniu skrzynek,
+  a powiadomienie o nowej poczcie tylko dokleja nowe listy na górę.
+  Otwieranie, usuwanie i przekazywanie zawsze tłumaczy wpis na świeży
+  numer serwera — numery w grze żyją w kontekście ostatniego listingu,
+  więc plugin nie strzela komendami na ślepo.
 - **Szukaj** — pasek nad listą korzysta z serwerowej składni `?listy`:
   osoba (`od`/`do` dobrane do skrzynki), zakres dat (włączny, z kalendarza),
   temat i treść — argumenty można łączyć. Wyniki pokazują się z banerem
