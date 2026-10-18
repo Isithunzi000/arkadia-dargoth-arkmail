@@ -60,6 +60,10 @@ export function contactsFromBoxes(
   people: ContactInput['people'],
 ): Contact[] {
   const korespondencja: ContactInput['korespondencja'] = [];
+  // Fala 9c: ten sam list widac w kilku skrzynkach (nieprzeczytany jest
+  // i w odebranych, i w nieprzeczytanych) - liczymy go RAZ. Klucz bez
+  // numeru (serwer renumeruje); data+temat+osoba+kierunek = tozsamosc.
+  const seen = new Set<string>();
   for (const [box, view] of Object.entries(boxes)) {
     const direction = box === 'odebrane' || box === 'nieprzeczytane' ? 'in' : 'out';
     for (const e of view?.entries ?? []) {
@@ -72,6 +76,15 @@ export function contactsFromBoxes(
         : undefined;
       // Wspolny list do kilku osob liczy sie kazdej z nich osobno.
       for (const name of splitParty(e.party)) {
+        const dedupKey = [
+          direction,
+          name.toLowerCase(),
+          e.subject,
+          e.forwarded ? 'f' : '',
+          e.date?.raw ?? '',
+        ].join('|');
+        if (seen.has(dedupKey)) continue;
+        seen.add(dedupKey);
         korespondencja.push({ name, direction, dateRaw: e.date?.raw, dateKey });
       }
     }

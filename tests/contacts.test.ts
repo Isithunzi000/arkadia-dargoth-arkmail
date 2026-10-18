@@ -249,3 +249,48 @@ test('viewContacts: sort nazwa / liczba / ostatni kontakt', () => {
   assert.deepEqual(contacts.map((c) => c.name), ['Grault', 'Garply', 'Bar'],
     'viewContacts nie mutuje wejscia');
 });
+
+// --- Fala 9c: ten sam list w kilku skrzynkach liczony RAZ -------------------
+
+test('contactsFromBoxes: nieprzeczytany list w odebranych i nieprzeczytanych liczy sie raz', () => {
+  const date = { raw: 'Cz, 24 XII 2025, 08:00:00', weekday: 'Cz', day: 24, month: 12, year: 2025, time: '08:00:00' };
+  const entry = { number: 1, isRead: false, subject: 'Swiezy', forwarded: false,
+    party: 'Grault', partyKind: 'nadawca' as const, date };
+  const out = contactsFromBoxes({
+    odebrane: { entries: [entry] },
+    nieprzeczytane: { entries: [{ ...entry }] },
+  }, []);
+  const at = out.find((c) => c.name === 'Grault')!;
+  assert.equal(at.lettersReceived, 1);
+});
+
+test('contactsFromBoxes: rozne listy tego samego dnia licza sie osobno', () => {
+  const d1 = { raw: 'Cz, 24 XII 2025, 08:00:00', weekday: 'Cz', day: 24, month: 12, year: 2025, time: '08:00:00' };
+  const d2 = { raw: 'Cz, 24 XII 2025, 09:30:00', weekday: 'Cz', day: 24, month: 12, year: 2025, time: '09:30:00' };
+  const out = contactsFromBoxes({
+    odebrane: { entries: [
+      { number: 2, isRead: true, subject: 'A', forwarded: false, party: 'Grault', partyKind: 'nadawca' as const, date: d1 },
+      { number: 1, isRead: true, subject: 'B', forwarded: false, party: 'Grault', partyKind: 'nadawca' as const, date: d2 },
+    ] },
+  }, []);
+  const at = out.find((c) => c.name === 'Grault')!;
+  assert.equal(at.lettersReceived, 2);
+});
+
+test('contactsFromBoxes: dedup nie scala roznych kierunkow ani roznych osob', () => {
+  const date = { raw: 'Cz, 24 XII 2025, 08:00:00', weekday: 'Cz', day: 24, month: 12, year: 2025, time: '08:00:00' };
+  const out = contactsFromBoxes({
+    odebrane: { entries: [
+      { number: 1, isRead: true, subject: 'Perly', forwarded: false, party: 'Grault', partyKind: 'nadawca' as const, date },
+    ] },
+    wyslane: { entries: [
+      { number: 1, isRead: true, subject: 'Perly', forwarded: false, party: 'Grault', partyKind: 'odbiorcy' as const, date },
+      { number: 2, isRead: true, subject: 'Perly', forwarded: false, party: 'Bar', partyKind: 'odbiorcy' as const, date },
+    ] },
+  }, []);
+  const at = out.find((c) => c.name === 'Grault')!;
+  assert.equal(at.lettersReceived, 1);
+  assert.equal(at.lettersSent, 1);
+  const gw = out.find((c) => c.name === 'Bar')!;
+  assert.equal(gw.lettersSent, 1);
+});
