@@ -126,7 +126,34 @@ test('render: lista listow, nieprzeczytany wyrozniony, klik otwiera', () => {
   assert.ok(rows[1].textContent?.includes('Perly'));
   assert.ok(rows[1].textContent?.includes('Foo'));
   click(rows[1]);
-  assert.deepEqual(calls, [{ name: 'open', args: ['odebrane', 3] }]);
+  // Fala 9a: handler dostaje WPIS (tozsamosc do re-kotwiczenia), nie numer.
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].name, 'open');
+  assert.equal(calls[0].args[0], 'odebrane');
+  const passed = calls[0].args[1] as MailboxEntry;
+  assert.equal(passed.subject, 'Perly');
+  assert.equal(passed.party, 'Foo');
+  off();
+});
+
+test('render: numery wierszy sa ciagle 1..N (serwerowe numery zostaja w srodku)', () => {
+  const s = new MailUiStore();
+  const { container, off } = mount(s);
+  // Magazyn trzyma najstarszy->najnowszy z serwerowymi numerami strony.
+  s.applyMailbox('odebrane', {
+    kind: 'lista',
+    header: { box: 'odebrane', truncated: false },
+    entries: [
+      entry({ number: 50, subject: 'Najstarszy' }),
+      entry({ number: 49, subject: 'Srodkowy', isRead: true }),
+      entry({ number: 48, subject: 'Najnowszy', isRead: true }),
+    ],
+  });
+  const nums = [...container.querySelectorAll('.arkmail-entry-num')].map((n) => n.textContent);
+  assert.deepEqual(nums, ['1.', '2.', '3.']);
+  // data-number zostaje serwerowe (diagnoza), ale nie trafia do handlerow.
+  const rows = container.querySelectorAll('.arkmail-entry');
+  assert.equal(rows[0].getAttribute('data-number'), '48');
   off();
 });
 
@@ -339,14 +366,20 @@ test('render: pusta tresc nie wywołuje wysylki', () => {
 test('render: widok listu ma Usun i Przekaz z polem adresata', () => {
   const s = new MailUiStore();
   const { container, calls, off } = mount(s);
-  s.openLetter('odebrane', {
-    number: 3, from: 'Foo', subject: 'Perly', to: 'Gracz', cc: null, date: null, body: ['czesc'],
-  });
+  // Fala 9a: openLetter dostaje wpis-zrodlo; operacje dzialaja na wpisie.
+  const source = entry({ number: 3 });
+  s.openLetter(
+    'odebrane',
+    { number: 3, from: 'Foo', subject: 'Perly', to: 'Gracz', cc: null, date: null, body: ['czesc'] },
+    source,
+  );
   click(container.querySelector('.arkmail-del'));
-  assert.deepEqual(calls[0], { name: 'del', args: ['odebrane', 3] });
+  assert.equal(calls[0].name, 'del');
+  assert.deepEqual(calls[0].args, ['odebrane', source]);
   (container.querySelector('[data-field="forward"]') as unknown as HTMLInputElement).value = 'Bar';
   click(container.querySelector('.arkmail-fwd'));
-  assert.deepEqual(calls[1], { name: 'fwd', args: ['odebrane', 3, 'Bar'] });
+  assert.equal(calls[1].name, 'fwd');
+  assert.deepEqual(calls[1].args, ['odebrane', source, 'Bar']);
   off();
 });
 

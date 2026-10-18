@@ -41,6 +41,14 @@ export interface MailboxEntry extends ListingEntry {
   party: string;
   partyKind: 'nadawca' | 'odbiorcy' | null;
   date: MailDate | null;
+  /**
+   * Wewnetrzne (Fala 9a): kontekst listingu serwera, z ktorego pochodzi
+   * wpis. Serwer rozumie "przeczytaj list N" wzgledem OSTATNIEGO listingu
+   * - numer jest wazny tylko, gdy ctx == biezacy kontekst; inaczej wpis
+   * wymaga re-kotwiczenia (patrz index.ts resolveEntry). Nie trafia do
+   * archiwum ani storage.
+   */
+  ctx?: number;
 }
 
 export type MailboxResult =

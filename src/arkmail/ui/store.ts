@@ -24,6 +24,12 @@ export interface BoxView {
 
 export interface OpenLetter extends LetterContent {
   box: MailBox;
+  /**
+   * Wpis listingu, z ktorego otwarto list (Fala 9a) - tozsamosc do
+   * re-kotwiczenia operacji pagerowych (Usun/Przekaz). Brak = list bez
+   * zrodla (operacje wylaczone w UI).
+   */
+  source?: MailboxEntry;
 }
 
 export interface MailUiState {
@@ -181,8 +187,8 @@ export class MailUiStore {
   }
 
   /** Otwiera list: waski -> zakladka 'list', szeroki -> zostaje w podziale. */
-  openLetter(box: MailBox, letter: LetterContent): void {
-    const next: Partial<MailUiState> = { letter: { ...letter, box } };
+  openLetter(box: MailBox, letter: LetterContent, source?: MailboxEntry): void {
+    const next: Partial<MailUiState> = { letter: { ...letter, box, source } };
     if (!this.current.wide) next.tab = 'list';
     this.update(next);
   }

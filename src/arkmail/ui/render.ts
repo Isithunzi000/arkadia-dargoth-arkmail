@@ -8,6 +8,7 @@
  */
 
 import type { MailBox } from '../core/protocol/types.js';
+import type { MailboxEntry } from '../core/session/mailbox.js';
 import { fromISODate, type ListingSearch } from '../core/protocol/commands.js';
 import { filterLetters, type ArchiveFilter } from '../core/archive.js';
 import { viewContacts, type ContactSort } from '../core/contacts.js';
@@ -20,7 +21,12 @@ import type { MailUiState, MailUiStore, UiTab } from './store.js';
 import { STYLES } from './styles.js';
 
 export interface MailUiHandlers {
-  onOpenLetter(box: MailBox, number: number): void;
+  /**
+   * Handlery dostaja WPIS listingu (tozsamosc), nie surowy numer - numer
+   * serwera zyje w kontekscie ostatniego listingu, wiec index.ts przed
+   * kazda operacja pagerowa re-kotwiczy wpis na swiezy listing (Fala 9a).
+   */
+  onOpenLetter(box: MailBox, entry: MailboxEntry): void;
   onSendCompose(input: { adresat: string; temat: string; dw: string; linie: string[] }): void;
   onCloseLetter(): void;
   onRefreshBox(box: MailBox): void;
@@ -31,8 +37,8 @@ export interface MailUiHandlers {
   onSearch(box: MailBox, query: ListingSearch): void;
   /** Koniec trybu wynikow szukania (restore pelnego widoku, bez refetchu). */
   onClearSearch(box: MailBox): void;
-  onDeleteLetter(box: MailBox, number: number): void;
-  onForwardLetter(box: MailBox, number: number, adresat: string): void;
+  onDeleteLetter(box: MailBox, entry: MailboxEntry): void;
+  onForwardLetter(box: MailBox, entry: MailboxEntry, adresat: string): void;
 }
 
 const TEMPLATES: Array<[LetterTemplate, string]> = [
@@ -231,14 +237,18 @@ export function mountMailUi(
       return pane;
     }
     // Serwer podaje najstarszy->najnowszy; wyswietlamy najnowszy->najstarszy.
-    for (const e of [...view.entries].reverse()) {
+    const displayed = [...view.entries].reverse();
+    for (const [idx, e] of displayed.entries()) {
       // Wiersz w stylu nowoczesnej poczty: numer | nadawca | temat | data.
+      // Numer WYSWIETLANY jest nasz, ciagly 1..N (Fala 9a): serwerowe numery
+      // sa kontekstowe (renumeracja per listing), pokazywanie ich mylilo
+      // ("1-50 i znowu 1-50"). Serwerowy numer zostaje w data-number.
       const row = doc.createElement('div');
       row.className = 'arkmail-entry' + (e.isRead ? '' : ' arkmail-unread');
       row.setAttribute('data-number', String(e.number));
       const num = doc.createElement('span');
       num.className = 'arkmail-entry-num';
-      num.textContent = `${e.number}.`;
+      num.textContent = `${idx + 1}.`;
       row.appendChild(num);
       const party = doc.createElement('span');
       party.className = 'arkmail-entry-party';
@@ -252,7 +262,7 @@ export function mountMailUi(
       date.className = 'arkmail-entry-date';
       date.textContent = e.date ? e.date.raw : '';
       row.appendChild(date);
-      row.addEventListener('click', () => handlers.onOpenLetter(state.activeBox, e.number));
+      row.addEventListener('click', () => handlers.onOpenLetter(state.activeBox, e));
       pane.appendChild(row);
     }
     if (searchMode) {
@@ -313,24 +323,37 @@ export function mountMailUi(
     pane.appendChild(body);
 
     // Operacje pagerowe: kasowanie i przekazanie (sesje w index.ts).
+    // Wymagaja wpisu-zrodla (re-kotwiczenie numeru); bez zrodla wylaczone.
     const ops = doc.createElement('div');
     ops.className = 'arkmail-letter-ops';
+    const source = l.source;
     const del = doc.createElement('button');
     del.className = 'arkmail-del';
     del.textContent = 'Usuń';
-    del.addEventListener('click', () => handlers.onDeleteLetter(l.box, l.number));
+    if (source) {
+      del.addEventListener('click', () => handlers.onDeleteLetter(l.box, source));
+    } else {
+      del.setAttribute('disabled', '');
+      del.setAttribute('title', 'Otworz list z zakladki Listy, aby go skasowac.');
+    }
     ops.appendChild(del);
     const fwdInput = doc.createElement('input');
     fwdInput.setAttribute('data-field', 'forward');
     fwdInput.setAttribute('placeholder', 'Przekaż do (gracz/alias)');
+    if (!source) fwdInput.setAttribute('disabled', '');
     ops.appendChild(fwdInput);
     const fwd = doc.createElement('button');
     fwd.className = 'arkmail-fwd';
     fwd.textContent = 'Przekaż';
-    fwd.addEventListener('click', () => {
-      const adresat = fwdInput.value.trim();
-      if (adresat) handlers.onForwardLetter(l.box, l.number, adresat);
-    });
+    if (source) {
+      fwd.addEventListener('click', () => {
+        const adresat = fwdInput.value.trim();
+        if (adresat) handlers.onForwardLetter(l.box, source, adresat);
+      });
+    } else {
+      fwd.setAttribute('disabled', '');
+      fwd.setAttribute('title', 'Otworz list z zakladki Listy, aby go przekazac.');
+    }
     ops.appendChild(fwd);
     pane.appendChild(ops);
 
@@ -578,11 +601,13 @@ export function mountMailUi(
     const repaint = () => {
       const rows = filterLetters(state.archive, archFilter);
       list.replaceChildren(
-        ...rows.map((l) => {
+        ...rows.map((l, idx) => {
           const row = doc.createElement('div');
           row.className = 'arkmail-arch-entry';
           const subj = doc.createElement('span');
-          subj.textContent = `${l.number}. ${l.subject}`;
+          // Numer wyswietlany ciagly (Fala 9a) - numer z listingu serwera
+          // jest kontekstowy i po scaleniu stron nic nie znaczy.
+          subj.textContent = `${idx + 1}. ${l.subject}`;
           row.appendChild(subj);
           const meta = doc.createElement('span');
           meta.className = 'arkmail-arch-meta';

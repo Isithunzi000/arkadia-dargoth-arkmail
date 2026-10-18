@@ -55,6 +55,13 @@ const SESSION_OPTS = { timeoutMs: 8000, idleMs: 400 };
  *  na jedno klikniecie i pauza miedzy stronami (grzecznosc wobec serwera). */
 export const LOAD_ALL_MAX_PAGES = 40;
 export const LOAD_ALL_PACE_MS = 400;
+/**
+ * Kontekst listingu serwera (Fala 9a): kazde pobranie listingu
+ * (lista niepusta) dostaje kolejny numer. Serwer interpretuje
+ * "przeczytaj list N" wzgledem OSTATNIEGO listingu, wiec numer wpisu
+ * jest wazny tylko w jego kontekscie.
+ */
+let listingCtx = 0;
 const ARCHIVE_KEY = "archiwum";
 const NOTIFY_KEY = "powiadomienia";
 const COMPOSE_KEY = "compose";
@@ -136,6 +143,7 @@ export async function init(api: PluginApi) {
         for (const box of boxes) {
           ui.setBusy(`Pobieram skrzynke ${box}...`);
           const res = await mailbox.fetch(box);
+          if (res.kind === "lista") stampEntries(res.entries);
           ui.applyMailbox(box, res);
           if (res.kind === "lista") {
             // Cache (Fala 8f): KAZDE pobranie listingu dokleja wpisy do
@@ -187,6 +195,47 @@ export async function init(api: PluginApi) {
     return oldest;
   };
 
+  /** Klucz tozsamosci wpisu - BEZ numeru (serwer renumeruje strony). */
+  const entryKey = (e: MailboxEntry): string =>
+    [e.party, e.subject, e.forwarded ? "f" : "", e.date?.raw ?? ""].join("|");
+
+  /** Nadaje wpisom kontekst biezacego listingu serwera (Fala 9a). */
+  const stampEntries = (entries: MailboxEntry[]): void => {
+    listingCtx += 1;
+    for (const e of entries) e.ctx = listingCtx;
+  };
+
+  /**
+   * Swiezy wpis do operacji pagerowej (Fala 9a). Wpis z biezacego
+   * kontekstu idzie od razu; stary -> re-kotwica: listing po dacie listu
+   * (serwerowe "przed" wyklucza dzien graniczny, wiec dzien PO dacie)
+   * i odnalezienie wpisu po tozsamosci. Numer NIGDY nie leci do serwera
+   * bezposrednio z UI - zawsze z tego tlumaczenia. Null = nie znaleziono
+   * (komunikat dla gracza, zadna komenda nie wylatuje na slepo).
+   */
+  const resolveEntry = async (box: MailBox, entry: MailboxEntry): Promise<MailboxEntry | null> => {
+    if (entry.ctx !== undefined && entry.ctx === listingCtx) return entry;
+    if (!entry.date) {
+      notify(api, "Nie moge zlokalizowac listu (brak daty) - odswiez skrzynke.");
+      return null;
+    }
+    const res = await mailbox.fetch(box, olderListingCommand(box, nextDay(entry.date)));
+    if (res.kind === "lista") {
+      stampEntries(res.entries);
+      // Jak kazde pobranie listingu: cicho do archiwum.
+      const merged = upsertLetters(
+        ui.state.archive,
+        res.entries.map((e) => fromMailboxEntry(box, e)),
+      );
+      ui.setArchive(merged.letters);
+      persistArchive();
+      const fresh = res.entries.find((e) => entryKey(e) === entryKey(entry));
+      if (fresh) return fresh;
+    }
+    notify(api, "Nie znalazlem listu na swiezym listingu - odswiez skrzynke.");
+    return null;
+  };
+
   /** Paginacja wstecz: jedna starsza strona listingow do archiwum. */
   const loadOlder = (box: MailBox): void => {
     const view = ui.state.boxes[box];
@@ -203,6 +252,7 @@ export async function init(api: PluginApi) {
       .runExclusive(async () => {
         const res = await mailbox.fetch(box, olderListingCommand(box, anchor));
         if (res.kind === "lista") {
+          stampEntries(res.entries);
           ui.appendMailboxPage(box, res.entries, res.header.truncated);
           const incoming = res.entries.map((e) => fromMailboxEntry(box, e));
           const merged = upsertLetters(ui.state.archive, incoming);
@@ -263,6 +313,7 @@ export async function init(api: PluginApi) {
             pages += 1;
             let more = false;
             if (res.kind === "lista") {
+              stampEntries(res.entries);
               ui.appendMailboxPage(box, res.entries, res.header.truncated);
               const merged = upsertLetters(
                 ui.state.archive,
@@ -302,19 +353,22 @@ export async function init(api: PluginApi) {
   };
 
   handlersRef = {
-    onOpenLetter: (box, number) => {
-      ui.setBusy(`Czytam list ${number}...`);
+    onOpenLetter: (box, entry) => {
+      ui.setBusy(`Czytam list: ${entry.subject}...`);
       void lock
         .runExclusive(async () => {
+          // Re-kotwiczenie (Fala 9a): numer serwera dopiero ze swiezego
+          // kontekstu; brak wpisu = zadna komenda nie wylatuje.
+          const fresh = await resolveEntry(box, entry);
+          if (!fresh) return;
           transport!.beginModal();
           try {
-            const res = await pager.readLetter(number);
-            ui.openLetter(box, res.letter);
-            // Cache (Fala 8f): tresc listu do archiwum. Wpis z listingu
-            // daje zgodnosc id (flaga forwarded); bez wpisu - naglowki.
-            const entry = ui.state.boxes[box]?.entries.find((e) => e.number === number);
+            const res = await pager.readLetter(fresh.number);
+            ui.openLetter(box, res.letter, fresh);
+            // Cache (Fala 8f): tresc listu do archiwum. Swiezy wpis
+            // daje zgodnosc id (flaga forwarded) z rekordem z listingu.
             const merged = upsertLetters(ui.state.archive, [
-              fromOpenedLetter(box, res.letter, entry),
+              fromOpenedLetter(box, res.letter, fresh),
             ]);
             ui.setArchive(merged.letters);
             persistArchive();
@@ -366,6 +420,7 @@ export async function init(api: PluginApi) {
       void lock
         .runExclusive(async () => {
           const res = await mailbox.fetch(box, searchListingCommand(box, query));
+          if (res.kind === "lista") stampEntries(res.entries);
           ui.setSearch({ box, label: searchDescription(box, query) });
           ui.applySearchResults(box, res);
           if (res.kind === "lista") {
@@ -387,15 +442,17 @@ export async function init(api: PluginApi) {
         .finally(() => ui.setBusy(null));
     },
     onClearSearch: (box) => ui.clearSearch(box),
-    onDeleteLetter: (box, number) => {
-      ui.setBusy(`Kasuje list ${number}...`);
+    onDeleteLetter: (box, entry) => {
+      ui.setBusy(`Kasuje list: ${entry.subject}...`);
       void lock
         .runExclusive(async () => {
+          const fresh = await resolveEntry(box, entry);
+          if (!fresh) return;
           transport!.beginModal();
           try {
-            const res = await pager.deleteLetters(number, String(number));
+            const res = await pager.deleteLetters(fresh.number, String(fresh.number));
             if (res.deleted) {
-              notify(api, `List ${number} oznaczony do skasowania.`);
+              notify(api, "List oznaczony do skasowania.");
               ui.closeLetter();
               refreshBoxes([box]);
             } else {
@@ -408,13 +465,15 @@ export async function init(api: PluginApi) {
         .catch(() => notify(api, "Blad kasowania listu."))
         .finally(() => ui.setBusy(null));
     },
-    onForwardLetter: (box, number, adresat) => {
-      ui.setBusy(`Przekazuje list ${number}...`);
+    onForwardLetter: (box, entry, adresat) => {
+      ui.setBusy(`Przekazuje list: ${entry.subject}...`);
       void lock
         .runExclusive(async () => {
+          const fresh = await resolveEntry(box, entry);
+          if (!fresh) return;
           transport!.beginModal();
           try {
-            const res = await pager.forwardLetter(number, adresat);
+            const res = await pager.forwardLetter(fresh.number, adresat);
             if (res.queued) {
               notify(api, "List przekazany - czeka w niewyslanych.");
               refreshBoxes(["niewyslane"]);
