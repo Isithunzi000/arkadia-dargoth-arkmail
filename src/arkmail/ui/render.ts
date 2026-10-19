@@ -462,7 +462,14 @@ export function mountMailUi(
       // sa kontekstowe (renumeracja per listing), pokazywanie ich mylilo
       // ("1-50 i znowu 1-50"). Serwerowy numer zostaje w data-number.
       const row = doc.createElement('div');
-      row.className = 'arkmail-entry' + (e.isRead ? '' : ' arkmail-unread');
+      // Fala 14c: kropka nieprzeczytania TYLKO w skrzynkach przychodzacych.
+      // Listingi wyslane/niewyslane nie maja znacznika *R* (serwer go tam
+      // nie drukuje), wiec parser daje isRead=false i kazdy wiersz dostawal
+      // kropke w skrzynce, gdzie stan "nieprzeczytany" nie ma sensu
+      // (zgloszenie 2026-10-19, pkty 4 i 5).
+      const unreadMark =
+        !e.isRead && (state.activeBox === 'odebrane' || state.activeBox === 'nieprzeczytane');
+      row.className = 'arkmail-entry' + (unreadMark ? ' arkmail-unread' : '');
       row.setAttribute('data-number', String(e.number));
       const num = doc.createElement('span');
       num.className = 'arkmail-entry-num';
