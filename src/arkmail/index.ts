@@ -30,7 +30,7 @@ import {
   searchDescription,
 } from "./core/protocol/commands";
 import type { LetterTemplate } from "./core/letterRender";
-import { contactsFromBoxes } from "./core/contacts";
+import { contactsFromArchive } from "./core/contacts";
 import {
   fromMailboxEntry,
   fromOpenedLetter,
@@ -163,13 +163,17 @@ export async function init(api: PluginApi) {
   });
 
   /**
-   * Kontakty WYLACZNIE z korespondencji (nadawcy/adresaci z pobranych
-   * listingow) - bez doklejania calej bazy znanych osob klienta.
-   * (Decyzja uzytkownika, Fala 7b: zakladka Kontakty ma pokazywac
-   * tylko osoby, z ktorymi jest realna poczta.)
+   * Kontakty WYLACZNIE z korespondencji (nadawcy/adresaci) - bez
+   * doklejania calej bazy znanych osob klienta. (Decyzja uzytkownika,
+   * Fala 7b: zakladka Kontakty ma pokazywac tylko osoby, z ktorymi jest
+   * realna poczta.)
+   * Fala 14a: liczniki z ARCHIWUM, nie z zaladowanych widokow - widok
+   * skrzynki to domyslnie pierwsze 50 wpisow i licznik skakal/znikal
+   * po refreshu (zgloszenie 2026-10-19); archiwum kumuluje kazdy
+   * pobrany listing i przetrwa refresh oraz restart.
    */
   const rebuildContacts = (): void => {
-    ui.setContacts(contactsFromBoxes(ui.state.boxes, []));
+    ui.setContacts(contactsFromArchive(ui.state.archive));
   };
 
   /**

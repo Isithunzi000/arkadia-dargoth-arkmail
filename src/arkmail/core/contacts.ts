@@ -16,6 +16,7 @@
 
 import type { MailBox } from './protocol/types.js';
 import type { MailboxEntry } from './session/mailbox.js';
+import type { ArchiveLetter } from './archive.js';
 
 export type ContactSource = 'people' | 'przedstawieni' | 'korespondencja' | 'alias';
 
@@ -50,46 +51,118 @@ export function splitParty(party: string): string[] {
   return out;
 }
 
+/** Kierunek korespondencji po skrzynce: listy OD osoby vs DO osoby. */
+const directionOf = (box: MailBox): 'in' | 'out' =>
+  box === 'odebrane' || box === 'nieprzeczytane' ? 'in' : 'out';
+
+/** Znormalizowany wpis korespondencji (wspolny dla listingow i archiwum). */
+interface LetterLike {
+  direction: 'in' | 'out';
+  party: string;
+  subject: string;
+  forwarded: boolean;
+  dateRaw?: string | null;
+  dateKey?: number;
+}
+
+/**
+ * Wspolny rdzen liczenia: ten sam list widac w kilku skrzynkach
+ * (nieprzeczytany jest i w odebranych, i w nieprzeczytanych) - liczymy
+ * go RAZ (Fala 9c). Klucz bez numeru (serwer renumeruje);
+ * kierunek+osoba+temat+forwarded+data = tozsamosc. Wspolny list do
+ * kilku osob liczy sie kazdej z nich osobno. Wpisy bez strony listu
+ * (party === '') sa pomijane.
+ */
+function korespondencjaFromLetters(
+  letters: readonly LetterLike[],
+): ContactInput['korespondencja'] {
+  const korespondencja: ContactInput['korespondencja'] = [];
+  const seen = new Set<string>();
+  for (const l of letters) {
+    if (!l.party) continue;
+    for (const name of splitParty(l.party)) {
+      const dedupKey = [
+        l.direction,
+        name.toLowerCase(),
+        l.subject,
+        l.forwarded ? 'f' : '',
+        l.dateRaw ?? '',
+      ].join('|');
+      if (seen.has(dedupKey)) continue;
+      seen.add(dedupKey);
+      korespondencja.push({ name, direction: l.direction, dateRaw: l.dateRaw ?? undefined, dateKey: l.dateKey });
+    }
+  }
+  return korespondencja;
+}
+
+/** Listings wpis -> znormalizowany LetterLike (dateKey z MailDate). */
+function entryToLetterLike(box: MailBox, e: MailboxEntry): LetterLike {
+  // Klucz yyyymmddHHMMSS: czas rozbija remisy tego samego dnia
+  // (logi: dwa listy 19 IV 2026 o 02:49:49 i 03:03:00).
+  const dateKey = e.date
+    ? (e.date.year * 10000 + e.date.month * 100 + e.date.day) * 1000000 +
+      Number(e.date.time.replace(/:/g, ''))
+    : undefined;
+  return {
+    direction: directionOf(box),
+    party: e.party,
+    subject: e.subject,
+    forwarded: e.forwarded,
+    dateRaw: e.date?.raw,
+    dateKey,
+  };
+}
+
+/** Rekord archiwum -> znormalizowany LetterLike (dateKey z sortKey). */
+function archiveToLetterLike(l: ArchiveLetter): LetterLike {
+  // sortKey 'YYYY-MM-DD HH:MM:SS' -> yyyymmddHHMMSS; same zera = brak daty.
+  const digits = Number(l.sortKey.replace(/\D/g, ''));
+  return {
+    direction: directionOf(l.box),
+    party: l.party,
+    subject: l.subject,
+    forwarded: l.forwarded === true,
+    dateRaw: l.dateRaw,
+    dateKey: digits > 0 ? digits : undefined,
+  };
+}
+
 /**
  * Kontakty z zaladowanych listingow (korespondencja) + baza people
- * klienta. Kierunek po skrzynce: odebrane/nieprzeczytane = 'in'.
- * Wpisy bez strony listu (party === '') sa pomijane.
+ * klienta. Wpisy bez strony listu (party === '') sa pomijane.
  */
 export function contactsFromBoxes(
   boxes: Partial<Record<MailBox, { entries: MailboxEntry[] }>>,
   people: ContactInput['people'],
 ): Contact[] {
-  const korespondencja: ContactInput['korespondencja'] = [];
-  // Fala 9c: ten sam list widac w kilku skrzynkach (nieprzeczytany jest
-  // i w odebranych, i w nieprzeczytanych) - liczymy go RAZ. Klucz bez
-  // numeru (serwer renumeruje); data+temat+osoba+kierunek = tozsamosc.
-  const seen = new Set<string>();
+  const letters: LetterLike[] = [];
   for (const [box, view] of Object.entries(boxes)) {
-    const direction = box === 'odebrane' || box === 'nieprzeczytane' ? 'in' : 'out';
     for (const e of view?.entries ?? []) {
-      if (!e.party) continue;
-      // Klucz yyyymmddHHMMSS: czas rozbija remisy tego samego dnia
-      // (logi: dwa listy 19 IV 2026 o 02:49:49 i 03:03:00).
-      const dateKey = e.date
-        ? (e.date.year * 10000 + e.date.month * 100 + e.date.day) * 1000000 +
-          Number(e.date.time.replace(/:/g, ''))
-        : undefined;
-      // Wspolny list do kilku osob liczy sie kazdej z nich osobno.
-      for (const name of splitParty(e.party)) {
-        const dedupKey = [
-          direction,
-          name.toLowerCase(),
-          e.subject,
-          e.forwarded ? 'f' : '',
-          e.date?.raw ?? '',
-        ].join('|');
-        if (seen.has(dedupKey)) continue;
-        seen.add(dedupKey);
-        korespondencja.push({ name, direction, dateRaw: e.date?.raw, dateKey });
-      }
+      letters.push(entryToLetterLike(box as MailBox, e));
     }
   }
-  return mergeContacts({ people, przedstawieni: [], korespondencja, aliasy: [] });
+  return mergeContacts({
+    people,
+    przedstawieni: [],
+    korespondencja: korespondencjaFromLetters(letters),
+    aliasy: [],
+  });
+}
+
+/**
+ * Kontakty z ARCHIWUM (Fala 14a): licznik stabilny - archiwum kumuluje
+ * kazdy pobrany listing i przetrwa refresh oraz restart (storage),
+ * w przeciwienstwie do widokow skrzynek (domyslnie pierwsze 50 wpisow).
+ * Rekordy sprzed Fali 14a nie maja pola forwarded - traktowane jak false.
+ */
+export function contactsFromArchive(letters: readonly ArchiveLetter[]): Contact[] {
+  return mergeContacts({
+    people: [],
+    przedstawieni: [],
+    korespondencja: korespondencjaFromLetters(letters.map(archiveToLetterLike)),
+    aliasy: [],
+  });
 }
 
 export interface ContactInput {

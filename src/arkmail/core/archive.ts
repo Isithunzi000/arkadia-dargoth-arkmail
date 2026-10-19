@@ -22,6 +22,13 @@ export interface ArchiveLetter {
   /** Druga strona listu: nadawca (odebrane) lub odbiorcy (wyslane). */
   party: string;
   subject: string;
+  /**
+   * Flaga "(forwardowany)" z listingu (Fala 14a: kontakty z archiwum
+   * rozrozniaja nia forward oryginalu wyslany w tej samej sekundzie,
+   * jak letterId). Rekordy zapisane przed Fala 14a nie maja tego pola
+   * - przy odczycie traktowane jak false (konsumuj przez === true).
+   */
+  forwarded?: boolean;
   dateRaw: string | null;
   /** Klucz sortowania "YYYY-MM-DD HH:MM:SS" ('0000-...' gdy brak daty). */
   sortKey: string;
@@ -87,6 +94,7 @@ export function fromMailboxEntry(box: MailBox, entry: MailboxEntry): ArchiveLett
     number: entry.number,
     party: entry.party,
     subject: entry.subject,
+    forwarded: entry.forwarded,
     dateRaw,
     sortKey: sortKeyOf(entry.date),
     read: entry.isRead,
@@ -118,6 +126,7 @@ export function fromOpenedLetter(
     number: letter.number,
     party,
     subject: letter.subject,
+    forwarded: false,
     dateRaw,
     sortKey: sortKeyOf(parsed),
     read: true,
