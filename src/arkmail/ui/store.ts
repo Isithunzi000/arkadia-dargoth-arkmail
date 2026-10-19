@@ -39,6 +39,12 @@ export interface MailUiState {
   activeBox: MailBox;
   boxes: Partial<Record<MailBox, BoxView>>;
   badge: number;
+  /**
+   * Liczba listow w niewyslanych z ostatniego listingu (Fala 14d).
+   * GMCP Mail.State daje tylko booleany - licznik pochodzi z listingow;
+   * etykieta '(u/n)' przez formatBadgeSuffix.
+   */
+  badgeUnsent: number;
   /** opis operacji pocztowej w toku (pasek); null = wolne */
   busy: string | null;
   /** petla "Wczytaj wszystkie" w toku: skrzynka + liczba pobranych stron */
@@ -69,6 +75,7 @@ const DEFAULT_STATE: MailUiState = {
   activeBox: 'odebrane',
   boxes: {},
   badge: 0,
+  badgeUnsent: 0,
   busy: null,
   loadAll: null,
   search: null,
@@ -132,7 +139,8 @@ export class MailUiStore {
         ? { entries: result.entries, truncated: result.header.truncated, empty: null }
         : { entries: [], truncated: false, empty: result.reason };
     const boxes = { ...this.current.boxes, [box]: view };
-    this.update({ boxes, badge: computeBadge(boxes) });
+    const b = computeBadges(boxes);
+    this.update({ boxes, badge: b.unread, badgeUnsent: b.unsent });
   }
 
   /**
@@ -156,7 +164,8 @@ export class MailUiStore {
       empty: null,
     };
     const boxes = { ...this.current.boxes, [box]: next };
-    this.update({ boxes, badge: computeBadge(boxes) });
+    const b = computeBadges(boxes);
+    this.update({ boxes, badge: b.unread, badgeUnsent: b.unsent });
     return fresh.length;
   }
 
@@ -218,7 +227,8 @@ export class MailUiStore {
       empty: null,
     };
     const boxes = { ...this.current.boxes, [box]: nextView };
-    this.update({ boxes, badge: computeBadge(boxes) });
+    const b = computeBadges(boxes);
+    this.update({ boxes, badge: b.unread, badgeUnsent: b.unsent });
     return { updated, added, removed };
   }
 
@@ -256,7 +266,9 @@ export class MailUiStore {
     if (stashed) {
       const boxes = { ...this.current.boxes, [box]: stashed };
       patch.boxes = boxes;
-      patch.badge = computeBadge(boxes);
+      const b = computeBadges(boxes);
+      patch.badge = b.unread;
+      patch.badgeUnsent = b.unsent;
     }
     this.update(patch);
   }
@@ -293,7 +305,15 @@ export class MailUiStore {
     for (const b of Object.keys(this.stashedViews)) {
       delete this.stashedViews[b as MailBox];
     }
-    this.update({ boxes: {}, archive: [], contacts: [], badge: 0, search: null, unsentFlash: false });
+    this.update({
+      boxes: {},
+      archive: [],
+      contacts: [],
+      badge: 0,
+      badgeUnsent: 0,
+      search: null,
+      unsentFlash: false,
+    });
   }
 
   setContacts(contacts: Contact[]): void {
@@ -329,10 +349,24 @@ export class MailUiStore {
   }
 }
 
-function computeBadge(boxes: Partial<Record<MailBox, BoxView>>): number {
-  const unread = boxes.nieprzeczytane;
-  if (unread) return unread.entries.length;
-  const odebrane = boxes.odebrane;
-  if (odebrane) return odebrane.entries.filter((e) => !e.isRead).length;
-  return 0;
+function computeBadges(boxes: Partial<Record<MailBox, BoxView>>): {
+  unread: number;
+  unsent: number;
+} {
+  const unreadBox = boxes.nieprzeczytane;
+  const unread = unreadBox
+    ? unreadBox.entries.length
+    : (boxes.odebrane?.entries.filter((e) => !e.isRead).length ?? 0);
+  const unsent = boxes.niewyslane?.entries.length ?? 0;
+  return { unread, unsent };
+}
+
+/**
+ * Fala 14d: suffix licznika dla zakladki Listy i klawisza stopki.
+ * '(u)' gdy sa same nieprzeczytane, '(u/n)' gdy sa tez niewyslane,
+ * '' gdy zero i zero. Liczby z listingow (GMCP daje tylko booleany).
+ */
+export function formatBadgeSuffix(unread: number, unsent: number): string {
+  if (unread <= 0 && unsent <= 0) return '';
+  return unsent > 0 ? ` (${unread}/${unsent})` : ` (${unread})`;
 }

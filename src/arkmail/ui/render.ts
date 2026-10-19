@@ -18,6 +18,7 @@ import {
   type LetterTemplate,
 } from '../core/letterRender.js';
 import type { MailUiState, MailUiStore, UiTab } from './store.js';
+import { formatBadgeSuffix } from './store.js';
 import { STYLES } from './styles.js';
 import { attachGhost, type GhostSource } from './ghost.js';
 
@@ -251,7 +252,9 @@ export function mountMailUi(
         // poza poczta zawsze kolejkuje) - gracz widzi, gdzie kliknac.
         (state.unsentFlash && id === 'listy' ? ' arkmail-flash' : '');
       btn.setAttribute('data-tab', id);
-      btn.textContent = id === 'listy' && state.badge > 0 ? `${label} (${state.badge})` : label;
+      // Fala 14d: '(u)' albo '(u/n)' - nieprzeczytane/niewyslane.
+      btn.textContent =
+        id === 'listy' ? label + formatBadgeSuffix(state.badge, state.badgeUnsent) : label;
       btn.addEventListener('click', () => store.setTab(id));
       bar.appendChild(btn);
     }

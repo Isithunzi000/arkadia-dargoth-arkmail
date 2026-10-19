@@ -18,6 +18,10 @@ export class FakeApi {
   popupConfig: { createContent: () => Promise<unknown> } | null = null;
   /** Zarejestrowane nasluchy zdarzen klienta (Fala 13a: gmcp.mail.state). */
   eventListeners = new Map<string, Array<(payload: unknown) => void>>();
+  /** Historia update'ow klawisza stopki (Fala 14d: badge '(u/n)'). */
+  footerUpdates: Array<{ label?: string }> = [];
+  /** Historia podswietlen stopki (setFooterButtonState). */
+  footerStates: Array<{ state: string; highlighted: boolean }> = [];
 
   readonly api = {
     command: {
@@ -77,8 +81,15 @@ export class FakeApi {
         };
       },
       addPopupMenuEntry: () => ({ remove: () => {} }),
-      registerFooterButton: () => ({ update: () => {}, remove: () => {} }),
-      setFooterButtonState: () => {},
+      registerFooterButton: (_id: string, _cfg: unknown) => ({
+        update: (u: { label?: string }) => {
+          this.footerUpdates.push(u);
+        },
+        remove: () => {},
+      }),
+      setFooterButtonState: (state: string, highlighted: boolean) => {
+        this.footerStates.push({ state, highlighted });
+      },
     },
   } as unknown as PluginApi;
 

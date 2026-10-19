@@ -115,11 +115,25 @@ export class MailboxSession {
           if (line.cls === 'command' || isEchoLine(line.text)) return;
           const empty = parseEmptyListing(line.text);
           if (empty) {
+            // Fala 14d: fail-fast, gdy serwer odpowiada za INNA skrzynke
+            // (desynchronizacja). Stary kod przyjmowal cudzy komunikat
+            // po cichu - listing 50 odebranych ladowal jako "nieprzeczytane"
+            // i badge pokazywal 50 (zgloszenie 2026-10-19, pkt 6).
+            if (empty.box !== box) {
+              cleanup();
+              reject(new Error(`pusta ${empty.box} podczas fetch ${box}`));
+              return;
+            }
             finish({ kind: 'pusta', box: empty.box, reason: empty.reason });
             return;
           }
           const h = parseListingHeader(line.text);
           if (h) {
+            if (h.box !== box) {
+              cleanup();
+              reject(new Error(`listing ${h.box} podczas fetch ${box}`));
+              return;
+            }
             header = h;
             armIdle();
           }

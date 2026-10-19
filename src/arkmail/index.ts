@@ -44,7 +44,7 @@ import { SessionLock } from "./core/sessionLock";
 import { DargothTransport } from "./adapters/dargothTransport";
 import { CharStorage, type KVLike } from "./adapters/storage";
 import { notify } from "./adapters/notify";
-import { MailUiStore } from "./ui/store";
+import { MailUiStore, formatBadgeSuffix } from "./ui/store";
 import { mountMailUi, type MailUiHandlers } from "./ui/render";
 
 const POPUP_ID = "arkmail";
@@ -820,8 +820,10 @@ export async function init(api: PluginApi) {
 
   // Badge na klawiszu stopki.
   unsubBadge = ui.subscribe((s) => {
-    footerHandle?.update({ label: s.badge > 0 ? `${PLUGIN_NAME} (${s.badge})` : PLUGIN_NAME });
-    api.ui.setFooterButtonState(FOOTER_STATE, s.badge > 0);
+    // Fala 14d: '(u)' albo '(u/n)' (nieprzeczytane/niewyslane);
+    // podswietlenie, gdy cokolwiek czeka.
+    footerHandle?.update({ label: PLUGIN_NAME + formatBadgeSuffix(s.badge, s.badgeUnsent) });
+    api.ui.setFooterButtonState(FOOTER_STATE, s.badge > 0 || s.badgeUnsent > 0);
     storage.setJSON(COMPOSE_KEY, { template: s.composeTemplate, width: s.composeWidth });
     storage.setJSON(NOTIFY_KEY, s.notifyEnabled);
   });
