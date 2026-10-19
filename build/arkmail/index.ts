@@ -3,7 +3,7 @@ var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { en
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
 // src/arkmail/meta.ts
-const PLUGIN_VERSION = "1.6.0";
+const PLUGIN_VERSION = "1.7.0";
 var PLUGIN_NAME = "ArkMail";
 var PLUGIN_AUTHOR = "Isithunzi000";
 var PLUGIN_DESCRIPTION = "ArkMail to kompleksowy system pocztowy dla klienta Dargoth: skrzynki, kontakty, archiwum i pisanie listow (alias /arkmail). Plugin w pelni zgodny z regulaminem gry - wszystkie komendy wysylane swiadomie przez gracza, bez automatyki.";
@@ -115,6 +115,10 @@ function parseNotification(text) {
   if (t === "Goniec przyniosl nowa partie listow.") return { kind: "goniec" };
   const wysylasz = t.match(/^Wysylasz ([A-Za-z]+) na poczte\.$/);
   if (wysylasz) return { kind: "wysylasz", zwierze: wysylasz[1] };
+  const powrot = t.match(/^Wsrod trzepotu skrzydel ([A-Za-z]+) laduje na (?:twoim|twojej) \w+(?: \w+)?\.$/);
+  if (powrot) return { kind: "powrot-zwierzecia", zwierze: powrot[1] };
+  if (t === "List zostal pomyslnie wyslany.") return { kind: "list-wyslany" };
+  if (t === "Slucham?") return { kind: "slucham" };
   return null;
 }
 function parseMailError(text) {
@@ -997,6 +1001,7 @@ var DEFAULT_STATE = {
   contacts: [],
   archive: [],
   notifyEnabled: false,
+  animalFlying: false,
   composeTemplate: "plain",
   composeWidth: 60
 };
@@ -1194,6 +1199,9 @@ var MailUiStore = class {
   }
   setNotifyEnabled(notifyEnabled) {
     this.update({ notifyEnabled });
+  }
+  setAnimalFlying(animalFlying) {
+    this.update({ animalFlying });
   }
   setCompose(prefs) {
     const patch = {};
@@ -2088,6 +2096,12 @@ function mountMailUi(container, store2, handlers) {
     refreshAll.textContent = "Odswiez";
     refreshAll.addEventListener("click", () => handlers.onRefreshBox(state.activeBox));
     ops.appendChild(refreshAll);
+    const animalBtn = doc.createElement("button");
+    animalBtn.className = "arkmail-animal-send";
+    animalBtn.textContent = state.animalFlying ? "Zwierze w drodze..." : "Wyslij Zwierze";
+    if (state.animalFlying) animalBtn.setAttribute("disabled", "");
+    animalBtn.addEventListener("click", () => handlers.onSendAnimal?.());
+    ops.appendChild(animalBtn);
     const view0 = state.boxes[state.activeBox];
     const searchMode0 = state.search && state.search.box === state.activeBox ? state.search : null;
     const loopHere = state.loadAll !== null && state.loadAll.box === state.activeBox;
@@ -2666,6 +2680,7 @@ var SESSION_OPTS = { timeoutMs: 8e3, idleMs: 400 };
 var LOAD_ALL_MAX_PAGES = 40;
 var WIDE_MIN_WIDTH = 900;
 var LOAD_ALL_PACE_MS = 400;
+var ANIMAL_TIMING = { flightTimeoutMs: 6e4, sluchamWindowMs: 2e3 };
 var listingCtx = 0;
 var ARCHIVE_KEY = "archiwum";
 var NOTIFY_KEY = "powiadomienia";
@@ -2688,6 +2703,8 @@ var store = null;
 var unmount = null;
 var unsubBadge = null;
 var wideObserver = null;
+var animalTimer = null;
+var sluchamTimer = null;
 function createContent() {
   const root = document.createElement("div");
   root.style.height = "100%";
@@ -2737,34 +2754,80 @@ async function init(api) {
   const rebuildContacts = () => {
     ui.setContacts(contactsFromBoxes(ui.state.boxes, []));
   };
+  const fetchBoxes = async (boxes, mode) => {
+    for (const box of boxes) {
+      ui.setBusy(`Pobieram skrzynke ${box}...`);
+      const res = await mailbox.fetch(box);
+      if (res.kind === "lista") stampEntries(res.entries);
+      if (res.kind === "lista" && mode === "sync") {
+        const synced = ui.syncMailboxPage(box, res.entries, res.header.truncated);
+        if (!synced) ui.applyMailbox(box, res);
+      } else {
+        ui.applyMailbox(box, res);
+      }
+      if (res.kind === "lista") {
+        const merged = upsertLetters(
+          ui.state.archive,
+          res.entries.map((e) => fromMailboxEntry(box, e))
+        );
+        ui.setArchive(merged.letters);
+      }
+    }
+  };
   const refreshBoxes = (boxes, mode = "sync") => {
     ui.clearSearchBoxes(boxes);
-    void lock.runExclusive(async () => {
-      for (const box of boxes) {
-        ui.setBusy(`Pobieram skrzynke ${box}...`);
-        const res = await mailbox.fetch(box);
-        if (res.kind === "lista") stampEntries(res.entries);
-        if (res.kind === "lista" && mode === "sync") {
-          const synced = ui.syncMailboxPage(box, res.entries, res.header.truncated);
-          if (!synced) ui.applyMailbox(box, res);
-        } else {
-          ui.applyMailbox(box, res);
-        }
-        if (res.kind === "lista") {
-          const merged = upsertLetters(
-            ui.state.archive,
-            res.entries.map((e) => fromMailboxEntry(box, e))
-          );
-          ui.setArchive(merged.letters);
-        }
-      }
-    }).catch(() => {
+    void lock.runExclusive(() => fetchBoxes(boxes, mode)).catch(() => {
     }).finally(() => {
       ui.setBusy(null);
       rebuildContacts();
       persistArchive();
     });
   };
+  const pendingRefresh = /* @__PURE__ */ new Set();
+  let drainScheduled = false;
+  const scheduleRefresh = (boxes) => {
+    for (const b of boxes) pendingRefresh.add(b);
+    if (drainScheduled) return;
+    drainScheduled = true;
+    void lock.runExclusive(async () => {
+      const batch = [...pendingRefresh];
+      pendingRefresh.clear();
+      ui.clearSearchBoxes(batch);
+      await fetchBoxes(batch, "sync");
+    }).catch(() => {
+    }).finally(() => {
+      ui.setBusy(null);
+      rebuildContacts();
+      persistArchive();
+      drainScheduled = false;
+      if (pendingRefresh.size > 0) scheduleRefresh([]);
+    });
+  };
+  let lastMailState = null;
+  api.events.on("gmcp.mail.state", (d) => {
+    if (!d || typeof d !== "object") return;
+    const s = d;
+    if (typeof s.unread !== "boolean" || typeof s.unreceived !== "boolean" || typeof s.unsent !== "boolean") {
+      return;
+    }
+    const cur = { unread: s.unread, unreceived: s.unreceived, unsent: s.unsent };
+    const prev = lastMailState;
+    if (prev && cur.unread === prev.unread && cur.unreceived === prev.unreceived && cur.unsent === prev.unsent) {
+      return;
+    }
+    lastMailState = cur;
+    const boxes = /* @__PURE__ */ new Set();
+    const inboxTouched = prev ? cur.unread !== prev.unread || cur.unreceived !== prev.unreceived : cur.unread || cur.unreceived;
+    if (inboxTouched) {
+      boxes.add("odebrane");
+      boxes.add("nieprzeczytane");
+    }
+    if (prev ? cur.unsent !== prev.unsent : cur.unsent) {
+      boxes.add("niewyslane");
+      boxes.add("wyslane");
+    }
+    if (boxes.size > 0) scheduleRefresh([...boxes]);
+  });
   const persistArchive = () => {
     storage.setJSON(ARCHIVE_KEY, ui.state.archive);
   };
@@ -2897,7 +2960,54 @@ async function init(api) {
       (err) => notify(api, `Blad wczytywania: ${err instanceof Error ? err.message : String(err)}`)
     ).finally(() => ui.setBusy(null));
   };
+  let animalFlight = false;
+  let sluchamArmed = false;
+  const disarmSlucham = () => {
+    sluchamArmed = false;
+    if (sluchamTimer !== null) {
+      clearTimeout(sluchamTimer);
+      sluchamTimer = null;
+    }
+  };
+  const armSluchamWindow = () => {
+    sluchamArmed = true;
+    if (sluchamTimer !== null) clearTimeout(sluchamTimer);
+    sluchamTimer = setTimeout(() => {
+      sluchamTimer = null;
+      sluchamArmed = false;
+    }, ANIMAL_TIMING.sluchamWindowMs);
+  };
+  const endAnimalFlight = () => {
+    animalFlight = false;
+    if (animalTimer !== null) {
+      clearTimeout(animalTimer);
+      animalTimer = null;
+    }
+    ui.setAnimalFlying(false);
+  };
+  const startAnimalFlight = () => {
+    animalFlight = true;
+    if (animalTimer !== null) clearTimeout(animalTimer);
+    animalTimer = setTimeout(() => {
+      animalTimer = null;
+      if (animalFlight) endAnimalFlight();
+    }, ANIMAL_TIMING.flightTimeoutMs);
+    ui.setAnimalFlying(true);
+  };
   handlersRef = {
+    onSendAnimal: () => {
+      if (lock.locked) {
+        notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+        return;
+      }
+      if (animalFlight) {
+        notify(api, "Zwierze jest juz w drodze - poczekaj na jego powrot.");
+        return;
+      }
+      startAnimalFlight();
+      transport.send("wyslij zwierze");
+      armSluchamWindow();
+    },
     onOpenLetter: (box, entry) => {
       if (lock.locked) {
         notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
@@ -3047,6 +3157,7 @@ async function init(api) {
   transport.subscribe((line) => {
     if (line.cls === "command" || isEchoLine(line.text)) return;
     if (!extractPagerPrompt(line.text)) return;
+    console.error("WATCHDOG locked=", lock.locked);
     if (lock.locked) return;
     const now = Date.now();
     if (now - lastWatchdogQ < 2e3) return;
@@ -3058,9 +3169,24 @@ async function init(api) {
     if (!n) return;
     if (n.kind === "nowa-poczte") {
       if (ui.state.notifyEnabled) notify(api, `Masz nowa poczte od ${n.nadawca}.`);
-      refreshBoxes(["odebrane", "nieprzeczytane"]);
+      scheduleRefresh(["odebrane", "nieprzeczytane"]);
     } else if (n.kind === "goniec") {
-      refreshBoxes(["odebrane", "nieprzeczytane"]);
+      scheduleRefresh(["odebrane", "nieprzeczytane"]);
+    } else if (n.kind === "wysylasz") {
+      if (!animalFlight) startAnimalFlight();
+      disarmSlucham();
+    } else if (n.kind === "slucham") {
+      if (sluchamArmed) {
+        disarmSlucham();
+        endAnimalFlight();
+        notify(api, "Zwierze nie odpowiada - sprawdz, czy masz zwierze pocztowe.");
+      }
+    } else if (n.kind === "powrot-zwierzecia") {
+      disarmSlucham();
+      endAnimalFlight();
+      scheduleRefresh(["odebrane", "nieprzeczytane"]);
+    } else if (n.kind === "list-wyslany") {
+      if (!lock.locked) scheduleRefresh(["niewyslane", "wyslane"]);
     }
   });
   unsubBadge = ui.subscribe((s) => {
@@ -3102,6 +3228,14 @@ async function init(api) {
   };
 }
 async function destroy() {
+  if (animalTimer !== null) {
+    clearTimeout(animalTimer);
+    animalTimer = null;
+  }
+  if (sluchamTimer !== null) {
+    clearTimeout(sluchamTimer);
+    sluchamTimer = null;
+  }
   if (unsubBadge) {
     unsubBadge();
     unsubBadge = null;
@@ -3139,6 +3273,7 @@ async function destroy() {
   apiRef = null;
 }
 export {
+  ANIMAL_TIMING,
   LOAD_ALL_MAX_PAGES,
   LOAD_ALL_PACE_MS,
   WIDE_MIN_WIDTH,
