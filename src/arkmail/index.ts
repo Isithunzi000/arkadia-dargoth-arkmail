@@ -714,7 +714,9 @@ export async function init(api: PluginApi) {
           try {
             const res = await pager.deleteLetters(fresh.number, String(fresh.number));
             if (res.deleted) {
-              notify(api, "List oznaczony do skasowania.");
+              // Fala 14e: sesja pagera (d N -> q) kasuje list FAKTYCZNIE
+              // przy wyjsciu ("Kasuje: N.") - toast mowi o skutku.
+              notify(api, "List zostal usuniety.");
               ui.closeLetter();
               // Replace (Fala 12b): skasowany list ma zniknac z widoku
               // natychmiast, nawet gdy listing jest uciety (sync bez

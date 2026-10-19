@@ -164,6 +164,8 @@ test('re-kotwiczenie: kasowanie po zmianie kontekstu uzywa swiezego numeru', asy
     await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec refreshu');
 
     // Usun: zrodlowy wpis listu ma stary kontekst -> re-kotwica.
+    // Fala 14e: dwuklik (pierwszy klik tylko uzbraja przycisk).
+    click(h, '.arkmail-del');
     click(h, '.arkmail-del');
     await waitFor(
       () => f.sent.includes('listy odebrane przed 24 XII 2025'),
@@ -183,7 +185,9 @@ test('re-kotwiczenie: kasowanie po zmianie kontekstu uzywa swiezego numeru', asy
     // Po potwierdzeniu serwer WRACA do promptu pagera - dopiero wtedy q.
     f.fire('[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 4) -- ', 'mail');
     f.fire('> ', 'prompt');
-    await waitFor(() => notifyText(f, 'oznaczony do skasowania'), 'notify o skasowaniu');
+    // Fala 14e: pager (d N -> q) kasuje list FAKTYCZNIE przy wyjsciu -
+    // toast mowi o skutku, nie o zaznaczeniu.
+    await waitFor(() => notifyText(f, 'List zostal usuniety.'), 'notify o skasowaniu');
   } finally {
     await stopHarness();
   }

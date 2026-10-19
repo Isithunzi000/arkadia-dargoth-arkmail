@@ -564,7 +564,27 @@ export function mountMailUi(
     del.className = 'arkmail-del';
     del.textContent = 'Usun';
     if (source) {
-      del.addEventListener('click', () => handlers.onDeleteLetter(l.box, source));
+      // Fala 14e: kasowanie z dwuklikowym potwierdzeniem (uzbrojenie
+      // wygasa po 3 s, wzorzec jak "Wyczysc pamiec podreczna") -
+      // pojedynczy przypadkowy klik nie kasuje listu (zgloszenie
+      // 2026-10-19, pkt 7).
+      let delArmed = false;
+      let delTimer: ReturnType<typeof setTimeout> | null = null;
+      del.addEventListener('click', () => {
+        if (!delArmed) {
+          delArmed = true;
+          del.textContent = 'Na pewno? Kliknij ponownie';
+          delTimer = setTimeout(() => {
+            delArmed = false;
+            del.textContent = 'Usun';
+          }, 3000);
+          return;
+        }
+        if (delTimer) clearTimeout(delTimer);
+        delArmed = false;
+        del.textContent = 'Usun';
+        handlers.onDeleteLetter(l.box, source);
+      });
     } else {
       del.setAttribute('disabled', '');
       del.setAttribute('title', 'Otworz list z zakladki Listy, aby go skasowac.');

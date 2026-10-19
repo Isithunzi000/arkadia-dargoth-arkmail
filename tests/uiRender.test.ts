@@ -392,6 +392,9 @@ test('render: widok listu ma Usun i Przekaz z polem adresata', () => {
     { number: 3, from: 'Foo', subject: 'Perly', to: 'Gracz', cc: null, date: null, body: ['czesc'] },
     source,
   );
+  // Fala 14e: Usun z dwuklikowym potwierdzeniem - pierwszy klik uzbraja.
+  click(container.querySelector('.arkmail-del'));
+  assert.equal(calls.length, 0, 'pierwszy klik tylko uzbraja');
   click(container.querySelector('.arkmail-del'));
   assert.equal(calls[0].name, 'del');
   assert.deepEqual(calls[0].args, ['odebrane', source]);
