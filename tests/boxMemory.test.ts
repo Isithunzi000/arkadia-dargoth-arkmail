@@ -1,11 +1,14 @@
 /**
- * Odswiezanie skrzynek (Fala 11e; zastepuje "pamiec skrzynek" z Fali 9b).
+ * Odswiezanie skrzynek (Fala 11e; kontrakt sync zmieniony w Fali 12b).
  *
- * Klik w skrzynke ZAWSZE pobiera najnowsza strone z serwera (replace) -
- * gracz nie moze utknac na nieodswiezonym cache i przegapic nowych
- * listow. Wczytane starsze strony zostaja do nastepnego kliku (replace
- * kasuje je swieza strona). Powiadomienie o nowej poczcie dalej SCALA
- * swieza strone z widokiem (dokleja nowe, zostawia wczytane strony).
+ * Klik w skrzynke ZAWSZE pobiera najnowsza strone z serwera - gracz nie
+ * moze utknac na nieodswiezonym cache i przegapic nowych listow.
+ * Fala 12b: odswiezenie to SYNC (aktualizacja w miejscu + doklejenie
+ * nowych na koncu), nie replace - wczytane starsze strony ("Wczytaj
+ * starsze" / "Wczytaj wszystkie") NIE znikaja przy odswiezeniu.
+ * Powiadomienie o nowej poczcie dziala tak samo (ten sam sync).
+ * Pelny replace zostaje tylko po skasowaniu listu.
+ * Szczegoly kontraktu: tests/syncMailbox.test.ts.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,6 +21,7 @@ import {
   stopHarness,
   loadTruncatedBox,
   click,
+  textOf,
   type Harness,
 } from './harness';
 
@@ -81,7 +85,7 @@ async function loadOlderPage(h: Harness): Promise<void> {
   await waitFor(() => h.content.querySelectorAll('.arkmail-entry').length === 5, '5 wierszy');
 }
 
-test('zakladki: powrot na skrzynke odswieza najnowsza strone (replace)', async () => {
+test('zakladki: powrot na skrzynke odswieza najnowsza strone (sync zachowuje wczytane)', async () => {
   const h = await startHarness();
   const { f, waitFor, content } = h;
   try {
@@ -100,18 +104,28 @@ test('zakladki: powrot na skrzynke odswieza najnowsza strone (replace)', async (
       'powrot = refetch najnowszej strony',
     );
 
-    // Replace: widok to tylko swieza strona - doczytane starsze znikaja.
+    // Sync (Fala 12b): swieza strona (z jednym NOWYM listem) aktualizuje
+    // wpisy w miejscu - doczytane starsze strony NIE znikaja.
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
-    f.fire(' 3. *R* Temat: najstarszy', 'mail');
+    f.fire(' 4. *R* Temat: najstarszy', 'mail');
     f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
-    f.fire(' 2. *R* Temat: srodkowy', 'mail');
+    f.fire(' 3. *R* Temat: srodkowy', 'mail');
     f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
-    f.fire(' 1. *R* Temat: najnowszy', 'mail');
+    f.fire(' 2. *R* Temat: najnowszy', 'mail');
     f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire(' 1. Temat: swiezy', 'mail');
+    f.fire('Nadawca: Grault                         Cz, 24 XII 2025, 08:00:00', 'mail');
     f.fire('> ', 'prompt');
+    // Najpierw czekamy az swiezy listing ZOSTANIE zastosowany (nowy list
+    // widoczny) - inaczej waitFor zlapalby stan sprzed async zapisu.
     await waitFor(
-      () => content.querySelectorAll('.arkmail-entry').length === 3,
-      'widok = swieza strona (3 wiersze, starsze doczytane odpadly)',
+      () => textOf(h, '.arkmail-entry').includes('swiezy'),
+      'swiezy listing zastosowany (nowy list widoczny)',
+    );
+    assert.equal(
+      content.querySelectorAll('.arkmail-entry').length,
+      6,
+      'widok = swieza strona + wczytane starsze (5+1=6 wierszy)',
     );
   } finally {
     await stopHarness();

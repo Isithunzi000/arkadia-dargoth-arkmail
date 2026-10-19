@@ -160,13 +160,14 @@ export async function init(api: PluginApi) {
   };
 
   /**
-   * Pobranie skrzynek. Tryb "merge" (powiadomienie o nowej poczcie,
-   * Fala 9b): swieza strona SCALA sie z widokiem - nowe wpisy laduja
-   * na gorze, wczytane strony zostaja; znacznik uciecia zostaje
-   * zdjety tylko, gdy mamy juz komplet. Tryb "replace" (domyslny):
-   * pelna wymiana widoku (reczne odswiezenie, po operacjach).
+   * Pobranie skrzynek. Tryb "sync" (domyslny, Fala 12b): swieza strona
+   * SYNCHRONIZUJE sie z widokiem - znane wpisy aktualizowane w miejscu,
+   * nowe doklejane na koncu (najnowszy), wczytane starsze strony
+   * ZOSTAJA. Tryb "replace": pelna wymiana widoku (po skasowaniu listu
+   * - lista ma zniknac natychmiast, nawet z ucietych listingow).
+   * Kontrakt sync: ui/store.ts syncMailboxPage, tests/syncMailbox.test.ts.
    */
-  const refreshBoxes = (boxes: MailBox[], mode: "replace" | "merge" = "replace"): void => {
+  const refreshBoxes = (boxes: MailBox[], mode: "sync" | "replace" = "sync"): void => {
     // Swiezy listing nadpisuje widok - tryb wynikow szukania na tych
     // skrzynkach przestaje obowiazywac (bez przywracania schowka).
     ui.clearSearchBoxes(boxes);
@@ -175,10 +176,11 @@ export async function init(api: PluginApi) {
         for (const box of boxes) {
           ui.setBusy(`Pobieram skrzynke ${box}...`);
           const res = await mailbox.fetch(box);
-          const view = mode === "merge" ? ui.state.boxes[box] : undefined;
           if (res.kind === "lista") stampEntries(res.entries);
-          if (res.kind === "lista" && view && view.empty === null) {
-            ui.appendMailboxPage(box, res.entries, view.truncated && res.header.truncated);
+          if (res.kind === "lista" && mode === "sync") {
+            // null = brak widoku / widok pusty -> pelne zastosowanie.
+            const synced = ui.syncMailboxPage(box, res.entries, res.header.truncated);
+            if (!synced) ui.applyMailbox(box, res);
           } else {
             ui.applyMailbox(box, res);
           }
@@ -517,7 +519,10 @@ export async function init(api: PluginApi) {
             if (res.deleted) {
               notify(api, "List oznaczony do skasowania.");
               ui.closeLetter();
-              refreshBoxes([box]);
+              // Replace (Fala 12b): skasowany list ma zniknac z widoku
+              // natychmiast, nawet gdy listing jest uciety (sync bez
+              // pelnego listingu nie usuwa wpisow).
+              refreshBoxes([box], "replace");
             } else {
               notify(api, "Nie udalo sie skasowac listu.");
             }
@@ -580,9 +585,9 @@ export async function init(api: PluginApi) {
     if (!n) return;
     if (n.kind === "nowa-poczte") {
       if (ui.state.notifyEnabled) notify(api, `Masz nowa poczte od ${n.nadawca}.`);
-      refreshBoxes(["odebrane", "nieprzeczytane"], "merge");
+      refreshBoxes(["odebrane", "nieprzeczytane"]);
     } else if (n.kind === "goniec") {
-      refreshBoxes(["odebrane", "nieprzeczytane"], "merge");
+      refreshBoxes(["odebrane", "nieprzeczytane"]);
     }
   });
 

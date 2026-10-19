@@ -149,6 +149,68 @@ export class MailUiStore {
     return fresh.length;
   }
 
+  /**
+   * Sync najnowszej strony z widokiem (Fala 12b; zastepuje "replace"
+   * z Fali 11e jako domyslny tryb odswiezania). Wczytane starsze strony
+   * ("Wczytaj starsze" / "Wczytaj wszystkie") NIE znikaja przy
+   * odswiezeniu - gracz nie wraca do domyslnych 50 wpisow.
+   *
+   * - wpisy znane (tozsamosc: strona|temat|forwarded|data, jak w
+   *   appendMailboxPage) aktualizowane sa W MIEJSCU (np. znacznik *R*);
+   * - nowe listy doklejane sa NA KONCU tablicy (koniec najnowszy; UI
+   *   renderuje odwrotnie, wiec laduja na gorze ekranu);
+   * - znacznik uciecia: truncated = stary && nowy (zdjety dopiero, gdy
+   *   mamy komplet);
+   * - usuwanie wpisow TYLKO gdy swiezy listing jest kompletny (bez
+   *   uciecia): wtedy serwer raportuje pelna prawde (np. przeczytany
+   *   list znika z 'nieprzeczytane'). Przy ucietych listingach brak
+   *   wpisu moze byc wypchnieciem poza pierwsza strone - nic nie
+   *   usuwamy.
+   *
+   * Zwraca null, gdy brak widoku lub widok pusty - caller powinien
+   * zrobic applyMailbox. Zwraca liczby {updated, added, removed}.
+   */
+  syncMailboxPage(
+    box: MailBox,
+    entries: MailboxEntry[],
+    truncated: boolean,
+  ): { updated: number; added: number; removed: number } | null {
+    const view = this.current.boxes[box];
+    if (!view || view.empty !== null) return null;
+    const key = (e: MailboxEntry): string =>
+      [e.party, e.subject, e.forwarded ? 'f' : '', e.date?.raw ?? ''].join('|');
+    const pos = new Map(view.entries.map((e, i) => [key(e), i] as const));
+    let next = [...view.entries];
+    let updated = 0;
+    let added = 0;
+    for (const e of entries) {
+      const i = pos.get(key(e));
+      if (i === undefined) {
+        pos.set(key(e), next.length);
+        next.push(e);
+        added += 1;
+      } else {
+        next[i] = e;
+        updated += 1;
+      }
+    }
+    let removed = 0;
+    if (!truncated) {
+      const freshKeys = new Set(entries.map(key));
+      const kept = next.filter((e) => freshKeys.has(key(e)));
+      removed = next.length - kept.length;
+      next = kept;
+    }
+    const nextView: BoxView = {
+      entries: next,
+      truncated: view.truncated && truncated,
+      empty: null,
+    };
+    const boxes = { ...this.current.boxes, [box]: nextView };
+    this.update({ boxes, badge: computeBadge(boxes) });
+    return { updated, added, removed };
+  }
+
   setBusy(label: string | null): void {
     this.update({ busy: label });
   }
