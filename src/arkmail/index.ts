@@ -21,7 +21,7 @@ import {
   PLUGIN_DESCRIPTION,
 } from "./meta";
 import type { MailBox } from "./core/protocol/types";
-import { parseNotification, extractPagerPrompt } from "./core/protocol/parser";
+import { parseNotification, extractPagerPrompt, parseMailDate } from "./core/protocol/parser";
 import { isEchoLine } from "./core/session/lines";
 import {
   olderListingCommand,
@@ -625,6 +625,54 @@ export async function init(api: PluginApi) {
     ui.setAnimalFlying(true);
   };
 
+  /**
+   * Odczyt listu przez re-kotwice (Fala 9a) z druga szansa po zniknieciu
+   * listingu (Fala 16c). Wspolna sciezka dla kliku w liste skrzynki
+   * i w wpis archiwum bez tresci (Fala 16h). WYMAGA locka (caller).
+   */
+  const openWithResolve = async (box: MailBox, entry: MailboxEntry): Promise<void> => {
+    // Fala 16c: blad "listing serwera zniknal" (re-login, cudzy
+    // listing gracza miedzy operacjami - log 2026-10-19 17:13:14)
+    // dostaje JEDNA druga szanse: wymuszamy re-kotwice (bumpCtx
+    // uniewaznia dopasowanie kontekstu) i ponawiamy odczyt.
+    // Powtorka bledu = toast, bez trzeciej proby.
+    for (let attempt = 0; attempt < 2; attempt++) {
+      // Re-kotwiczenie (Fala 9a): numer serwera dopiero ze swiezego
+      // kontekstu; brak wpisu = zadna komenda nie wylatuje.
+      const fresh = await resolveEntry(box, entry);
+      if (!fresh) return;
+      transport!.beginModal();
+      try {
+        const res = await pager.readLetter(fresh.number);
+        ui.openLetter(box, res.letter, fresh);
+        // Cache (Fala 8f): tresc listu do archiwum. Swiezy wpis
+        // daje zgodnosc id (flaga forwarded) z rekordem z listingu.
+        const merged = upsertLetters(ui.state.archive, [
+          fromOpenedLetter(box, res.letter, fresh),
+        ]);
+        ui.setArchive(merged.letters);
+        persistArchive();
+        // Fala 11f: po odczycie swiezy listing skrzynki - znacznik
+        // przeczytania i badge to prawda serwerowa (plugin niczego
+        // nie zaznacza lokalnie). W trybie wynikow szukania pomijamy:
+        // refresh czysci selekcje i wywalilby gracza z wynikow.
+        if (ui.state.search?.box !== box) refreshBoxes([box]);
+        return;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const listingGone =
+          /nie zostaly wybrane|Zly numer listu/.test(msg);
+        if (attempt === 0 && listingGone) {
+          bumpCtx(box); // wymuszenie re-kotwicy w drugiej probie
+          continue;
+        }
+        throw err;
+      } finally {
+        transport!.endModal();
+      }
+    }
+  };
+
   handlersRef = {
     onSendAnimal: () => {
       // Jak przy innych operacjach (Fala 12a): zero cichego kolejkowania.
@@ -650,48 +698,47 @@ export async function init(api: PluginApi) {
       }
       ui.setBusy(`Czytam list: ${entry.subject}...`);
       void lock
-        .runExclusive(async () => {
-          // Fala 16c: blad "listing serwera zniknal" (re-login, cudzy
-          // listing gracza miedzy operacjami - log 2026-10-19 17:13:14)
-          // dostaje JEDNA druga szanse: wymuszamy re-kotwice (bumpCtx
-          // uniewaznia dopasowanie kontekstu) i ponawiamy odczyt.
-          // Powtorka bledu = toast, bez trzeciej proby.
-          for (let attempt = 0; attempt < 2; attempt++) {
-            // Re-kotwiczenie (Fala 9a): numer serwera dopiero ze swiezego
-            // kontekstu; brak wpisu = zadna komenda nie wylatuje.
-            const fresh = await resolveEntry(box, entry);
-            if (!fresh) return;
-            transport!.beginModal();
-            try {
-              const res = await pager.readLetter(fresh.number);
-              ui.openLetter(box, res.letter, fresh);
-              // Cache (Fala 8f): tresc listu do archiwum. Swiezy wpis
-              // daje zgodnosc id (flaga forwarded) z rekordem z listingu.
-              const merged = upsertLetters(ui.state.archive, [
-                fromOpenedLetter(box, res.letter, fresh),
-              ]);
-              ui.setArchive(merged.letters);
-              persistArchive();
-              // Fala 11f: po odczycie swiezy listing skrzynki - znacznik
-              // przeczytania i badge to prawda serwerowa (plugin niczego
-              // nie zaznacza lokalnie). W trybie wynikow szukania pomijamy:
-              // refresh czysci selekcje i wywalilby gracza z wynikow.
-              if (ui.state.search?.box !== box) refreshBoxes([box]);
-              return;
-            } catch (err) {
-              const msg = err instanceof Error ? err.message : String(err);
-              const listingGone =
-                /nie zostaly wybrane|Zly numer listu/.test(msg);
-              if (attempt === 0 && listingGone) {
-                bumpCtx(box); // wymuszenie re-kotwicy w drugiej probie
-                continue;
-              }
-              throw err;
-            } finally {
-              transport!.endModal();
-            }
-          }
-        })
+        .runExclusive(() => openWithResolve(box, entry))
+        .catch(() => notify(api, "Nie udalo sie odczytac listu."))
+        .finally(() => ui.setBusy(null));
+    },
+    onOpenArchiveLetter: (letter) => {
+      // Fala 16h: klikalne archiwum (zgloszenie pkt 9). Wpis z trescia
+      // w cache otwiera sie z pamieci - ZERO komend do serwera.
+      if (letter.body.length > 0) {
+        const senderBox = letter.box === "odebrane" || letter.box === "nieprzeczytane";
+        ui.openLetter(letter.box, {
+          number: letter.number,
+          from: senderBox ? letter.party : "",
+          subject: letter.subject,
+          to: senderBox ? "" : letter.party,
+          cc: null,
+          date: letter.dateRaw,
+          body: letter.body,
+        });
+        return;
+      }
+      // Bez tresci: pseudo-wpis (ctx undefined -> zawsze re-kotwica po
+      // dacie) i ta sama sciezka odczytu co klik w liste skrzynki.
+      if (lock.locked) {
+        notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+        return;
+      }
+      ui.setBusy(`Czytam list: ${letter.subject}...`);
+      const pseudo: MailboxEntry = {
+        number: letter.number,
+        isRead: letter.read,
+        subject: letter.subject,
+        forwarded: letter.forwarded === true,
+        party: letter.party,
+        partyKind:
+          letter.box === "odebrane" || letter.box === "nieprzeczytane"
+            ? "nadawca"
+            : "odbiorcy",
+        date: letter.dateRaw ? parseMailDate(letter.dateRaw) : null,
+      };
+      void lock
+        .runExclusive(() => openWithResolve(letter.box, pseudo))
         .catch(() => notify(api, "Nie udalo sie odczytac listu."))
         .finally(() => ui.setBusy(null));
     },

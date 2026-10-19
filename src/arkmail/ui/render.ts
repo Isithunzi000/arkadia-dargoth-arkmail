@@ -10,7 +10,7 @@
 import type { MailBox } from '../core/protocol/types.js';
 import type { MailboxEntry } from '../core/session/mailbox.js';
 import { fromISODate, type ListingSearch } from '../core/protocol/commands.js';
-import { filterLetters, type ArchiveFilter } from '../core/archive.js';
+import { filterLetters, type ArchiveFilter, type ArchiveLetter } from '../core/archive.js';
 import { viewContacts, type ContactSort } from '../core/contacts.js';
 import {
   clampLineWidth,
@@ -41,6 +41,13 @@ export interface MailUiHandlers {
   onClearSearch(box: MailBox): void;
   onDeleteLetter(box: MailBox, entry: MailboxEntry): void;
   onForwardLetter(box: MailBox, entry: MailboxEntry, adresat: string): void;
+  /**
+   * Klik w wpis archiwum (Fala 16h): wpis z trescia w cache otwiera
+   * sie z pamieci (zero komend); bez tresci - re-kotwica po dacie
+   * i odczyt z serwera (index.ts buduje pseudo-wpis). Opcjonalny:
+   * starsze montaze testowe go nie podaja (jak onClearCache).
+   */
+  onOpenArchiveLetter?(letter: ArchiveLetter): void;
   /**
    * Czyszczenie pamieci podrecznej (Fala 12e). Opcjonalny: starsze
    * montaze testowe go nie podaja - przycisk wtedy po prostu nic nie
@@ -1141,6 +1148,9 @@ export function mountMailUi(
           const dir = l.box === 'odebrane' || l.box === 'nieprzeczytane' ? 'od' : 'do';
           meta.textContent = `${dir} ${l.party} | ${l.box}`;
           row.appendChild(meta);
+          // Fala 16h: archiwum klikalne (zgloszenie pkt 9) - tresc
+          // z cache albo doczyt z serwera po re-kotwicy (index.ts).
+          row.addEventListener('click', () => handlers.onOpenArchiveLetter?.(l));
           return row;
         }),
       );
