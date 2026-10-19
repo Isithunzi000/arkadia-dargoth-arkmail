@@ -22,6 +22,8 @@ export class FakeApi {
   footerUpdates: Array<{ label?: string }> = [];
   /** Historia podswietlen stopki (setFooterButtonState). */
   footerStates: Array<{ state: string; highlighted: boolean }> = [];
+  /** Linie stlumione przez trigger pluginu (zwrot null = gag, Fala 16j). */
+  gagged: string[] = [];
 
   readonly api = {
     command: {
@@ -94,7 +96,8 @@ export class FakeApi {
   } as unknown as PluginApi;
 
   fire(text: string, cls = ''): void {
-    this.triggerCb?.({ text }, null, cls);
+    const ret = this.triggerCb?.({ text }, null, cls);
+    if (ret === null) this.gagged.push(text); // Fala 16j: null = gag linii
   }
 
   /** Wystrzelenie zdarzenia klienta do nasluchow pluginu (np. gmcp.mail.state). */

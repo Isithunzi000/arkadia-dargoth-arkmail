@@ -161,6 +161,11 @@ export async function init(api: PluginApi) {
   const storage = new CharStorage(kv);
   transport = new DargothTransport(api);
   const lock = new SessionLock();
+  // Fala 16j: linie pocztowe (cls 'mail') przychodzace pod blokada sesji
+  // to odpowiedzi na komendy pluginu - tlumione w glownym oknie gry.
+  // Reczne "listy" gracza i powiadomienia POCZTA przychodza poza
+  // blokada i zostaja widoczne.
+  transport.setGagPredicate(() => lock.locked);
   const composePrefs = storage.getJSON<{ template?: LetterTemplate; width?: number }>(COMPOSE_KEY);
   store = new MailUiStore({
     notifyEnabled: storage.getJSON<boolean>(NOTIFY_KEY) ?? false,

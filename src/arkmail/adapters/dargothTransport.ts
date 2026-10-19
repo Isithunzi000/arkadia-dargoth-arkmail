@@ -26,8 +26,20 @@ export class DargothTransport implements Transport {
   private hookId: string | null = null;
   private queue: string[] = [];
   private bypass = new Set<string>();
+  /** Fala 16j: kiedy tlumic linie pocztowe (index.ts: blokada sesji). */
+  private gagWhen: (() => boolean) | null = null;
 
   constructor(private readonly api: PluginApi) {}
+
+  /**
+   * Fala 16j: predykat gagowania linii pocztowych (cls 'mail'). Linie
+   * przychodzace podczas operacji pluginowej (listingi, tresci listow)
+   * nie smieca glownego okna gry; poza operacja wszystko przechodzi
+   * bez zmian (reczne "listy" gracza, powiadomienie POCZTA).
+   */
+  setGagPredicate(pred: () => boolean): void {
+    this.gagWhen = pred;
+  }
 
   send(line: string): void {
     if (this.modalActive) this.bypass.add(line);
@@ -94,6 +106,10 @@ export class DargothTransport implements Transport {
       (line: AnsiAwareBuffer, _matches: RegExpMatchArray, type: string, originalLine?: string) => {
         const proto: ProtoLine = { text: originalLine ?? line.text, cls: type ?? '' };
         for (const cb of [...this.subscribers]) cb(proto);
+        // Fala 16j: subskrybenci (parser) dostaja linie ZAWSZE; zwrot
+        // null tlumi tylko wyswietlanie w glownym oknie gry, i to
+        // wylacznie podczas operacji pluginowej (blokada sesji).
+        if (type === 'mail' && this.gagWhen?.()) return null;
         return line;
       },
       'arkmail',
