@@ -46,6 +46,12 @@ export interface MailUiHandlers {
    * robi po potwierdzeniu.
    */
   onClearCache?(): void;
+  /**
+   * Wyslanie zwierzecia pocztowego (Fala 13b): komenda "wyslij zwierze"
+   * - zwierze samo wysyla niewyslane i odbiera nowa poczte. Opcjonalny
+   *  jak onClearCache.
+   */
+  onSendAnimal?(): void;
 }
 
 const TEMPLATES: Array<[LetterTemplate, string]> = [
@@ -300,6 +306,15 @@ export function mountMailUi(
     refreshAll.textContent = 'Odswiez';
     refreshAll.addEventListener('click', () => handlers.onRefreshBox(state.activeBox));
     ops.appendChild(refreshAll);
+    // Fala 13b: wyslanie zwierzecia pocztowego (send/receive w jednym) -
+    // komenda "wyslij zwierze". Nieaktywny w trakcie lotu (roundtrip
+    // 20-50 s wg logow); koniec lotu: linia ladowania albo timeout.
+    const animalBtn = doc.createElement('button');
+    animalBtn.className = 'arkmail-animal-send';
+    animalBtn.textContent = state.animalFlying ? 'Zwierze w drodze...' : 'Wyslij Zwierze';
+    if (state.animalFlying) animalBtn.setAttribute('disabled', '');
+    animalBtn.addEventListener('click', () => handlers.onSendAnimal?.());
+    ops.appendChild(animalBtn);
     const view0 = state.boxes[state.activeBox];
     const searchMode0 = state.search && state.search.box === state.activeBox ? state.search : null;
     const loopHere = state.loadAll !== null && state.loadAll.box === state.activeBox;

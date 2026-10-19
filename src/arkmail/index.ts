@@ -60,6 +60,15 @@ export const LOAD_ALL_MAX_PAGES = 40;
 export const WIDE_MIN_WIDTH = 900;
 export const LOAD_ALL_PACE_MS = 400;
 /**
+ * Timingu lotu zwierzecia pocztowego (Fala 13b). Obiekt (nie const
+ * skalarne), zeby testy mogly podmienic wartosci przed init -
+ * eksport ESM jest read-only z zewnatrz, wlasciwosci obiektu nie.
+ * flightTimeoutMs: bezpiecznik konca lotu (roundtrip wg logow 20-50 s,
+ * wiec 60 s z zapasem); sluchamWindowMs: okno na "Slucham?" po naszym
+ * wyslaniu (Fala 13d).
+ */
+export const ANIMAL_TIMING = { flightTimeoutMs: 60000, sluchamWindowMs: 2000 };
+/**
  * Kontekst listingu serwera (Fala 9a): kazde pobranie listingu
  * (lista niepusta) dostaje kolejny numer. Serwer interpretuje
  * "przeczytaj list N" wzgledem OSTATNIEGO listingu, wiec numer wpisu
@@ -90,6 +99,8 @@ let store: MailUiStore | null = null;
 let unmount: (() => void) | null = null;
 let unsubBadge: (() => void) | null = null;
 let wideObserver: ResizeObserver | null = null;
+/** Timer bezpiecznika lotu zwierzecia (Fala 13b) - czyszczony w destroy. */
+let animalTimer: ReturnType<typeof setTimeout> | null = null;
 
 function createContent(): HTMLDivElement {
   const root = document.createElement("div");
@@ -481,7 +492,46 @@ export async function init(api: PluginApi) {
       .finally(() => ui.setBusy(null));
   };
 
+  /**
+   * Maszyna lotu zwierzecia pocztowego (Fala 13b). Lot = blokada przycisku
+   * do ladowania albo timeoutu. Start: klik (onSendAnimal) albo linia
+   * 'wysylasz' z gry (gracz wpisal komende recznie). Koniec: linia
+   * 'powrot-zwierzecia' albo ANIMAL_TIMING.flightTimeoutMs (bezpiecznik;
+   * serwerowy cooldown przy spamie nie jest znany - brak dowodu w logach).
+   */
+  let animalFlight = false;
+  const endAnimalFlight = (): void => {
+    animalFlight = false;
+    if (animalTimer !== null) {
+      clearTimeout(animalTimer);
+      animalTimer = null;
+    }
+    ui.setAnimalFlying(false);
+  };
+  const startAnimalFlight = (): void => {
+    animalFlight = true;
+    if (animalTimer !== null) clearTimeout(animalTimer);
+    animalTimer = setTimeout(() => {
+      animalTimer = null;
+      if (animalFlight) endAnimalFlight();
+    }, ANIMAL_TIMING.flightTimeoutMs);
+    ui.setAnimalFlying(true);
+  };
+
   handlersRef = {
+    onSendAnimal: () => {
+      // Jak przy innych operacjach (Fala 12a): zero cichego kolejkowania.
+      if (lock.locked) {
+        notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+        return;
+      }
+      if (animalFlight) {
+        notify(api, "Zwierze jest juz w drodze - poczekaj na jego powrot.");
+        return;
+      }
+      startAnimalFlight();
+      transport!.send("wyslij zwierze");
+    },
     onOpenLetter: (box, entry) => {
       // Fala 12a: sesje modalne NIE kolejkuja klikow - w trakcie wiszacej
       // operacji kolejna komenda odczytu wpadalaby w sierocy pager
@@ -690,6 +740,15 @@ export async function init(api: PluginApi) {
       scheduleRefresh(["odebrane", "nieprzeczytane"]);
     } else if (n.kind === "goniec") {
       scheduleRefresh(["odebrane", "nieprzeczytane"]);
+    } else if (n.kind === "wysylasz") {
+      // Fala 13b: gracz wyslal zwierze recznie (komenda w gre) -
+      // uzbrajamy lot, zeby przycisk nie zrobil duplikatu w locie.
+      if (!animalFlight) startAnimalFlight();
+    } else if (n.kind === "powrot-zwierzecia") {
+      // Fala 13b: powrot zwierzecia konczy lot; serwer przy ladowaniu
+      // sam sprawdza nieprzeczytane, wiec inbox mogl sie zmienic.
+      endAnimalFlight();
+      scheduleRefresh(["odebrane", "nieprzeczytane"]);
     }
   });
 
@@ -738,6 +797,10 @@ export async function init(api: PluginApi) {
 }
 
 export async function destroy() {
+  if (animalTimer !== null) {
+    clearTimeout(animalTimer);
+    animalTimer = null;
+  }
   if (unsubBadge) {
     unsubBadge();
     unsubBadge = null;

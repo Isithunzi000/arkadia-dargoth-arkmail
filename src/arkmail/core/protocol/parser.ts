@@ -185,6 +185,11 @@ export function parseNotification(text: string): MailNotification | null {
   if (t === 'Goniec przyniosl nowa partie listow.') return { kind: 'goniec' };
   const wysylasz = t.match(/^Wysylasz ([A-Za-z]+) na poczte\.$/);
   if (wysylasz) return { kind: 'wysylasz', zwierze: wysylasz[1] };
+  // Powrot zwierzecia pocztowego (Fala 13b). Dwa warianty zaobserwowane
+  // w logach: "...laduje na twoim prawym ramieniu." i "...laduje na
+  // twojej rece." - imie zwierzecia jest zmienne per postac.
+  const powrot = t.match(/^Wsrod trzepotu skrzydel ([A-Za-z]+) laduje na (?:twoim|twojej) \w+(?: \w+)?\.$/);
+  if (powrot) return { kind: 'powrot-zwierzecia', zwierze: powrot[1] };
   return null;
 }
 

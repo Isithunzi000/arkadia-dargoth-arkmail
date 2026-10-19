@@ -66,7 +66,8 @@ export interface MailAliasDef {
 export type MailNotification =
   | { kind: 'nowa-poczte'; nadawca: string }
   | { kind: 'goniec' }
-  | { kind: 'wysylasz'; zwierze: string };
+  | { kind: 'wysylasz'; zwierze: string }
+  | { kind: 'powrot-zwierzecia'; zwierze: string };
 
 export type MailError =
   | { kind: 'zly-numer'; numer: number }

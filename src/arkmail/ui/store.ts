@@ -49,6 +49,8 @@ export interface MailUiState {
   contacts: Contact[];
   archive: ArchiveLetter[];
   notifyEnabled: boolean;
+  /** Lot zwierzecia pocztowego w toku (Fala 13b): przycisk nieaktywny. */
+  animalFlying: boolean;
   /** Preferencje compose: szablon ramki i szerokosc linii (20..120). */
   composeTemplate: LetterTemplate;
   composeWidth: number;
@@ -67,6 +69,7 @@ const DEFAULT_STATE: MailUiState = {
   contacts: [],
   archive: [],
   notifyEnabled: false,
+  animalFlying: false,
   composeTemplate: 'plain',
   composeWidth: 60,
 };
@@ -295,6 +298,10 @@ export class MailUiStore {
 
   setNotifyEnabled(notifyEnabled: boolean): void {
     this.update({ notifyEnabled });
+  }
+
+  setAnimalFlying(animalFlying: boolean): void {
+    this.update({ animalFlying });
   }
 
   setCompose(prefs: { template?: LetterTemplate; width?: number }): void {
