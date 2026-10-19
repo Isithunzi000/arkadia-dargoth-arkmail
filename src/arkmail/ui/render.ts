@@ -296,7 +296,11 @@ export function mountMailUi(
         'arkmail-box' +
         (state.activeBox === box ? ' arkmail-box-active' : '') +
         // Fala 14b: flash celu kolejki niewyslanych (jak zakladka Listy).
-        (state.unsentFlash && box === 'niewyslane' ? ' arkmail-flash' : '');
+        (state.unsentFlash && box === 'niewyslane' ? ' arkmail-flash' : '') +
+        // Fala 16f: trwala obwodka akcentu, gdy licznik skrzynki > 0
+        // (zgloszenie pkt 5/8: "zaznaczone, ze cos jest w niewyslanych").
+        (state.badge > 0 && box === 'nieprzeczytane' ? ' arkmail-box-attention' : '') +
+        (state.badgeUnsent > 0 && box === 'niewyslane' ? ' arkmail-box-attention' : '');
       btn.setAttribute('data-box', box);
       btn.textContent = label;
       btn.addEventListener('click', () => {

@@ -137,6 +137,12 @@ export const STYLES = `
   font-weight: 600;
 }
 .arkmail-root .arkmail-box-active:hover { background: ${ACCENT}; color: ${ACCENT_FG}; }
+/* Fala 16f: trwaly akcent (obwodka) na skrzynce z licznikiem > 0 -
+   Nieprzeczytane/Niewyslane widac z daleka (zgloszenie pkt 5/8). */
+.arkmail-root .arkmail-box-attention {
+  border-color: ${ACCENT};
+  color: ${FG};
+}
 
 /* Fala 11e: zbiorcze operacje na aktywnej skrzynce (zamiast ↻ per box). */
 .arkmail-box-ops { display: flex; gap: 6px; margin-bottom: 8px; }
@@ -172,6 +178,10 @@ export const STYLES = `
   color: ${FG_DIM};
 }
 .arkmail-entry-date { color: ${FG_DIM}; font-size: 11px; white-space: nowrap; }
+/* Fala 16f: nieprzeczytany wiersz dodatkowo JAŚNIEJSZY (pkt 8: kropka +
+   pogrubienie + rozjasnienie; po odczyciu listing daje *R* i wiersz
+   wraca do normalnego). */
+.arkmail-unread { background: ${BG_PANEL}; }
 .arkmail-unread .arkmail-entry-party, .arkmail-unread .arkmail-entry-subject {
   color: ${FG};
   font-weight: 700;
