@@ -51,6 +51,13 @@ export interface MailUiState {
   notifyEnabled: boolean;
   /** Lot zwierzecia pocztowego w toku (Fala 13b): przycisk nieaktywny. */
   animalFlying: boolean;
+  /**
+   * Flash "list odlozony w niewyslanych" (Fala 14b): zakladka Listy
+   * i skrzynka Niewyslane migaja ~3 s po compose/Przekaz. Compose poza
+   * poczta ZAWSZE kolejkuje ("List jest gotowy do wyslania."), wiec
+   * gracz musi widziec, gdzie list wyladowal.
+   */
+  unsentFlash: boolean;
   /** Preferencje compose: szablon ramki i szerokosc linii (20..120). */
   composeTemplate: LetterTemplate;
   composeWidth: number;
@@ -70,6 +77,7 @@ const DEFAULT_STATE: MailUiState = {
   archive: [],
   notifyEnabled: false,
   animalFlying: false,
+  unsentFlash: false,
   composeTemplate: 'plain',
   composeWidth: 60,
 };
@@ -285,7 +293,7 @@ export class MailUiStore {
     for (const b of Object.keys(this.stashedViews)) {
       delete this.stashedViews[b as MailBox];
     }
-    this.update({ boxes: {}, archive: [], contacts: [], badge: 0, search: null });
+    this.update({ boxes: {}, archive: [], contacts: [], badge: 0, search: null, unsentFlash: false });
   }
 
   setContacts(contacts: Contact[]): void {
@@ -302,6 +310,10 @@ export class MailUiStore {
 
   setAnimalFlying(animalFlying: boolean): void {
     this.update({ animalFlying });
+  }
+
+  setUnsentFlash(unsentFlash: boolean): void {
+    this.update({ unsentFlash });
   }
 
   setCompose(prefs: { template?: LetterTemplate; width?: number }): void {

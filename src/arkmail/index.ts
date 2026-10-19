@@ -103,6 +103,8 @@ let wideObserver: ResizeObserver | null = null;
 let animalTimer: ReturnType<typeof setTimeout> | null = null;
 /** Timer okna "Slucham?" po naszym wyslaniu (Fala 13d) - czyszczony w destroy. */
 let sluchamTimer: ReturnType<typeof setTimeout> | null = null;
+/** Timer pulsowania Listy/Niewyslane po odlozeniu listu (Fala 14b) - czyszczony w destroy. */
+let unsentFlashTimer: ReturnType<typeof setTimeout> | null = null;
 
 function createContent(): HTMLDivElement {
   const root = document.createElement("div");
@@ -174,6 +176,21 @@ export async function init(api: PluginApi) {
    */
   const rebuildContacts = (): void => {
     ui.setContacts(contactsFromArchive(ui.state.archive));
+  };
+
+  /**
+   * Fala 14b: po odlozeniu listu w niewyslanych (compose poza poczta lub
+   * przekazanie) pulsuja zakladka Listy i skrzynka Niewyslane (~3 s), zeby
+   * uzytkownik widzial, GDZIE list trafil. Ponowne odlozenie przedluza
+   * pulsowanie (restart timera).
+   */
+  const flashUnsent = (): void => {
+    ui.setUnsentFlash(true);
+    if (unsentFlashTimer !== null) clearTimeout(unsentFlashTimer);
+    unsentFlashTimer = setTimeout(() => {
+      unsentFlashTimer = null;
+      ui.setUnsentFlash(false);
+    }, 3000);
   };
 
   /**
@@ -627,6 +644,7 @@ export async function init(api: PluginApi) {
             } else if (out.result === "gotowy") {
               notify(api, "List odlozony w niewyslanych.");
               refreshBoxes(["niewyslane"]);
+              flashUnsent();
             } else {
               notify(api, "Blad wysylki - sprawdz adresata.");
             }
@@ -729,6 +747,7 @@ export async function init(api: PluginApi) {
             if (res.queued) {
               notify(api, "List przekazany - czeka w niewyslanych.");
               refreshBoxes(["niewyslane"]);
+              flashUnsent();
             } else {
               notify(api, "Blad przekazania - sprawdz adresata.");
             }
@@ -851,6 +870,10 @@ export async function destroy() {
   if (sluchamTimer !== null) {
     clearTimeout(sluchamTimer);
     sluchamTimer = null;
+  }
+  if (unsentFlashTimer !== null) {
+    clearTimeout(unsentFlashTimer);
+    unsentFlashTimer = null;
   }
   if (unsubBadge) {
     unsubBadge();

@@ -372,4 +372,14 @@ export const STYLES = `
   right: 10px;
   padding: 2px 10px;
 }
+
+/* Fala 14b: pulsowanie Listy/Niewyslane po odlozeniu listu w kolejce.
+   Kontrakt uiStyles: jawne hex (bez transparent/inherit). */
+@keyframes arkmailFlash {
+  0%, 100% { background: ${BG_RAISED}; color: ${FG}; }
+  50% { background: ${ACCENT}; color: ${ACCENT_FG}; }
+}
+.arkmail-root .arkmail-flash {
+  animation: arkmailFlash 0.6s ease-in-out 5;
+}
 `;

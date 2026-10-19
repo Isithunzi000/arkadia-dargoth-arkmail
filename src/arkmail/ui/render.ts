@@ -244,7 +244,12 @@ export function mountMailUi(
     bar.className = 'arkmail-tabs';
     for (const [id, label] of TABS) {
       const btn = doc.createElement('button');
-      btn.className = 'arkmail-tab' + (state.tab === id ? ' arkmail-tab-active' : '');
+      btn.className =
+        'arkmail-tab' +
+        (state.tab === id ? ' arkmail-tab-active' : '') +
+        // Fala 14b: flash po odlozeniu listu w niewyslanych (compose
+        // poza poczta zawsze kolejkuje) - gracz widzi, gdzie kliknac.
+        (state.unsentFlash && id === 'listy' ? ' arkmail-flash' : '');
       btn.setAttribute('data-tab', id);
       btn.textContent = id === 'listy' && state.badge > 0 ? `${label} (${state.badge})` : label;
       btn.addEventListener('click', () => store.setTab(id));
@@ -284,7 +289,11 @@ export function mountMailUi(
     boxes.className = 'arkmail-boxes';
     for (const [box, label] of BOXES) {
       const btn = doc.createElement('button');
-      btn.className = 'arkmail-box' + (state.activeBox === box ? ' arkmail-box-active' : '');
+      btn.className =
+        'arkmail-box' +
+        (state.activeBox === box ? ' arkmail-box-active' : '') +
+        // Fala 14b: flash celu kolejki niewyslanych (jak zakladka Listy).
+        (state.unsentFlash && box === 'niewyslane' ? ' arkmail-flash' : '');
       btn.setAttribute('data-box', box);
       btn.textContent = label;
       btn.addEventListener('click', () => {
@@ -754,7 +763,10 @@ export function mountMailUi(
 
     const send = doc.createElement('button');
     send.className = 'arkmail-send';
-    send.textContent = 'Wyslij';
+    // Fala 14b: poza poczta compose ZAWSZE laduje w kolejce niewyslanych
+    // ("List jest gotowy do wyslania.") - przycisk "Wyslij" mylil gracza
+    // (zgloszenie 2026-10-19). Etykieta mowi, co naprawde sie stanie.
+    send.textContent = 'Zapisz w kolejce do wyslania';
     send.addEventListener('click', () => {
       const st = store.state;
       const rendered = renderLetter(tresc.value, st.composeTemplate, st.composeWidth);
@@ -769,6 +781,44 @@ export function mountMailUi(
       });
     });
     pane.appendChild(send);
+
+    // Fala 14b: czyszczenie pol compose z dwuklikowym potwierdzeniem
+    // (uzbrojenie wygasa po 3 s; wzorzec "Wyczysc pamiec podreczna").
+    // Czysci pola LISTU (adresat/temat/dw/tresc) - szablon i szerokosc
+    // to ustawienia, zostaja. Stan uzbrojenia lokalny - kazdy rerender
+    // wraca do stanu poczatkowego.
+    const clearCompose = doc.createElement('button');
+    clearCompose.className = 'arkmail-compose-clear';
+    clearCompose.textContent = 'Wyczysc';
+    let clearArmed = false;
+    let clearTimer: ReturnType<typeof setTimeout> | null = null;
+    clearCompose.addEventListener('click', () => {
+      if (!clearArmed) {
+        clearArmed = true;
+        clearCompose.textContent = 'Na pewno? Kliknij ponownie';
+        clearTimer = setTimeout(() => {
+          clearArmed = false;
+          clearCompose.textContent = 'Wyczysc';
+        }, 3000);
+        return;
+      }
+      if (clearTimer) clearTimeout(clearTimer);
+      clearArmed = false;
+      clearCompose.textContent = 'Wyczysc';
+      composeDraft.adresat = '';
+      composeDraft.temat = '';
+      composeDraft.dw = '';
+      composeDraft.tresc = '';
+      for (const f of ['adresat', 'temat', 'dw', 'tresc']) {
+        const el = pane.querySelector(`[data-field="${f}"]`) as
+          | HTMLInputElement
+          | HTMLTextAreaElement
+          | null;
+        if (el) el.value = '';
+      }
+      repaintCompose(); // podglad tez sie czysci
+    });
+    pane.appendChild(clearCompose);
     return pane;
   };
 
