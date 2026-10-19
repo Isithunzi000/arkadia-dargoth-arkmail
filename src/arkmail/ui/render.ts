@@ -447,7 +447,13 @@ export function mountMailUi(
       const clear = doc.createElement('button');
       clear.className = 'arkmail-search-clear';
       clear.textContent = 'Wyczysc';
-      clear.addEventListener('click', () => handlers.onClearSearch(state.activeBox));
+      clear.addEventListener('click', () => {
+        // Fala 16g: Wyczysc kasuje tez pola szukajki (zgloszenie pkt 11)
+        // - wyniki znikaly, ale frazy zostawaly w polach i mylily.
+        for (const key of ['osoba', 'temat', 'odDaty', 'doDaty']) searchDraft[key] = '';
+        for (const el of [sOsoba, sTemat, sOd, sDo]) (el as HTMLInputElement).value = '';
+        handlers.onClearSearch(state.activeBox);
+      });
       banner.appendChild(clear);
       pane.appendChild(banner);
     }
@@ -1098,6 +1104,22 @@ export function mountMailUi(
     controls.appendChild(mkText('tresc', 'Tresc listu'));
     controls.appendChild(mkText('odDaty', 'Od daty', 'date'));
     controls.appendChild(mkText('doDaty', 'Do daty', 'date'));
+    // Fala 16g: czyszczenie wszystkich filtrow archiwum jednym klikiem
+    // (zgloszenie pkt 11). Niedestrukcyjne (dane zostaja) - bez dwukliku.
+    const clearFilters = doc.createElement('button');
+    clearFilters.className = 'arkmail-arch-clear';
+    clearFilters.textContent = 'Wyczysc filtry';
+    clearFilters.addEventListener('click', () => {
+      for (const key of ['osoba', 'temat', 'tresc', 'odDaty', 'doDaty'] as const) {
+        archFilter[key] = undefined;
+      }
+      archFilter.skrzynka = undefined;
+      controls.querySelectorAll('[data-filter]').forEach((el) => {
+        (el as HTMLInputElement | HTMLSelectElement).value = '';
+      });
+      repaint();
+    });
+    controls.appendChild(clearFilters);
     pane.appendChild(controls);
     const list = doc.createElement('div');
     pane.appendChild(list);
