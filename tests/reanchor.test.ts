@@ -93,8 +93,26 @@ test('re-kotwiczenie: wpis z biezacego kontekstu otwiera sie bez dodatkowego fet
   const { f, waitFor } = h;
   try {
     await loadTruncatedBox(h);
+    // Fala 14f: prolog konczy sie PUSTYM listingiem nieprzeczytanych, ktory
+    // nadpisuje kontekst serwera - zeby wpis odebranych byl biezacy,
+    // najpierw odswiezamy skrzynke odebranych (klik w jej przycisk).
+    click(h, '[data-box="odebrane"]');
+    await waitFor(
+      () => f.sent.filter((c) => c === 'listy odebrane').length === 2,
+      'refresh odebranych po prologu',
+    );
+    // Swiezy listing identyczny z prologiem: "najnowszy" ma numer 1.
+    f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
+    f.fire(' 3. *R* Temat: najstarszy', 'mail');
+    f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire(' 2. *R* Temat: srodkowy', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire(' 1. *R* Temat: najnowszy', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('> ', 'prompt');
+    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec refreshu');
     const sentBefore = f.sent.length;
-    click(h, '.arkmail-entry');
+    click(h, '.arkmail-entry'); // najnowszy - biezacy kontekst po refreshu
     await waitFor(() => f.sent.includes('przeczytaj list 1'), 'przeczytaj list 1');
     // Zero nowych listingow po kliku - tylko komenda czytania.
     assert.equal(
@@ -135,10 +153,16 @@ test('re-kotwiczenie: kasowanie po zmianie kontekstu uzywa swiezego numeru', asy
   const { f, waitFor } = h;
   try {
     await loadTruncatedBox(h);
-    // Otwieramy najnowszy list (kontekst biezacy).
+    // Fala 14f: prolog konczy sie pustym listingiem nieprzeczytanych,
+    // wiec otwarcie najnowszego listu idzie przez re-kotwice.
     click(h, '.arkmail-entry');
-    await waitFor(() => f.sent.includes('przeczytaj list 1'), 'przeczytaj list 1');
-    replayLetter(h, 1);
+    await waitFor(
+      () => f.sent.includes('listy odebrane przed 24 XII 2025'),
+      're-kotwica przed otwarciem',
+    );
+    replayFreshListing(h);
+    await waitFor(() => f.sent.includes('przeczytaj list 2'), 'przeczytaj list 2');
+    replayLetter(h, 2);
     await waitFor(() => !!h.content.querySelector('.arkmail-del'), 'widok listu z Usun');
 
     // Fala 11f: po odczycie plugin odswieza skrzynke - ten refresh
@@ -168,8 +192,8 @@ test('re-kotwiczenie: kasowanie po zmianie kontekstu uzywa swiezego numeru', asy
     click(h, '.arkmail-del');
     click(h, '.arkmail-del');
     await waitFor(
-      () => f.sent.includes('listy odebrane przed 24 XII 2025'),
-      're-kotwica przed kasowaniem',
+      () => f.sent.filter((c) => c === 'listy odebrane przed 24 XII 2025').length === 2,
+      're-kotwica przed kasowaniem (druga - pierwsza byla przy otwarciu)',
     );
     // Na tej stronie "najnowszy" ma numer 4.
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');

@@ -147,9 +147,16 @@ test('harness: Usun wymaga dwukliku; toast "List zostal usuniety."', async () =>
   const { f, waitFor } = h;
   try {
     await loadTruncatedBox(h);
+    // Fala 14f: prolog konczy sie pustym listingiem nieprzeczytanych -
+    // wpis ma stary kontekst, wiec otwarcie idzie przez re-kotwice.
     click(h, '.arkmail-entry');
-    await waitFor(() => f.sent.includes('przeczytaj list 1'), 'przeczytaj list 1');
-    replayLetter(h, 1);
+    await waitFor(
+      () => f.sent.includes('listy odebrane przed 24 XII 2025'),
+      're-kotwica przed otwarciem',
+    );
+    replayFreshListing(h);
+    await waitFor(() => f.sent.includes('przeczytaj list 2'), 'przeczytaj list 2');
+    replayLetter(h, 2);
     await waitFor(() => !!h.content.querySelector('.arkmail-del'), 'widok listu z Usun');
     // Fala 11f: refresh po odczycie nadpisuje kontekst listingu serwera.
     await waitFor(
@@ -169,13 +176,17 @@ test('harness: Usun wymaga dwukliku; toast "List zostal usuniety."', async () =>
     );
 
     // Drugi klik: kasowanie (wpis ma stary kontekst -> re-kotwica).
+    // Te same komende co przy otwarciu rozrozniamy po liczbie wystapien.
     click(h, '.arkmail-del');
     await waitFor(
-      () => f.sent.includes('listy odebrane przed 24 XII 2025'),
+      () => f.sent.filter((c) => c === 'listy odebrane przed 24 XII 2025').length === 2,
       're-kotwica przed kasowaniem',
     );
     replayFreshListing(h);
-    await waitFor(() => f.sent.includes('przeczytaj list 2'), 'przeczytaj ze swiezym numerem 2');
+    await waitFor(
+      () => f.sent.filter((c) => c === 'przeczytaj list 2').length === 2,
+      'przeczytaj ze swiezym numerem 2',
+    );
     replayLetter(h, 2);
     await waitFor(() => f.sent.includes('d 2'), 'zaznaczenie 2 do skasowania');
     f.fire('Zaznaczono do skasowania: 2.', 'mail');

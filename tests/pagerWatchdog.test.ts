@@ -46,7 +46,17 @@ test('straznik: prompt pagera pod blokada (legalny odczyt) bez dodatkowego q', a
   const { f, waitFor, content } = h;
   try {
     await loadTruncatedBox(h);
+    // Fala 14f: prolog konczy sie pustym listingiem nieprzeczytanych -
+    // wpis ma stary kontekst, wiec otwarcie idzie przez re-kotwice.
     click(h, '.arkmail-entry');
+    await waitFor(
+      () => f.sent.includes('listy odebrane przed 24 XII 2025'),
+      're-kotwica przed otwarciem',
+    );
+    f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
+    f.fire(' 1. *R* Temat: najnowszy', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('> ', 'prompt');
     await waitFor(() => f.sent.includes('przeczytaj list 1'), 'przeczytaj list 1');
     replayLetter(h, 1);
     await waitFor(() => !!content.querySelector('.arkmail-letter-body'), 'list otwarty');

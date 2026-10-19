@@ -43,8 +43,8 @@ async function loadBoxWithUnread(h: Harness): Promise<void> {
   f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
   f.fire('> ', 'prompt');
   await waitFor(() => f.sent.includes('listy nieprzeczytane'), 'komenda listy nieprzeczytane');
-  // Pusta odpowiedz: bez stampEntries kontekst listingu zostaje przy
-  // odebranych, wiec klik w wpis nie strzela re-kotwica (jak 9a).
+  // Fala 14f: PUSTA odpowiedz tez nadpisuje biezacy listing serwera -
+  // kontekst wpisow odebranych wygasa, klik w wpis robi re-kotwice.
   f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
   f.fire('> ', 'prompt');
   await waitFor(() => content.querySelectorAll('.arkmail-entry').length === 3, '3 wiersze');
@@ -63,7 +63,22 @@ test('odczyt listu odswieza skrzynke - znacznik R przychodzi z serwera', async (
     assert.ok(row()!.className.includes('arkmail-unread'), 'najnowszy nieprzeczytany');
     const listingsBefore = f.sent.filter((c) => c === 'listy odebrane').length;
 
-    click(h, '.arkmail-entry'); // najnowszy (numer 1, biezacy kontekst)
+    // Fala 14f: po pustym listingu nieprzeczytanych wpis ma stary
+    // kontekst - najpierw re-kotwica po dacie listu (dzien po).
+    click(h, '.arkmail-entry'); // najnowszy (numer 1, stary kontekst)
+    await waitFor(
+      () => f.sent.includes('listy odebrane przed 24 XII 2025'),
+      're-kotwica po pustym listingu nieprzeczytanych',
+    );
+    // Swiezy listing: "najnowszy" (wciaz nieprzeczytany) ma numer 1.
+    f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
+    f.fire(' 3. *R* Temat: najstarszy', 'mail');
+    f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire(' 2. *R* Temat: srodkowy', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire(' 1. Temat: najnowszy', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('> ', 'prompt');
     await waitFor(() => f.sent.includes('przeczytaj list 1'), 'przeczytaj list 1');
     replayLetter(h, 1);
     await waitFor(() => !!content.querySelector('.arkmail-letter-body'), 'list otwarty');

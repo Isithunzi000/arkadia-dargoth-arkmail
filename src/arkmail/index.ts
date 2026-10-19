@@ -37,7 +37,7 @@ import {
   upsertLetters,
   type ArchiveLetter,
 } from "./core/archive";
-import { MailboxSession, type MailboxEntry } from "./core/session/mailbox";
+import { MailboxSession, type ListingCtx, type MailboxEntry } from "./core/session/mailbox";
 import { PagerSession } from "./core/session/pager";
 import { EditorSession } from "./core/session/editor";
 import { SessionLock } from "./core/sessionLock";
@@ -69,12 +69,16 @@ export const LOAD_ALL_PACE_MS = 400;
  */
 export const ANIMAL_TIMING = { flightTimeoutMs: 60000, sluchamWindowMs: 2000 };
 /**
- * Kontekst listingu serwera (Fala 9a): kazde pobranie listingu
- * (lista niepusta) dostaje kolejny numer. Serwer interpretuje
- * "przeczytaj list N" wzgledem OSTATNIEGO listingu, wiec numer wpisu
- * jest wazny tylko w jego kontekscie.
+ * Kontekst listingu serwera (Fala 9a/14f): serwer ma JEDEN globalny
+ * "biezacy listing" i interpretuje "przeczytaj list N" / "d N"
+ * wzgledem niego. KAZDA komenda listujaca go nadpisuje - takze PUSTA
+ * ("Nie masz zadnych..."; dowod: log 2026-10-19 04:22 - po pustym
+ * listingu nieprzeczytanych "d N" dostalo "Zadne listy nie zostaly
+ * wybrane."). Znacznik rosnie przy kazdym listingu pluginu; wpis jest
+ * aktualny tylko, gdy jego ctx rowna sie biezacemu.
  */
-let listingCtx = 0;
+let listingCtxSeq = 0;
+let listingCtx: ListingCtx | null = null;
 const ARCHIVE_KEY = "archiwum";
 const NOTIFY_KEY = "powiadomienia";
 const COMPOSE_KEY = "compose";
@@ -206,7 +210,9 @@ export async function init(api: PluginApi) {
     for (const box of boxes) {
       ui.setBusy(`Pobieram skrzynke ${box}...`);
       const res = await mailbox.fetch(box);
-      if (res.kind === "lista") stampEntries(res.entries);
+      // Fala 14f: pusty listing TEZ nadpisuje biezacy kontekst serwera.
+      if (res.kind === "lista") stampEntries(box, res.entries);
+      else bumpCtx(box);
       if (res.kind === "lista" && mode === "sync") {
         // null = brak widoku / widok pusty -> pelne zastosowanie.
         const synced = ui.syncMailboxPage(box, res.entries, res.header.truncated);
@@ -358,10 +364,19 @@ export async function init(api: PluginApi) {
   const entryKey = (e: MailboxEntry): string =>
     [e.party, e.subject, e.forwarded ? "f" : "", e.date?.raw ?? ""].join("|");
 
+  /**
+   * Bump kontekstu po KAZDYM listingu (Fala 14f) - takze pustym, bo
+   * serwer nadpisuje swoj biezacy listing kazda komenda listujaca.
+   */
+  const bumpCtx = (box: MailBox): void => {
+    listingCtxSeq += 1;
+    listingCtx = { box, stamp: listingCtxSeq };
+  };
+
   /** Nadaje wpisom kontekst biezacego listingu serwera (Fala 9a). */
-  const stampEntries = (entries: MailboxEntry[]): void => {
-    listingCtx += 1;
-    for (const e of entries) e.ctx = listingCtx;
+  const stampEntries = (box: MailBox, entries: MailboxEntry[]): void => {
+    bumpCtx(box);
+    for (const e of entries) e.ctx = { box, stamp: listingCtxSeq };
   };
 
   /**
@@ -373,14 +388,23 @@ export async function init(api: PluginApi) {
    * (komunikat dla gracza, zadna komenda nie wylatuje na slepo).
    */
   const resolveEntry = async (box: MailBox, entry: MailboxEntry): Promise<MailboxEntry | null> => {
-    if (entry.ctx !== undefined && entry.ctx === listingCtx) return entry;
+    if (
+      entry.ctx !== undefined &&
+      listingCtx !== null &&
+      entry.ctx.stamp === listingCtx.stamp &&
+      entry.ctx.box === listingCtx.box
+    ) {
+      return entry;
+    }
     if (!entry.date) {
       notify(api, "Nie moge zlokalizowac listu (brak daty) - odswiez skrzynke.");
       return null;
     }
     const res = await mailbox.fetch(box, olderListingCommand(box, nextDay(entry.date)));
+    // Fala 14f: takze pusta re-kotwica nadpisuje biezacy listing serwera.
+    if (res.kind !== "lista") bumpCtx(box);
     if (res.kind === "lista") {
-      stampEntries(res.entries);
+      stampEntries(box, res.entries);
       // Jak kazde pobranie listingu: cicho do archiwum.
       const merged = upsertLetters(
         ui.state.archive,
@@ -411,7 +435,7 @@ export async function init(api: PluginApi) {
       .runExclusive(async () => {
         const res = await mailbox.fetch(box, olderListingCommand(box, anchor));
         if (res.kind === "lista") {
-          stampEntries(res.entries);
+          stampEntries(box, res.entries);
           ui.appendMailboxPage(box, res.entries, res.header.truncated);
           const incoming = res.entries.map((e) => fromMailboxEntry(box, e));
           const merged = upsertLetters(ui.state.archive, incoming);
@@ -419,6 +443,7 @@ export async function init(api: PluginApi) {
           persistArchive();
           notify(api, `Wczytano starsze listy (nowych: ${merged.added}).`);
         } else {
+          bumpCtx(box); // Fala 14f: pusta strona tez nadpisuje kontekst
           ui.appendMailboxPage(box, [], false);
           notify(api, "Brak starszych listow.");
         }
@@ -472,7 +497,7 @@ export async function init(api: PluginApi) {
             pages += 1;
             let more = false;
             if (res.kind === "lista") {
-              stampEntries(res.entries);
+              stampEntries(box, res.entries);
               const freshCount = ui.appendMailboxPage(box, res.entries, res.header.truncated);
               const merged = upsertLetters(
                 ui.state.archive,
@@ -487,6 +512,7 @@ export async function init(api: PluginApi) {
               // suffixu uciecia.
               more = res.header.truncated && freshCount > 0;
             } else {
+              bumpCtx(box); // Fala 14f: pusta strona tez nadpisuje kontekst
               ui.appendMailboxPage(box, [], false);
             }
             ui.setLoadAll({ box, pages });
@@ -664,7 +690,9 @@ export async function init(api: PluginApi) {
       void lock
         .runExclusive(async () => {
           const res = await mailbox.fetch(box, searchListingCommand(box, query));
-          if (res.kind === "lista") stampEntries(res.entries);
+          // Fala 14f: puste wyniki szukania tez nadpisuja kontekst serwera.
+          if (res.kind === "lista") stampEntries(box, res.entries);
+          else bumpCtx(box);
           ui.setSearch({ box, label: searchDescription(box, query) });
           ui.applySearchResults(box, res);
           if (res.kind === "lista") {

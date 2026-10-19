@@ -36,19 +36,29 @@ export interface SessionOptions {
   idleMs?: number;
 }
 
+/**
+ * Kontekst listingu serwera (Fala 14f): skrzynka + znacznik kolejnosci.
+ * Serwer ma JEDEN globalny "biezacy listing" - kazda komenda listujaca
+ * go nadpisuje, takze pusta; stamp rosnie przy kazdym listingu pluginu.
+ */
+export interface ListingCtx {
+  box: MailBox;
+  stamp: number;
+}
+
 export interface MailboxEntry extends ListingEntry {
   /** Surowa strona listu: nadawca (odebrane) lub odbiorcy (wyslane). */
   party: string;
   partyKind: 'nadawca' | 'odbiorcy' | null;
   date: MailDate | null;
   /**
-   * Wewnetrzne (Fala 9a): kontekst listingu serwera, z ktorego pochodzi
-   * wpis. Serwer rozumie "przeczytaj list N" wzgledem OSTATNIEGO listingu
-   * - numer jest wazny tylko, gdy ctx == biezacy kontekst; inaczej wpis
-   * wymaga re-kotwiczenia (patrz index.ts resolveEntry). Nie trafia do
-   * archiwum ani storage.
+   * Wewnetrzne (Fala 9a/14f): kontekst listingu serwera, z ktorego
+   * pochodzi wpis. Serwer rozumie "przeczytaj list N" wzgledem
+   * OSTATNIEGO listingu - numer jest wazny tylko, gdy ctx == biezacy
+   * kontekst; inaczej wpis wymaga re-kotwiczenia (patrz index.ts
+   * resolveEntry). Nie trafia do archiwum ani storage.
    */
-  ctx?: number;
+  ctx?: ListingCtx;
 }
 
 export type MailboxResult =

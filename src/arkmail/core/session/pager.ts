@@ -273,6 +273,21 @@ export class PagerSession {
           return;
         }
 
+        // Fala 14f: linia-blad serwera na "przeczytaj list N" (np. "Zly
+        // numer listu: N." po zmianie kontekstu listingu, albo "Zadne
+        // listy nie zostaly wybrane." po pustym listingu - log
+        // 2026-10-19 04:22:39). Pager NIE zostal otwarty, wiec odrzucamy
+        // od razu i BEZ "q" (q bez pagera = smieciowa komenda; stary kod
+        // ignorowal te linie i sesja wisiala do timeoutu ~8 s).
+        if (state === 'letter' && !headersDone) {
+          const mailErr = parseMailError(line.text);
+          if (mailErr) {
+            cleanup();
+            reject(new Error(`pager session list ${numer}: ${line.text.trim()}`));
+            return;
+          }
+        }
+
         // Fala 12a: extractPagerPrompt znajduje tez prompt sklejony
         // z inna trescia w jednej linii (isPagerPrompt bylby slepy).
         const pp = extractPagerPrompt(line.text);
