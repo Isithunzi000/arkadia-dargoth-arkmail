@@ -673,6 +673,120 @@ export async function init(api: PluginApi) {
     }
   };
 
+  /**
+   * Pseudo-wpis skrzynki z rekordu archiwum (Fala 16h): ctx undefined
+   * -> resolveEntry zawsze idzie przez re-kotwice po dacie. Wspolne
+   * dla kliku w wpis archiwum i petli pobierania tresci (Fala 16i).
+   */
+  const archivePseudoEntry = (letter: ArchiveLetter): MailboxEntry => ({
+    number: letter.number,
+    isRead: letter.read,
+    subject: letter.subject,
+    forwarded: letter.forwarded === true,
+    party: letter.party,
+    partyKind:
+      letter.box === "odebrane" || letter.box === "nieprzeczytane"
+        ? "nadawca"
+        : "odbiorcy",
+    date: letter.dateRaw ? parseMailDate(letter.dateRaw) : null,
+  });
+
+  /**
+   * Doczyt tresci jednego rekordu archiwum (Fala 16i): ta sama sciezka
+   * co openWithResolve (re-kotwica + druga szansa 16c), ale BEZ
+   * otwierania listu w UI. true = tresc pobrana i zapisana.
+   * WYMAGA locka (caller).
+   */
+  const fetchArchiveBody = async (letter: ArchiveLetter): Promise<boolean> => {
+    const pseudo = archivePseudoEntry(letter);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const fresh = await resolveEntry(letter.box, pseudo);
+      if (!fresh) return false;
+      transport!.beginModal();
+      try {
+        const res = await pager.readLetter(fresh.number);
+        const merged = upsertLetters(ui.state.archive, [
+          fromOpenedLetter(letter.box, res.letter, fresh),
+        ]);
+        ui.setArchive(merged.letters);
+        persistArchive();
+        return true;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const listingGone = /nie zostaly wybrane|Zly numer listu/.test(msg);
+        if (attempt === 0 && listingGone) {
+          bumpCtx(letter.box); // wymuszenie re-kotwicy w drugiej probie
+          continue;
+        }
+        return false;
+      } finally {
+        transport!.endModal();
+      }
+    }
+    return false;
+  };
+
+  /** Flaga biezacej petli pobierania tresci (jedna na raz; null = brak). */
+  let archiveDownloadFlag: { cancelled: boolean } | null = null;
+
+  /**
+   * Petla "Pobierz tresci do archiwum" (Fala 16i, zgloszenie pkt 10):
+   * kolejne listy bez tresci pod JEDNA blokada sesji, tempo jak loadAll.
+   * Drugi klik przycisku = Przerwij. Blad pojedynczego listu nie zabija
+   * petli - liczony i podsumowany na koncu.
+   */
+  const downloadArchiveBodies = (): void => {
+    if (archiveDownloadFlag) {
+      archiveDownloadFlag.cancelled = true;
+      return;
+    }
+    if (lock.locked) {
+      notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+      return;
+    }
+    // Bez daty nie ma re-kotwicy (Fala 16h) - takie listy zostaja.
+    const candidates = ui.state.archive.filter(
+      (l) => l.body.length === 0 && l.dateRaw !== null,
+    );
+    if (candidates.length === 0) {
+      notify(api, "Brak listow bez tresci - archiwum kompletne.");
+      return;
+    }
+    const flag = { cancelled: false };
+    archiveDownloadFlag = flag;
+    const total = candidates.length;
+    ui.setArchiveDownload({ done: 0, total });
+    ui.setBusy(`Pobieram tresci do archiwum (0/${total})...`);
+    void lock
+      .runExclusive(async () => {
+        let done = 0;
+        let failed = 0;
+        try {
+          for (const letter of candidates) {
+            if (flag.cancelled) break;
+            if (await fetchArchiveBody(letter)) done += 1;
+            else failed += 1;
+            ui.setArchiveDownload({ done: done + failed, total });
+            ui.setBusy(`Pobieram tresci do archiwum (${done + failed}/${total})...`);
+            if (flag.cancelled) break;
+            await sleepOrCancel(LOAD_ALL_PACE_MS, flag);
+          }
+          if (flag.cancelled) {
+            notify(api, `Przerwiano pobieranie tresci (pobrano: ${done} z ${total}).`);
+          } else if (failed > 0) {
+            notify(api, `Pobrano tresci (${done} z ${total}; nieudane: ${failed}).`);
+          } else {
+            notify(api, `Pobrano tresci do archiwum (listow: ${done}).`);
+          }
+        } finally {
+          archiveDownloadFlag = null;
+          ui.setArchiveDownload(null);
+          ui.setBusy(null);
+        }
+      })
+      .catch(() => notify(api, "Blad pobierania tresci do archiwum."));
+  };
+
   handlersRef = {
     onSendAnimal: () => {
       // Jak przy innych operacjach (Fala 12a): zero cichego kolejkowania.
@@ -725,23 +839,13 @@ export async function init(api: PluginApi) {
         return;
       }
       ui.setBusy(`Czytam list: ${letter.subject}...`);
-      const pseudo: MailboxEntry = {
-        number: letter.number,
-        isRead: letter.read,
-        subject: letter.subject,
-        forwarded: letter.forwarded === true,
-        party: letter.party,
-        partyKind:
-          letter.box === "odebrane" || letter.box === "nieprzeczytane"
-            ? "nadawca"
-            : "odbiorcy",
-        date: letter.dateRaw ? parseMailDate(letter.dateRaw) : null,
-      };
+      const pseudo = archivePseudoEntry(letter);
       void lock
         .runExclusive(() => openWithResolve(letter.box, pseudo))
         .catch(() => notify(api, "Nie udalo sie odczytac listu."))
         .finally(() => ui.setBusy(null));
     },
+    onDownloadArchiveBodies: () => downloadArchiveBodies(),
     onSendCompose: (input) => {
       if (!input.adresat.trim() || !input.temat.trim()) {
         notify(api, "Adresat i temat sa wymagane.");

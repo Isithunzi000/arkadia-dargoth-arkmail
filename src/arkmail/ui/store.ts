@@ -49,6 +49,8 @@ export interface MailUiState {
   busy: string | null;
   /** petla "Wczytaj wszystkie" w toku: skrzynka + liczba pobranych stron */
   loadAll: { box: MailBox; pages: number } | null;
+  /** petla "Pobierz tresci do archiwum" w toku: przetworzone / razem */
+  archiveDownload: { done: number; total: number } | null;
   /** tryb wynikow szukania serwerowego: skrzynka + opis zapytania */
   search: { box: MailBox; label: string } | null;
   letter: OpenLetter | null;
@@ -84,6 +86,7 @@ const DEFAULT_STATE: MailUiState = {
   badgeUnsent: 0,
   busy: null,
   loadAll: null,
+  archiveDownload: null,
   search: null,
   letter: null,
   contacts: [],
@@ -245,6 +248,10 @@ export class MailUiStore {
 
   setLoadAll(loadAll: { box: MailBox; pages: number } | null): void {
     this.update({ loadAll });
+  }
+
+  setArchiveDownload(archiveDownload: { done: number; total: number } | null): void {
+    this.update({ archiveDownload });
   }
 
   setSearch(search: { box: MailBox; label: string } | null): void {

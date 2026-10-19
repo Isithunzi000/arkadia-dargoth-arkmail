@@ -49,6 +49,12 @@ export interface MailUiHandlers {
    */
   onOpenArchiveLetter?(letter: ArchiveLetter): void;
   /**
+   * Masowe pobieranie tresci do archiwum (Fala 16h). Start petli; w
+   * trakcie petli drugi klik = Przerwij (jak onLoadAll). Opcjonalny:
+   * starsze montaze testowe go nie podaja (jak onClearCache).
+   */
+  onDownloadArchiveBodies?(): void;
+  /**
    * Czyszczenie pamieci podrecznej (Fala 12e). Opcjonalny: starsze
    * montaze testowe go nie podaja - przycisk wtedy po prostu nic nie
    * robi po potwierdzeniu.
@@ -1127,6 +1133,37 @@ export function mountMailUi(
       repaint();
     });
     controls.appendChild(clearFilters);
+    // Fala 16i: masowe pobieranie tresci do archiwum (zgloszenie
+    // pkt 10). Dwuklikowe uzbrojenie z ostrzezeniem o dlugim czasie
+    // (precedens: Wyczysc pamiec podreczna); w trakcie petli przycisk
+    // zamienia sie w Przerwij z postepem (precedens: Wczytaj wszystkie).
+    const dlBtn = doc.createElement('button');
+    dlBtn.className = 'arkmail-arch-download';
+    dlBtn.textContent = state.archiveDownload
+      ? `Przerwij (${state.archiveDownload.done}/${state.archiveDownload.total})`
+      : 'Pobierz tresci do archiwum';
+    let dlArmed = false;
+    let dlTimer: ReturnType<typeof setTimeout> | null = null;
+    dlBtn.addEventListener('click', () => {
+      if (state.archiveDownload) {
+        handlers.onDownloadArchiveBodies?.(); // petla w toku = Przerwij
+        return;
+      }
+      if (!dlArmed) {
+        dlArmed = true;
+        dlBtn.textContent = 'Moze potrwac bardzo dlugo - kliknij ponownie';
+        dlTimer = setTimeout(() => {
+          dlArmed = false;
+          dlBtn.textContent = 'Pobierz tresci do archiwum';
+        }, 3000);
+        return;
+      }
+      if (dlTimer) clearTimeout(dlTimer);
+      dlArmed = false;
+      dlBtn.textContent = 'Pobierz tresci do archiwum';
+      handlers.onDownloadArchiveBodies?.();
+    });
+    controls.appendChild(dlBtn);
     pane.appendChild(controls);
     const list = doc.createElement('div');
     pane.appendChild(list);
