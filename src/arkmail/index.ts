@@ -109,6 +109,16 @@ let animalTimer: ReturnType<typeof setTimeout> | null = null;
 let sluchamTimer: ReturnType<typeof setTimeout> | null = null;
 /** Timer pulsowania Listy/Niewyslane po odlozeniu listu (Fala 14b) - czyszczony w destroy. */
 let unsentFlashTimer: ReturnType<typeof setTimeout> | null = null;
+/**
+ * Fala 16a: opoznione retry odswiezenia odebranych po nowej poczcie.
+ * Serwer aktualizuje skrzynke z lagiem po powiadomieniu (log 2026-10-19:
+ * listing 2 s po "[ POCZTA ]" jeszcze bez listu, dopiero reczny refresh
+ * ~22 s pozniej go mial) - natychmiastowy refresh dostaje stary stan,
+ * a zadne kolejne zdarzenie nie strzela. Retry po 10 s i 25 s lapia lag.
+ * Timery czyszczone w destroy; seria powiadomien restartuje sekwencje.
+ */
+let delayedInboxTimers: ReturnType<typeof setTimeout>[] = [];
+const DELAYED_INBOX_RETRY_MS = [10_000, 25_000];
 
 function createContent(): HTMLDivElement {
   const root = document.createElement("div");
@@ -277,6 +287,15 @@ export async function init(api: PluginApi) {
         drainScheduled = false;
         if (pendingRefresh.size > 0) scheduleRefresh([]);
       });
+  };
+
+  /** Fala 16a: retry refreshu odebranych po lagu serwera (szczegoly przy
+   *  DELAYED_INBOX_RETRY_MS). Koalescencja przez sam scheduleRefresh. */
+  const scheduleDelayedInboxRefresh = (): void => {
+    for (const t of delayedInboxTimers) clearTimeout(t);
+    delayedInboxTimers = DELAYED_INBOX_RETRY_MS.map((ms) =>
+      setTimeout(() => scheduleRefresh(["odebrane", "nieprzeczytane"]), ms),
+    );
   };
 
   /**
@@ -817,8 +836,10 @@ export async function init(api: PluginApi) {
     if (n.kind === "nowa-poczte") {
       if (ui.state.notifyEnabled) notify(api, `Masz nowa poczte od ${n.nadawca}.`);
       scheduleRefresh(["odebrane", "nieprzeczytane"]);
+      scheduleDelayedInboxRefresh();
     } else if (n.kind === "goniec") {
       scheduleRefresh(["odebrane", "nieprzeczytane"]);
+      scheduleDelayedInboxRefresh();
     } else if (n.kind === "wysylasz") {
       // Fala 13b: gracz wyslal zwierze recznie (komenda w gre) -
       // uzbrajamy lot, zeby przycisk nie zrobil duplikatu w locie.
@@ -907,6 +928,8 @@ export async function destroy() {
     clearTimeout(unsentFlashTimer);
     unsentFlashTimer = null;
   }
+  for (const t of delayedInboxTimers) clearTimeout(t);
+  delayedInboxTimers = [];
   if (unsubBadge) {
     unsubBadge();
     unsubBadge = null;
