@@ -101,6 +101,8 @@ let unsubBadge: (() => void) | null = null;
 let wideObserver: ResizeObserver | null = null;
 /** Timer bezpiecznika lotu zwierzecia (Fala 13b) - czyszczony w destroy. */
 let animalTimer: ReturnType<typeof setTimeout> | null = null;
+/** Timer okna "Slucham?" po naszym wyslaniu (Fala 13d) - czyszczony w destroy. */
+let sluchamTimer: ReturnType<typeof setTimeout> | null = null;
 
 function createContent(): HTMLDivElement {
   const root = document.createElement("div");
@@ -500,6 +502,29 @@ export async function init(api: PluginApi) {
    * serwerowy cooldown przy spamie nie jest znany - brak dowodu w logach).
    */
   let animalFlight = false;
+  /**
+   * Okno "Slucham?" (Fala 13d): uzbrojone tylko po NASZYM wyslaniu
+   * "wyslij zwierze" i tylko do potwierdzenia linia 'wysylasz' albo
+   * konca okna. "Slucham?" to generyczny blad parsera serwera (~250x
+   * rozmaitych komend w jednej sesji logow) - globalna reakcja na nie
+   * łapalaby cudze bledy.
+   */
+  let sluchamArmed = false;
+  const disarmSlucham = (): void => {
+    sluchamArmed = false;
+    if (sluchamTimer !== null) {
+      clearTimeout(sluchamTimer);
+      sluchamTimer = null;
+    }
+  };
+  const armSluchamWindow = (): void => {
+    sluchamArmed = true;
+    if (sluchamTimer !== null) clearTimeout(sluchamTimer);
+    sluchamTimer = setTimeout(() => {
+      sluchamTimer = null;
+      sluchamArmed = false;
+    }, ANIMAL_TIMING.sluchamWindowMs);
+  };
   const endAnimalFlight = (): void => {
     animalFlight = false;
     if (animalTimer !== null) {
@@ -531,6 +556,7 @@ export async function init(api: PluginApi) {
       }
       startAnimalFlight();
       transport!.send("wyslij zwierze");
+      armSluchamWindow();
     },
     onOpenLetter: (box, entry) => {
       // Fala 12a: sesje modalne NIE kolejkuja klikow - w trakcie wiszacej
@@ -744,9 +770,20 @@ export async function init(api: PluginApi) {
       // Fala 13b: gracz wyslal zwierze recznie (komenda w gre) -
       // uzbrajamy lot, zeby przycisk nie zrobil duplikatu w locie.
       if (!animalFlight) startAnimalFlight();
+      // Fala 13d: serwer potwierdzil wyslanie - okno "Slucham?" zamykane.
+      disarmSlucham();
+    } else if (n.kind === "slucham") {
+      // Fala 13d: "Slucham?" w oknie po naszym wyslaniu = serwer nie zna
+      // komendy, czyli brak zwierzecia pocztowego (log 2025-12-21).
+      if (sluchamArmed) {
+        disarmSlucham();
+        endAnimalFlight();
+        notify(api, "Zwierze nie odpowiada - sprawdz, czy masz zwierze pocztowe.");
+      }
     } else if (n.kind === "powrot-zwierzecia") {
       // Fala 13b: powrot zwierzecia konczy lot; serwer przy ladowaniu
       // sam sprawdza nieprzeczytane, wiec inbox mogl sie zmienic.
+      disarmSlucham();
       endAnimalFlight();
       scheduleRefresh(["odebrane", "nieprzeczytane"]);
     } else if (n.kind === "list-wyslany") {
@@ -806,6 +843,10 @@ export async function destroy() {
   if (animalTimer !== null) {
     clearTimeout(animalTimer);
     animalTimer = null;
+  }
+  if (sluchamTimer !== null) {
+    clearTimeout(sluchamTimer);
+    sluchamTimer = null;
   }
   if (unsubBadge) {
     unsubBadge();

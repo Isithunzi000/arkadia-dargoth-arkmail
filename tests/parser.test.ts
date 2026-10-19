@@ -157,6 +157,9 @@ test('powiadomienia: nowa poczte (z prefiksem klienta), goniec, wysylasz', () =>
   assert.deepEqual(parseNotification('Wsrod trzepotu skrzydel Kruk laduje na twojej rece.'), { kind: 'powrot-zwierzecia', zwierze: 'Kruk' });
   // Fala 13c: dostawa przez zwierze poza sesja compose.
   assert.deepEqual(parseNotification('List zostal pomyslnie wyslany.'), { kind: 'list-wyslany' });
+  // Fala 13d: generyczny blad parsera serwera (brak zwierzecia = komenda
+  // nie istnieje; log 2025-12-21). Wiring reaguje tylko w waskim oknie.
+  assert.deepEqual(parseNotification('Slucham?'), { kind: 'slucham' });
   assert.equal(parseNotification('Poczta jest zamknieta.'), null);
 });
 

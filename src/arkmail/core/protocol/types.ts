@@ -68,7 +68,8 @@ export type MailNotification =
   | { kind: 'goniec' }
   | { kind: 'wysylasz'; zwierze: string }
   | { kind: 'powrot-zwierzecia'; zwierze: string }
-  | { kind: 'list-wyslany' };
+  | { kind: 'list-wyslany' }
+  | { kind: 'slucham' };
 
 export type MailError =
   | { kind: 'zly-numer'; numer: number }

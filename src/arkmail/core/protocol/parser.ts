@@ -193,6 +193,11 @@ export function parseNotification(text: string): MailNotification | null {
   // Dostawa niewyslanych przez zwierze POZA sesja compose (Fala 13c) -
   // w compose te sama linie konsumuje flota edytora (parseComposeResult).
   if (t === 'List zostal pomyslnie wyslany.') return { kind: 'list-wyslany' };
+  // Fala 13d: generyczny blad parsera serwera. Bez zwierzecia pocztowego
+  // komenda "wyslij zwierze" nie istnieje i dostaje wlasnie to (dowod:
+  // log 2025-12-21; w tej sesji "Slucham?" pada ~250 razy przy rozmaitych
+  // nieznanych komendach) - wiring reaguje tylko w waskim oknie czasowym.
+  if (t === 'Slucham?') return { kind: 'slucham' };
   return null;
 }
 
