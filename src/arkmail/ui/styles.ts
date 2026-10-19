@@ -268,6 +268,21 @@ export const STYLES = `
   overflow: auto;
   max-height: 220px;
 }
+/* Fala 12d: podglad compose bez obcinania. W split (wide) pre rozciaga
+   sie na pelna wysokosc prawego panelu; tryb "Pelne okno" to ten sam
+   pre na calym popupie. Belka z przyciskiem nad podgladem. */
+.arkmail-preview-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.arkmail-preview-bar label { margin: 0; }
+.arkmail-split-compose .arkmail-pane { display: flex; flex-direction: column; }
+.arkmail-split-compose .arkmail-preview { flex: 1; max-height: none; }
+.arkmail-preview-full-pane { display: flex; flex-direction: column; }
+.arkmail-preview-full-pane .arkmail-preview { flex: 1; max-height: none; }
 .arkmail-root .arkmail-send {
   margin-top: 10px;
   padding: 6px 18px;

@@ -84,6 +84,9 @@ export function mountMailUi(
   const archFilter: ArchiveFilter = {};
   /** Filtr i sort kontaktow: lokalne (poza store) - ten sam powod co wyzej. */
   const contactView: { filter: string; sort: ContactSort } = { filter: '', sort: 'nazwa' };
+  /** Pelnoekranowy podglad compose (Fala 12d): czysto prezentacyjny stan,
+   *  lokalny jak contactView; tresc listu zyje w composeDraft (nic nie ginie). */
+  let previewFull = false;
   /** Draft pol szukajki: lokalny (jak filtr archiwum) - rerender nie kasuje
    *  wpisanego zapytania. */
   const searchDraft: Record<string, string> = { osoba: '', temat: '', odDaty: '', doDaty: '' };
@@ -193,11 +196,17 @@ export function mountMailUi(
     const snap = snapshotView();
     root.className = 'arkmail-root' + (state.wide ? ' arkmail-wide' : '');
     composePreview = null; // nowe drzewo = nowy <pre> podgladu
+    // Fala 12d: pelny podglad zyje tylko na zakladce napisz - zmiana
+    // zakladki zamyka overlay (powrot do napisz = formularz).
+    if (state.tab !== 'napisz') previewFull = false;
     const nodes: Node[] = [renderTabs(state)];
     if (state.busy !== null) nodes.push(renderBusy(state.busy));
-    // Fala 10: na szerokim zakladka 'listy' to ZAWSZE split (klasyczny
-    // klient poczty) - bez otwartego listu prawy panel ma placeholder.
-    if (state.wide && state.tab === 'listy') {
+    if (state.tab === 'napisz' && previewFull) {
+      // Fala 12d: podglad na cale okno popupu (oba tryby szerokosci).
+      nodes.push(renderPreviewFull());
+    } else if (state.wide && state.tab === 'listy') {
+      // Fala 10: na szerokim zakladka 'listy' to ZAWSZE split (klasyczny
+      // klient poczty) - bez otwartego listu prawy panel ma placeholder.
       const split = doc.createElement('div');
       split.className = 'arkmail-split';
       split.appendChild(renderListy(state));
@@ -546,14 +555,63 @@ export function mountMailUi(
     ).lines.join('\n');
   };
 
+  /** Przycisk otwierajacy pelnoekranowy podglad compose (Fala 12d). */
+  const previewOpenBtn = (): HTMLElement => {
+    const btn = doc.createElement('button');
+    btn.className = 'arkmail-preview-open';
+    btn.textContent = 'Pelne okno';
+    btn.addEventListener('click', () => {
+      previewFull = true;
+      render(store.state);
+    });
+    return btn;
+  };
+
+  /**
+   * Podglad compose na cale okno popupu (Fala 12d): pre w naturalnym
+   * rozmiarze, bez obcinania - widac caly szablon pergaminu. Tresc
+   * zyje w composeDraft, wiec powrot do formularza nic nie gubi.
+   */
+  const renderPreviewFull = (): HTMLElement => {
+    const pane = doc.createElement('div');
+    pane.className = 'arkmail-pane arkmail-preview-full-pane';
+    pane.setAttribute('data-pane-key', 'napisz:podglad-full');
+    const bar = doc.createElement('div');
+    bar.className = 'arkmail-preview-bar';
+    const lab = doc.createElement('label');
+    lab.textContent = 'Podglad (tak list zostanie wyslany)';
+    bar.appendChild(lab);
+    const close = doc.createElement('button');
+    close.className = 'arkmail-preview-close';
+    close.textContent = 'Zamknij podglad';
+    close.addEventListener('click', () => {
+      previewFull = false;
+      render(store.state);
+    });
+    bar.appendChild(close);
+    pane.appendChild(bar);
+    const pre = doc.createElement('pre');
+    pre.className = 'arkmail-preview';
+    pane.appendChild(pre);
+    composePreview = pre;
+    repaintCompose();
+    return pane;
+  };
+
   /** Prawy panel compose w wide: zywy podglad wysylanego listu. */
   const renderComposePreview = (): HTMLElement => {
     const pane = doc.createElement('div');
     pane.className = 'arkmail-pane';
     pane.setAttribute('data-pane-key', 'napisz:podglad');
+    // Fala 12d: belka z przyciskiem pelnego okna; pre rozciaga sie na
+    // pelna wysokosc panelu (style: flex + max-height:none).
+    const bar = doc.createElement('div');
+    bar.className = 'arkmail-preview-bar';
     const lab = doc.createElement('label');
     lab.textContent = 'Podglad (tak list zostanie wyslany)';
-    pane.appendChild(lab);
+    bar.appendChild(lab);
+    bar.appendChild(previewOpenBtn());
+    pane.appendChild(bar);
     const pre = doc.createElement('pre');
     pre.className = 'arkmail-preview';
     pane.appendChild(pre);
@@ -630,9 +688,14 @@ export function mountMailUi(
     // Podglad: waski - pod forma w tym samym panelu; wide - osobny
     // prawy panel (renderComposePreview, Fala 11d).
     if (!state.wide) {
+      // Fala 12d: waski tez ma przycisk pelnego okna.
+      const barP = doc.createElement('div');
+      barP.className = 'arkmail-preview-bar';
       const labP = doc.createElement('label');
       labP.textContent = 'Podglad (tak list zostanie wyslany)';
-      pane.appendChild(labP);
+      barP.appendChild(labP);
+      barP.appendChild(previewOpenBtn());
+      pane.appendChild(barP);
       const preview = doc.createElement('pre');
       preview.className = 'arkmail-preview';
       pane.appendChild(preview);
