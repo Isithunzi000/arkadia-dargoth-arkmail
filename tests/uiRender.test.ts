@@ -361,8 +361,16 @@ test('render: wysylka przekazuje wyrenderowane linie (ramka w tresci)', () => {
   const tresc = container.querySelector('[data-field="tresc"]') as unknown as HTMLTextAreaElement;
   tresc.value = 'Witaj';
   fireEvent(tresc, 'input');
-  (container.querySelector('[data-field="adresat"]') as unknown as HTMLInputElement).value = 'Garply';
-  (container.querySelector('[data-field="temat"]') as unknown as HTMLInputElement).value = 'Perly';
+  // Fala 15b: adresat/temat tez z eventem input - bez tego composeDraft
+  // zostaje pusty i rerender (zmiana szerokosci nizej) zeruje pola,
+  // a walidacja pustego adresata blokuje wysylke (wczesniej test
+  // przechodzil przez luke: szla pusta wartosc).
+  const adresat = container.querySelector('[data-field="adresat"]') as unknown as HTMLInputElement;
+  adresat.value = 'Garply';
+  fireEvent(adresat, 'input');
+  const temat = container.querySelector('[data-field="temat"]') as unknown as HTMLInputElement;
+  temat.value = 'Perly';
+  fireEvent(temat, 'input');
   (container.querySelector('[data-field="szerokosc"]') as unknown as HTMLInputElement).value = '20';
   fireEvent(container.querySelector('[data-field="szerokosc"]'), 'change');
   click(container.querySelector('.arkmail-send'));

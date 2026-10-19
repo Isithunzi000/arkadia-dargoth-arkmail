@@ -821,12 +821,41 @@ export function mountMailUi(
     // ("List jest gotowy do wyslania.") - przycisk "Wyslij" mylil gracza
     // (zgloszenie 2026-10-19). Etykieta mowi, co naprawde sie stanie.
     send.textContent = 'Zapisz w kolejce do wyslania';
+    // Fala 15b: walidacja przed zapisem do kolejki. Pusty adresat =
+    // twarda blokada (serwer wymaga >= 1 adresata - "musimy podac
+    // przynajmniej jednego"); pusty temat = dwuklikowe uzbrojenie jak
+    // Wyczysc/Usun (temat bywa celowo pusty, ale najczesciej to
+    // przeoczenie - bez walidacji pusta linia rozbijala rozmowe compose
+    // w cisze do timeoutu). Stan lokalny - rerender wraca do etykiety.
+    const SEND_LABEL = 'Zapisz w kolejce do wyslania';
+    let sendArmed = false;
+    let sendTimer: ReturnType<typeof setTimeout> | null = null;
+    const disarmSend = (): void => {
+      sendArmed = false;
+      send.textContent = SEND_LABEL;
+    };
     send.addEventListener('click', () => {
       const st = store.state;
       const rendered = renderLetter(tresc.value, st.composeTemplate, st.composeWidth);
       if (!rendered.hasContent) return; // pusty list nie wylatuje
       const val = (f: string) =>
         (pane.querySelector(`[data-field="${f}"]`) as HTMLInputElement | HTMLTextAreaElement).value;
+      if (!val('adresat').trim()) {
+        if (sendTimer) clearTimeout(sendTimer);
+        sendArmed = false;
+        send.textContent = 'Podaj adresata.';
+        sendTimer = setTimeout(disarmSend, 3000);
+        return;
+      }
+      if (!val('temat').trim() && !sendArmed) {
+        sendArmed = true;
+        send.textContent = 'Temat pusty - na pewno? Kliknij ponownie';
+        if (sendTimer) clearTimeout(sendTimer);
+        sendTimer = setTimeout(disarmSend, 3000);
+        return;
+      }
+      if (sendTimer) clearTimeout(sendTimer);
+      disarmSend();
       handlers.onSendCompose({
         adresat: val('adresat'),
         temat: val('temat'),
