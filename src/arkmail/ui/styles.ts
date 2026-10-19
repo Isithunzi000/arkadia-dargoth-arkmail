@@ -55,6 +55,8 @@ export const STYLES = `
   padding: 4px 12px;
   font: inherit;
   cursor: pointer;
+  /* Fala 16k: etykiety przyciskow nie lamia sie w waskim popupie. */
+  white-space: nowrap;
 }
 .arkmail-root button:hover { background: #3b3d47; }
 .arkmail-root input, .arkmail-root textarea, .arkmail-root select {
@@ -105,6 +107,12 @@ export const STYLES = `
   border-radius: 6px;
   background: ${BG_PANEL};
   color: ${FG_DIM};
+  /* Fala 16k: pasek operacji nie rosnie w pionie - mniejsza czcionka,
+     zero lamania, dlugi opis ucina ellipsis. */
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* --- panele --- */

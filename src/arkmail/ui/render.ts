@@ -350,7 +350,7 @@ export function mountMailUi(
     const loadAllBtn = doc.createElement('button');
     loadAllBtn.className = 'arkmail-older-all';
     loadAllBtn.textContent = loopHere
-      ? `Przerwij (strona ${state.loadAll!.pages})`
+      ? `Przerwij · ${state.loadAll!.pages}`
       : 'Wczytaj wszystkie';
     // Wylaczony, gdy nie ma czego doczytywac: tryb wynikow, skrzynka
     // pusta/niezaladowana lub w calosci, petla na innej skrzynce.
@@ -1140,7 +1140,7 @@ export function mountMailUi(
     const dlBtn = doc.createElement('button');
     dlBtn.className = 'arkmail-arch-download';
     dlBtn.textContent = state.archiveDownload
-      ? `Przerwij (${state.archiveDownload.done}/${state.archiveDownload.total})`
+      ? `Przerwij · ${state.archiveDownload.done}/${state.archiveDownload.total}`
       : 'Pobierz tresci do archiwum';
     let dlArmed = false;
     let dlTimer: ReturnType<typeof setTimeout> | null = null;

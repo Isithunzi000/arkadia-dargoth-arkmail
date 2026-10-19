@@ -9,6 +9,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { STYLES } from '../src/arkmail/ui/styles';
 
@@ -72,4 +74,36 @@ test('style: szukajka uklada sie stosowo, Szukaj na calej szerokosci', () => {
   const go = ruleBody(/\.arkmail-search-row\s+\.arkmail-search-go\b/);
   assert.ok(go, 'regula przycisku Szukaj w szukajce');
   assert.match(go!, /grid-column:\s*1\s*\/\s*-1/, 'Szukaj rozpiety na caly wiersz');
+});
+
+// Fala 16k: etykiety w waskim popupie nie moga sie lamiac - przyciski
+// maja nowrap w catch-all, a dlugi opis w pasku operacji ucina ellipsis.
+test('style: przyciski nie lamia etykiet (nowrap w catch-all)', () => {
+  const body = ruleBody(/\.arkmail-root\s+button\b/);
+  assert.ok(body, 'regula catch-all button istnieje');
+  assert.match(body!, /white-space:\s*nowrap/, 'przyciski maja white-space: nowrap');
+});
+
+test('style: pasek operacji - 12px, bez lamania, ellipsis', () => {
+  const body = ruleBody(/\.arkmail-busy\b/);
+  assert.ok(body, 'regula .arkmail-busy istnieje');
+  assert.match(body!, /font-size:\s*12px/, 'czcionka 12px');
+  assert.match(body!, /white-space:\s*nowrap/, 'bez lamania');
+  assert.match(body!, /text-overflow:\s*ellipsis/, 'dlugi opis ucina ellipsis');
+});
+
+// Audyt etykiet (Fala 16k): kazda statyczna etykieta w render.ts musi
+// byc krotka (<=45 znakow), a stary dlugi format "Przerwij (strona N)"
+// jest zakazany - teraz "Przerwij · N" (dynamiczny, poza regexem).
+test('style: audyt etykiet - krotkie, bez starego formatu Przerwij', () => {
+  // Test leci skompilowany z out-test/tests/ - repo root dwa poziomy wyzej.
+  const src = readFileSync(join(__dirname, '..', '..', 'src/arkmail/ui/render.ts'), 'utf8');
+  const labels = [...src.matchAll(/textContent = '([^']+)'/g)].map((m) => m[1]);
+  assert.ok(labels.length >= 20, `audyt obejmuje etykiety (znaleziono: ${labels.length})`);
+  for (const label of labels) {
+    assert.ok(label.length <= 45, `etykieta <= 45 znakow (${label.length}): "${label}"`);
+  }
+  // Format dynamiczny (template literal) - sprawdzany w zrodle.
+  assert.ok(!src.includes('Przerwij (strona'), 'stary dlugi format "Przerwij (strona N)" usuniety');
+  assert.ok(src.includes('Przerwij · '), 'krotki format "Przerwij · N" w uzyciu');
 });
