@@ -3,7 +3,7 @@ var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { en
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
 // src/arkmail/meta.ts
-const PLUGIN_VERSION = "1.8.0";
+const PLUGIN_VERSION = "1.9.0";
 var PLUGIN_NAME = "ArkMail";
 var PLUGIN_AUTHOR = "Isithunzi000";
 var PLUGIN_DESCRIPTION = "ArkMail to kompleksowy system pocztowy dla klienta Dargoth: skrzynki, kontakty, archiwum i pisanie listow (alias /arkmail). Plugin w pelni zgodny z regulaminem gry - wszystkie komendy wysylane swiadomie przez gracza, bez automatyki.";
@@ -2352,6 +2352,24 @@ function mountMailUi(container, store2, handlers) {
     const ops = doc.createElement("div");
     ops.className = "arkmail-letter-ops";
     const source = l.source;
+    const replyTo = (all) => {
+      const received = l.box === "odebrane" || l.box === "nieprzeczytane";
+      composeDraft.adresat = received ? l.from : l.to || l.cc || "";
+      composeDraft.dw = all && l.cc ? l.cc : "";
+      composeDraft.temat = "";
+      composeDraft.tresc = "";
+      store2.setTab("napisz");
+    };
+    const reply = doc.createElement("button");
+    reply.className = "arkmail-reply";
+    reply.textContent = "Odpowiedz";
+    reply.addEventListener("click", () => replyTo(false));
+    ops.appendChild(reply);
+    const replyAll = doc.createElement("button");
+    replyAll.className = "arkmail-reply-all";
+    replyAll.textContent = "Odpowiedz wszystkim";
+    replyAll.addEventListener("click", () => replyTo(true));
+    ops.appendChild(replyAll);
     const del = doc.createElement("button");
     del.className = "arkmail-del";
     del.textContent = "Usun";
@@ -2551,11 +2569,34 @@ function mountMailUi(container, store2, handlers) {
     const send = doc.createElement("button");
     send.className = "arkmail-send";
     send.textContent = "Zapisz w kolejce do wyslania";
+    const SEND_LABEL = "Zapisz w kolejce do wyslania";
+    let sendArmed = false;
+    let sendTimer = null;
+    const disarmSend = () => {
+      sendArmed = false;
+      send.textContent = SEND_LABEL;
+    };
     send.addEventListener("click", () => {
       const st = store2.state;
       const rendered = renderLetter(tresc.value, st.composeTemplate, st.composeWidth);
       if (!rendered.hasContent) return;
       const val = (f) => pane.querySelector(`[data-field="${f}"]`).value;
+      if (!val("adresat").trim()) {
+        if (sendTimer) clearTimeout(sendTimer);
+        sendArmed = false;
+        send.textContent = "Podaj adresata.";
+        sendTimer = setTimeout(disarmSend, 3e3);
+        return;
+      }
+      if (!val("temat").trim() && !sendArmed) {
+        sendArmed = true;
+        send.textContent = "Temat pusty - na pewno? Kliknij ponownie";
+        if (sendTimer) clearTimeout(sendTimer);
+        sendTimer = setTimeout(disarmSend, 3e3);
+        return;
+      }
+      if (sendTimer) clearTimeout(sendTimer);
+      disarmSend();
       handlers.onSendCompose({
         adresat: val("adresat"),
         temat: val("temat"),
