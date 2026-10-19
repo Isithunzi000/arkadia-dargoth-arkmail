@@ -99,15 +99,22 @@ export function parseListingParty(text: string): { kind: 'nadawca' | 'odbiorcy';
   };
 }
 
-const EMPTY_LISTING_RE = /^Nie masz zadnych (nieprzeczytanych|odebranych|wyslanych|niewyslanych) listow\.$/;
-const FILTERED_EMPTY_RE = /^Nie znaleziono zadnych takich (nieprzeczytanych|odebranych|wyslanych|niewyslanych) listow\.$/;
+// Fala 16b: wariant "otrzymanych" (log 2026-10-19 17:25:11, odpowiedz
+// na "listy nieprzeczytane" - serwer zmienia słowo; 17:21:08 to samo
+// w wariancie filtrowanym).
+const EMPTY_LISTING_RE = /^Nie masz zadnych (nieprzeczytanych|odebranych|wyslanych|niewyslanych|otrzymanych) listow\.$/;
+const FILTERED_EMPTY_RE = /^Nie znaleziono zadnych takich (nieprzeczytanych|odebranych|wyslanych|niewyslanych|otrzymanych) listow\.$/;
 
 const BOX_FROM_GENITIVE: Record<string, MailBox> = {
   nieprzeczytanych: 'nieprzeczytane',
   odebranych: 'odebrane',
   wyslanych: 'wyslane',
   niewyslanych: 'niewyslane',
+  otrzymanych: 'nieprzeczytane',
 };
+
+/** Throttle serwera przy czestych listingach (log 2026-10-19 17:25:10). */
+export const LISTS_LOADING_RE = /^Listy sa w tej chwili ladowane\.$/;
 
 export function parseEmptyListing(text: string): EmptyListing | null {
   const puste = text.match(EMPTY_LISTING_RE);

@@ -10,6 +10,7 @@
  */
 
 import {
+  LISTS_LOADING_RE,
   parseEmptyListing,
   parseListingEntry,
   parseListingHeader,
@@ -78,9 +79,14 @@ export class MailboxSession {
    */
   fetch(box: MailBox, command?: string): Promise<MailboxResult> {
     return new Promise((resolve, reject) => {
+      const cmd = command ?? `listy ${box}`;
       let header: ListingHeader | null = null;
       const entries: MailboxEntry[] = [];
       let done = false;
+      /** Fala 16b: jeden retry po linii throttle "Listy sa w tej chwili
+       *  ladowane." (serwer nie zdazyl zbudowac listingu). */
+      let loadRetried = false;
+      let loadRetryTimer: ReturnType<typeof setTimeout> | null = null;
       const idleMs = this.opts.idleMs ?? 600;
       let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -88,6 +94,7 @@ export class MailboxSession {
         done = true;
         clearTimeout(timer);
         if (idleTimer) clearTimeout(idleTimer);
+        if (loadRetryTimer) clearTimeout(loadRetryTimer);
         unsub();
       };
       const finish = (r: MailboxResult) => {
@@ -117,6 +124,24 @@ export class MailboxSession {
         if (MAIL_ERROR_RE.test(line.text)) {
           cleanup();
           reject(new Error(line.text.trim()));
+          return;
+        }
+
+        // Fala 16b: throttle serwera "Listy sa w tej chwili ladowane."
+        // (log 2026-10-19 17:25:10). Stary kod tej linii nie znal -
+        // fetch wisial w ciszy do timeoutu ~8 s (zgloszenie pkt 3/13:
+        // "klikam i nic sie nie dzieje"). Jeden retry komendy po ~2 s;
+        // powtorka = blad od razu, bez cichego czekania.
+        if (LISTS_LOADING_RE.test(line.text)) {
+          if (loadRetried) {
+            cleanup();
+            reject(new Error('Listy sa w tej chwili ladowane.'));
+            return;
+          }
+          loadRetried = true;
+          loadRetryTimer = setTimeout(() => {
+            if (!done) this.transport.send(cmd);
+          }, 2000);
           return;
         }
 
@@ -177,7 +202,7 @@ export class MailboxSession {
         }
       });
 
-      this.transport.send(command ?? `listy ${box}`);
+      this.transport.send(cmd);
     });
   }
 }

@@ -11,6 +11,7 @@
 
 import {
   extractPagerPrompt,
+  LISTS_LOADING_RE,
   parseLetterHeaderLine,
   parseMailError,
 } from '../protocol/parser.js';
@@ -145,6 +146,10 @@ export class PagerSession {
       /** Fala 12a: akcja odpalona z idle-completion (prompt nie doszedl). */
       let idleOpened = false;
       let retried = false;
+      /** Fala 16b: jeden retry odczytu po throttle "Listy sa w tej
+       *  chwili ladowane." (jak w mailbox). */
+      let loadRetried = false;
+      let loadRetryTimer: ReturnType<typeof setTimeout> | null = null;
       let done = false;
       const idleMs = this.opts.idleMs ?? 600;
       let idleTimer: ReturnType<typeof setTimeout> | null = null;
@@ -158,6 +163,7 @@ export class PagerSession {
         if (idleTimer) clearTimeout(idleTimer);
         if (quietTimer) clearTimeout(quietTimer);
         if (graceTimer) clearTimeout(graceTimer);
+        if (loadRetryTimer) clearTimeout(loadRetryTimer);
         unsub();
       };
       const finish = () => {
@@ -280,6 +286,24 @@ export class PagerSession {
         // od razu i BEZ "q" (q bez pagera = smieciowa komenda; stary kod
         // ignorowal te linie i sesja wisiala do timeoutu ~8 s).
         if (state === 'letter' && !headersDone) {
+          // Fala 16b: throttle serwera "Listy sa w tej chwili ladowane."
+          // tez przy odczycie (klik w list zaraz po logowaniu - cisza
+          // do timeoutu, zgloszenie pkt 3). Jeden retry komendy po
+          // ~2 s; powtorka = blad od razu (bez "q" - pager nieotwarty).
+          if (LISTS_LOADING_RE.test(line.text)) {
+            if (loadRetried) {
+              cleanup();
+              reject(new Error(`pager session list ${numer}: Listy sa w tej chwili ladowane.`));
+              return;
+            }
+            loadRetried = true;
+            loadRetryTimer = setTimeout(() => {
+              if (!done && state === 'letter') {
+                this.transport.send(`przeczytaj list ${numer}`);
+              }
+            }, 2000);
+            return;
+          }
           const mailErr = parseMailError(line.text);
           if (mailErr) {
             cleanup();
