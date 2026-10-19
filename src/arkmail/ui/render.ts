@@ -837,7 +837,16 @@ export function mountMailUi(
     send.addEventListener('click', () => {
       const st = store.state;
       const rendered = renderLetter(tresc.value, st.composeTemplate, st.composeWidth);
-      if (!rendered.hasContent) return; // pusty list nie wylatuje
+      if (!rendered.hasContent) {
+        // Fala 16d: pusta tresc = twarda blokada z komunikatem na
+        // przycisku, jak adresat (zgloszenie pkt 4). Cichy return z 15b
+        // zostawial gracza bez informacji, czemu klikniecie nic nie daje.
+        if (sendTimer) clearTimeout(sendTimer);
+        sendArmed = false;
+        send.textContent = 'Brak tresci listu.';
+        sendTimer = setTimeout(disarmSend, 3000);
+        return;
+      }
       const val = (f: string) =>
         (pane.querySelector(`[data-field="${f}"]`) as HTMLInputElement | HTMLTextAreaElement).value;
       if (!val('adresat').trim()) {

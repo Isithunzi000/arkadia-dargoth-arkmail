@@ -15,6 +15,11 @@
  *    na pewno? Kliknij ponownie", drugi klik w 3 s wysyla (pusty temat
  *    bywa celowy); wzorzec jak Wyczysc/Usun;
  *  - wypelnione adresat+temat+tresc -> wysylka za pierwszym klikiem.
+ *
+ * Fala 16d (zgloszenie 2026-10-19 pkt 4): pusta tresc tez ma TWARDa
+ * blokade z komunikatem na przycisku ("Brak tresci listu.", 3 s) -
+ * cichy return z Fali 15b zostawial gracza bez informacji, dlaczego
+ * klikniecie nic nie daje.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -129,5 +134,37 @@ test('ui: wypelnione adresat+temat+tresc wysylaja za pierwszym klikiem', () => {
   setField(container, 'tresc', 'czesc');
   clickEl(sendBtn(container));
   assert.equal(sends(calls).length, 1, 'brak uzbrajania przy pelnym formularzu');
+  off();
+});
+
+test('ui: pusta tresc blokuje wyslanie twardo z komunikatem na przycisku', () => {
+  const s = new MailUiStore();
+  const { container, calls, off } = mount(s);
+  s.setTab('napisz');
+  setField(container, 'adresat', 'Foo');
+  setField(container, 'temat', 'Perly');
+  const send = sendBtn(container);
+  clickEl(send);
+  assert.equal(sends(calls).length, 0, 'pusta tresc nie wysyla');
+  assert.equal(send.textContent, 'Brak tresci listu.', 'komunikat na przycisku');
+  clickEl(send);
+  assert.equal(sends(calls).length, 0, 'drugi klik tez nie wysyla (twarda blokada)');
+  assert.equal(send.textContent, 'Brak tresci listu.', 'blokada nie uzbraja dwukliku');
+  off();
+});
+
+test('ui: blokada pustej tresci wygasa po 3 s', async () => {
+  const s = new MailUiStore();
+  const { container, calls, off } = mount(s);
+  s.setTab('napisz');
+  setField(container, 'adresat', 'Foo');
+  setField(container, 'temat', 'Perly');
+  const send = sendBtn(container);
+  clickEl(send);
+  assert.equal(send.textContent, 'Brak tresci listu.', 'zablokowany');
+  await waitRt(() => send.textContent === 'Zapisz w kolejce do wyslania', 'etykieta wrocila');
+  setField(container, 'tresc', 'czesc');
+  clickEl(send);
+  assert.equal(sends(calls).length, 1, 'po wpisaniu tresci zapis dziala');
   off();
 });
