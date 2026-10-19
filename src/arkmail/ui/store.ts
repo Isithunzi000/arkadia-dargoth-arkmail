@@ -67,6 +67,12 @@ export interface MailUiState {
   /** Preferencje compose: szablon ramki i szerokosc linii (20..120). */
   composeTemplate: LetterTemplate;
   composeWidth: number;
+  /**
+   * Licznik sygnalu "wyczysc compose" (Fala 16e): po udanym zapisie/
+   * wyslaniu listu index.ts podbija licznik, a render przy najblizszym
+   * renderze zeruje roboczy draft i pola formularza.
+   */
+  composeClearSeq: number;
 }
 
 const DEFAULT_STATE: MailUiState = {
@@ -87,6 +93,7 @@ const DEFAULT_STATE: MailUiState = {
   unsentFlash: false,
   composeTemplate: 'plain',
   composeWidth: 60,
+  composeClearSeq: 0,
 };
 
 export class MailUiStore {
@@ -341,6 +348,12 @@ export class MailUiStore {
     if (prefs.template !== undefined) patch.composeTemplate = prefs.template;
     if (prefs.width !== undefined) patch.composeWidth = prefs.width;
     this.update(patch);
+  }
+
+  /** Fala 16e: wyczyszczenie formularza compose po udanym zapisie/
+   *  wyslaniu (render zeruje draft przy najblizszym renderze). */
+  clearCompose(): void {
+    this.update({ composeClearSeq: this.current.composeClearSeq + 1 });
   }
 
   private update(patch: Partial<MailUiState>): void {

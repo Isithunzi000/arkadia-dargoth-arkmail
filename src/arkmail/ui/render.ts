@@ -728,7 +728,22 @@ export function mountMailUi(
     return pane;
   };
 
+  /** Fala 16e: obsluzony licznik clearCompose (zerowanie draftu raz
+   *  na sygnal, nie przy kazdym renderze - inaczej pisanicie byloby
+   *  kasowane przy kazdej zmianie stanu). */
+  let seenComposeClearSeq = 0;
+
   const renderNapisz = (state: MailUiState): HTMLElement => {
+    // Fala 16e: po udanym zapisie/wyslaniu pola compose sie czyscza
+    // (zgloszenie pkt 12). Sygnal ze store -> zerujemy draft PRZED
+    // zbudowaniem pol (input.value czyta composeDraft).
+    if (state.composeClearSeq !== seenComposeClearSeq) {
+      seenComposeClearSeq = state.composeClearSeq;
+      composeDraft.adresat = '';
+      composeDraft.temat = '';
+      composeDraft.dw = '';
+      composeDraft.tresc = '';
+    }
     const pane = doc.createElement('div');
     pane.className = 'arkmail-pane arkmail-form';
     pane.setAttribute('data-pane-key', 'napisz');

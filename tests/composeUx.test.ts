@@ -9,6 +9,13 @@
  * 3. Po odlozeniu listu (compose "gotowy" albo Przekaz) klawisz
  *    zakladki Listy i skrzynki Niewyslane migaja (~3 s) - gracz widzi,
  *    gdzie list wyladowal.
+ *
+ * Fala 16e (zgloszenia 2026-10-19 pkt 1 i 12):
+ * 4. Toast po zapisie brzmi "List zapisany w niewyslanych." (nie
+ *    "odlozony");
+ * 5. Po udanym zapisie/wyslaniu pola compose sie CZYSZCZA (sygnal
+ *    store.clearCompose -> render czysci draft); bez wysylki pola
+ *    zostaja.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,6 +27,7 @@ import {
   startHarness,
   stopHarness,
   click as hClick,
+  notifyText,
   waitRt,
   type Harness,
 } from './harness';
@@ -165,6 +173,88 @@ test('compose gotowy -> flash niewyslanych zapala sie i gasnie po ~3 s', async (
             ?.className ?? '',
         ).includes('arkmail-flash'),
       'flash gasnie sam po ~3 s',
+    );
+  } finally {
+    await stopHarness();
+  }
+});
+
+test('compose: store.clearCompose czysci pola i draft (przez rerender)', () => {
+  const s = new MailUiStore({ tab: 'napisz' });
+  const { container, off } = mount(s);
+  const setVal = (f: string, v: string) => {
+    const el = container.querySelector(`[data-field="${f}"]`) as unknown as HTMLInputElement;
+    el.value = v;
+    el.dispatchEvent(new window.Event('input') as unknown as Event);
+  };
+  setVal('adresat', 'Garply');
+  setVal('temat', 'Perly');
+  setVal('tresc', 'tresc listu');
+
+  s.clearCompose();
+  for (const f of ['adresat', 'temat', 'dw', 'tresc']) {
+    assert.equal(
+      (container.querySelector(`[data-field="${f}"]`) as unknown as HTMLInputElement).value,
+      '',
+      `pole ${f} wyczyszczone`,
+    );
+  }
+  // Draft tez pusty - rerender nie przywraca starych wartosci.
+  s.setTab('listy');
+  s.setTab('napisz');
+  assert.equal(
+    (container.querySelector('[data-field="adresat"]') as unknown as HTMLInputElement).value,
+    '',
+    'draft adresata pusty po rerenderze',
+  );
+  off();
+});
+
+test('compose: po zapisie w niewyslanych toast "zapisany" i pola czyszczone', async () => {
+  const h: Harness = await startHarness();
+  const { f, waitFor, content } = h;
+  try {
+    hClick(h, '[data-tab="napisz"]');
+    const setVal = (field: string, v: string) => {
+      const el = content.querySelector(`[data-field="${field}"]`) as {
+        value: string;
+        dispatchEvent(e: unknown): void;
+      };
+      el.value = v;
+      el.dispatchEvent(new h.window.Event('input'));
+    };
+    setVal('adresat', 'Gracz');
+    setVal('temat', 'Test zapisu');
+    setVal('tresc', 'czesc');
+    hClick(h, '.arkmail-send');
+    await waitFor(() => f.sent.includes('napisz list'), 'compose start');
+    f.fire('Adresat: Temat: DW: ', 'mail');
+    await waitFor(() => f.sent.includes('**'), 'tresc wyslana');
+    f.fire('List jest gotowy do wyslania.', 'mail');
+    await waitFor(() => f.sent.includes('listy niewyslane'), 'refresh niewyslanych');
+    f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
+    f.fire('> ', 'prompt');
+
+    await waitFor(
+      () => notifyText(f, 'List zapisany w niewyslanych.'),
+      'toast o zapisie (nie "odlozony")',
+    );
+    assert.ok(!notifyText(f, 'odlozony'), 'stary string zniknal');
+    await waitFor(
+      () =>
+        (content.querySelector('[data-field="adresat"]') as { value: string } | null)
+          ?.value === '',
+      'pole adresata wyczyszczone po zapisie',
+    );
+    assert.equal(
+      (content.querySelector('[data-field="temat"]') as { value: string } | null)?.value,
+      '',
+      'pole tematu wyczyszczone',
+    );
+    assert.equal(
+      (content.querySelector('[data-field="tresc"]') as { value: string } | null)?.value,
+      '',
+      'pole tresci wyczyszczone',
     );
   } finally {
     await stopHarness();

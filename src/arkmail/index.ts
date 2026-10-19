@@ -719,10 +719,15 @@ export async function init(api: PluginApi) {
             if (out.result === "wyslany") {
               notify(api, "List zostal wyslany.");
               refreshBoxes(["wyslane"]);
+              // Fala 16e: po udanej wysylce formularz sie czysci
+              // (zgloszenie pkt 12) - kolejny list zaczyna sie od zera.
+              ui.clearCompose();
             } else if (out.result === "gotowy") {
-              notify(api, "List odlozony w niewyslanych.");
+              // Fala 16e: "zapisany", nie "odlozony" (zgloszenie pkt 1).
+              notify(api, "List zapisany w niewyslanych.");
               refreshBoxes(["niewyslane"]);
               flashUnsent();
+              ui.clearCompose();
             } else {
               notify(api, "Blad wysylki - sprawdz adresata.");
             }
