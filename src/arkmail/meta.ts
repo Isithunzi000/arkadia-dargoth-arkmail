@@ -5,7 +5,7 @@
  * PLUGIN_BUILD_DATE nadpisuje scripts/stamp_build_date.py przy release.
  */
 
-export const PLUGIN_VERSION = "1.7.0";
+export const PLUGIN_VERSION = "1.8.0";
 export const PLUGIN_BUILD_DATE = "19-10-2026";
 
 export const PLUGIN_NAME = "ArkMail";

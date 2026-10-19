@@ -3,7 +3,7 @@ var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { en
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
 // src/arkmail/meta.ts
-const PLUGIN_VERSION = "1.7.0";
+const PLUGIN_VERSION = "1.8.0";
 var PLUGIN_NAME = "ArkMail";
 var PLUGIN_AUTHOR = "Isithunzi000";
 var PLUGIN_DESCRIPTION = "ArkMail to kompleksowy system pocztowy dla klienta Dargoth: skrzynki, kontakty, archiwum i pisanie listow (alias /arkmail). Plugin w pelni zgodny z regulaminem gry - wszystkie komendy wysylane swiadomie przez gracza, bez automatyki.";
@@ -240,29 +240,45 @@ function splitParty(party) {
   }
   return out;
 }
-function contactsFromBoxes(boxes, people) {
+var directionOf = (box) => box === "odebrane" || box === "nieprzeczytane" ? "in" : "out";
+function korespondencjaFromLetters(letters) {
   const korespondencja = [];
   const seen = /* @__PURE__ */ new Set();
-  for (const [box, view] of Object.entries(boxes)) {
-    const direction = box === "odebrane" || box === "nieprzeczytane" ? "in" : "out";
-    for (const e of view?.entries ?? []) {
-      if (!e.party) continue;
-      const dateKey = e.date ? (e.date.year * 1e4 + e.date.month * 100 + e.date.day) * 1e6 + Number(e.date.time.replace(/:/g, "")) : void 0;
-      for (const name of splitParty(e.party)) {
-        const dedupKey = [
-          direction,
-          name.toLowerCase(),
-          e.subject,
-          e.forwarded ? "f" : "",
-          e.date?.raw ?? ""
-        ].join("|");
-        if (seen.has(dedupKey)) continue;
-        seen.add(dedupKey);
-        korespondencja.push({ name, direction, dateRaw: e.date?.raw, dateKey });
-      }
+  for (const l of letters) {
+    if (!l.party) continue;
+    for (const name of splitParty(l.party)) {
+      const dedupKey = [
+        l.direction,
+        name.toLowerCase(),
+        l.subject,
+        l.forwarded ? "f" : "",
+        l.dateRaw ?? ""
+      ].join("|");
+      if (seen.has(dedupKey)) continue;
+      seen.add(dedupKey);
+      korespondencja.push({ name, direction: l.direction, dateRaw: l.dateRaw ?? void 0, dateKey: l.dateKey });
     }
   }
-  return mergeContacts({ people, przedstawieni: [], korespondencja, aliasy: [] });
+  return korespondencja;
+}
+function archiveToLetterLike(l) {
+  const digits = Number(l.sortKey.replace(/\D/g, ""));
+  return {
+    direction: directionOf(l.box),
+    party: l.party,
+    subject: l.subject,
+    forwarded: l.forwarded === true,
+    dateRaw: l.dateRaw,
+    dateKey: digits > 0 ? digits : void 0
+  };
+}
+function contactsFromArchive(letters) {
+  return mergeContacts({
+    people: [],
+    przedstawieni: [],
+    korespondencja: korespondencjaFromLetters(letters.map(archiveToLetterLike)),
+    aliasy: []
+  });
 }
 var SOURCE_ORDER = ["people", "przedstawieni", "korespondencja", "alias"];
 function mergeContacts(input) {
@@ -370,6 +386,7 @@ function fromMailboxEntry(box, entry) {
     number: entry.number,
     party: entry.party,
     subject: entry.subject,
+    forwarded: entry.forwarded,
     dateRaw,
     sortKey: sortKeyOf(entry.date),
     read: entry.isRead,
@@ -389,6 +406,7 @@ function fromOpenedLetter(box, letter, entry) {
     number: letter.number,
     party,
     subject: letter.subject,
+    forwarded: false,
     dateRaw,
     sortKey: sortKeyOf(parsed),
     read: true,
@@ -492,11 +510,21 @@ var MailboxSession = class {
           if (line.cls === "command" || isEchoLine(line.text)) return;
           const empty = parseEmptyListing(line.text);
           if (empty) {
+            if (empty.box !== box) {
+              cleanup();
+              reject(new Error(`pusta ${empty.box} podczas fetch ${box}`));
+              return;
+            }
             finish({ kind: "pusta", box: empty.box, reason: empty.reason });
             return;
           }
           const h = parseListingHeader(line.text);
           if (h) {
+            if (h.box !== box) {
+              cleanup();
+              reject(new Error(`listing ${h.box} podczas fetch ${box}`));
+              return;
+            }
             header = h;
             armIdle();
           }
@@ -705,6 +733,14 @@ var PagerSession = class {
           retried = true;
           state = "recovering";
           return;
+        }
+        if (state === "letter" && !headersDone) {
+          const mailErr = parseMailError(line.text);
+          if (mailErr) {
+            cleanup();
+            reject(new Error(`pager session list ${numer}: ${line.text.trim()}`));
+            return;
+          }
         }
         const pp = extractPagerPrompt(line.text);
         if (pp) {
@@ -994,6 +1030,7 @@ var DEFAULT_STATE = {
   activeBox: "odebrane",
   boxes: {},
   badge: 0,
+  badgeUnsent: 0,
   busy: null,
   loadAll: null,
   search: null,
@@ -1002,6 +1039,7 @@ var DEFAULT_STATE = {
   archive: [],
   notifyEnabled: false,
   animalFlying: false,
+  unsentFlash: false,
   composeTemplate: "plain",
   composeWidth: 60
 };
@@ -1045,7 +1083,8 @@ var MailUiStore = class {
   applyMailbox(box, result) {
     const view = result.kind === "lista" ? { entries: result.entries, truncated: result.header.truncated, empty: null } : { entries: [], truncated: false, empty: result.reason };
     const boxes = { ...this.current.boxes, [box]: view };
-    this.update({ boxes, badge: computeBadge(boxes) });
+    const b = computeBadges(boxes);
+    this.update({ boxes, badge: b.unread, badgeUnsent: b.unsent });
   }
   /**
    * Dokleja strone starszych listow (paginacja "Wybrane listy") PRZED
@@ -1067,7 +1106,8 @@ var MailUiStore = class {
       empty: null
     };
     const boxes = { ...this.current.boxes, [box]: next };
-    this.update({ boxes, badge: computeBadge(boxes) });
+    const b = computeBadges(boxes);
+    this.update({ boxes, badge: b.unread, badgeUnsent: b.unsent });
     return fresh.length;
   }
   /**
@@ -1123,7 +1163,8 @@ var MailUiStore = class {
       empty: null
     };
     const boxes = { ...this.current.boxes, [box]: nextView };
-    this.update({ boxes, badge: computeBadge(boxes) });
+    const b = computeBadges(boxes);
+    this.update({ boxes, badge: b.unread, badgeUnsent: b.unsent });
     return { updated, added, removed };
   }
   setBusy(label) {
@@ -1156,7 +1197,9 @@ var MailUiStore = class {
     if (stashed) {
       const boxes = { ...this.current.boxes, [box]: stashed };
       patch.boxes = boxes;
-      patch.badge = computeBadge(boxes);
+      const b = computeBadges(boxes);
+      patch.badge = b.unread;
+      patch.badgeUnsent = b.unsent;
     }
     this.update(patch);
   }
@@ -1189,7 +1232,15 @@ var MailUiStore = class {
     for (const b of Object.keys(this.stashedViews)) {
       delete this.stashedViews[b];
     }
-    this.update({ boxes: {}, archive: [], contacts: [], badge: 0, search: null });
+    this.update({
+      boxes: {},
+      archive: [],
+      contacts: [],
+      badge: 0,
+      badgeUnsent: 0,
+      search: null,
+      unsentFlash: false
+    });
   }
   setContacts(contacts) {
     this.update({ contacts });
@@ -1203,6 +1254,9 @@ var MailUiStore = class {
   setAnimalFlying(animalFlying) {
     this.update({ animalFlying });
   }
+  setUnsentFlash(unsentFlash) {
+    this.update({ unsentFlash });
+  }
   setCompose(prefs) {
     const patch = {};
     if (prefs.template !== void 0) patch.composeTemplate = prefs.template;
@@ -1214,12 +1268,15 @@ var MailUiStore = class {
     for (const cb of [...this.listeners]) cb(this.current);
   }
 };
-function computeBadge(boxes) {
-  const unread = boxes.nieprzeczytane;
-  if (unread) return unread.entries.length;
-  const odebrane = boxes.odebrane;
-  if (odebrane) return odebrane.entries.filter((e) => !e.isRead).length;
-  return 0;
+function computeBadges(boxes) {
+  const unreadBox = boxes.nieprzeczytane;
+  const unread = unreadBox ? unreadBox.entries.length : boxes.odebrane?.entries.filter((e) => !e.isRead).length ?? 0;
+  const unsent = boxes.niewyslane?.entries.length ?? 0;
+  return { unread, unsent };
+}
+function formatBadgeSuffix(unread, unsent) {
+  if (unread <= 0 && unsent <= 0) return "";
+  return unsent > 0 ? ` (${unread}/${unsent})` : ` (${unread})`;
 }
 
 // src/arkmail/core/letterRender.ts
@@ -1838,6 +1895,16 @@ var STYLES = `
   right: 10px;
   padding: 2px 10px;
 }
+
+/* Fala 14b: pulsowanie Listy/Niewyslane po odlozeniu listu w kolejce.
+   Kontrakt uiStyles: jawne hex (bez transparent/inherit). */
+@keyframes arkmailFlash {
+  0%, 100% { background: ${BG_RAISED}; color: ${FG}; }
+  50% { background: ${ACCENT}; color: ${ACCENT_FG}; }
+}
+.arkmail-root .arkmail-flash {
+  animation: arkmailFlash 0.6s ease-in-out 5;
+}
 `;
 
 // src/arkmail/ui/ghost.ts
@@ -2043,9 +2110,11 @@ function mountMailUi(container, store2, handlers) {
     bar.className = "arkmail-tabs";
     for (const [id, label] of TABS) {
       const btn = doc.createElement("button");
-      btn.className = "arkmail-tab" + (state.tab === id ? " arkmail-tab-active" : "");
+      btn.className = "arkmail-tab" + (state.tab === id ? " arkmail-tab-active" : "") + // Fala 14b: flash po odlozeniu listu w niewyslanych (compose
+      // poza poczta zawsze kolejkuje) - gracz widzi, gdzie kliknac.
+      (state.unsentFlash && id === "listy" ? " arkmail-flash" : "");
       btn.setAttribute("data-tab", id);
-      btn.textContent = id === "listy" && state.badge > 0 ? `${label} (${state.badge})` : label;
+      btn.textContent = id === "listy" ? label + formatBadgeSuffix(state.badge, state.badgeUnsent) : label;
       btn.addEventListener("click", () => store2.setTab(id));
       bar.appendChild(btn);
     }
@@ -2079,7 +2148,8 @@ function mountMailUi(container, store2, handlers) {
     boxes.className = "arkmail-boxes";
     for (const [box, label] of BOXES) {
       const btn = doc.createElement("button");
-      btn.className = "arkmail-box" + (state.activeBox === box ? " arkmail-box-active" : "");
+      btn.className = "arkmail-box" + (state.activeBox === box ? " arkmail-box-active" : "") + // Fala 14b: flash celu kolejki niewyslanych (jak zakladka Listy).
+      (state.unsentFlash && box === "niewyslane" ? " arkmail-flash" : "");
       btn.setAttribute("data-box", box);
       btn.textContent = label;
       btn.addEventListener("click", () => {
@@ -2210,7 +2280,8 @@ function mountMailUi(container, store2, handlers) {
     const displayed = [...view.entries].reverse();
     for (const [idx, e] of displayed.entries()) {
       const row = doc.createElement("div");
-      row.className = "arkmail-entry" + (e.isRead ? "" : " arkmail-unread");
+      const unreadMark = !e.isRead && (state.activeBox === "odebrane" || state.activeBox === "nieprzeczytane");
+      row.className = "arkmail-entry" + (unreadMark ? " arkmail-unread" : "");
       row.setAttribute("data-number", String(e.number));
       const num = doc.createElement("span");
       num.className = "arkmail-entry-num";
@@ -2285,7 +2356,23 @@ function mountMailUi(container, store2, handlers) {
     del.className = "arkmail-del";
     del.textContent = "Usun";
     if (source) {
-      del.addEventListener("click", () => handlers.onDeleteLetter(l.box, source));
+      let delArmed = false;
+      let delTimer = null;
+      del.addEventListener("click", () => {
+        if (!delArmed) {
+          delArmed = true;
+          del.textContent = "Na pewno? Kliknij ponownie";
+          delTimer = setTimeout(() => {
+            delArmed = false;
+            del.textContent = "Usun";
+          }, 3e3);
+          return;
+        }
+        if (delTimer) clearTimeout(delTimer);
+        delArmed = false;
+        del.textContent = "Usun";
+        handlers.onDeleteLetter(l.box, source);
+      });
     } else {
       del.setAttribute("disabled", "");
       del.setAttribute("title", "Otworz list z zakladki Listy, aby go skasowac.");
@@ -2463,7 +2550,7 @@ function mountMailUi(container, store2, handlers) {
     });
     const send = doc.createElement("button");
     send.className = "arkmail-send";
-    send.textContent = "Wyslij";
+    send.textContent = "Zapisz w kolejce do wyslania";
     send.addEventListener("click", () => {
       const st = store2.state;
       const rendered = renderLetter(tresc.value, st.composeTemplate, st.composeWidth);
@@ -2477,6 +2564,35 @@ function mountMailUi(container, store2, handlers) {
       });
     });
     pane.appendChild(send);
+    const clearCompose = doc.createElement("button");
+    clearCompose.className = "arkmail-compose-clear";
+    clearCompose.textContent = "Wyczysc";
+    let clearArmed = false;
+    let clearTimer = null;
+    clearCompose.addEventListener("click", () => {
+      if (!clearArmed) {
+        clearArmed = true;
+        clearCompose.textContent = "Na pewno? Kliknij ponownie";
+        clearTimer = setTimeout(() => {
+          clearArmed = false;
+          clearCompose.textContent = "Wyczysc";
+        }, 3e3);
+        return;
+      }
+      if (clearTimer) clearTimeout(clearTimer);
+      clearArmed = false;
+      clearCompose.textContent = "Wyczysc";
+      composeDraft.adresat = "";
+      composeDraft.temat = "";
+      composeDraft.dw = "";
+      composeDraft.tresc = "";
+      for (const f of ["adresat", "temat", "dw", "tresc"]) {
+        const el = pane.querySelector(`[data-field="${f}"]`);
+        if (el) el.value = "";
+      }
+      repaintCompose();
+    });
+    pane.appendChild(clearCompose);
     return pane;
   };
   const renderKontakty = (state) => {
@@ -2681,7 +2797,8 @@ var LOAD_ALL_MAX_PAGES = 40;
 var WIDE_MIN_WIDTH = 900;
 var LOAD_ALL_PACE_MS = 400;
 var ANIMAL_TIMING = { flightTimeoutMs: 6e4, sluchamWindowMs: 2e3 };
-var listingCtx = 0;
+var listingCtxSeq = 0;
+var listingCtx = null;
 var ARCHIVE_KEY = "archiwum";
 var NOTIFY_KEY = "powiadomienia";
 var COMPOSE_KEY = "compose";
@@ -2705,6 +2822,7 @@ var unsubBadge = null;
 var wideObserver = null;
 var animalTimer = null;
 var sluchamTimer = null;
+var unsentFlashTimer = null;
 function createContent() {
   const root = document.createElement("div");
   root.style.height = "100%";
@@ -2752,13 +2870,22 @@ async function init(api) {
     if (d?.name) storage.setCharacter(d.name);
   });
   const rebuildContacts = () => {
-    ui.setContacts(contactsFromBoxes(ui.state.boxes, []));
+    ui.setContacts(contactsFromArchive(ui.state.archive));
+  };
+  const flashUnsent = () => {
+    ui.setUnsentFlash(true);
+    if (unsentFlashTimer !== null) clearTimeout(unsentFlashTimer);
+    unsentFlashTimer = setTimeout(() => {
+      unsentFlashTimer = null;
+      ui.setUnsentFlash(false);
+    }, 3e3);
   };
   const fetchBoxes = async (boxes, mode) => {
     for (const box of boxes) {
       ui.setBusy(`Pobieram skrzynke ${box}...`);
       const res = await mailbox.fetch(box);
-      if (res.kind === "lista") stampEntries(res.entries);
+      if (res.kind === "lista") stampEntries(box, res.entries);
+      else bumpCtx(box);
       if (res.kind === "lista" && mode === "sync") {
         const synced = ui.syncMailboxPage(box, res.entries, res.header.truncated);
         if (!synced) ui.applyMailbox(box, res);
@@ -2842,19 +2969,26 @@ async function init(api) {
     return oldest;
   };
   const entryKey = (e) => [e.party, e.subject, e.forwarded ? "f" : "", e.date?.raw ?? ""].join("|");
-  const stampEntries = (entries) => {
-    listingCtx += 1;
-    for (const e of entries) e.ctx = listingCtx;
+  const bumpCtx = (box) => {
+    listingCtxSeq += 1;
+    listingCtx = { box, stamp: listingCtxSeq };
+  };
+  const stampEntries = (box, entries) => {
+    bumpCtx(box);
+    for (const e of entries) e.ctx = { box, stamp: listingCtxSeq };
   };
   const resolveEntry = async (box, entry) => {
-    if (entry.ctx !== void 0 && entry.ctx === listingCtx) return entry;
+    if (entry.ctx !== void 0 && listingCtx !== null && entry.ctx.stamp === listingCtx.stamp && entry.ctx.box === listingCtx.box) {
+      return entry;
+    }
     if (!entry.date) {
       notify(api, "Nie moge zlokalizowac listu (brak daty) - odswiez skrzynke.");
       return null;
     }
     const res = await mailbox.fetch(box, olderListingCommand(box, nextDay(entry.date)));
+    if (res.kind !== "lista") bumpCtx(box);
     if (res.kind === "lista") {
-      stampEntries(res.entries);
+      stampEntries(box, res.entries);
       const merged = upsertLetters(
         ui.state.archive,
         res.entries.map((e) => fromMailboxEntry(box, e))
@@ -2879,7 +3013,7 @@ async function init(api) {
     void lock.runExclusive(async () => {
       const res = await mailbox.fetch(box, olderListingCommand(box, anchor));
       if (res.kind === "lista") {
-        stampEntries(res.entries);
+        stampEntries(box, res.entries);
         ui.appendMailboxPage(box, res.entries, res.header.truncated);
         const incoming = res.entries.map((e) => fromMailboxEntry(box, e));
         const merged = upsertLetters(ui.state.archive, incoming);
@@ -2887,6 +3021,7 @@ async function init(api) {
         persistArchive();
         notify(api, `Wczytano starsze listy (nowych: ${merged.added}).`);
       } else {
+        bumpCtx(box);
         ui.appendMailboxPage(box, [], false);
         notify(api, "Brak starszych listow.");
       }
@@ -2924,7 +3059,7 @@ async function init(api) {
           pages += 1;
           let more = false;
           if (res.kind === "lista") {
-            stampEntries(res.entries);
+            stampEntries(box, res.entries);
             const freshCount = ui.appendMailboxPage(box, res.entries, res.header.truncated);
             const merged = upsertLetters(
               ui.state.archive,
@@ -2935,6 +3070,7 @@ async function init(api) {
             added += merged.added;
             more = res.header.truncated && freshCount > 0;
           } else {
+            bumpCtx(box);
             ui.appendMailboxPage(box, [], false);
           }
           ui.setLoadAll({ box, pages });
@@ -3057,6 +3193,7 @@ async function init(api) {
           } else if (out.result === "gotowy") {
             notify(api, "List odlozony w niewyslanych.");
             refreshBoxes(["niewyslane"]);
+            flashUnsent();
           } else {
             notify(api, "Blad wysylki - sprawdz adresata.");
           }
@@ -3073,7 +3210,8 @@ async function init(api) {
       ui.setBusy(`Szukam w skrzynce ${box}...`);
       void lock.runExclusive(async () => {
         const res = await mailbox.fetch(box, searchListingCommand(box, query));
-        if (res.kind === "lista") stampEntries(res.entries);
+        if (res.kind === "lista") stampEntries(box, res.entries);
+        else bumpCtx(box);
         ui.setSearch({ box, label: searchDescription(box, query) });
         ui.applySearchResults(box, res);
         if (res.kind === "lista") {
@@ -3118,7 +3256,7 @@ async function init(api) {
         try {
           const res = await pager.deleteLetters(fresh.number, String(fresh.number));
           if (res.deleted) {
-            notify(api, "List oznaczony do skasowania.");
+            notify(api, "List zostal usuniety.");
             ui.closeLetter();
             refreshBoxes([box], "replace");
           } else {
@@ -3144,6 +3282,7 @@ async function init(api) {
           if (res.queued) {
             notify(api, "List przekazany - czeka w niewyslanych.");
             refreshBoxes(["niewyslane"]);
+            flashUnsent();
           } else {
             notify(api, "Blad przekazania - sprawdz adresata.");
           }
@@ -3190,8 +3329,8 @@ async function init(api) {
     }
   });
   unsubBadge = ui.subscribe((s) => {
-    footerHandle?.update({ label: s.badge > 0 ? `${PLUGIN_NAME} (${s.badge})` : PLUGIN_NAME });
-    api.ui.setFooterButtonState(FOOTER_STATE, s.badge > 0);
+    footerHandle?.update({ label: PLUGIN_NAME + formatBadgeSuffix(s.badge, s.badgeUnsent) });
+    api.ui.setFooterButtonState(FOOTER_STATE, s.badge > 0 || s.badgeUnsent > 0);
     storage.setJSON(COMPOSE_KEY, { template: s.composeTemplate, width: s.composeWidth });
     storage.setJSON(NOTIFY_KEY, s.notifyEnabled);
   });
@@ -3235,6 +3374,10 @@ async function destroy() {
   if (sluchamTimer !== null) {
     clearTimeout(sluchamTimer);
     sluchamTimer = null;
+  }
+  if (unsentFlashTimer !== null) {
+    clearTimeout(unsentFlashTimer);
+    unsentFlashTimer = null;
   }
   if (unsubBadge) {
     unsubBadge();
