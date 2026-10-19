@@ -705,6 +705,21 @@ export function mountMailUi(
           const name = doc.createElement('span');
           name.className = 'arkmail-contact-name';
           name.textContent = c.name;
+          // Fala 12c: jawny wybor kierunku - gracz decyduje, czy pokazac
+          // odebrane OD osoby czy wyslane DO niej (wczesniej klik szukal
+          // na aktywnej skrzynce, czyli "gdzie popadnie").
+          const jumpTo = (box: MailBox) => {
+            searchDraft.osoba = c.name;
+            store.setActiveBox(box);
+            store.setTab('listy');
+            handlers.onSearch(box, { osoba: c.name });
+          };
+          // Klik w imie = kierunek domyslny: odebrane, gdy sa.
+          name.setAttribute('title', 'Pokaz listy tej osoby (domyslnie: odebrane)');
+          name.addEventListener('click', () => {
+            if (c.lettersReceived > 0) jumpTo('odebrane');
+            else if (c.lettersSent > 0) jumpTo('wyslane');
+          });
           row.appendChild(name);
           const stats = doc.createElement('span');
           stats.className = 'arkmail-contact-stats';
@@ -718,14 +733,27 @@ export function mountMailUi(
             last.textContent = c.lastContactRaw;
             row.appendChild(last);
           }
-          // Fala 11h: klik w kontakt -> zakladka Listy + szukanie
-          // serwerowe po tej osobie na aktywnej skrzynce.
-          row.setAttribute('title', 'Pokaz listy tej osoby');
-          row.addEventListener('click', () => {
-            searchDraft.osoba = c.name;
-            store.setTab('listy');
-            handlers.onSearch(store.state.activeBox, { osoba: c.name });
-          });
+          // Przyciski kierunku (Fala 12c); wylaczone, gdy licznik = 0.
+          const dirs = doc.createElement('span');
+          dirs.className = 'arkmail-contact-dirs';
+          const DIR_OPTS: Array<[MailBox, string, number]> = [
+            ['odebrane', 'Odebrane', c.lettersReceived],
+            ['wyslane', 'Wyslane', c.lettersSent],
+          ];
+          for (const [box, label, count] of DIR_OPTS) {
+            const btn = doc.createElement('button');
+            btn.className = 'arkmail-contact-dir';
+            btn.setAttribute('data-dir', box);
+            btn.textContent = label;
+            if (count === 0) {
+              btn.setAttribute('disabled', '1');
+              btn.setAttribute('title', 'Brak listow w tym kierunku');
+            } else {
+              btn.addEventListener('click', () => jumpTo(box));
+            }
+            dirs.appendChild(btn);
+          }
+          row.appendChild(dirs);
           return row;
         }),
       );

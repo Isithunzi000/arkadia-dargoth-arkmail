@@ -286,10 +286,25 @@ export const STYLES = `
   border-radius: 6px;
   border-bottom: 1px solid ${BG};
 }
-/* Fala 11h: wiersz kontaktu klikalny (skok do listow tej osoby). */
-.arkmail-contact { cursor: pointer; }
+/* Fala 12c: klikalne jest IMIE (kierunek domyslny) + przyciski kierunku. */
 .arkmail-contact:hover, .arkmail-arch-entry:hover { background: ${BG_RAISED}; }
-.arkmail-contact-name { color: ${FG}; font-weight: 600; }
+.arkmail-contact-name { color: ${FG}; font-weight: 600; cursor: pointer; }
+.arkmail-contact-name:hover { text-decoration: underline; }
+.arkmail-contact-dirs { margin-left: auto; display: flex; gap: 4px; }
+.arkmail-root .arkmail-contact-dir {
+  background: ${BG_RAISED};
+  color: ${FG};
+  border: 1px solid ${BORDER};
+  border-radius: 4px;
+  padding: 1px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.arkmail-root .arkmail-contact-dir:hover { border-color: ${FG_DIM}; }
+.arkmail-root .arkmail-contact-dir:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
 .arkmail-contact-stats, .arkmail-arch-meta { color: ${FG_DIM}; font-size: 12px; }
 .arkmail-contact-controls { display: flex; gap: 6px; margin-bottom: 8px; }
 .arkmail-arch-controls {
