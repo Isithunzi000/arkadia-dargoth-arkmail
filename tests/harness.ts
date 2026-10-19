@@ -16,6 +16,8 @@ export class FakeApi {
   triggerCb: TriggerCb | null = null;
   emitted: { event: string; args: unknown[] }[] = [];
   popupConfig: { createContent: () => Promise<unknown> } | null = null;
+  /** Zarejestrowane nasluchy zdarzen klienta (Fala 13a: gmcp.mail.state). */
+  eventListeners = new Map<string, Array<(payload: unknown) => void>>();
 
   readonly api = {
     command: {
@@ -38,7 +40,11 @@ export class FakeApi {
       unregister: () => true,
     },
     events: {
-      on: () => {},
+      on: (event: string, cb: (payload: unknown) => void) => {
+        const arr = this.eventListeners.get(event) ?? [];
+        arr.push(cb);
+        this.eventListeners.set(event, arr);
+      },
       off: () => {},
       emit: (event: string, ...args: unknown[]) => {
         this.emitted.push({ event, args });
@@ -78,6 +84,11 @@ export class FakeApi {
 
   fire(text: string, cls = ''): void {
     this.triggerCb?.({ text }, null, cls);
+  }
+
+  /** Wystrzelenie zdarzenia klienta do nasluchow pluginu (np. gmcp.mail.state). */
+  fireEvent(event: string, payload: unknown): void {
+    for (const cb of this.eventListeners.get(event) ?? []) cb(payload);
   }
 }
 
@@ -129,6 +140,11 @@ export async function loadTruncatedBox(h: Harness): Promise<void> {
   await waitFor(() => f.sent.includes('listy nieprzeczytane'), 'komenda listy nieprzeczytane');
   f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
   await waitFor(() => !!content.querySelector('.arkmail-older'), 'przycisk Wczytaj starsze');
+  // Fala 13a: koniec prologu = sesja ZAMKNIETA. Sam przycisk pojawia sie
+  // juz po listingu odebranych (przed koncem fetchu nieprzeczytanych),
+  // wiec czekamy tez na znikniecie paska busy - inaczej test łapal
+  // chwile, gdy blokada sesji jeszcze stoi (wyscig mikrozadan).
+  await waitFor(() => !content.querySelector('.arkmail-busy'), 'koniec sesji prologu');
 }
 
 export const click = (h: Harness, selector: string): void =>

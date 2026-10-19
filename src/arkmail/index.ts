@@ -167,36 +167,39 @@ export async function init(api: PluginApi) {
    * - lista ma zniknac natychmiast, nawet z ucietych listingow).
    * Kontrakt sync: ui/store.ts syncMailboxPage, tests/syncMailbox.test.ts.
    */
+  /** Wnetrze refreshBoxes: pobranie i zastosowanie listingow (pod lockiem). */
+  const fetchBoxes = async (boxes: MailBox[], mode: "sync" | "replace"): Promise<void> => {
+    for (const box of boxes) {
+      ui.setBusy(`Pobieram skrzynke ${box}...`);
+      const res = await mailbox.fetch(box);
+      if (res.kind === "lista") stampEntries(res.entries);
+      if (res.kind === "lista" && mode === "sync") {
+        // null = brak widoku / widok pusty -> pelne zastosowanie.
+        const synced = ui.syncMailboxPage(box, res.entries, res.header.truncated);
+        if (!synced) ui.applyMailbox(box, res);
+      } else {
+        ui.applyMailbox(box, res);
+      }
+      if (res.kind === "lista") {
+        // Cache (Fala 8f): KAZDE pobranie listingu dokleja wpisy do
+        // archiwum (cicho, bez notify). Widok skrzynki NIE jest
+        // hydratowany z cache - numery zyja w kontekscie ostatniego
+        // listingu serwera.
+        const merged = upsertLetters(
+          ui.state.archive,
+          res.entries.map((e) => fromMailboxEntry(box, e)),
+        );
+        ui.setArchive(merged.letters);
+      }
+    }
+  };
+
   const refreshBoxes = (boxes: MailBox[], mode: "sync" | "replace" = "sync"): void => {
     // Swiezy listing nadpisuje widok - tryb wynikow szukania na tych
     // skrzynkach przestaje obowiazywac (bez przywracania schowka).
     ui.clearSearchBoxes(boxes);
     void lock
-      .runExclusive(async () => {
-        for (const box of boxes) {
-          ui.setBusy(`Pobieram skrzynke ${box}...`);
-          const res = await mailbox.fetch(box);
-          if (res.kind === "lista") stampEntries(res.entries);
-          if (res.kind === "lista" && mode === "sync") {
-            // null = brak widoku / widok pusty -> pelne zastosowanie.
-            const synced = ui.syncMailboxPage(box, res.entries, res.header.truncated);
-            if (!synced) ui.applyMailbox(box, res);
-          } else {
-            ui.applyMailbox(box, res);
-          }
-          if (res.kind === "lista") {
-            // Cache (Fala 8f): KAZDE pobranie listingu dokleja wpisy do
-            // archiwum (cicho, bez notify). Widok skrzynki NIE jest
-            // hydratowany z cache - numery zyja w kontekscie ostatniego
-            // listingu serwera.
-            const merged = upsertLetters(
-              ui.state.archive,
-              res.entries.map((e) => fromMailboxEntry(box, e)),
-            );
-            ui.setArchive(merged.letters);
-          }
-        }
-      })
+      .runExclusive(() => fetchBoxes(boxes, mode))
       .catch(() => {})
       .finally(() => {
         ui.setBusy(null);
@@ -204,6 +207,89 @@ export async function init(api: PluginApi) {
         persistArchive();
       });
   };
+
+  /**
+   * Koalescencja odswiezen ze zdarzen zewnetrznych (Fala 13a): powiadomienie
+   * tekstowe i GMCP Mail.State zwykle przychodza RAZEM (to samo zdarzenie
+   * serwera) - bez zbiornika kazde zrodlo kolejkowaloby osobny refresh,
+   * marnujac komendy i blokade. Skrzynki laduja w zbiorniku; jedna sesja
+   * drenażuja pobiera caly aktywny zbior; zdarzenia naplywajace w trakcie
+   * drenażu odpalaja dokladnie jedna kolejna ture.
+   */
+  const pendingRefresh = new Set<MailBox>();
+  let drainScheduled = false;
+  const scheduleRefresh = (boxes: MailBox[]): void => {
+    for (const b of boxes) pendingRefresh.add(b);
+    if (drainScheduled) return;
+    drainScheduled = true;
+    void lock
+      .runExclusive(async () => {
+        const batch = [...pendingRefresh];
+        pendingRefresh.clear();
+        ui.clearSearchBoxes(batch);
+        await fetchBoxes(batch, "sync");
+      })
+      .catch(() => {})
+      .finally(() => {
+        ui.setBusy(null);
+        rebuildContacts();
+        persistArchive();
+        drainScheduled = false;
+        if (pendingRefresh.size > 0) scheduleRefresh([]);
+      });
+  };
+
+  /**
+   * GMCP Mail.State (Fala 13a): deklaratywne zrodlo prawdy o skrzynkach.
+   * Serwer wysyla je po zalogowaniu oraz przy otrzymywaniu i czytaniu
+   * poczty; klient emituje jako "gmcp.mail.state" (path lowercasowany
+   * w gmcp.ts). Po co, skoro sa linie tekstowe: one potrafia sie rozjechac
+   * ze stanem (log 2026-01-04 01:03 - "Masz nowa poczte od Bar.", a 15 s
+   * pozniej przy ladowaniu zwierzecia "Nie masz zadnych nieprzeczytanych
+   * listow.", choć list byl w skrzynce). GMCP jest WYZWALACZEM odswiezenia;
+   * badge nadal liczy sie z listingow (computeBadge).
+   *
+   * Kontrakt: pierwsza ramka po starcie odswieza tylko grupy z flaga true;
+   * kolejne ramki reaguja na ZMIANE pola (obie strony: true->false tez,
+   * bo poczte mozna przeczytac na fizycznej poczcie); identyczna ramka
+   * nic nie robi; ramka bez trzech booleanow jest ignorowana.
+   */
+  let lastMailState: { unread: boolean; unreceived: boolean; unsent: boolean } | null = null;
+  api.events.on("gmcp.mail.state", (d) => {
+    if (!d || typeof d !== "object") return;
+    const s = d as { unread?: unknown; unreceived?: unknown; unsent?: unknown };
+    if (
+      typeof s.unread !== "boolean" ||
+      typeof s.unreceived !== "boolean" ||
+      typeof s.unsent !== "boolean"
+    ) {
+      return;
+    }
+    const cur = { unread: s.unread, unreceived: s.unreceived, unsent: s.unsent };
+    const prev = lastMailState;
+    if (
+      prev &&
+      cur.unread === prev.unread &&
+      cur.unreceived === prev.unreceived &&
+      cur.unsent === prev.unsent
+    ) {
+      return;
+    }
+    lastMailState = cur;
+    const boxes = new Set<MailBox>();
+    const inboxTouched = prev
+      ? cur.unread !== prev.unread || cur.unreceived !== prev.unreceived
+      : cur.unread || cur.unreceived;
+    if (inboxTouched) {
+      boxes.add("odebrane");
+      boxes.add("nieprzeczytane");
+    }
+    if (prev ? cur.unsent !== prev.unsent : cur.unsent) {
+      boxes.add("niewyslane");
+      boxes.add("wyslane");
+    }
+    if (boxes.size > 0) scheduleRefresh([...boxes]);
+  });
 
   const persistArchive = (): void => {
     storage.setJSON(ARCHIVE_KEY, ui.state.archive);
@@ -585,6 +671,7 @@ export async function init(api: PluginApi) {
   transport.subscribe((line) => {
     if (line.cls === "command" || isEchoLine(line.text)) return;
     if (!extractPagerPrompt(line.text)) return;
+    console.error("WATCHDOG locked=", lock.locked);
     if (lock.locked) return; // legalna sesja pagerowa pod blokada
     const now = Date.now();
     if (now - lastWatchdogQ < 2000) return; // cooldown: jedno q na serie
@@ -593,14 +680,16 @@ export async function init(api: PluginApi) {
   });
 
   // Powiadomienia pocztowe: odswiezenie + opcjonalny tost.
+  // Fala 13a: przez scheduleRefresh (koalescencja z GMCP Mail.State,
+  // ktore zwykle przychodzi w parze z linia tekstowa).
   transport.subscribe((line) => {
     const n = parseNotification(line.text);
     if (!n) return;
     if (n.kind === "nowa-poczte") {
       if (ui.state.notifyEnabled) notify(api, `Masz nowa poczte od ${n.nadawca}.`);
-      refreshBoxes(["odebrane", "nieprzeczytane"]);
+      scheduleRefresh(["odebrane", "nieprzeczytane"]);
     } else if (n.kind === "goniec") {
-      refreshBoxes(["odebrane", "nieprzeczytane"]);
+      scheduleRefresh(["odebrane", "nieprzeczytane"]);
     }
   });
 

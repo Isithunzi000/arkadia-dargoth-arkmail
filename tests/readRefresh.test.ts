@@ -48,6 +48,9 @@ async function loadBoxWithUnread(h: Harness): Promise<void> {
   f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
   f.fire('> ', 'prompt');
   await waitFor(() => content.querySelectorAll('.arkmail-entry').length === 3, '3 wiersze');
+  // Fala 13a: koniec prologu = sesja zamknieta (jak w loadTruncatedBox) -
+  // wiersze renderuja sie przed koncem fetchu nieprzeczytanych.
+  await waitFor(() => !content.querySelector('.arkmail-busy'), 'koniec sesji prologu');
 }
 
 test('odczyt listu odswieza skrzynke - znacznik R przychodzi z serwera', async () => {
