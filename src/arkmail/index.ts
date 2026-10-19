@@ -258,6 +258,22 @@ export async function init(api: PluginApi) {
       });
   };
 
+  // Fala 16c: reconnect/re-login uniewaznia kontekst listingu serwera.
+  // Nowa sesja serwera NIE MA "biezacego listingu" - wpisy sprzed
+  // polaczenia musza przejsc re-kotwice, inaczej "przeczytaj list N"
+  // leci na pusto ("Zadne listy nie zostaly wybrane.", log 2026-10-19
+  // 17:13:14; zgloszenie pkt 3/13 "klikam i nie moge wyswietlic listu").
+  // Po uniewaznieniu auto-refresh daje widokowi swieze stemple.
+  const invalidateOnReconnect = (): void => {
+    listingCtx = null;
+    refreshBoxes(["odebrane", "nieprzeczytane", "wyslane", "niewyslane"]);
+  };
+  api.events.on("client.connect", invalidateOnReconnect);
+  // Disconnect: listing serwera i tak nie przetrwa - samo uniewaznienie.
+  api.events.on("client.disconnect", () => {
+    listingCtx = null;
+  });
+
   /**
    * Koalescencja odswiezen ze zdarzen zewnetrznych (Fala 13a): powiadomienie
    * tekstowe i GMCP Mail.State zwykle przychodza RAZEM (to samo zdarzenie
@@ -635,28 +651,45 @@ export async function init(api: PluginApi) {
       ui.setBusy(`Czytam list: ${entry.subject}...`);
       void lock
         .runExclusive(async () => {
-          // Re-kotwiczenie (Fala 9a): numer serwera dopiero ze swiezego
-          // kontekstu; brak wpisu = zadna komenda nie wylatuje.
-          const fresh = await resolveEntry(box, entry);
-          if (!fresh) return;
-          transport!.beginModal();
-          try {
-            const res = await pager.readLetter(fresh.number);
-            ui.openLetter(box, res.letter, fresh);
-            // Cache (Fala 8f): tresc listu do archiwum. Swiezy wpis
-            // daje zgodnosc id (flaga forwarded) z rekordem z listingu.
-            const merged = upsertLetters(ui.state.archive, [
-              fromOpenedLetter(box, res.letter, fresh),
-            ]);
-            ui.setArchive(merged.letters);
-            persistArchive();
-            // Fala 11f: po odczycie swiezy listing skrzynki - znacznik
-            // przeczytania i badge to prawda serwerowa (plugin niczego
-            // nie zaznacza lokalnie). W trybie wynikow szukania pomijamy:
-            // refresh czysci selekcje i wywalilby gracza z wynikow.
-            if (ui.state.search?.box !== box) refreshBoxes([box]);
-          } finally {
-            transport!.endModal();
+          // Fala 16c: blad "listing serwera zniknal" (re-login, cudzy
+          // listing gracza miedzy operacjami - log 2026-10-19 17:13:14)
+          // dostaje JEDNA druga szanse: wymuszamy re-kotwice (bumpCtx
+          // uniewaznia dopasowanie kontekstu) i ponawiamy odczyt.
+          // Powtorka bledu = toast, bez trzeciej proby.
+          for (let attempt = 0; attempt < 2; attempt++) {
+            // Re-kotwiczenie (Fala 9a): numer serwera dopiero ze swiezego
+            // kontekstu; brak wpisu = zadna komenda nie wylatuje.
+            const fresh = await resolveEntry(box, entry);
+            if (!fresh) return;
+            transport!.beginModal();
+            try {
+              const res = await pager.readLetter(fresh.number);
+              ui.openLetter(box, res.letter, fresh);
+              // Cache (Fala 8f): tresc listu do archiwum. Swiezy wpis
+              // daje zgodnosc id (flaga forwarded) z rekordem z listingu.
+              const merged = upsertLetters(ui.state.archive, [
+                fromOpenedLetter(box, res.letter, fresh),
+              ]);
+              ui.setArchive(merged.letters);
+              persistArchive();
+              // Fala 11f: po odczycie swiezy listing skrzynki - znacznik
+              // przeczytania i badge to prawda serwerowa (plugin niczego
+              // nie zaznacza lokalnie). W trybie wynikow szukania pomijamy:
+              // refresh czysci selekcje i wywalilby gracza z wynikow.
+              if (ui.state.search?.box !== box) refreshBoxes([box]);
+              return;
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              const listingGone =
+                /nie zostaly wybrane|Zly numer listu/.test(msg);
+              if (attempt === 0 && listingGone) {
+                bumpCtx(box); // wymuszenie re-kotwicy w drugiej probie
+                continue;
+              }
+              throw err;
+            } finally {
+              transport!.endModal();
+            }
           }
         })
         .catch(() => notify(api, "Nie udalo sie odczytac listu."))
