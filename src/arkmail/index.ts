@@ -502,6 +502,19 @@ export async function init(api: PluginApi) {
         .finally(() => ui.setBusy(null));
     },
     onClearSearch: (box) => ui.clearSearch(box),
+    // Fala 12e: czyszczenie pamieci podrecznej na zadanie gracza.
+    // Kasuje archiwum (storage + RAM), widoki skrzynek i kontakty;
+    // ZACHOWUJE ustawienia (powiadomienia, szablon compose) - one nie
+    // sa cache, tylko preferencje.
+    onClearCache: () => {
+      if (lock.locked) {
+        notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+        return;
+      }
+      storage.remove(ARCHIVE_KEY);
+      ui.clearCacheData();
+      notify(api, "Pamiec podreczna wyczyszczona - skrzynki pobiora sie na nowo.");
+    },
     onDeleteLetter: (box, entry) => {
       // Fala 12a: zero cichego kolejkowania sesji modalnych.
       if (lock.locked) {

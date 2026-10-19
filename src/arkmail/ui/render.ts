@@ -40,6 +40,12 @@ export interface MailUiHandlers {
   onClearSearch(box: MailBox): void;
   onDeleteLetter(box: MailBox, entry: MailboxEntry): void;
   onForwardLetter(box: MailBox, entry: MailboxEntry, adresat: string): void;
+  /**
+   * Czyszczenie pamieci podrecznej (Fala 12e). Opcjonalny: starsze
+   * montaze testowe go nie podaja - przycisk wtedy po prostu nic nie
+   * robi po potwierdzeniu.
+   */
+  onClearCache?(): void;
 }
 
 const TEMPLATES: Array<[LetterTemplate, string]> = [
@@ -314,6 +320,30 @@ export function mountMailUi(
     if (nothingToLoad) loadAllBtn.setAttribute('disabled', '');
     loadAllBtn.addEventListener('click', () => handlers.onLoadAll(state.activeBox));
     ops.appendChild(loadAllBtn);
+    // Fala 12e: czyszczenie pamieci podrecznej z dwuklikowym
+    // potwierdzeniem (uzbrojenie wygasa po 3 s). Stan uzbrojenia lokalny
+    // dla przycisku - kazdy rerender wraca do stanu poczatkowego.
+    const clearBtn = doc.createElement('button');
+    clearBtn.className = 'arkmail-cache-clear';
+    clearBtn.textContent = 'Wyczysc pamiec podreczna';
+    let clearArmed = false;
+    let clearTimer: ReturnType<typeof setTimeout> | null = null;
+    clearBtn.addEventListener('click', () => {
+      if (!clearArmed) {
+        clearArmed = true;
+        clearBtn.textContent = 'Na pewno? Kliknij ponownie';
+        clearTimer = setTimeout(() => {
+          clearArmed = false;
+          clearBtn.textContent = 'Wyczysc pamiec podreczna';
+        }, 3000);
+        return;
+      }
+      if (clearTimer) clearTimeout(clearTimer);
+      clearArmed = false;
+      clearBtn.textContent = 'Wyczysc pamiec podreczna';
+      handlers.onClearCache?.();
+    });
+    ops.appendChild(clearBtn);
     pane.appendChild(ops);
 
     // Przelacznik powiadomien o nowej poczcie (trwale w storage).

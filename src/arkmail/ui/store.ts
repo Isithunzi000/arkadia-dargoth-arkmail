@@ -272,6 +272,19 @@ export class MailUiStore {
     this.update({ letter: null, tab: 'listy' });
   }
 
+  /**
+   * Czysci pamiec podreczna pluginu (Fala 12e): widoki skrzynek,
+   * archiwum (RAM; storage kasuje caller), kontakty, schowek wynikow
+   * szukania i tryb szukania. ZACHOWUJE ustawienia (powiadomienia,
+   * szablon/szerokosc compose) i otwarty list.
+   */
+  clearCacheData(): void {
+    for (const b of Object.keys(this.stashedViews)) {
+      delete this.stashedViews[b as MailBox];
+    }
+    this.update({ boxes: {}, archive: [], contacts: [], badge: 0, search: null });
+  }
+
   setContacts(contacts: Contact[]): void {
     this.update({ contacts });
   }
