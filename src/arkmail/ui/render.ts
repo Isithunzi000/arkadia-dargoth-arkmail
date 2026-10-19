@@ -560,6 +560,30 @@ export function mountMailUi(
     const ops = doc.createElement('div');
     ops.className = 'arkmail-letter-ops';
     const source = l.source;
+    // Fala 15a: Odpowiedz / Odpowiedz wszystkim - pierwsze w pasku.
+    // Czysta operacja UI: prefill composeDraft + przelaczenie na Napisz,
+    // zero komend do serwera, wiec dziala tez bez wpisu-zrodla.
+    // Adresat: odebrane -> nadawca; wyslane -> odbiorca (puste "Do" =
+    // list tylko na DW -> adresat = DW). Reply-all doklada oryginalne
+    // DW; brak DW -> jak zwykle Odpowiedz. Temat i tresc puste.
+    const replyTo = (all: boolean): void => {
+      const received = l.box === 'odebrane' || l.box === 'nieprzeczytane';
+      composeDraft.adresat = received ? l.from : l.to || l.cc || '';
+      composeDraft.dw = all && l.cc ? l.cc : '';
+      composeDraft.temat = '';
+      composeDraft.tresc = '';
+      store.setTab('napisz');
+    };
+    const reply = doc.createElement('button');
+    reply.className = 'arkmail-reply';
+    reply.textContent = 'Odpowiedz';
+    reply.addEventListener('click', () => replyTo(false));
+    ops.appendChild(reply);
+    const replyAll = doc.createElement('button');
+    replyAll.className = 'arkmail-reply-all';
+    replyAll.textContent = 'Odpowiedz wszystkim';
+    replyAll.addEventListener('click', () => replyTo(true));
+    ops.appendChild(replyAll);
     const del = doc.createElement('button');
     del.className = 'arkmail-del';
     del.textContent = 'Usun';
