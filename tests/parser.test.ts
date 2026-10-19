@@ -152,6 +152,11 @@ test('powiadomienia: nowa poczte (z prefiksem klienta), goniec, wysylasz', () =>
   assert.deepEqual(parseNotification('Goniec przyniosl nowa partie listow.'), { kind: 'goniec' });
   assert.deepEqual(parseNotification('Wysylasz Kruk na poczte.'), { kind: 'wysylasz', zwierze: 'Kruk' });
   assert.deepEqual(parseNotification('Wysylasz Kruka na poczte.'), { kind: 'wysylasz', zwierze: 'Kruka' });
+  // Fala 13b: powrot zwierzecia - dwa warianty z logow.
+  assert.deepEqual(parseNotification('Wsrod trzepotu skrzydel Kruk laduje na twoim prawym ramieniu.'), { kind: 'powrot-zwierzecia', zwierze: 'Kruk' });
+  assert.deepEqual(parseNotification('Wsrod trzepotu skrzydel Kruk laduje na twojej rece.'), { kind: 'powrot-zwierzecia', zwierze: 'Kruk' });
+  // Fala 13c: dostawa przez zwierze poza sesja compose.
+  assert.deepEqual(parseNotification('List zostal pomyslnie wyslany.'), { kind: 'list-wyslany' });
   assert.equal(parseNotification('Poczta jest zamknieta.'), null);
 });
 

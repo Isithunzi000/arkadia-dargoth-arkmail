@@ -190,6 +190,9 @@ export function parseNotification(text: string): MailNotification | null {
   // twojej rece." - imie zwierzecia jest zmienne per postac.
   const powrot = t.match(/^Wsrod trzepotu skrzydel ([A-Za-z]+) laduje na (?:twoim|twojej) \w+(?: \w+)?\.$/);
   if (powrot) return { kind: 'powrot-zwierzecia', zwierze: powrot[1] };
+  // Dostawa niewyslanych przez zwierze POZA sesja compose (Fala 13c) -
+  // w compose te sama linie konsumuje flota edytora (parseComposeResult).
+  if (t === 'List zostal pomyslnie wyslany.') return { kind: 'list-wyslany' };
   return null;
 }
 

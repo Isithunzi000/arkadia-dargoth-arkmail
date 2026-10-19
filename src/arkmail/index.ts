@@ -749,6 +749,12 @@ export async function init(api: PluginApi) {
       // sam sprawdza nieprzeczytane, wiec inbox mogl sie zmienic.
       endAnimalFlight();
       scheduleRefresh(["odebrane", "nieprzeczytane"]);
+    } else if (n.kind === "list-wyslany") {
+      // Fala 13c: dostawa niewyslanych przez zwierze (poza compose).
+      // Pod lockiem pomijamy - sesja compose/edytora sama odswieza
+      // skrzynki na koncu (inaczej kazdy compose mialby dodatkowy
+      // dwa listingi z tej samej linii).
+      if (!lock.locked) scheduleRefresh(["niewyslane", "wyslane"]);
     }
   });
 
