@@ -40,6 +40,9 @@ import {
 } from "./core/archive";
 import { MailboxSession, type ListingCtx, type MailboxEntry } from "./core/session/mailbox";
 import { humanizeMailError } from "./core/errors";
+import { archiveExportEntries, letterTxt, txtFileName } from "./core/exportTxt";
+import { buildZip } from "./core/zipStore";
+import { downloadBlob } from "./ui/download";
 import { PagerSession } from "./core/session/pager";
 import { EditorSession } from "./core/session/editor";
 import { SessionLock } from "./core/sessionLock";
@@ -934,6 +937,55 @@ export async function init(api: PluginApi) {
         .finally(() => ui.setBusy(null));
     },
     onDownloadArchiveBodies: () => downloadArchiveBodies(),
+    // Fala 17g: eksporty TXT/ZIP - operacje czysto lokalne (dane
+    // z cache), bez locka i bez komend do serwera.
+    onExportLetter: () => {
+      const l = ui.state.letter;
+      if (!l) return;
+      const sender = l.box === "odebrane" || l.box === "nieprzeczytane";
+      const party = sender ? l.from : l.to || l.cc || "";
+      const txt = letterTxt({
+        subject: l.subject,
+        from: l.from,
+        to: l.to,
+        cc: l.cc,
+        date: l.date,
+        box: l.box,
+        body: l.body,
+      });
+      const blob = new Blob([txt], { type: "text/plain" });
+      const ok = downloadBlob(txtFileName(party, l.subject, l.date), blob);
+      notify(
+        api,
+        ok
+          ? "Zapisano list do pliku TXT."
+          : "Nie udalo sie zapisac pliku - klient nie obsluguje pobierania.",
+      );
+    },
+    onExportArchive: () => {
+      const { entries, skipped } = archiveExportEntries(ui.state.archive);
+      if (entries.length === 0) {
+        notify(api, "Brak listow z tresci w archiwum - najpierw pobierz tresci.");
+        return;
+      }
+      const enc = new TextEncoder();
+      const zip = buildZip(entries.map((e) => ({ name: e.name, data: enc.encode(e.txt) })));
+      const now = new Date();
+      const p2 = (n: number) => String(n).padStart(2, "0");
+      const name =
+        `arkmail_listy_${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())}` +
+        `_${p2(now.getHours())}${p2(now.getMinutes())}.zip`;
+      // buildZip alokuje bufor dokladnie na wynik - buffer jest ArrayBuffer.
+      const ok = downloadBlob(name, new Blob([zip.buffer as ArrayBuffer], { type: "application/zip" }));
+      notify(
+        api,
+        ok
+          ? `Zapisano listy do ZIP (plikow: ${entries.length})` +
+              (skipped > 0 ? `; pominietych bez tresci: ${skipped}` : "") +
+              "."
+          : "Nie udalo sie zapisac pliku - klient nie obsluguje pobierania.",
+      );
+    },
     onSendCompose: (input) => {
       if (!input.adresat.trim() || !input.temat.trim()) {
         notify(api, "Adresat i temat sa wymagane.");

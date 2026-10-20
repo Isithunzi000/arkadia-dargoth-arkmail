@@ -66,6 +66,17 @@ export interface MailUiHandlers {
    *  jak onClearCache.
    */
   onSendAnimal?(): void;
+  /**
+   * Eksport otwartego listu do pliku TXT (Fala 17g, zgloszenie
+   * 2026-10-19/20 pkt 7). Opcjonalny: starsze montaze testowe go nie
+   * podaja (jak onClearCache).
+   */
+  onExportLetter?(): void;
+  /**
+   * Eksport calego archiwum do ZIP z plikami TXT (Fala 17g).
+   * Opcjonalny: starsze montaze testowe go nie podaja.
+   */
+  onExportArchive?(): void;
 }
 
 const TEMPLATES: Array<[LetterTemplate, string]> = [
@@ -656,6 +667,14 @@ export function mountMailUi(
       fwd.setAttribute('title', 'Otworz list z zakladki Listy, aby go przekazac.');
     }
     ops.appendChild(fwd);
+    // Fala 17g: eksport listu do TXT (zgloszenie 2026-10-19/20 pkt 7).
+    // Operacja lokalna (dane z cache widoku) - bez dwukliku. Na koncu
+    // paska: pin kolejnosci rezerwuje poczatek dla Odpowiedz/Usun.
+    const exp = doc.createElement('button');
+    exp.className = 'arkmail-export-letter';
+    exp.textContent = 'Zapisz list TXT';
+    exp.addEventListener('click', () => handlers.onExportLetter?.());
+    ops.appendChild(exp);
     pane.appendChild(ops);
 
     if (!state.wide) {
@@ -1164,6 +1183,13 @@ export function mountMailUi(
       handlers.onDownloadArchiveBodies?.();
     });
     controls.appendChild(dlBtn);
+    // Fala 17g: eksport calego archiwum do ZIP z TXT per list.
+    // Operacja lokalna (tylko listy z trescia w cache) - bez dwukliku.
+    const expBtn = doc.createElement('button');
+    expBtn.className = 'arkmail-arch-export';
+    expBtn.textContent = 'Zapisz wszystkie TXT';
+    expBtn.addEventListener('click', () => handlers.onExportArchive?.());
+    controls.appendChild(expBtn);
     pane.appendChild(controls);
     const list = doc.createElement('div');
     pane.appendChild(list);
