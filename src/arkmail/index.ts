@@ -661,6 +661,9 @@ export async function init(api: PluginApi) {
     const flag = { cancelled: false };
     indexFlag = flag;
     let done = 0;
+    // Fala 19a: skrzynki pominiete (kotwica bez postepu / limit stron)
+    // z powodem - petla jedzie dalej, raport koncowy je wymienia.
+    const skipped: string[] = [];
     void lock
       .runExclusive(async () => {
         try {
@@ -673,6 +676,7 @@ export async function init(api: PluginApi) {
             const all: MailboxEntry[] = [];
             let pages = 0;
             let complete = false;
+            let skipWhy: string | null = null;
             let res = await mailbox.fetch(box);
             for (;;) {
               if (res.kind === "lista") {
@@ -691,19 +695,37 @@ export async function init(api: PluginApi) {
                   complete = true;
                   break;
                 }
-                if (freshCount === 0) break;
-                if (pages >= LOAD_ALL_MAX_PAGES) break;
+                if (freshCount === 0) {
+                  skipWhy = "kotwica bez postepu";
+                  break;
+                }
+                if (pages >= LOAD_ALL_MAX_PAGES) {
+                  skipWhy = `limit ${LOAD_ALL_MAX_PAGES} stron`;
+                  break;
+                }
                 if (flag.cancelled) break;
                 const oldest = oldestEntry(all);
-                if (!oldest?.date) break;
+                if (!oldest?.date) {
+                  skipWhy = "brak daty w wpisach";
+                  break;
+                }
                 await sleepOrCancel(LOAD_ALL_PACE_MS, flag);
                 if (flag.cancelled) break;
                 res = await mailbox.fetch(box, olderListingCommand(box, nextDay(oldest.date)));
               } else {
-                // Pusta skrzynka/strona = kompletna prawda (jak w
-                // fetchBoxes). Powod 'filtr' tu nie wystepuje (komenda
-                // bez filtrow) - gdyby jednak, bez flagi (bezpieczniej).
-                complete = res.reason === "puste";
+                // Fala 19a (zgloszenie 2026-10-20): KAZDA zaakceptowana
+                // pusta odpowiedz = kompletna prawda o skrzynce. Wariant
+                // 'puste' ("Nie masz zadnych ... listow.") na pustej
+                // skrzynce; wariant 'filtr' ("Nie znaleziono zadnych
+                // takich ...") na pustej skrzynce wyslanych (serwer
+                // traktuje wyslane jako selekcje - fixture z loga
+                // 2026-10-18) ORAZ na pustej stronie kotwicowej (brak
+                // starszych = koniec paginacji, jak w loadAll). Straznik
+                // desynchronizacji w mailbox.fetch odfiltrowal odpowiedzi
+                // za inne skrzynki - tu dociera tylko odpowiedz za
+                // zadana. Przed Fala 19a 'filtr' zabijal petle bez flagi
+                // ("2 z 4" i martwa petla).
+                complete = true;
                 break;
               }
             }
@@ -712,8 +734,12 @@ export async function init(api: PluginApi) {
               ui.setIndexMeta({ ...ui.state.indexMeta, [box]: new Date().toISOString() });
               persistIndexMeta();
               done += 1;
-            } else {
+            } else if (flag.cancelled) {
               break;
+            } else {
+              // Fala 19a: skrzynka niedomknieta nie zabija petli -
+              // jedziemy dalej, raport koncowy ja wymieni.
+              skipped.push(`${box} (${skipWhy ?? "niekompletne"})`);
             }
           }
           if (flag.cancelled) {
@@ -721,16 +747,18 @@ export async function init(api: PluginApi) {
               api,
               `Przerwiano indeksowanie (zindeksowane skrzynki: ${done} z ${INDEX_BOXES.length}).`,
             );
-          } else if (done === INDEX_BOXES.length) {
+          } else if (skipped.length === 0) {
             rebuildContacts();
             notify(
               api,
               `Zindeksowano wszystkie skrzynki (listow w bazie: ${ui.state.archive.length}).`,
             );
           } else {
+            rebuildContacts(); // czesciowy indeks tez odswieza liczniki
             notify(
               api,
-              `Indeksowanie niekompletne (skrzynki: ${done} z ${INDEX_BOXES.length}) - sprobuj ponownie.`,
+              `Indeksowanie niekompletne - pominiete: ${skipped.join(", ")}. ` +
+                `Pozostale skrzynki zindeksowane.`,
             );
           }
         } finally {
