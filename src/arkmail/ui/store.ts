@@ -298,15 +298,32 @@ export class MailUiStore {
     }
   }
 
-  /** Otwiera list: waski -> zakladka 'list', szeroki -> zostaje w podziale. */
+  /**
+   * Zakladka, do ktorej wraca Zamknij list (Fala 17d, zgloszenie
+   * pkt 2): list otwarty z Archiwum zamyka sie DO Archiwum, nie na
+   * Listy. Zapisywana przy openLetter z zakladki innej niz 'list'
+   * (openLetter nad otwartym listem nie nadpisuje pierwszego zrodla).
+   */
+  private letterReturnTab: UiTab | null = null;
+
+  /**
+   * Otwiera list i ZAWSZE go pokazuje (Fala 17d): waski -> zakladka
+   * 'list', szeroki -> 'listy' (split: listing + list obok). Stary
+   * kod w trybie szerokim zostawial zakladke bez zmian - klik w wpis
+   * archiwum ladowal list niewidoczny dla gracza (zgloszenie pkt 2).
+   */
   openLetter(box: MailBox, letter: LetterContent, source?: MailboxEntry): void {
+    if (this.current.tab !== 'list') this.letterReturnTab = this.current.tab;
     const next: Partial<MailUiState> = { letter: { ...letter, box, source } };
-    if (!this.current.wide) next.tab = 'list';
+    next.tab = this.current.wide ? 'listy' : 'list';
     this.update(next);
   }
 
   closeLetter(): void {
-    this.update({ letter: null, tab: 'listy' });
+    // Fala 17d: powrot do zakladki zrodlowej (archiwum -> archiwum).
+    const tab = this.letterReturnTab ?? 'listy';
+    this.letterReturnTab = null;
+    this.update({ letter: null, tab });
   }
 
   /**
