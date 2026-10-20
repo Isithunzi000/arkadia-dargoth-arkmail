@@ -32,6 +32,7 @@ import {
 import type { LetterTemplate } from "./core/letterRender";
 import { contactsFromArchive } from "./core/contacts";
 import {
+  contentKeyOf,
   fromMailboxEntry,
   fromOpenedLetter,
   upsertLetters,
@@ -683,47 +684,61 @@ export async function init(api: PluginApi) {
    * -> resolveEntry zawsze idzie przez re-kotwice po dacie. Wspolne
    * dla kliku w wpis archiwum i petli pobierania tresci (Fala 16i).
    */
-  const archivePseudoEntry = (letter: ArchiveLetter): MailboxEntry => ({
+  const archivePseudoEntry = (letter: ArchiveLetter, box?: MailBox): MailboxEntry => ({
     number: letter.number,
     isRead: letter.read,
     subject: letter.subject,
     forwarded: letter.forwarded === true,
     party: letter.party,
     partyKind:
-      letter.box === "odebrane" || letter.box === "nieprzeczytane"
+      (box ?? letter.box) === "odebrane" || (box ?? letter.box) === "nieprzeczytane"
         ? "nadawca"
         : "odbiorcy",
     date: letter.dateRaw ? parseMailDate(letter.dateRaw) : null,
   });
 
   /**
+   * Wynik doczytu tresci (Fala 17c): 'ok' = tresc pobrana; 'missing' =
+   * listu nie ma na swiezym listingu (zniknal z serwera - caller
+   * oznacza rekord i pomija go w kolejnych uruchomieniach); 'error' =
+   * porazka przejsciowa (timeout, sierocy pager, przerwanie).
+   */
+  type FetchBodyResult =
+    | { kind: "ok"; body: string[] }
+    | { kind: "missing" }
+    | { kind: "error" };
+
+  /**
    * Doczyt tresci jednego rekordu archiwum (Fala 16i): ta sama sciezka
    * co openWithResolve (re-kotwica + druga szansa 16c), ale BEZ
-   * otwierania listu w UI. true = tresc pobrana i zapisana.
-   * WYMAGA locka (caller).
+   * otwierania listu w UI. WYMAGA locka (caller).
    * Fala 17a (zgloszenie pkt 4): resolveEntry W try - wyjatek z
    * re-kotwicy (timeout, sierocy pager, linia-blad serwera) jest
    * pojedyncza porazka listu, NIE smiercia calej petli pobierania.
    * shouldAbort: Przerwij domyka pager w toku (patrz pager.readLetter).
+   * Fala 17c (zgloszenie pkt 3): opcjonalny override skrzynki - petla
+   * pobiera blizniaki przez skrzynke kanoniczna (odebrane), bo rekord
+   * "nieprzeczytane" znika z listingu po przeczytaniu.
    */
   const fetchArchiveBody = async (
     letter: ArchiveLetter,
-    shouldAbort?: () => boolean,
-  ): Promise<boolean> => {
-    const pseudo = archivePseudoEntry(letter);
+    opts?: { shouldAbort?: () => boolean; box?: MailBox },
+  ): Promise<FetchBodyResult> => {
+    const box = opts?.box ?? letter.box;
+    const pseudo = archivePseudoEntry(letter, box);
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const fresh = await resolveEntry(letter.box, pseudo);
-        if (!fresh) return false;
+        const fresh = await resolveEntry(box, pseudo);
+        if (!fresh) return { kind: "missing" };
         transport!.beginModal();
         try {
-          const res = await pager.readLetter(fresh.number, shouldAbort);
+          const res = await pager.readLetter(fresh.number, opts?.shouldAbort);
           const merged = upsertLetters(ui.state.archive, [
-            fromOpenedLetter(letter.box, res.letter, fresh),
+            fromOpenedLetter(box, res.letter, fresh),
           ]);
           ui.setArchive(merged.letters);
           persistArchive();
-          return true;
+          return { kind: "ok", body: res.letter.body };
         } finally {
           transport!.endModal();
         }
@@ -731,13 +746,13 @@ export async function init(api: PluginApi) {
         const msg = err instanceof Error ? err.message : String(err);
         const listingGone = /nie zostaly wybrane|Zly numer listu/.test(msg);
         if (attempt === 0 && listingGone) {
-          bumpCtx(letter.box); // wymuszenie re-kotwicy w drugiej probie
+          bumpCtx(box); // wymuszenie re-kotwicy w drugiej probie
           continue;
         }
-        return false;
+        return { kind: "error" };
       }
     }
-    return false;
+    return { kind: "error" };
   };
 
   /** Flaga biezacej petli pobierania tresci (jedna na raz; null = brak). */
@@ -748,6 +763,9 @@ export async function init(api: PluginApi) {
    * kolejne listy bez tresci pod JEDNA blokada sesji, tempo jak loadAll.
    * Drugi klik przycisku = Przerwij. Blad pojedynczego listu nie zabija
    * petli - liczony i podsumowany na koncu.
+   * Fala 17c (zgloszenie pkt 3): petla jest IDEMPOTENTNA - kandydaci
+   * grupowani po kluczu tresci (blizniak pobierany raz), rekordy
+   * znikniete z serwera oznaczane i pomijane przy restarcie.
    */
   const downloadArchiveBodies = (): void => {
     if (archiveDownloadFlag) {
@@ -759,9 +777,20 @@ export async function init(api: PluginApi) {
       return;
     }
     // Bez daty nie ma re-kotwicy (Fala 16h) - takie listy zostaja.
-    const candidates = ui.state.archive.filter(
-      (l) => l.body.length === 0 && l.dateRaw !== null,
-    );
+    // Fala 17c: pomijamy tez rekordy oznaczone jako znikniete z serwera
+    // (bez znacznika kazdy restart mielil zombie-wpisy do timeoutu).
+    // Grupowanie po kluczu TRESCI (bez skrzynki): list nieprzeczytany
+    // ma w archiwum blizniaka (nieprzeczytane + odebrane) - pobieramy
+    // go RAZ, przez skrzynke kanoniczna.
+    const groups = new Map<string, ArchiveLetter[]>();
+    for (const l of ui.state.archive) {
+      if (l.body.length > 0 || l.dateRaw === null || l.missingOnServer === true) continue;
+      const key = contentKeyOf(l);
+      const arr = groups.get(key);
+      if (arr) arr.push(l);
+      else groups.set(key, [l]);
+    }
+    const candidates = [...groups.values()];
     if (candidates.length === 0) {
       notify(api, "Brak listow bez tresci - archiwum kompletne.");
       return;
@@ -775,23 +804,65 @@ export async function init(api: PluginApi) {
       .runExclusive(async () => {
         let done = 0;
         let failed = 0;
+        let missing = 0;
         try {
-          for (const letter of candidates) {
+          for (const group of candidates) {
             if (flag.cancelled) break;
-            // Fala 17a: Przerwij domyka tez pager w toku (shouldAbort).
-            if (await fetchArchiveBody(letter, () => flag.cancelled)) done += 1;
-            else failed += 1;
-            ui.setArchiveDownload({ done: done + failed, total });
-            ui.setBusy(`Pobieram tresci do archiwum (${done + failed}/${total})...`);
+            // Kolejnosc prob: przychodzace przez "odebrane" (rekord
+            // "nieprzeczytane" znika z listingu po przeczytaniu),
+            // wychodzace przez "wyslane"; tylko skrzynki obecne
+            // w grupie blizniakow.
+            const present = new Set(group.map((l) => l.box));
+            const order = (
+              ["odebrane", "nieprzeczytane", "wyslane", "niewyslane"] as MailBox[]
+            ).filter((b) => present.has(b));
+            let result: FetchBodyResult = { kind: "error" };
+            for (const box of order) {
+              if (flag.cancelled) break;
+              // Fala 17a: Przerwij domyka tez pager w toku (shouldAbort).
+              result = await fetchArchiveBody(group[0], {
+                shouldAbort: () => flag.cancelled,
+                box,
+              });
+              if (result.kind === "ok") break;
+            }
+            if (result.kind === "ok") {
+              done += 1;
+              // Tresc do WSZYSTKICH rekordow blizniaczych grupy.
+              const fill = group
+                .filter((l) => l.body.length === 0)
+                .map((l) => ({ ...l, body: result.body }));
+              if (fill.length > 0) {
+                const merged = upsertLetters(ui.state.archive, fill);
+                ui.setArchive(merged.letters);
+                persistArchive();
+              }
+            } else if (result.kind === "missing" && !flag.cancelled) {
+              missing += 1;
+              // Znacznik na calej grupie: restart petli je pomija.
+              const marked = group.map((l) => ({ ...l, missingOnServer: true }));
+              const merged = upsertLetters(ui.state.archive, marked);
+              ui.setArchive(merged.letters);
+              persistArchive();
+            } else if (!flag.cancelled) {
+              failed += 1;
+            }
+            ui.setArchiveDownload({ done: done + failed + missing, total });
+            ui.setBusy(
+              `Pobieram tresci do archiwum (${done + failed + missing}/${total})...`,
+            );
             if (flag.cancelled) break;
             await sleepOrCancel(LOAD_ALL_PACE_MS, flag);
           }
           if (flag.cancelled) {
             notify(api, `Przerwiano pobieranie tresci (pobrano: ${done} z ${total}).`);
-          } else if (failed > 0) {
-            notify(api, `Pobrano tresci (${done} z ${total}; nieudane: ${failed}).`);
-          } else {
+          } else if (failed === 0 && missing === 0) {
             notify(api, `Pobrano tresci do archiwum (listow: ${done}).`);
+          } else {
+            const parts: string[] = [];
+            if (failed > 0) parts.push(`nieudane: ${failed}`);
+            if (missing > 0) parts.push(`zniknely z serwera: ${missing}`);
+            notify(api, `Pobrano tresci (${done} z ${total}; ${parts.join("; ")}).`);
           }
         } finally {
           archiveDownloadFlag = null;

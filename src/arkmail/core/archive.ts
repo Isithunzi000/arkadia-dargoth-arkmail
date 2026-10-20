@@ -34,6 +34,14 @@ export interface ArchiveLetter {
   sortKey: string;
   read: boolean;
   body: string[];
+  /**
+   * List zniknal z serwera (Fala 17c, zgloszenie pkt 3): re-kotwica
+   * nie znalazla go na swiezym listingu podczas pobierania tresci.
+   * Petla pobierania takie rekordy POMIJA (bez znacznika kazdy restart
+   * mielil zombie-wpisy do timeoutu). Upsert z listingu znacznik
+   * czysci - list wrocil na serwer.
+   */
+  missingOnServer?: boolean;
 }
 
 export interface ArchiveFilter {
@@ -83,6 +91,20 @@ export function letterId(
   // od strony/listingu. Flaga forwarded rozroznia forward oryginalu
   // wyslany w tej samej sekundzie (log 2026-10-18).
   return fnv1a([box, party, subject, forwarded ? 'f' : '', dateRaw ?? ''].join('|'));
+}
+
+/**
+ * Klucz TRESCI rekordu (Fala 17c): jak letterId, ale BEZ skrzynki.
+ * Ten sam list istnieje w archiwum podwojnie, gdy jest nieprzeczytany
+ * (rekordy "nieprzeczytane" i "odebrane" maja rozne id) - petla
+ * pobierania tresci grupuje po tym kluczu i pobiera blizniaka RAZ.
+ */
+export function contentKeyOf(letter: ArchiveLetter): string {
+  return fnv1a(
+    [letter.party, letter.subject, letter.forwarded === true ? 'f' : '', letter.dateRaw ?? ''].join(
+      '|',
+    ),
+  );
 }
 
 /** List z listingu -> rekord archiwum (tresc pusta, dokleja ja pager). */
@@ -168,6 +190,10 @@ export function upsertLetters(
       ...prev,
       ...inc,
       body: inc.body.length > 0 ? inc.body : prev.body,
+      // Fala 17c: powrot listu do listingu czysci znacznik znikniecia
+      // (incoming z listingu nigdy go nie niesie, wiec undefined
+      // wygrywa; znacznik ustawia wylacznie petla pobierania tresci).
+      missingOnServer: inc.missingOnServer === true ? true : undefined,
     });
     updated++;
   }
