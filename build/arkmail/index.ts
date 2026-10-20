@@ -3,7 +3,7 @@ var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { en
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
 // src/arkmail/meta.ts
-const PLUGIN_VERSION = "1.9.0";
+const PLUGIN_VERSION = "1.11.0";
 var PLUGIN_NAME = "ArkMail";
 var PLUGIN_AUTHOR = "Isithunzi000";
 var PLUGIN_DESCRIPTION = "ArkMail to kompleksowy system pocztowy dla klienta Dargoth: skrzynki, kontakty, archiwum i pisanie listow (alias /arkmail). Plugin w pelni zgodny z regulaminem gry - wszystkie komendy wysylane swiadomie przez gracza, bez automatyki.";
@@ -72,19 +72,21 @@ function parseListingParty(text) {
     date: m[3] ? parseMailDate(m[3]) : null
   };
 }
-var EMPTY_LISTING_RE = /^Nie masz zadnych (nieprzeczytanych|odebranych|wyslanych|niewyslanych) listow\.$/;
-var FILTERED_EMPTY_RE = /^Nie znaleziono zadnych takich (nieprzeczytanych|odebranych|wyslanych|niewyslanych) listow\.$/;
-var BOX_FROM_GENITIVE = {
-  nieprzeczytanych: "nieprzeczytane",
-  odebranych: "odebrane",
-  wyslanych: "wyslane",
-  niewyslanych: "niewyslane"
+var EMPTY_LISTING_RE = /^Nie masz zadnych (nieprzeczytanych|odebranych|wyslanych|niewyslanych|otrzymanych) listow\.$/;
+var FILTERED_EMPTY_RE = /^Nie znaleziono zadnych takich (nieprzeczytanych|odebranych|wyslanych|niewyslanych|otrzymanych) listow\.$/;
+var BOXES_FROM_GENITIVE = {
+  nieprzeczytanych: ["nieprzeczytane"],
+  odebranych: ["odebrane"],
+  wyslanych: ["wyslane"],
+  niewyslanych: ["niewyslane"],
+  otrzymanych: ["odebrane", "nieprzeczytane"]
 };
+var LISTS_LOADING_RE = /^Listy sa w tej chwili ladowane\.$/;
 function parseEmptyListing(text) {
   const puste = text.match(EMPTY_LISTING_RE);
-  if (puste) return { box: BOX_FROM_GENITIVE[puste[1]], reason: "puste" };
+  if (puste) return { boxes: BOXES_FROM_GENITIVE[puste[1]], reason: "puste" };
   const filtr = text.match(FILTERED_EMPTY_RE);
-  if (filtr) return { box: BOX_FROM_GENITIVE[filtr[1]], reason: "filtr" };
+  if (filtr) return { boxes: BOXES_FROM_GENITIVE[filtr[1]], reason: "filtr" };
   return null;
 }
 var LETTER_HEADER_RES = [
@@ -378,6 +380,13 @@ function sortKeyOf(date) {
 function letterId(box, party, subject, forwarded, dateRaw) {
   return fnv1a([box, party, subject, forwarded ? "f" : "", dateRaw ?? ""].join("|"));
 }
+function contentKeyOf(letter) {
+  return fnv1a(
+    [letter.party, letter.subject, letter.forwarded === true ? "f" : "", letter.dateRaw ?? ""].join(
+      "|"
+    )
+  );
+}
 function fromMailboxEntry(box, entry) {
   const dateRaw = entry.date?.raw ?? null;
   return {
@@ -432,7 +441,11 @@ function upsertLetters(existing, incoming) {
     map.set(inc.id, {
       ...prev,
       ...inc,
-      body: inc.body.length > 0 ? inc.body : prev.body
+      body: inc.body.length > 0 ? inc.body : prev.body,
+      // Fala 17c: powrot listu do listingu czysci znacznik znikniecia
+      // (incoming z listingu nigdy go nie niesie, wiec undefined
+      // wygrywa; znacznik ustawia wylacznie petla pobierania tresci).
+      missingOnServer: inc.missingOnServer === true ? true : void 0
     });
     updated++;
   }
@@ -473,15 +486,21 @@ var MailboxSession = class {
    */
   fetch(box, command) {
     return new Promise((resolve, reject) => {
+      const cmd = command ?? `listy ${box}`;
       let header = null;
       const entries = [];
       let done = false;
+      let loadRetried = false;
+      let loadRetryTimer = null;
+      let pagerRetried = false;
+      let awaitingPromptAfterQ = false;
       const idleMs = this.opts.idleMs ?? 600;
       let idleTimer = null;
       const cleanup = () => {
         done = true;
         clearTimeout(timer);
         if (idleTimer) clearTimeout(idleTimer);
+        if (loadRetryTimer) clearTimeout(loadRetryTimer);
         unsub();
       };
       const finish = (r) => {
@@ -506,16 +525,46 @@ var MailboxSession = class {
           reject(new Error(line.text.trim()));
           return;
         }
+        if (LISTS_LOADING_RE.test(line.text)) {
+          if (loadRetried) {
+            cleanup();
+            reject(new Error("Listy sa w tej chwili ladowane."));
+            return;
+          }
+          loadRetried = true;
+          loadRetryTimer = setTimeout(() => {
+            if (!done) this.transport.send(cmd);
+          }, 2e3);
+          return;
+        }
         if (!header) {
           if (line.cls === "command" || isEchoLine(line.text)) return;
-          const empty = parseEmptyListing(line.text);
-          if (empty) {
-            if (empty.box !== box) {
+          if (awaitingPromptAfterQ) {
+            if (line.cls === "prompt" || isPromptLine(line.text)) {
+              awaitingPromptAfterQ = false;
+              this.transport.send(cmd);
+            }
+            return;
+          }
+          if (extractPagerPrompt(line.text)) {
+            if (pagerRetried) {
               cleanup();
-              reject(new Error(`pusta ${empty.box} podczas fetch ${box}`));
+              reject(new Error(`sierocy pager podczas fetch ${box}`));
               return;
             }
-            finish({ kind: "pusta", box: empty.box, reason: empty.reason });
+            pagerRetried = true;
+            awaitingPromptAfterQ = true;
+            this.transport.send("q");
+            return;
+          }
+          const empty = parseEmptyListing(line.text);
+          if (empty) {
+            if (!empty.boxes.includes(box)) {
+              cleanup();
+              reject(new Error(`pusta ${empty.boxes.join("/")} podczas fetch ${box}`));
+              return;
+            }
+            finish({ kind: "pusta", box, reason: empty.reason });
             return;
           }
           const h = parseListingHeader(line.text);
@@ -548,10 +597,259 @@ var MailboxSession = class {
           last.date = party.date;
         }
       });
-      this.transport.send(command ?? `listy ${box}`);
+      this.transport.send(cmd);
     });
   }
 };
+
+// src/arkmail/core/errors.ts
+var RULES = [
+  {
+    re: /^timeout: mailbox fetch /,
+    msg: "Serwer nie odpowiedzial na czas - sprobuj ponownie."
+  },
+  {
+    re: /^timeout: pager session list \d+$/,
+    msg: "Odczyt listu trwal za dlugo - sprobuj ponownie."
+  },
+  {
+    re: /^pager session list \d+: przerwano$/,
+    msg: "Przerwano odczyt listu."
+  },
+  {
+    // Sierocy pager serwera (17a domyka, ale porazka moze sie zdarzyc).
+    re: /odrzucono przez sierocy pager$|^sierocy pager podczas fetch /,
+    msg: "Poczta miala zawieszony pager - sprobuj ponownie."
+  },
+  {
+    re: /Listy sa w tej chwili ladowane\.$/,
+    msg: "Serwer jeszcze laduje listy - sprobuj ponownie za chwile."
+  },
+  {
+    // Straznik desynchronizacji (Fala 14d/17b): surowy format
+    // "pusta <skrzynka> podczas fetch <skrzynka>" / "listing ...".
+    re: /^(?:pusta|listing) (\S+) podczas fetch (\S+)$/,
+    msg: (m) => `Serwer odpowiedzial za inna skrzynke (${m[1]} zamiast ${m[2]}) - sprobuj ponownie.`
+  },
+  {
+    // "pager session list N: <linia serwera>" - linia serwera jest
+    // juz po polsku ("Zly numer listu: 5."), tniemy tylko prefiks.
+    re: /^pager session list \d+: (.+)$/,
+    msg: (m) => m[1]
+  }
+];
+var SERVER_LINE_RE = /^[A-Z][^]*\.$/;
+function humanizeMailError(raw) {
+  const text = raw.trim();
+  for (const rule of RULES) {
+    const m = text.match(rule.re);
+    if (m) return typeof rule.msg === "string" ? rule.msg : rule.msg(m);
+  }
+  if (SERVER_LINE_RE.test(text)) return text;
+  return "Operacja nie powiodla sie - sprobuj ponownie.";
+}
+
+// src/arkmail/core/exportTxt.ts
+var ANSI_RE = /\[[0-9;]*m/g;
+function stripAnsi(s) {
+  return s.replace(ANSI_RE, "");
+}
+function letterTxt(l) {
+  const meta = [];
+  if (l.from) meta.push(`Od: ${stripAnsi(l.from)}`);
+  if (l.to) meta.push(`Do: ${stripAnsi(l.to)}`);
+  if (l.cc) meta.push(`DW: ${stripAnsi(l.cc)}`);
+  if (l.date) meta.push(stripAnsi(l.date));
+  meta.push(`skrzynka: ${l.box}`);
+  const lines = [stripAnsi(l.subject), meta.join(" | "), "", ...l.body.map(stripAnsi)];
+  return lines.join("\n") + "\n";
+}
+var SENDER_BOXES3 = /* @__PURE__ */ new Set(["odebrane", "nieprzeczytane"]);
+function archiveLetterTxt(l) {
+  const sender = SENDER_BOXES3.has(l.box);
+  return letterTxt({
+    subject: l.subject,
+    from: sender ? l.party : "",
+    to: sender ? "" : l.party,
+    date: l.dateRaw,
+    box: l.box,
+    body: l.body
+  });
+}
+function slugAscii(s, max = 40) {
+  const slug = s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return (slug || "list").slice(0, max);
+}
+var p2 = (n) => String(n).padStart(2, "0");
+function txtFileName(party, subject, dateRaw) {
+  const d = dateRaw ? parseMailDate(dateRaw) : null;
+  const stamp = d ? `${d.year}-${p2(d.month)}-${p2(d.day)}_${d.time.replace(/:/g, "-")}` : "0000-00-00_00-00-00";
+  return `${stamp}_${slugAscii(party, 24)}_${slugAscii(subject, 40)}.txt`;
+}
+var BOX_RANK = {
+  odebrane: 0,
+  nieprzeczytane: 1,
+  wyslane: 2,
+  niewyslane: 3
+};
+function archiveExportEntries(letters) {
+  const byKey = /* @__PURE__ */ new Map();
+  let skipped = 0;
+  for (const l of letters) {
+    if (l.body.length === 0) {
+      skipped++;
+      continue;
+    }
+    const key = contentKeyOf(l);
+    const prev = byKey.get(key);
+    if (!prev || BOX_RANK[l.box] < BOX_RANK[prev.box]) byKey.set(key, l);
+  }
+  const sorted = [...byKey.values()].sort((a, b) => {
+    if (a.sortKey !== b.sortKey) return a.sortKey < b.sortKey ? 1 : -1;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+  const used = /* @__PURE__ */ new Map();
+  const entries = sorted.map((l) => {
+    const base = `${l.box}/${txtFileName(l.party, l.subject, l.dateRaw)}`;
+    const n = (used.get(base) ?? 0) + 1;
+    used.set(base, n);
+    const name = n === 1 ? base : base.replace(/\.txt$/, `-${n}.txt`);
+    return { name, txt: archiveLetterTxt(l) };
+  });
+  return { entries, skipped };
+}
+
+// src/arkmail/core/zipStore.ts
+var CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 3988292384 ^ c >>> 1 : c >>> 1;
+    t[n] = c >>> 0;
+  }
+  return t;
+})();
+function crc32(data) {
+  let c = 4294967295;
+  for (let i = 0; i < data.length; i++) c = CRC_TABLE[(c ^ data[i]) & 255] ^ c >>> 8;
+  return (c ^ 4294967295) >>> 0;
+}
+function nameBytes(name) {
+  const out = new Uint8Array(name.length);
+  for (let i = 0; i < name.length; i++) out[i] = name.charCodeAt(i) & 127;
+  return out;
+}
+var ByteSink = class {
+  constructor() {
+    __publicField(this, "chunks", []);
+    __publicField(this, "len", 0);
+  }
+  push(b) {
+    this.chunks.push(b);
+    this.len += b.length;
+  }
+  u16(v) {
+    this.push(new Uint8Array([v & 255, v >>> 8 & 255]));
+  }
+  u32(v) {
+    this.push(new Uint8Array([v & 255, v >>> 8 & 255, v >>> 16 & 255, v >>> 24 & 255]));
+  }
+  get length() {
+    return this.len;
+  }
+  concat() {
+    const out = new Uint8Array(this.len);
+    let off = 0;
+    for (const c of this.chunks) {
+      out.set(c, off);
+      off += c.length;
+    }
+    return out;
+  }
+};
+var DOS_TIME = 0;
+var DOS_DATE = 33;
+function buildZip(files) {
+  const local = new ByteSink();
+  const central = new ByteSink();
+  for (const f of files) {
+    const name = nameBytes(f.name);
+    const crc = crc32(f.data);
+    const offset = local.length;
+    local.u32(67324752);
+    local.u16(20);
+    local.u16(0);
+    local.u16(0);
+    local.u16(DOS_TIME);
+    local.u16(DOS_DATE);
+    local.u32(crc);
+    local.u32(f.data.length);
+    local.u32(f.data.length);
+    local.u16(name.length);
+    local.u16(0);
+    local.push(name);
+    local.push(f.data);
+    central.u32(33639248);
+    central.u16(20);
+    central.u16(20);
+    central.u16(0);
+    central.u16(0);
+    central.u16(DOS_TIME);
+    central.u16(DOS_DATE);
+    central.u32(crc);
+    central.u32(f.data.length);
+    central.u32(f.data.length);
+    central.u16(name.length);
+    central.u16(0);
+    central.u16(0);
+    central.u16(0);
+    central.u16(0);
+    central.u32(0);
+    central.u32(offset);
+    central.push(name);
+  }
+  const cd = central.concat();
+  const body = local.concat();
+  const eocd = new ByteSink();
+  eocd.u32(101010256);
+  eocd.u16(0);
+  eocd.u16(0);
+  eocd.u16(files.length);
+  eocd.u16(files.length);
+  eocd.u32(cd.length);
+  eocd.u32(body.length);
+  eocd.u16(0);
+  const out = new Uint8Array(body.length + cd.length + eocd.length);
+  out.set(body, 0);
+  out.set(cd, body.length);
+  out.set(eocd.concat(), body.length + cd.length);
+  return out;
+}
+
+// src/arkmail/ui/download.ts
+var impl = null;
+function downloadBlob(name, data) {
+  if (impl) {
+    impl(name, data);
+    return true;
+  }
+  try {
+    const g = globalThis;
+    const doc = g.document;
+    if (!doc?.body || !g.URL) return false;
+    const a = doc.createElement("a");
+    const url = g.URL.createObjectURL(data);
+    a.href = url;
+    a.download = name;
+    doc.body.appendChild(a);
+    a.click();
+    a.remove();
+    g.URL.revokeObjectURL(url);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // src/arkmail/core/session/pager.ts
 var PAGER_REJECTION_RE = /Nie ma takiej komendy\./;
@@ -560,8 +858,15 @@ var PagerSession = class {
     this.transport = transport2;
     this.opts = opts;
   }
-  readLetter(numer) {
-    return this.run(numer, () => null, (letter, pager) => ({ letter, pager }));
+  /**
+   * Odczyt listu. shouldAbort (Fala 17a, zgloszenie pkt 4): Przerwij
+   * petli pobierania w trakcie odczytu - sesja domyka pager od razu
+   * ("q" tylko gdy pager faktycznie otwarty albo naglowki kompletne;
+   * przed otwarciem zadnego smieciowego "q") i odrzuca "przerwano",
+   * zamiast wisiec do timeoutu z otwartym pagerem serwera.
+   */
+  readLetter(numer, shouldAbort) {
+    return this.run(numer, () => null, (letter, pager) => ({ letter, pager }), shouldAbort);
   }
   deleteLetters(numer, zakres) {
     let deletedNumbers = [];
@@ -618,7 +923,7 @@ var PagerSession = class {
    * pager prompcie. Konczy sie na linii promptu (klasa albo tresc)
    * albo idle-flush po "q".
    */
-  run(numer, makeActions, build) {
+  run(numer, makeActions, build, shouldAbort) {
     return new Promise((resolve, reject) => {
       const letter = {
         number: numer,
@@ -636,6 +941,8 @@ var PagerSession = class {
       let pagerFired = false;
       let idleOpened = false;
       let retried = false;
+      let loadRetried = false;
+      let loadRetryTimer = null;
       let done = false;
       const idleMs = this.opts.idleMs ?? 600;
       let idleTimer = null;
@@ -648,11 +955,27 @@ var PagerSession = class {
         if (idleTimer) clearTimeout(idleTimer);
         if (quietTimer) clearTimeout(quietTimer);
         if (graceTimer) clearTimeout(graceTimer);
+        if (loadRetryTimer) clearTimeout(loadRetryTimer);
         unsub();
       };
+      let aborted = false;
       const finish = () => {
         cleanup();
+        if (aborted) {
+          reject(new Error(`pager session list ${numer}: przerwano`));
+          return;
+        }
         resolve(build(letter, pager));
+      };
+      const checkAbort = () => {
+        if (done || aborted || !shouldAbort || !shouldAbort()) return;
+        aborted = true;
+        if (state === "pager" || pagerFired || idleOpened || headersDone) {
+          if (state !== "closing") enterClosing();
+          return;
+        }
+        cleanup();
+        reject(new Error(`pager session list ${numer}: przerwano`));
       };
       const armIdle = () => {
         if (idleTimer) clearTimeout(idleTimer);
@@ -662,6 +985,8 @@ var PagerSession = class {
       };
       const onQuiet = () => {
         if (done) return;
+        checkAbort();
+        if (done || aborted) return;
         if (state === "letter" && headersDone) {
           state = "pager";
           pagerFired = true;
@@ -708,6 +1033,8 @@ var PagerSession = class {
       };
       const unsub = this.transport.subscribe((line) => {
         if (done || line.cls === "command" || isEchoLine(line.text)) return;
+        checkAbort();
+        if (done) return;
         if (state === "closing") {
           if (line.cls === "prompt" || isPromptLine(line.text)) {
             finish();
@@ -735,6 +1062,20 @@ var PagerSession = class {
           return;
         }
         if (state === "letter" && !headersDone) {
+          if (LISTS_LOADING_RE.test(line.text)) {
+            if (loadRetried) {
+              cleanup();
+              reject(new Error(`pager session list ${numer}: Listy sa w tej chwili ladowane.`));
+              return;
+            }
+            loadRetried = true;
+            loadRetryTimer = setTimeout(() => {
+              if (!done && state === "letter") {
+                this.transport.send(`przeczytaj list ${numer}`);
+              }
+            }, 2e3);
+            return;
+          }
           const mailErr = parseMailError(line.text);
           if (mailErr) {
             cleanup();
@@ -918,6 +1259,17 @@ var DargothTransport = class {
     __publicField(this, "hookId", null);
     __publicField(this, "queue", []);
     __publicField(this, "bypass", /* @__PURE__ */ new Set());
+    /** Fala 16j: kiedy tlumic linie pocztowe (index.ts: blokada sesji). */
+    __publicField(this, "gagWhen", null);
+  }
+  /**
+   * Fala 16j: predykat gagowania linii pocztowych (cls 'mail'). Linie
+   * przychodzace podczas operacji pluginowej (listingi, tresci listow)
+   * nie smieca glownego okna gry; poza operacja wszystko przechodzi
+   * bez zmian (reczne "listy" gracza, powiadomienie POCZTA).
+   */
+  setGagPredicate(pred) {
+    this.gagWhen = pred;
   }
   send(line) {
     if (this.modalActive) this.bypass.add(line);
@@ -978,6 +1330,7 @@ var DargothTransport = class {
       (line, _matches, type, originalLine) => {
         const proto = { text: originalLine ?? line.text, cls: type ?? "" };
         for (const cb of [...this.subscribers]) cb(proto);
+        if (type === "mail" && this.gagWhen?.()) return null;
         return line;
       },
       "arkmail"
@@ -1033,6 +1386,7 @@ var DEFAULT_STATE = {
   badgeUnsent: 0,
   busy: null,
   loadAll: null,
+  archiveDownload: null,
   search: null,
   letter: null,
   contacts: [],
@@ -1041,7 +1395,8 @@ var DEFAULT_STATE = {
   animalFlying: false,
   unsentFlash: false,
   composeTemplate: "plain",
-  composeWidth: 60
+  composeWidth: 60,
+  composeClearSeq: 0
 };
 var MailUiStore = class {
   constructor(initial) {
@@ -1049,6 +1404,13 @@ var MailUiStore = class {
     __publicField(this, "listeners", /* @__PURE__ */ new Set());
     /** Schowek pelnych widokow skrzynek na czas trybu wynikow szukania. */
     __publicField(this, "stashedViews", {});
+    /**
+     * Zakladka, do ktorej wraca Zamknij list (Fala 17d, zgloszenie
+     * pkt 2): list otwarty z Archiwum zamyka sie DO Archiwum, nie na
+     * Listy. Zapisywana przy openLetter z zakladki innej niz 'list'
+     * (openLetter nad otwartym listem nie nadpisuje pierwszego zrodla).
+     */
+    __publicField(this, "letterReturnTab", null);
     this.current = { ...DEFAULT_STATE, ...initial };
   }
   get state() {
@@ -1173,6 +1535,9 @@ var MailUiStore = class {
   setLoadAll(loadAll) {
     this.update({ loadAll });
   }
+  setArchiveDownload(archiveDownload) {
+    this.update({ archiveDownload });
+  }
   setSearch(search) {
     this.update({ search });
   }
@@ -1213,14 +1578,22 @@ var MailUiStore = class {
       this.update({ search: null });
     }
   }
-  /** Otwiera list: waski -> zakladka 'list', szeroki -> zostaje w podziale. */
+  /**
+   * Otwiera list i ZAWSZE go pokazuje (Fala 17d): waski -> zakladka
+   * 'list', szeroki -> 'listy' (split: listing + list obok). Stary
+   * kod w trybie szerokim zostawial zakladke bez zmian - klik w wpis
+   * archiwum ladowal list niewidoczny dla gracza (zgloszenie pkt 2).
+   */
   openLetter(box, letter, source) {
+    if (this.current.tab !== "list") this.letterReturnTab = this.current.tab;
     const next = { letter: { ...letter, box, source } };
-    if (!this.current.wide) next.tab = "list";
+    next.tab = this.current.wide ? "listy" : "list";
     this.update(next);
   }
   closeLetter() {
-    this.update({ letter: null, tab: "listy" });
+    const tab = this.letterReturnTab ?? "listy";
+    this.letterReturnTab = null;
+    this.update({ letter: null, tab });
   }
   /**
    * Czysci pamiec podreczna pluginu (Fala 12e): widoki skrzynek,
@@ -1262,6 +1635,11 @@ var MailUiStore = class {
     if (prefs.template !== void 0) patch.composeTemplate = prefs.template;
     if (prefs.width !== void 0) patch.composeWidth = prefs.width;
     this.update(patch);
+  }
+  /** Fala 16e: wyczyszczenie formularza compose po udanym zapisie/
+   *  wyslaniu (render zeruje draft przy najblizszym renderze). */
+  clearCompose() {
+    this.update({ composeClearSeq: this.current.composeClearSeq + 1 });
   }
   update(patch) {
     this.current = { ...this.current, ...patch };
@@ -1578,6 +1956,14 @@ var STYLES = `
   padding: 4px 12px;
   font: inherit;
   cursor: pointer;
+  /* Fala 16k: etykiety przyciskow nie lamia sie w waskim popupie. */
+  white-space: nowrap;
+  /* Fala 17e: jednolita wysokosc i centrowanie etykiety niezaleznie
+   * od jej dlugosci (zgloszenie pkt 1: obwodka spojna wielkosciowo). */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
 }
 .arkmail-root button:hover { background: #3b3d47; }
 .arkmail-root input, .arkmail-root textarea, .arkmail-root select {
@@ -1628,6 +2014,12 @@ var STYLES = `
   border-radius: 6px;
   background: ${BG_PANEL};
   color: ${FG_DIM};
+  /* Fala 16k: pasek operacji nie rosnie w pionie - mniejsza czcionka,
+     zero lamania, dlugi opis ucina ellipsis. */
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* --- panele --- */
@@ -1660,6 +2052,12 @@ var STYLES = `
   font-weight: 600;
 }
 .arkmail-root .arkmail-box-active:hover { background: ${ACCENT}; color: ${ACCENT_FG}; }
+/* Fala 16f: trwaly akcent (obwodka) na skrzynce z licznikiem > 0 -
+   Nieprzeczytane/Niewyslane widac z daleka (zgloszenie pkt 5/8). */
+.arkmail-root .arkmail-box-attention {
+  border-color: ${ACCENT};
+  color: ${FG};
+}
 
 /* Fala 11e: zbiorcze operacje na aktywnej skrzynce (zamiast \u21BB per box). */
 .arkmail-box-ops { display: flex; gap: 6px; margin-bottom: 8px; }
@@ -1695,6 +2093,10 @@ var STYLES = `
   color: ${FG_DIM};
 }
 .arkmail-entry-date { color: ${FG_DIM}; font-size: 11px; white-space: nowrap; }
+/* Fala 16f: nieprzeczytany wiersz dodatkowo JA\u015ANIEJSZY (pkt 8: kropka +
+   pogrubienie + rozjasnienie; po odczyciu listing daje *R* i wiersz
+   wraca do normalnego). */
+.arkmail-unread { background: ${BG_PANEL}; }
 .arkmail-unread .arkmail-entry-party, .arkmail-unread .arkmail-entry-subject {
   color: ${FG};
   font-weight: 700;
@@ -1740,6 +2142,10 @@ var STYLES = `
 .arkmail-root .arkmail-older-all { flex: 1; }
 .arkmail-root button.arkmail-older-all { margin-top: 8px; width: 100%; }
 .arkmail-older-row button.arkmail-older-all { margin-top: 0; width: auto; }
+/* Fala 17e: "Wczytaj wszystkie" w box-ops - regula paginacji wyzej
+ * (margin-top: 8px; width: 100%) lapala go specyficznoscia 0,2,1 i
+ * przycisk odjezdzal od sasiadow (zgloszenie pkt 1). */
+.arkmail-box-ops button.arkmail-older-all { margin-top: 0; width: auto; }
 
 /* --- widok listu --- */
 .arkmail-letter-head {
@@ -2149,7 +2555,9 @@ function mountMailUi(container, store2, handlers) {
     for (const [box, label] of BOXES) {
       const btn = doc.createElement("button");
       btn.className = "arkmail-box" + (state.activeBox === box ? " arkmail-box-active" : "") + // Fala 14b: flash celu kolejki niewyslanych (jak zakladka Listy).
-      (state.unsentFlash && box === "niewyslane" ? " arkmail-flash" : "");
+      (state.unsentFlash && box === "niewyslane" ? " arkmail-flash" : "") + // Fala 16f: trwala obwodka akcentu, gdy licznik skrzynki > 0
+      // (zgloszenie pkt 5/8: "zaznaczone, ze cos jest w niewyslanych").
+      (state.badge > 0 && box === "nieprzeczytane" ? " arkmail-box-attention" : "") + (state.badgeUnsent > 0 && box === "niewyslane" ? " arkmail-box-attention" : "");
       btn.setAttribute("data-box", box);
       btn.textContent = label;
       btn.addEventListener("click", () => {
@@ -2177,7 +2585,7 @@ function mountMailUi(container, store2, handlers) {
     const loopHere = state.loadAll !== null && state.loadAll.box === state.activeBox;
     const loadAllBtn = doc.createElement("button");
     loadAllBtn.className = "arkmail-older-all";
-    loadAllBtn.textContent = loopHere ? `Przerwij (strona ${state.loadAll.pages})` : "Wczytaj wszystkie";
+    loadAllBtn.textContent = loopHere ? `Przerwij \xB7 ${state.loadAll.pages}` : "Wczytaj wszystkie";
     const nothingToLoad = !loopHere && (searchMode0 !== null || !view0 || view0.empty !== null || !view0.truncated || state.loadAll !== null);
     if (nothingToLoad) loadAllBtn.setAttribute("disabled", "");
     loadAllBtn.addEventListener("click", () => handlers.onLoadAll(state.activeBox));
@@ -2264,7 +2672,11 @@ function mountMailUi(container, store2, handlers) {
       const clear = doc.createElement("button");
       clear.className = "arkmail-search-clear";
       clear.textContent = "Wyczysc";
-      clear.addEventListener("click", () => handlers.onClearSearch(state.activeBox));
+      clear.addEventListener("click", () => {
+        for (const key of ["osoba", "temat", "odDaty", "doDaty"]) searchDraft[key] = "";
+        for (const el of [sOsoba, sTemat, sOd, sDo]) el.value = "";
+        handlers.onClearSearch(state.activeBox);
+      });
       banner.appendChild(clear);
       pane.appendChild(banner);
     }
@@ -2415,6 +2827,11 @@ function mountMailUi(container, store2, handlers) {
       fwd.setAttribute("title", "Otworz list z zakladki Listy, aby go przekazac.");
     }
     ops.appendChild(fwd);
+    const exp = doc.createElement("button");
+    exp.className = "arkmail-export-letter";
+    exp.textContent = "Zapisz list TXT";
+    exp.addEventListener("click", () => handlers.onExportLetter?.());
+    ops.appendChild(exp);
     pane.appendChild(ops);
     if (!state.wide) {
       const back = doc.createElement("button");
@@ -2453,7 +2870,7 @@ function mountMailUi(container, store2, handlers) {
     const bar = doc.createElement("div");
     bar.className = "arkmail-preview-bar";
     const lab = doc.createElement("label");
-    lab.textContent = "Podglad (tak list zostanie wyslany)";
+    lab.textContent = "Podglad - tak list zostanie wyslany";
     bar.appendChild(lab);
     const close = doc.createElement("button");
     close.className = "arkmail-preview-close";
@@ -2478,7 +2895,7 @@ function mountMailUi(container, store2, handlers) {
     const bar = doc.createElement("div");
     bar.className = "arkmail-preview-bar";
     const lab = doc.createElement("label");
-    lab.textContent = "Podglad (tak list zostanie wyslany)";
+    lab.textContent = "Podglad - tak list zostanie wyslany";
     bar.appendChild(lab);
     bar.appendChild(previewOpenBtn());
     pane.appendChild(bar);
@@ -2489,7 +2906,15 @@ function mountMailUi(container, store2, handlers) {
     repaintCompose();
     return pane;
   };
+  let seenComposeClearSeq = 0;
   const renderNapisz = (state) => {
+    if (state.composeClearSeq !== seenComposeClearSeq) {
+      seenComposeClearSeq = state.composeClearSeq;
+      composeDraft.adresat = "";
+      composeDraft.temat = "";
+      composeDraft.dw = "";
+      composeDraft.tresc = "";
+    }
     const pane = doc.createElement("div");
     pane.className = "arkmail-pane arkmail-form";
     pane.setAttribute("data-pane-key", "napisz");
@@ -2552,7 +2977,7 @@ function mountMailUi(container, store2, handlers) {
       const barP = doc.createElement("div");
       barP.className = "arkmail-preview-bar";
       const labP = doc.createElement("label");
-      labP.textContent = "Podglad (tak list zostanie wyslany)";
+      labP.textContent = "Podglad - tak list zostanie wyslany";
       barP.appendChild(labP);
       barP.appendChild(previewOpenBtn());
       pane.appendChild(barP);
@@ -2579,7 +3004,13 @@ function mountMailUi(container, store2, handlers) {
     send.addEventListener("click", () => {
       const st = store2.state;
       const rendered = renderLetter(tresc.value, st.composeTemplate, st.composeWidth);
-      if (!rendered.hasContent) return;
+      if (!rendered.hasContent) {
+        if (sendTimer) clearTimeout(sendTimer);
+        sendArmed = false;
+        send.textContent = "Brak tresci listu.";
+        sendTimer = setTimeout(disarmSend, 3e3);
+        return;
+      }
       const val = (f) => pane.querySelector(`[data-field="${f}"]`).value;
       if (!val("adresat").trim()) {
         if (sendTimer) clearTimeout(sendTimer);
@@ -2723,7 +3154,7 @@ function mountMailUi(container, store2, handlers) {
       if (rows.length === 0) {
         list.replaceChildren(
           dim(
-            state.contacts.length === 0 ? "Brak kontaktow - pojawia sie po pobraniu listingow." : "Filtr niczego nie trafia."
+            state.contacts.length === 0 ? "Brak kontaktow - pojawia sie po pobraniu listingow." : "Zaden kontakt nie pasuje do filtra."
           )
         );
       }
@@ -2787,6 +3218,50 @@ function mountMailUi(container, store2, handlers) {
     controls.appendChild(mkText("tresc", "Tresc listu"));
     controls.appendChild(mkText("odDaty", "Od daty", "date"));
     controls.appendChild(mkText("doDaty", "Do daty", "date"));
+    const clearFilters = doc.createElement("button");
+    clearFilters.className = "arkmail-arch-clear";
+    clearFilters.textContent = "Wyczysc filtry";
+    clearFilters.addEventListener("click", () => {
+      for (const key of ["osoba", "temat", "tresc", "odDaty", "doDaty"]) {
+        archFilter[key] = void 0;
+      }
+      archFilter.skrzynka = void 0;
+      controls.querySelectorAll("[data-filter]").forEach((el) => {
+        el.value = "";
+      });
+      repaint();
+    });
+    controls.appendChild(clearFilters);
+    const dlBtn = doc.createElement("button");
+    dlBtn.className = "arkmail-arch-download";
+    dlBtn.textContent = state.archiveDownload ? `Przerwij \xB7 ${state.archiveDownload.done}/${state.archiveDownload.total}` : "Pobierz tresci do archiwum";
+    let dlArmed = false;
+    let dlTimer = null;
+    dlBtn.addEventListener("click", () => {
+      if (state.archiveDownload) {
+        handlers.onDownloadArchiveBodies?.();
+        return;
+      }
+      if (!dlArmed) {
+        dlArmed = true;
+        dlBtn.textContent = "Pobieranie potrwa dlugo - kliknij ponownie";
+        dlTimer = setTimeout(() => {
+          dlArmed = false;
+          dlBtn.textContent = "Pobierz tresci do archiwum";
+        }, 3e3);
+        return;
+      }
+      if (dlTimer) clearTimeout(dlTimer);
+      dlArmed = false;
+      dlBtn.textContent = "Pobierz tresci do archiwum";
+      handlers.onDownloadArchiveBodies?.();
+    });
+    controls.appendChild(dlBtn);
+    const expBtn = doc.createElement("button");
+    expBtn.className = "arkmail-arch-export";
+    expBtn.textContent = "Zapisz wszystkie TXT";
+    expBtn.addEventListener("click", () => handlers.onExportArchive?.());
+    controls.appendChild(expBtn);
     pane.appendChild(controls);
     const list = doc.createElement("div");
     pane.appendChild(list);
@@ -2804,11 +3279,12 @@ function mountMailUi(container, store2, handlers) {
           const dir = l.box === "odebrane" || l.box === "nieprzeczytane" ? "od" : "do";
           meta.textContent = `${dir} ${l.party} | ${l.box}`;
           row.appendChild(meta);
+          row.addEventListener("click", () => handlers.onOpenArchiveLetter?.(l));
           return row;
         })
       );
       if (rows.length === 0) {
-        list.replaceChildren(dim("Archiwum puste albo filtr niczego nie trafia."));
+        list.replaceChildren(dim("Archiwum puste albo zaden list nie pasuje do filtra."));
       }
     };
     repaint();
@@ -2864,6 +3340,8 @@ var wideObserver = null;
 var animalTimer = null;
 var sluchamTimer = null;
 var unsentFlashTimer = null;
+var delayedInboxTimers = [];
+var DELAYED_INBOX_RETRY_MS = [1e4, 25e3];
 function createContent() {
   const root = document.createElement("div");
   root.style.height = "100%";
@@ -2896,6 +3374,7 @@ async function init(api) {
   const storage = new CharStorage(kv);
   transport = new DargothTransport(api);
   const lock = new SessionLock();
+  transport.setGagPredicate(() => lock.locked);
   const composePrefs = storage.getJSON(COMPOSE_KEY);
   store = new MailUiStore({
     notifyEnabled: storage.getJSON(NOTIFY_KEY) ?? false,
@@ -2951,6 +3430,14 @@ async function init(api) {
       persistArchive();
     });
   };
+  const invalidateOnReconnect = () => {
+    listingCtx = null;
+    refreshBoxes(["odebrane", "nieprzeczytane", "wyslane", "niewyslane"]);
+  };
+  api.events.on("client.connect", invalidateOnReconnect);
+  api.events.on("client.disconnect", () => {
+    listingCtx = null;
+  });
   const pendingRefresh = /* @__PURE__ */ new Set();
   let drainScheduled = false;
   const scheduleRefresh = (boxes) => {
@@ -2970,6 +3457,12 @@ async function init(api) {
       drainScheduled = false;
       if (pendingRefresh.size > 0) scheduleRefresh([]);
     });
+  };
+  const scheduleDelayedInboxRefresh = () => {
+    for (const t of delayedInboxTimers) clearTimeout(t);
+    delayedInboxTimers = DELAYED_INBOX_RETRY_MS.map(
+      (ms) => setTimeout(() => scheduleRefresh(["odebrane", "nieprzeczytane"]), ms)
+    );
   };
   let lastMailState = null;
   api.events.on("gmcp.mail.state", (d) => {
@@ -3023,7 +3516,7 @@ async function init(api) {
       return entry;
     }
     if (!entry.date) {
-      notify(api, "Nie moge zlokalizowac listu (brak daty) - odswiez skrzynke.");
+      notify(api, "Nie moge znalezc tego listu (brak daty) - odswiez skrzynke.");
       return null;
     }
     const res = await mailbox.fetch(box, olderListingCommand(box, nextDay(entry.date)));
@@ -3039,7 +3532,7 @@ async function init(api) {
       const fresh = res.entries.find((e) => entryKey(e) === entryKey(entry));
       if (fresh) return fresh;
     }
-    notify(api, "Nie znalazlem listu na swiezym listingu - odswiez skrzynke.");
+    notify(api, "Nie ma tego listu na liscie - odswiez skrzynke.");
     return null;
   };
   const loadOlder = (box) => {
@@ -3067,7 +3560,10 @@ async function init(api) {
         notify(api, "Brak starszych listow.");
       }
     }).catch(
-      (err) => notify(api, `Blad wczytywania starszych: ${err instanceof Error ? err.message : String(err)}`)
+      (err) => (
+        // Fala 17f: technikalia sesji przez mapper na ludzki polski.
+        notify(api, `Blad wczytywania starszych: ${humanizeMailError(err instanceof Error ? err.message : String(err))}`)
+      )
     ).finally(() => ui.setBusy(null));
   };
   let loadAllFlag = null;
@@ -3134,7 +3630,7 @@ async function init(api) {
         ui.setLoadAll(null);
       }
     }).catch(
-      (err) => notify(api, `Blad wczytywania: ${err instanceof Error ? err.message : String(err)}`)
+      (err) => notify(api, `Blad wczytywania: ${humanizeMailError(err instanceof Error ? err.message : String(err))}`)
     ).finally(() => ui.setBusy(null));
   };
   let animalFlight = false;
@@ -3171,6 +3667,161 @@ async function init(api) {
     }, ANIMAL_TIMING.flightTimeoutMs);
     ui.setAnimalFlying(true);
   };
+  const openWithResolve = async (box, entry) => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const fresh = await resolveEntry(box, entry);
+      if (!fresh) return;
+      transport.beginModal();
+      try {
+        const res = await pager.readLetter(fresh.number);
+        ui.openLetter(box, res.letter, fresh);
+        const merged = upsertLetters(ui.state.archive, [
+          fromOpenedLetter(box, res.letter, fresh)
+        ]);
+        ui.setArchive(merged.letters);
+        persistArchive();
+        if (ui.state.search?.box !== box) refreshBoxes([box]);
+        return;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const listingGone = /nie zostaly wybrane|Zly numer listu/.test(msg);
+        if (attempt === 0 && listingGone) {
+          bumpCtx(box);
+          continue;
+        }
+        throw err;
+      } finally {
+        transport.endModal();
+      }
+    }
+  };
+  const archivePseudoEntry = (letter, box) => ({
+    number: letter.number,
+    isRead: letter.read,
+    subject: letter.subject,
+    forwarded: letter.forwarded === true,
+    party: letter.party,
+    partyKind: (box ?? letter.box) === "odebrane" || (box ?? letter.box) === "nieprzeczytane" ? "nadawca" : "odbiorcy",
+    date: letter.dateRaw ? parseMailDate(letter.dateRaw) : null
+  });
+  const fetchArchiveBody = async (letter, opts) => {
+    const box = opts?.box ?? letter.box;
+    const pseudo = archivePseudoEntry(letter, box);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const fresh = await resolveEntry(box, pseudo);
+        if (!fresh) return { kind: "missing" };
+        transport.beginModal();
+        try {
+          const res = await pager.readLetter(fresh.number, opts?.shouldAbort);
+          const merged = upsertLetters(ui.state.archive, [
+            fromOpenedLetter(box, res.letter, fresh)
+          ]);
+          ui.setArchive(merged.letters);
+          persistArchive();
+          return { kind: "ok", body: res.letter.body };
+        } finally {
+          transport.endModal();
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const listingGone = /nie zostaly wybrane|Zly numer listu/.test(msg);
+        if (attempt === 0 && listingGone) {
+          bumpCtx(box);
+          continue;
+        }
+        return { kind: "error" };
+      }
+    }
+    return { kind: "error" };
+  };
+  let archiveDownloadFlag = null;
+  const downloadArchiveBodies = () => {
+    if (archiveDownloadFlag) {
+      archiveDownloadFlag.cancelled = true;
+      return;
+    }
+    if (lock.locked) {
+      notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+      return;
+    }
+    const groups = /* @__PURE__ */ new Map();
+    for (const l of ui.state.archive) {
+      if (l.body.length > 0 || l.dateRaw === null || l.missingOnServer === true) continue;
+      const key = contentKeyOf(l);
+      const arr = groups.get(key);
+      if (arr) arr.push(l);
+      else groups.set(key, [l]);
+    }
+    const candidates = [...groups.values()];
+    if (candidates.length === 0) {
+      notify(api, "Brak listow bez tresci - archiwum kompletne.");
+      return;
+    }
+    const flag = { cancelled: false };
+    archiveDownloadFlag = flag;
+    const total = candidates.length;
+    ui.setArchiveDownload({ done: 0, total });
+    ui.setBusy(`Pobieram tresci do archiwum (0/${total})...`);
+    void lock.runExclusive(async () => {
+      let done = 0;
+      let failed = 0;
+      let missing = 0;
+      try {
+        for (const group of candidates) {
+          if (flag.cancelled) break;
+          const present = new Set(group.map((l) => l.box));
+          const order = ["odebrane", "nieprzeczytane", "wyslane", "niewyslane"].filter((b) => present.has(b));
+          let result = { kind: "error" };
+          for (const box of order) {
+            if (flag.cancelled) break;
+            result = await fetchArchiveBody(group[0], {
+              shouldAbort: () => flag.cancelled,
+              box
+            });
+            if (result.kind === "ok") break;
+          }
+          if (result.kind === "ok") {
+            done += 1;
+            const fill = group.filter((l) => l.body.length === 0).map((l) => ({ ...l, body: result.body }));
+            if (fill.length > 0) {
+              const merged = upsertLetters(ui.state.archive, fill);
+              ui.setArchive(merged.letters);
+              persistArchive();
+            }
+          } else if (result.kind === "missing" && !flag.cancelled) {
+            missing += 1;
+            const marked = group.map((l) => ({ ...l, missingOnServer: true }));
+            const merged = upsertLetters(ui.state.archive, marked);
+            ui.setArchive(merged.letters);
+            persistArchive();
+          } else if (!flag.cancelled) {
+            failed += 1;
+          }
+          ui.setArchiveDownload({ done: done + failed + missing, total });
+          ui.setBusy(
+            `Pobieram tresci do archiwum (${done + failed + missing}/${total})...`
+          );
+          if (flag.cancelled) break;
+          await sleepOrCancel(LOAD_ALL_PACE_MS, flag);
+        }
+        if (flag.cancelled) {
+          notify(api, `Przerwiano pobieranie tresci (pobrano: ${done} z ${total}).`);
+        } else if (failed === 0 && missing === 0) {
+          notify(api, `Pobrano tresci do archiwum (listow: ${done}).`);
+        } else {
+          const parts = [];
+          if (failed > 0) parts.push(`nieudane: ${failed}`);
+          if (missing > 0) parts.push(`zniknely z serwera: ${missing}`);
+          notify(api, `Pobrano tresci (${done} z ${total}; ${parts.join("; ")}).`);
+        }
+      } finally {
+        archiveDownloadFlag = null;
+        ui.setArchiveDownload(null);
+        ui.setBusy(null);
+      }
+    }).catch(() => notify(api, "Blad pobierania tresci do archiwum."));
+  };
   handlersRef = {
     onSendAnimal: () => {
       if (lock.locked) {
@@ -3191,23 +3842,70 @@ async function init(api) {
         return;
       }
       ui.setBusy(`Czytam list: ${entry.subject}...`);
-      void lock.runExclusive(async () => {
-        const fresh = await resolveEntry(box, entry);
-        if (!fresh) return;
-        transport.beginModal();
-        try {
-          const res = await pager.readLetter(fresh.number);
-          ui.openLetter(box, res.letter, fresh);
-          const merged = upsertLetters(ui.state.archive, [
-            fromOpenedLetter(box, res.letter, fresh)
-          ]);
-          ui.setArchive(merged.letters);
-          persistArchive();
-          if (ui.state.search?.box !== box) refreshBoxes([box]);
-        } finally {
-          transport.endModal();
-        }
-      }).catch(() => notify(api, "Nie udalo sie odczytac listu.")).finally(() => ui.setBusy(null));
+      void lock.runExclusive(() => openWithResolve(box, entry)).catch(() => notify(api, "Nie udalo sie odczytac listu.")).finally(() => ui.setBusy(null));
+    },
+    onOpenArchiveLetter: (letter) => {
+      if (letter.body.length > 0) {
+        const senderBox = letter.box === "odebrane" || letter.box === "nieprzeczytane";
+        ui.openLetter(letter.box, {
+          number: letter.number,
+          from: senderBox ? letter.party : "",
+          subject: letter.subject,
+          to: senderBox ? "" : letter.party,
+          cc: null,
+          date: letter.dateRaw,
+          body: letter.body
+        });
+        return;
+      }
+      if (lock.locked) {
+        notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+        return;
+      }
+      ui.setBusy(`Czytam list: ${letter.subject}...`);
+      const pseudo = archivePseudoEntry(letter);
+      void lock.runExclusive(() => openWithResolve(letter.box, pseudo)).catch(() => notify(api, "Nie udalo sie odczytac listu.")).finally(() => ui.setBusy(null));
+    },
+    onDownloadArchiveBodies: () => downloadArchiveBodies(),
+    // Fala 17g: eksporty TXT/ZIP - operacje czysto lokalne (dane
+    // z cache), bez locka i bez komend do serwera.
+    onExportLetter: () => {
+      const l = ui.state.letter;
+      if (!l) return;
+      const sender = l.box === "odebrane" || l.box === "nieprzeczytane";
+      const party = sender ? l.from : l.to || l.cc || "";
+      const txt = letterTxt({
+        subject: l.subject,
+        from: l.from,
+        to: l.to,
+        cc: l.cc,
+        date: l.date,
+        box: l.box,
+        body: l.body
+      });
+      const blob = new Blob([txt], { type: "text/plain" });
+      const ok = downloadBlob(txtFileName(party, l.subject, l.date), blob);
+      notify(
+        api,
+        ok ? "Zapisano list do pliku TXT." : "Nie udalo sie zapisac pliku - klient nie obsluguje pobierania."
+      );
+    },
+    onExportArchive: () => {
+      const { entries, skipped } = archiveExportEntries(ui.state.archive);
+      if (entries.length === 0) {
+        notify(api, "Brak listow z tresci w archiwum - najpierw pobierz tresci.");
+        return;
+      }
+      const enc = new TextEncoder();
+      const zip = buildZip(entries.map((e) => ({ name: e.name, data: enc.encode(e.txt) })));
+      const now = /* @__PURE__ */ new Date();
+      const p22 = (n) => String(n).padStart(2, "0");
+      const name = `arkmail_listy_${now.getFullYear()}-${p22(now.getMonth() + 1)}-${p22(now.getDate())}_${p22(now.getHours())}${p22(now.getMinutes())}.zip`;
+      const ok = downloadBlob(name, new Blob([zip.buffer], { type: "application/zip" }));
+      notify(
+        api,
+        ok ? `Zapisano listy do ZIP (plikow: ${entries.length})` + (skipped > 0 ? `; pominietych bez tresci: ${skipped}` : "") + "." : "Nie udalo sie zapisac pliku - klient nie obsluguje pobierania."
+      );
     },
     onSendCompose: (input) => {
       if (!input.adresat.trim() || !input.temat.trim()) {
@@ -3231,10 +3929,12 @@ async function init(api) {
           if (out.result === "wyslany") {
             notify(api, "List zostal wyslany.");
             refreshBoxes(["wyslane"]);
+            ui.clearCompose();
           } else if (out.result === "gotowy") {
-            notify(api, "List odlozony w niewyslanych.");
+            notify(api, "List zapisany w niewyslanych.");
             refreshBoxes(["niewyslane"]);
             flashUnsent();
+            ui.clearCompose();
           } else {
             notify(api, "Blad wysylki - sprawdz adresata.");
           }
@@ -3267,7 +3967,7 @@ async function init(api) {
           notify(api, "Brak pasujacych listow.");
         }
       }).catch(
-        (err) => notify(api, `Blad szukania: ${err instanceof Error ? err.message : String(err)}`)
+        (err) => notify(api, `Blad szukania: ${humanizeMailError(err instanceof Error ? err.message : String(err))}`)
       ).finally(() => ui.setBusy(null));
     },
     onClearSearch: (box) => ui.clearSearch(box),
@@ -3350,8 +4050,10 @@ async function init(api) {
     if (n.kind === "nowa-poczte") {
       if (ui.state.notifyEnabled) notify(api, `Masz nowa poczte od ${n.nadawca}.`);
       scheduleRefresh(["odebrane", "nieprzeczytane"]);
+      scheduleDelayedInboxRefresh();
     } else if (n.kind === "goniec") {
       scheduleRefresh(["odebrane", "nieprzeczytane"]);
+      scheduleDelayedInboxRefresh();
     } else if (n.kind === "wysylasz") {
       if (!animalFlight) startAnimalFlight();
       disarmSlucham();
@@ -3420,6 +4122,8 @@ async function destroy() {
     clearTimeout(unsentFlashTimer);
     unsentFlashTimer = null;
   }
+  for (const t of delayedInboxTimers) clearTimeout(t);
+  delayedInboxTimers = [];
   if (unsubBadge) {
     unsubBadge();
     unsubBadge = null;
