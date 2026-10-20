@@ -3,7 +3,7 @@ var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { en
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
 // src/arkmail/meta.ts
-const PLUGIN_VERSION = "1.12.0";
+const PLUGIN_VERSION = "1.12.1";
 var PLUGIN_NAME = "ArkMail";
 var PLUGIN_AUTHOR = "Isithunzi000";
 var PLUGIN_DESCRIPTION = "ArkMail to kompleksowy system pocztowy dla klienta Dargoth: skrzynki, kontakty, archiwum i pisanie listow (alias /arkmail). Plugin w pelni zgodny z regulaminem gry - wszystkie komendy wysylane swiadomie przez gracza, bez automatyki.";
@@ -3136,7 +3136,7 @@ function mountMailUi(container, store2, handlers) {
     if (!allBoxesIndexed(state.indexMeta)) {
       pane.appendChild(
         dim(
-          "Kontakty liczone sa z calej bazy listow, nie z pierwszych 50. Zindeksuj wszystkie skrzynki, aby zobaczyc kompletne liczniki."
+          "Kontakty liczone sa z bazy wszystkich listow ze wszystkich skrzynek. Zindeksuj skrzynki, aby zebrac baze (jednorazowo)."
         )
       );
       const gate = doc.createElement("button");
@@ -3765,6 +3765,7 @@ async function init(api) {
     const flag = { cancelled: false };
     indexFlag = flag;
     let done = 0;
+    const skipped = [];
     void lock.runExclusive(async () => {
       try {
         for (let i = 0; i < INDEX_BOXES.length; i++) {
@@ -3776,6 +3777,7 @@ async function init(api) {
           const all = [];
           let pages = 0;
           let complete = false;
+          let skipWhy = null;
           let res = await mailbox.fetch(box);
           for (; ; ) {
             if (res.kind === "lista") {
@@ -3792,16 +3794,25 @@ async function init(api) {
                 complete = true;
                 break;
               }
-              if (freshCount === 0) break;
-              if (pages >= LOAD_ALL_MAX_PAGES) break;
+              if (freshCount === 0) {
+                skipWhy = "kotwica bez postepu";
+                break;
+              }
+              if (pages >= LOAD_ALL_MAX_PAGES) {
+                skipWhy = `limit ${LOAD_ALL_MAX_PAGES} stron`;
+                break;
+              }
               if (flag.cancelled) break;
               const oldest = oldestEntry(all);
-              if (!oldest?.date) break;
+              if (!oldest?.date) {
+                skipWhy = "brak daty w wpisach";
+                break;
+              }
               await sleepOrCancel(LOAD_ALL_PACE_MS, flag);
               if (flag.cancelled) break;
               res = await mailbox.fetch(box, olderListingCommand(box, nextDay(oldest.date)));
             } else {
-              complete = res.reason === "puste";
+              complete = true;
               break;
             }
           }
@@ -3810,8 +3821,10 @@ async function init(api) {
             ui.setIndexMeta({ ...ui.state.indexMeta, [box]: (/* @__PURE__ */ new Date()).toISOString() });
             persistIndexMeta();
             done += 1;
-          } else {
+          } else if (flag.cancelled) {
             break;
+          } else {
+            skipped.push(`${box} (${skipWhy ?? "niekompletne"})`);
           }
         }
         if (flag.cancelled) {
@@ -3819,16 +3832,17 @@ async function init(api) {
             api,
             `Przerwiano indeksowanie (zindeksowane skrzynki: ${done} z ${INDEX_BOXES.length}).`
           );
-        } else if (done === INDEX_BOXES.length) {
+        } else if (skipped.length === 0) {
           rebuildContacts();
           notify(
             api,
             `Zindeksowano wszystkie skrzynki (listow w bazie: ${ui.state.archive.length}).`
           );
         } else {
+          rebuildContacts();
           notify(
             api,
-            `Indeksowanie niekompletne (skrzynki: ${done} z ${INDEX_BOXES.length}) - sprobuj ponownie.`
+            `Indeksowanie niekompletne - pominiete: ${skipped.join(", ")}. Pozostale skrzynki zindeksowane.`
           );
         }
       } finally {
