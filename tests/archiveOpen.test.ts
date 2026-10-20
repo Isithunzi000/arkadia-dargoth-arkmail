@@ -153,7 +153,8 @@ test('archiwum: wpis bez tresci i bez daty = toast, zadna komenda nie wylatuje',
     const base = f.sent.length;
     clickArchiveRow(h, 'bezdatny');
     await waitFor(
-      () => notifyText(f, 'Nie moge zlokalizowac listu'),
+      // Fala 17f: komunikat po ludzku ("zlokalizowac" zastapione).
+      () => notifyText(f, 'Nie moge znalezc tego listu'),
       'toast o braku lokalizacji',
     );
     assert.equal(f.sent.length, base, 'zadna komenda nie wyleciala');

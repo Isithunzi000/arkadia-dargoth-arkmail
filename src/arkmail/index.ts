@@ -39,6 +39,7 @@ import {
   type ArchiveLetter,
 } from "./core/archive";
 import { MailboxSession, type ListingCtx, type MailboxEntry } from "./core/session/mailbox";
+import { humanizeMailError } from "./core/errors";
 import { PagerSession } from "./core/session/pager";
 import { EditorSession } from "./core/session/editor";
 import { SessionLock } from "./core/sessionLock";
@@ -438,7 +439,7 @@ export async function init(api: PluginApi) {
       return entry;
     }
     if (!entry.date) {
-      notify(api, "Nie moge zlokalizowac listu (brak daty) - odswiez skrzynke.");
+      notify(api, "Nie moge znalezc tego listu (brak daty) - odswiez skrzynke.");
       return null;
     }
     const res = await mailbox.fetch(box, olderListingCommand(box, nextDay(entry.date)));
@@ -456,7 +457,7 @@ export async function init(api: PluginApi) {
       const fresh = res.entries.find((e) => entryKey(e) === entryKey(entry));
       if (fresh) return fresh;
     }
-    notify(api, "Nie znalazlem listu na swiezym listingu - odswiez skrzynke.");
+    notify(api, "Nie ma tego listu na liscie - odswiez skrzynke.");
     return null;
   };
 
@@ -490,7 +491,8 @@ export async function init(api: PluginApi) {
         }
       })
       .catch((err: unknown) =>
-        notify(api, `Blad wczytywania starszych: ${err instanceof Error ? err.message : String(err)}`),
+        // Fala 17f: technikalia sesji przez mapper na ludzki polski.
+        notify(api, `Blad wczytywania starszych: ${humanizeMailError(err instanceof Error ? err.message : String(err))}`),
       )
       .finally(() => ui.setBusy(null));
   };
@@ -577,7 +579,7 @@ export async function init(api: PluginApi) {
         }
       })
       .catch((err: unknown) =>
-        notify(api, `Blad wczytywania: ${err instanceof Error ? err.message : String(err)}`),
+        notify(api, `Blad wczytywania: ${humanizeMailError(err instanceof Error ? err.message : String(err))}`),
       )
       .finally(() => ui.setBusy(null));
   };
@@ -1003,7 +1005,7 @@ export async function init(api: PluginApi) {
           }
         })
         .catch((err: unknown) =>
-          notify(api, `Blad szukania: ${err instanceof Error ? err.message : String(err)}`),
+          notify(api, `Blad szukania: ${humanizeMailError(err instanceof Error ? err.message : String(err))}`),
         )
         .finally(() => ui.setBusy(null));
     },

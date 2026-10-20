@@ -710,7 +710,7 @@ export function mountMailUi(
     const bar = doc.createElement('div');
     bar.className = 'arkmail-preview-bar';
     const lab = doc.createElement('label');
-    lab.textContent = 'Podglad (tak list zostanie wyslany)';
+    lab.textContent = 'Podglad - tak list zostanie wyslany';
     bar.appendChild(lab);
     const close = doc.createElement('button');
     close.className = 'arkmail-preview-close';
@@ -739,7 +739,7 @@ export function mountMailUi(
     const bar = doc.createElement('div');
     bar.className = 'arkmail-preview-bar';
     const lab = doc.createElement('label');
-    lab.textContent = 'Podglad (tak list zostanie wyslany)';
+    lab.textContent = 'Podglad - tak list zostanie wyslany';
     bar.appendChild(lab);
     bar.appendChild(previewOpenBtn());
     pane.appendChild(bar);
@@ -838,7 +838,7 @@ export function mountMailUi(
       const barP = doc.createElement('div');
       barP.className = 'arkmail-preview-bar';
       const labP = doc.createElement('label');
-      labP.textContent = 'Podglad (tak list zostanie wyslany)';
+      labP.textContent = 'Podglad - tak list zostanie wyslany';
       barP.appendChild(labP);
       barP.appendChild(previewOpenBtn());
       pane.appendChild(barP);
@@ -1050,7 +1050,7 @@ export function mountMailUi(
           dim(
             state.contacts.length === 0
               ? 'Brak kontaktow - pojawia sie po pobraniu listingow.'
-              : 'Filtr niczego nie trafia.',
+              : 'Zaden kontakt nie pasuje do filtra.',
           ),
         );
       }
@@ -1151,7 +1151,7 @@ export function mountMailUi(
       }
       if (!dlArmed) {
         dlArmed = true;
-        dlBtn.textContent = 'Moze potrwac bardzo dlugo - kliknij ponownie';
+        dlBtn.textContent = 'Pobieranie potrwa dlugo - kliknij ponownie';
         dlTimer = setTimeout(() => {
           dlArmed = false;
           dlBtn.textContent = 'Pobierz tresci do archiwum';
@@ -1192,7 +1192,7 @@ export function mountMailUi(
         }),
       );
       if (rows.length === 0) {
-        list.replaceChildren(dim('Archiwum puste albo filtr niczego nie trafia.'));
+        list.replaceChildren(dim('Archiwum puste albo zaden list nie pasuje do filtra.'));
       }
     };
     repaint();
