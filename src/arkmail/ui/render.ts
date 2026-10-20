@@ -18,7 +18,7 @@ import {
   type LetterTemplate,
 } from '../core/letterRender.js';
 import type { MailUiState, MailUiStore, UiTab } from './store.js';
-import { formatBadgeSuffix } from './store.js';
+import { allBoxesIndexed, formatBadgeSuffix, INDEX_BOXES } from './store.js';
 import { STYLES } from './styles.js';
 import { attachGhost, type GhostSource } from './ghost.js';
 
@@ -77,6 +77,13 @@ export interface MailUiHandlers {
    * Opcjonalny: starsze montaze testowe go nie podaja.
    */
   onExportArchive?(): void;
+  /**
+   * Indeksacja wszystkich skrzynek (Fala 18c, zgloszenie 2026-10-20
+   * pkt 1): pelny listing kazdej skrzynki = kompletna baza dla
+   * kontaktow i eksportow. W trakcie petli drugi klik = Przerwij.
+   * Opcjonalny: starsze montaze testowe go nie podaja.
+   */
+  onIndexAll?(): void;
 }
 
 const TEMPLATES: Array<[LetterTemplate, string]> = [
@@ -975,6 +982,26 @@ export function mountMailUi(
     const pane = doc.createElement('div');
     pane.className = 'arkmail-pane';
     pane.setAttribute('data-pane-key', 'kontakty');
+    // Fala 18c (zgloszenie 2026-10-20 pkt 1): kontakty liczone z
+    // archiwum sa kompletne dopiero po pelnej indeksacji wszystkich
+    // skrzynek - wczesniej (baza = pierwsze 50 wpisow) liczniki
+    // klamaly, wiec zamiast nich brama z przyciskiem indeksacji.
+    if (!allBoxesIndexed(state.indexMeta)) {
+      pane.appendChild(
+        dim(
+          'Kontakty liczone sa z calej bazy listow, nie z pierwszych 50. ' +
+            'Zindeksuj wszystkie skrzynki, aby zobaczyc kompletne liczniki.',
+        ),
+      );
+      const gate = doc.createElement('button');
+      gate.className = 'arkmail-index-all';
+      gate.textContent = state.indexRun
+        ? `Przerwij indeksowanie (${state.indexRun.boxIndex + 1}/${INDEX_BOXES.length})`
+        : 'Indeksuj wszystkie skrzynki';
+      gate.addEventListener('click', () => handlers.onIndexAll?.());
+      pane.appendChild(gate);
+      return pane;
+    }
     // Filtr i sort sa lokalne (poza store, jak filtr archiwum):
     // repaint dotyczy tylko listy, input nie traci fokusu przy pisaniu.
     const controls = doc.createElement('div');
@@ -1083,6 +1110,17 @@ export function mountMailUi(
       repaint();
     });
     repaint();
+    // Stopka bramy (Fala 18c): data najstarszej flagi (konserwatywna
+    // prawda o kompletnosci) + rozmiar bazy bedacej podstawa licznikow.
+    const foot = doc.createElement('div');
+    foot.className = 'arkmail-dim arkmail-index-foot';
+    const dates = INDEX_BOXES.map((b) => state.indexMeta[b])
+      .filter((d): d is string => d !== undefined)
+      .sort();
+    foot.textContent =
+      `Zindeksowano ${(dates[0] ?? '').slice(0, 10)}; ` +
+      `listow w bazie: ${state.archive.length}`;
+    pane.appendChild(foot);
     return pane;
   };
 
@@ -1152,6 +1190,17 @@ export function mountMailUi(
       repaint();
     });
     controls.appendChild(clearFilters);
+    // Fala 18c (zgloszenie 2026-10-20 pkt 1): indeksacja wszystkich
+    // skrzynek - pelny listing kazdej (z paginacja kotwicowa) = kompletna
+    // baza dla kontaktow i eksportow. Operacja tylko czyta (jak Wczytaj
+    // wszystkie) - bez dwukliku; w trakcie petli drugi klik = Przerwij.
+    const idxBtn = doc.createElement('button');
+    idxBtn.className = 'arkmail-index-all';
+    idxBtn.textContent = state.indexRun
+      ? `Przerwij indeksowanie (${state.indexRun.boxIndex + 1}/${INDEX_BOXES.length})`
+      : 'Indeksuj wszystkie';
+    idxBtn.addEventListener('click', () => handlers.onIndexAll?.());
+    controls.appendChild(idxBtn);
     // Fala 16i: masowe pobieranie tresci do archiwum (zgloszenie
     // pkt 10). Dwuklikowe uzbrojenie z ostrzezeniem o dlugim czasie
     // (precedens: Wyczysc pamiec podreczna); w trakcie petli przycisk

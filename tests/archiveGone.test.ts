@@ -14,6 +14,7 @@ import {
   loadTruncatedBox,
   waitRt,
   click,
+  notifyText,
   type Harness,
 } from './harness';
 import { mountMailUi, type MailUiHandlers } from '../src/arkmail/ui/render';
@@ -58,6 +59,27 @@ test('kompletny listing: znikniety list znika z widoku archiwum i kontaktow', as
     ).map((r) => String(r.textContent ?? ''));
     assert.ok(texts.every((t) => !t.includes('najnowszy')), 'znikniety list ukryty');
     assert.ok(texts.some((t) => t.includes('srodkowy')), 'zywe zostaja');
+
+    // Fala 18c: kontakty stoja za brama pelnego indeksu - indeksujemy
+    // (sama brama i jej mechanika: tests/indexAll.test.ts). Odebrane
+    // juz sa kompletnie znane (listing wyzej) - replay bez zmian.
+    await waitRt(() => !!h.content.querySelector('.arkmail-index-all'), 'przycisk indeksacji');
+    click(h, '.arkmail-index-all');
+    await waitRt(
+      () => f.sent.filter((c) => c === 'listy odebrane').length === 3,
+      'indeksacja: odebrane',
+    );
+    replayCompleteListing2(h);
+    await waitRt(
+      () => f.sent.filter((c) => c === 'listy nieprzeczytane').length === 2,
+      'indeksacja: nieprzeczytane',
+    );
+    f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
+    await waitRt(() => f.sent.includes('listy wyslane'), 'indeksacja: wyslane');
+    f.fire('Nie masz zadnych wyslanych listow.', 'mail');
+    await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksacja: niewyslane');
+    f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
+    await waitRt(() => notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'koniec indeksacji');
 
     // Kontakty: Corge (nadawca zniknietego) odpada z licznikow.
     click(h, '[data-tab="kontakty"]');

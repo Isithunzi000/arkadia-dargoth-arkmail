@@ -75,7 +75,26 @@ export interface MailUiState {
    * renderze zeruje roboczy draft i pola formularza.
    */
   composeClearSeq: number;
+  /**
+   * Daty ISO ostatniej KOMPLETNEJ indeksacji per skrzynka (Fala 18c,
+   * zgloszenie 2026-10-20 pkt 1). Flaga stawiana wylacznie po pelnym
+   * przejsciu skrzynki (listing bez uciecia az do konca paginacji) -
+   * dopiero wtedy archiwum jest pelna podstawa licznikow kontaktow.
+   */
+  indexMeta: Partial<Record<MailBox, string>>;
+  /**
+   * Petla "Indeksuj wszystkie skrzynki" w toku (Fala 18c): indeks
+   * biezacej skrzynki (0..3 wg INDEX_BOXES) + liczba pobranych stron.
+   */
+  indexRun: { boxIndex: number; box: MailBox; pages: number } | null;
 }
+
+/** Kolejnosc petli "Indeksuj wszystkie skrzynki" (Fala 18c). */
+export const INDEX_BOXES: MailBox[] = ['odebrane', 'nieprzeczytane', 'wyslane', 'niewyslane'];
+
+/** Pelny indeks = flaga kompletnej indeksacji na kazdej z 4 skrzynek. */
+export const allBoxesIndexed = (meta: Partial<Record<MailBox, string>>): boolean =>
+  INDEX_BOXES.every((b) => meta[b] !== undefined);
 
 const DEFAULT_STATE: MailUiState = {
   tab: 'listy',
@@ -97,6 +116,8 @@ const DEFAULT_STATE: MailUiState = {
   composeTemplate: 'plain',
   composeWidth: 60,
   composeClearSeq: 0,
+  indexMeta: {},
+  indexRun: null,
 };
 
 export class MailUiStore {
@@ -252,6 +273,14 @@ export class MailUiStore {
 
   setArchiveDownload(archiveDownload: { done: number; total: number } | null): void {
     this.update({ archiveDownload });
+  }
+
+  setIndexMeta(indexMeta: Partial<Record<MailBox, string>>): void {
+    this.update({ indexMeta });
+  }
+
+  setIndexRun(indexRun: { boxIndex: number; box: MailBox; pages: number } | null): void {
+    this.update({ indexRun });
   }
 
   setSearch(search: { box: MailBox; label: string } | null): void {

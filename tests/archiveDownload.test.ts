@@ -137,7 +137,9 @@ test('archiwum: pobieranie tresci - uzbrojenie, petla, podsumowanie, cache', asy
     const base3 = f.sent.length;
     clickDownload(h); // uzbrojenie
     clickDownload(h); // start
-    await wf(() => notifyText(f, 'Brak listow bez tresci'), 'toast o kompletnym archiwum');
+    // Fala 18c (swiadoma zmiana pinu): jasny toast o kompletnej bazie
+    // zamiast "brak listow bez tresci".
+    await wf(() => notifyText(f, 'Wszystkie listy w bazie maja tresci.'), 'toast o kompletnym archiwum');
     assert.equal(f.sent.length, base3, 'bez komend, gdy nie ma czego pobrac');
   } finally {
     await stopHarness();

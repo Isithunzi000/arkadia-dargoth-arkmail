@@ -49,7 +49,7 @@ import { SessionLock } from "./core/sessionLock";
 import { DargothTransport } from "./adapters/dargothTransport";
 import { CharStorage, type KVLike } from "./adapters/storage";
 import { notify } from "./adapters/notify";
-import { MailUiStore, formatBadgeSuffix } from "./ui/store";
+import { allBoxesIndexed, INDEX_BOXES, MailUiStore, formatBadgeSuffix } from "./ui/store";
 import { mountMailUi, type MailUiHandlers } from "./ui/render";
 
 const POPUP_ID = "arkmail";
@@ -87,6 +87,7 @@ let listingCtx: ListingCtx | null = null;
 const ARCHIVE_KEY = "archiwum";
 const NOTIFY_KEY = "powiadomienia";
 const COMPOSE_KEY = "compose";
+const INDEX_KEY = "indeks";
 
 /** localStorage moze nie istniec (testy, starsze srodowiska) - awaria do RAM. */
 function memoryKv(): KVLike {
@@ -177,6 +178,8 @@ export async function init(api: PluginApi) {
     archive: storage.getJSON<ArchiveLetter[]>(ARCHIVE_KEY) ?? [],
     composeTemplate: composePrefs?.template ?? "plain",
     composeWidth: composePrefs?.width ?? 60,
+    // Fala 18c: flagi kompletnej indeksacji skrzynek (brama Kontaktow).
+    indexMeta: storage.getJSON<Partial<Record<MailBox, string>>>(INDEX_KEY) ?? {},
   });
   const ui = store;
   const mailbox = new MailboxSession(transport, SESSION_OPTS);
@@ -411,6 +414,11 @@ export async function init(api: PluginApi) {
     storage.setJSON(ARCHIVE_KEY, ui.state.archive);
   };
 
+  /** Fala 18c: flagi kompletnej indeksacji skrzynek (brama Kontaktow). */
+  const persistIndexMeta = (): void => {
+    storage.setJSON(INDEX_KEY, ui.state.indexMeta);
+  };
+
   /**
    * Najstarszy wpis widoku: listing idzie od NAJSTARSZEGO listu (gora)
    * do najnowszego (dol), ale liczymy minimum po dacie - odporne na
@@ -618,6 +626,136 @@ export async function init(api: PluginApi) {
       .finally(() => ui.setBusy(null));
   };
 
+  /** Flaga biezacej petli "Indeksuj wszystkie skrzynki" (null = brak). */
+  let indexFlag: { cancelled: boolean } | null = null;
+  /**
+   * Kontynuacja po pelnej indeksacji (Fala 18c): guardy przyciskow
+   * przy pustej niezindeksowanej bazie odpalaja indeksacje, a po niej
+   * automatycznie wlasciwa akcje ('download') albo wskazowke ('export').
+   */
+  let indexContinuation: null | "download" | "export" = null;
+
+  /**
+   * Petla "Indeksuj wszystkie skrzynki" (Fala 18c, zgloszenie
+   * 2026-10-20 pkt 1): pelny listing KAZDEJ skrzynki (kotwice
+   * paginacji jak loadAll, tempo LOAD_ALL_PACE_MS), kazda strona
+   * doklejana do archiwum. Po KOMPLETNYM przejsciu skrzynki:
+   * gone-marking (markGoneFromServer - ta sama pewnosco kompletnej
+   * prawdy co przy nieobcietym listingu w fetchBoxes) i flaga
+   * indexMeta[box]. Dopiero pelny indeks czyni archiwum kompletna
+   * podstawa licznikow kontaktow (brama Kontaktow w render.ts).
+   * Widoku skrzynek NIE dotyka (badge'y zyja z listingow
+   * jednostronicowych). Drugi klik przycisku = Przerwij. Skrzynka
+   * niedomknieta (mielenie kotwicy / limit stron / Przerwij) = stop
+   * calej petli bez flagi dla niej.
+   */
+  const indexAllBoxes = (): void => {
+    if (indexFlag) {
+      indexFlag.cancelled = true;
+      return;
+    }
+    if (lock.locked) {
+      notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+      return;
+    }
+    const flag = { cancelled: false };
+    indexFlag = flag;
+    let done = 0;
+    void lock
+      .runExclusive(async () => {
+        try {
+          for (let i = 0; i < INDEX_BOXES.length; i++) {
+            const box = INDEX_BOXES[i]!;
+            if (flag.cancelled) break;
+            ui.setIndexRun({ boxIndex: i, box, pages: 0 });
+            ui.setBusy(`Indeksuje skrzynke ${box} (${i + 1}/${INDEX_BOXES.length})...`);
+            const seen = new Set<string>();
+            const all: MailboxEntry[] = [];
+            let pages = 0;
+            let complete = false;
+            let res = await mailbox.fetch(box);
+            for (;;) {
+              if (res.kind === "lista") {
+                pages += 1;
+                ui.setIndexRun({ boxIndex: i, box, pages });
+                const entries = res.entries.map((e) => fromMailboxEntry(box, e));
+                // Straznik mielenia jak w loadAll (Fala 9d): strona bez
+                // NOWYCH wpisow = kotwica stoi w miejscu - stop bez flagi.
+                const freshCount = entries.filter((e) => !seen.has(e.id)).length;
+                for (const e of entries) seen.add(e.id);
+                all.push(...res.entries);
+                const merged = upsertLetters(ui.state.archive, entries);
+                ui.setArchive(merged.letters);
+                persistArchive();
+                if (!res.header.truncated) {
+                  complete = true;
+                  break;
+                }
+                if (freshCount === 0) break;
+                if (pages >= LOAD_ALL_MAX_PAGES) break;
+                if (flag.cancelled) break;
+                const oldest = oldestEntry(all);
+                if (!oldest?.date) break;
+                await sleepOrCancel(LOAD_ALL_PACE_MS, flag);
+                if (flag.cancelled) break;
+                res = await mailbox.fetch(box, olderListingCommand(box, nextDay(oldest.date)));
+              } else {
+                // Pusta skrzynka/strona = kompletna prawda (jak w
+                // fetchBoxes). Powod 'filtr' tu nie wystepuje (komenda
+                // bez filtrow) - gdyby jednak, bez flagi (bezpieczniej).
+                complete = res.reason === "puste";
+                break;
+              }
+            }
+            if (complete && !flag.cancelled) {
+              markGoneFromServer(box, seen);
+              ui.setIndexMeta({ ...ui.state.indexMeta, [box]: new Date().toISOString() });
+              persistIndexMeta();
+              done += 1;
+            } else {
+              break;
+            }
+          }
+          if (flag.cancelled) {
+            notify(
+              api,
+              `Przerwiano indeksowanie (zindeksowane skrzynki: ${done} z ${INDEX_BOXES.length}).`,
+            );
+          } else if (done === INDEX_BOXES.length) {
+            rebuildContacts();
+            notify(
+              api,
+              `Zindeksowano wszystkie skrzynki (listow w bazie: ${ui.state.archive.length}).`,
+            );
+          } else {
+            notify(
+              api,
+              `Indeksowanie niekompletne (skrzynki: ${done} z ${INDEX_BOXES.length}) - sprobuj ponownie.`,
+            );
+          }
+        } finally {
+          indexFlag = null;
+          ui.setIndexRun(null);
+          ui.setBusy(null);
+        }
+      })
+      .catch((err: unknown) =>
+        notify(api, `Blad indeksowania: ${humanizeMailError(err instanceof Error ? err.message : String(err))}`),
+      )
+      .finally(() => {
+        // Kontynuacja guardow PO zwolnieniu blokady sesji (finally
+        // runExclusive wykonuje sie po release). Tylko przy pelnym
+        // indeksie - przerwana petla nie odpala akcji nastepczej.
+        const cont = indexContinuation;
+        indexContinuation = null;
+        if (!allBoxesIndexed(ui.state.indexMeta)) return;
+        if (cont === "download") downloadArchiveBodies();
+        else if (cont === "export") {
+          notify(api, "Indeksacja zakonczona - kliknij ponownie Zapisz wszystkie (ZIP).");
+        }
+      });
+  };
+
   /**
    * Maszyna lotu zwierzecia pocztowego (Fala 13b). Lot = blokada przycisku
    * do ladowania albo timeoutu. Start: klik (onSendAnimal) albo linia
@@ -812,6 +950,15 @@ export async function init(api: PluginApi) {
       notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
       return;
     }
+    // Fala 18c (guard, zgloszenie 2026-10-20): pusta baza BEZ kompletnego
+    // indeksu = najpierw indeksacja wszystkich skrzynek (mozliwe, ze
+    // poczta w ogole nie byla pobierana), potem automatycznie pobieranie.
+    if (ui.state.archive.length === 0 && !allBoxesIndexed(ui.state.indexMeta)) {
+      notify(api, "Archiwum puste - najpierw indeksuje wszystkie skrzynki.");
+      indexContinuation = "download";
+      indexAllBoxes();
+      return;
+    }
     // Bez daty nie ma re-kotwicy (Fala 16h) - takie listy zostaja.
     // Fala 17c: pomijamy tez rekordy oznaczone jako znikniete z serwera
     // (bez znacznika kazdy restart mielil zombie-wpisy do timeoutu).
@@ -828,7 +975,15 @@ export async function init(api: PluginApi) {
     }
     const candidates = [...groups.values()];
     if (candidates.length === 0) {
-      notify(api, "Brak listow bez tresci - archiwum kompletne.");
+      // Fala 18c: rozroznienie stanu "nic do pobrania" - kompletna baza
+      // z tresciami vs faktycznie puste skrzynki (po pelnej indeksacji).
+      // Pusta baza bez indeksu odfiltrowana wyzej przez guard.
+      notify(
+        api,
+        ui.state.archive.length > 0
+          ? "Wszystkie listy w bazie maja tresci."
+          : "Skrzynki sa puste - nie ma czego pobierac.",
+      );
       return;
     }
     const flag = { cancelled: false };
@@ -968,6 +1123,9 @@ export async function init(api: PluginApi) {
         .finally(() => ui.setBusy(null));
     },
     onDownloadArchiveBodies: () => downloadArchiveBodies(),
+    // Fala 18c: indeksacja wszystkich skrzynek (brama Kontaktow,
+    // guardy pobierania/eksportu).
+    onIndexAll: () => indexAllBoxes(),
     // Fala 17g: eksporty TXT/ZIP - operacje czysto lokalne (dane
     // z cache), bez locka i bez komend do serwera.
     onExportLetter: () => {
@@ -996,7 +1154,22 @@ export async function init(api: PluginApi) {
     onExportArchive: () => {
       const { entries, skipped } = archiveExportEntries(ui.state.archive);
       if (entries.length === 0) {
-        notify(api, "Brak listow z tresci w archiwum - najpierw pobierz tresci.");
+        // Fala 18c (guard, zgloszenie 2026-10-20): pusta baza BEZ
+        // kompletnego indeksu = najpierw indeksacja (mozliwe, ze poczta
+        // w ogole nie byla pobierana); po pelnym indeksie "pusto"
+        // znaczy faktycznie puste skrzynki.
+        if (ui.state.archive.length === 0 && !allBoxesIndexed(ui.state.indexMeta)) {
+          notify(api, "Archiwum puste - najpierw indeksuje wszystkie skrzynki.");
+          indexContinuation = "export";
+          indexAllBoxes();
+          return;
+        }
+        notify(
+          api,
+          ui.state.archive.length === 0
+            ? "Skrzynki sa puste - nie ma czego zapisywac."
+            : "Brak listow z tresci w archiwum - najpierw pobierz tresci.",
+        );
         return;
       }
       const enc = new TextEncoder();

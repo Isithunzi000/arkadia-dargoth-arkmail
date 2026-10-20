@@ -16,6 +16,17 @@ import { Window } from 'happy-dom';
 import { mountMailUi } from '../src/arkmail/ui/render';
 import { MailUiStore } from '../src/arkmail/ui/store';
 import type { Contact } from '../src/arkmail/core/contacts';
+import type { MailBox } from '../src/arkmail/core/protocol/types';
+
+// Fala 18c: kontakty stoja za brama pelnego indeksu skrzynek - testy
+// widoku kontaktow montuja stan z kompletnymi flagami (sama brama i
+// jej integracja: tests/indexAll.test.ts).
+const INDEXED: Partial<Record<MailBox, string>> = {
+  odebrane: '2026-10-20T00:00:00.000Z',
+  nieprzeczytane: '2026-10-20T00:00:00.000Z',
+  wyslane: '2026-10-20T00:00:00.000Z',
+  niewyslane: '2026-10-20T00:00:00.000Z',
+};
 
 const window = new Window();
 const document = window.document;
@@ -61,7 +72,7 @@ const searchCalls = (calls: Mounted['calls']) =>
   calls.filter((c) => c.name === 'search').map((c) => c.args);
 
 test('kontakty: klik w imie -> kierunek domyslny odebrane (nie aktywna skrzynka)', () => {
-  const s = new MailUiStore({ tab: 'kontakty' });
+  const s = new MailUiStore({ tab: 'kontakty', indexMeta: INDEXED });
   s.setActiveBox('wyslane'); // aktywna skrzynka NIE moze decydowac
   s.setContacts([contact({})]);
   const { container, calls } = mount(s);
@@ -85,7 +96,7 @@ test('kontakty: klik w imie -> kierunek domyslny odebrane (nie aktywna skrzynka)
 });
 
 test('kontakty: klik w imie -> wyslane, gdy odebranych brak', () => {
-  const s = new MailUiStore({ tab: 'kontakty' });
+  const s = new MailUiStore({ tab: 'kontakty', indexMeta: INDEXED });
   s.setContacts([contact({ lettersReceived: 0, lettersSent: 3 })]);
   const { container, calls } = mount(s);
 
@@ -96,7 +107,7 @@ test('kontakty: klik w imie -> wyslane, gdy odebranych brak', () => {
 });
 
 test('kontakty: klik w imie bez zadnych listow -> nic sie nie dzieje', () => {
-  const s = new MailUiStore({ tab: 'kontakty' });
+  const s = new MailUiStore({ tab: 'kontakty', indexMeta: INDEXED });
   s.setContacts([contact({ lettersReceived: 0, lettersSent: 0 })]);
   const { container, calls } = mount(s);
 
@@ -107,7 +118,7 @@ test('kontakty: klik w imie bez zadnych listow -> nic sie nie dzieje', () => {
 });
 
 test('kontakty: przycisk Wyslane szuka na wyslanych niezaleznie od licznikow', () => {
-  const s = new MailUiStore({ tab: 'kontakty' });
+  const s = new MailUiStore({ tab: 'kontakty', indexMeta: INDEXED });
   s.setContacts([contact({})]); // ma oba kierunki
   const { container, calls } = mount(s);
 
@@ -125,7 +136,7 @@ test('kontakty: przycisk Wyslane szuka na wyslanych niezaleznie od licznikow', (
 });
 
 test('kontakty: przycisk kierunku wylaczony, gdy licznik wynosi 0', () => {
-  const s = new MailUiStore({ tab: 'kontakty' });
+  const s = new MailUiStore({ tab: 'kontakty', indexMeta: INDEXED });
   s.setContacts([contact({ lettersReceived: 0, lettersSent: 5 })]);
   const { container, calls } = mount(s);
 

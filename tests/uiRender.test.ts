@@ -551,7 +551,16 @@ test('render: naglowek listu z wyroznionym tematem i wierszem meta', () => {
 // --- Fala 8d: kontakty - filtr i sort lokalne (jak filtr archiwum) ------------
 
 test('render: kontakty - filtr i sort lokalne (bez store), wiersz z data', () => {
-  const s = new MailUiStore({ tab: 'kontakty' });
+  // Fala 18c: kontakty za brama pelnego indeksu - kompletne flagi.
+  const s = new MailUiStore({
+    tab: 'kontakty',
+    indexMeta: {
+      odebrane: '2026-10-20T00:00:00.000Z',
+      nieprzeczytane: '2026-10-20T00:00:00.000Z',
+      wyslane: '2026-10-20T00:00:00.000Z',
+      niewyslane: '2026-10-20T00:00:00.000Z',
+    },
+  });
   s.setContacts(mergeContacts({
     people: [],
     przedstawieni: [],

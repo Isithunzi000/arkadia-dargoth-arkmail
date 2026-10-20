@@ -231,7 +231,8 @@ test('archiwum: list znikniety z serwera dostaje znacznik i jest pomijany przy r
     const sentBefore = f.sent.length;
     downloadBtn(h).dispatchEvent(new h.window.Event('click')); // uzbrojenie
     downloadBtn(h).dispatchEvent(new h.window.Event('click')); // start
-    await waitRt(() => notifyText(f, 'Brak listow bez tresci'), 'brak kandydatow po znaczniku');
+    // Fala 18c (swiadoma zmiana pinu): jasny toast o kompletnej bazie.
+    await waitRt(() => notifyText(f, 'Wszystkie listy w bazie maja tresci.'), 'brak kandydatow po znaczniku');
     assert.equal(
       f.sent.filter((s) => s === 'listy odebrane przed 24 XII 2025').length,
       1,

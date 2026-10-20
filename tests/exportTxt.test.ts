@@ -268,13 +268,52 @@ test('archiwum: Zapisz wszystkie TXT pobiera ZIP per-list, puste archiwum = toas
     assert.ok(expBtn, 'przycisk eksportu archiwum');
     assert.equal(expBtn.textContent, 'Zapisz wszystkie (ZIP)', 'etykieta mowi ZIP, nie TXT');
     click(h, '.arkmail-arch-export');
-    await waitRt(() => notifyText(f, 'Brak listow z tresci'), 'toast o braku tresci');
+    // Fala 18c (guard, swiadoma zmiana pinu): pusta NIEZINDEKSOWANA
+    // baza = najpierw automatyczna indeksacja skrzynek, nie martwy
+    // toast. Dopiero po pelnym indeksie "pusto" = faktycznie puste
+    // skrzynki.
+    await waitRt(() => notifyText(f, 'najpierw indeksuje'), 'guard: indeksacja przed eksportem');
+    await waitRt(() => f.sent.includes('listy odebrane'), 'guard: indeksuje odebrane');
+    f.fire('Nie masz zadnych odebranych listow.', 'mail');
+    await waitRt(() => f.sent.includes('listy nieprzeczytane'), 'guard: indeksuje nieprzeczytane');
+    f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
+    await waitRt(() => f.sent.includes('listy wyslane'), 'guard: indeksuje wyslane');
+    f.fire('Nie masz zadnych wyslanych listow.', 'mail');
+    await waitRt(() => f.sent.includes('listy niewyslane'), 'guard: indeksuje niewyslane');
+    f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
+    await waitRt(
+      () => notifyText(f, 'kliknij ponownie Zapisz wszystkie'),
+      'kontynuacja eksportu po indeksacji',
+    );
     assert.equal(captured.length, 0, 'bez pobierania dla pustego archiwum');
 
     // Napelnij archiwum tresciami (petla 16i/17c). Prolog wymaga
     // widoku Listy (czeka na przycisk paginacji) - wracamy z Archiwum.
+    // Fala 18c: guard wyzej juz wyslal komendy "listy ...", wiec
+    // loadTruncatedBox (includes) by sie rozjechal - prolog liczacy.
     click(h, '[data-tab="listy"]');
-    await loadTruncatedBox(h);
+    const odb = f.sent.filter((c) => c === 'listy odebrane').length;
+    const niep = f.sent.filter((c) => c === 'listy nieprzeczytane').length;
+    f.fire(' [ POCZTA ] Masz nowa poczte od Foo.');
+    await waitRt(
+      () => f.sent.filter((c) => c === 'listy odebrane').length === odb + 1,
+      'prolog: odebrane',
+    );
+    f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
+    f.fire(' 3. *R* Temat: najstarszy', 'mail');
+    f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire(' 2. *R* Temat: srodkowy', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire(' 1. *R* Temat: najnowszy', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('> ', 'prompt');
+    await waitRt(
+      () => f.sent.filter((c) => c === 'listy nieprzeczytane').length === niep + 1,
+      'prolog: nieprzeczytane',
+    );
+    f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
+    await waitRt(() => !!h.content.querySelector('.arkmail-older'), 'przycisk Wczytaj starsze');
+    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji prologu');
     click(h, '[data-tab="archiwum"]');
     const dlBtn = () => {
       const b = h.content.querySelector('.arkmail-arch-download') as unknown as {
