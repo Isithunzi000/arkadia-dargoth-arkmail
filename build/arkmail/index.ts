@@ -3,7 +3,7 @@ var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { en
 var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 
 // src/arkmail/meta.ts
-const PLUGIN_VERSION = "1.11.0";
+const PLUGIN_VERSION = "1.12.0";
 var PLUGIN_NAME = "ArkMail";
 var PLUGIN_AUTHOR = "Isithunzi000";
 var PLUGIN_DESCRIPTION = "ArkMail to kompleksowy system pocztowy dla klienta Dargoth: skrzynki, kontakty, archiwum i pisanie listow (alias /arkmail). Plugin w pelni zgodny z regulaminem gry - wszystkie komendy wysylane swiadomie przez gracza, bez automatyki.";
@@ -278,7 +278,12 @@ function contactsFromArchive(letters) {
   return mergeContacts({
     people: [],
     przedstawieni: [],
-    korespondencja: korespondencjaFromLetters(letters.map(archiveToLetterLike)),
+    // Fala 18a: listy oznaczone jako znikniete z serwera nie licza sie
+    // do kontaktow (kompletny listing raportuje pelna prawde).
+    // Fala 18b: szkice (niewyslane) to nie wyslana korespondencja.
+    korespondencja: korespondencjaFromLetters(
+      letters.filter((l) => l.missingOnServer !== true && l.box !== "niewyslane").map(archiveToLetterLike)
+    ),
     aliasy: []
   });
 }
@@ -364,6 +369,12 @@ function viewContacts(contacts, opts = {}) {
 // src/arkmail/core/archive.ts
 var SENDER_BOXES2 = /* @__PURE__ */ new Set(["odebrane", "nieprzeczytane"]);
 var RECIPIENT_BOXES = /* @__PURE__ */ new Set(["wyslane", "niewyslane"]);
+var BOX_RANK = {
+  odebrane: 0,
+  nieprzeczytane: 1,
+  wyslane: 2,
+  niewyslane: 3
+};
 function fnv1a(input) {
   let h = 2166136261;
   for (let i = 0; i < input.length; i++) {
@@ -451,26 +462,43 @@ function upsertLetters(existing, incoming) {
   }
   return { letters: [...map.values()].sort(byNewest), added, updated };
 }
-var norm = (s) => s.toLowerCase();
-function filterLetters(letters, filter) {
-  return letters.filter((l) => {
+function representativeOf(group) {
+  return [...group].sort(
+    (a, b) => Number(b.body.length > 0) - Number(a.body.length > 0) || BOX_RANK[a.box] - BOX_RANK[b.box] || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+  )[0];
+}
+function filterVisibleArchive(letters, filter) {
+  const groups = /* @__PURE__ */ new Map();
+  for (const l of letters) {
+    if (l.missingOnServer === true) continue;
+    const key = contentKeyOf(l);
+    const arr = groups.get(key);
+    if (arr) arr.push(l);
+    else groups.set(key, [l]);
+  }
+  const out = [];
+  for (const group of groups.values()) {
+    if (filter.skrzynka !== void 0 && !group.some((l) => l.box === filter.skrzynka)) continue;
+    if (filter.tresc !== void 0 && !group.some((l) => norm(l.body.join("\n")).includes(norm(filter.tresc))))
+      continue;
+    const rep = representativeOf(group);
     if (filter.od !== void 0) {
-      if (!SENDER_BOXES2.has(l.box)) return false;
-      if (!norm(l.party).includes(norm(filter.od))) return false;
+      if (!SENDER_BOXES2.has(rep.box)) continue;
+      if (!norm(rep.party).includes(norm(filter.od))) continue;
     }
     if (filter.do !== void 0) {
-      if (!RECIPIENT_BOXES.has(l.box)) return false;
-      if (!norm(l.party).includes(norm(filter.do))) return false;
+      if (!RECIPIENT_BOXES.has(rep.box)) continue;
+      if (!norm(rep.party).includes(norm(filter.do))) continue;
     }
-    if (filter.osoba !== void 0 && !norm(l.party).includes(norm(filter.osoba))) return false;
-    if (filter.skrzynka !== void 0 && l.box !== filter.skrzynka) return false;
-    if (filter.temat !== void 0 && !norm(l.subject).includes(norm(filter.temat))) return false;
-    if (filter.tresc !== void 0 && !norm(l.body.join("\n")).includes(norm(filter.tresc))) return false;
-    if (filter.odDaty !== void 0 && l.sortKey.slice(0, 10) < filter.odDaty) return false;
-    if (filter.doDaty !== void 0 && l.sortKey.slice(0, 10) > filter.doDaty) return false;
-    return true;
-  });
+    if (filter.osoba !== void 0 && !norm(rep.party).includes(norm(filter.osoba))) continue;
+    if (filter.temat !== void 0 && !norm(rep.subject).includes(norm(filter.temat))) continue;
+    if (filter.odDaty !== void 0 && rep.sortKey.slice(0, 10) < filter.odDaty) continue;
+    if (filter.doDaty !== void 0 && rep.sortKey.slice(0, 10) > filter.doDaty) continue;
+    out.push(rep);
+  }
+  return out.sort(byNewest);
 }
+var norm = (s) => s.toLowerCase();
 
 // src/arkmail/core/session/mailbox.ts
 var MAIL_ERROR_RE = /^Data zostala podana w zlym formacie\./;
@@ -686,16 +714,11 @@ function txtFileName(party, subject, dateRaw) {
   const stamp = d ? `${d.year}-${p2(d.month)}-${p2(d.day)}_${d.time.replace(/:/g, "-")}` : "0000-00-00_00-00-00";
   return `${stamp}_${slugAscii(party, 24)}_${slugAscii(subject, 40)}.txt`;
 }
-var BOX_RANK = {
-  odebrane: 0,
-  nieprzeczytane: 1,
-  wyslane: 2,
-  niewyslane: 3
-};
 function archiveExportEntries(letters) {
   const byKey = /* @__PURE__ */ new Map();
   let skipped = 0;
   for (const l of letters) {
+    if (l.missingOnServer === true) continue;
     if (l.body.length === 0) {
       skipped++;
       continue;
@@ -1377,6 +1400,8 @@ function notify(api, text, opts = {}) {
 }
 
 // src/arkmail/ui/store.ts
+var INDEX_BOXES = ["odebrane", "nieprzeczytane", "wyslane", "niewyslane"];
+var allBoxesIndexed = (meta) => INDEX_BOXES.every((b) => meta[b] !== void 0);
 var DEFAULT_STATE = {
   tab: "listy",
   wide: false,
@@ -1396,7 +1421,9 @@ var DEFAULT_STATE = {
   unsentFlash: false,
   composeTemplate: "plain",
   composeWidth: 60,
-  composeClearSeq: 0
+  composeClearSeq: 0,
+  indexMeta: {},
+  indexRun: null
 };
 var MailUiStore = class {
   constructor(initial) {
@@ -1537,6 +1564,12 @@ var MailUiStore = class {
   }
   setArchiveDownload(archiveDownload) {
     this.update({ archiveDownload });
+  }
+  setIndexMeta(indexMeta) {
+    this.update({ indexMeta });
+  }
+  setIndexRun(indexRun) {
+    this.update({ indexRun });
   }
   setSearch(search) {
     this.update({ search });
@@ -2021,6 +2054,21 @@ var STYLES = `
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Fala 18d (zgloszenie pkt 2): pasek postepu pod tekstem busy przy
+   masowym pobieraniu tresci (jedyna petla ze znanym total). */
+.arkmail-busy-track {
+  margin-top: 4px;
+  height: 6px;
+  border-radius: 3px;
+  background: ${BG};
+  overflow: hidden;
+}
+.arkmail-busy-bar {
+  height: 100%;
+  border-radius: 3px;
+  background: ${ACCENT};
+  transition: width 200ms ease-out;
+}
 
 /* --- panele --- */
 .arkmail-pane {
@@ -2490,7 +2538,7 @@ function mountMailUi(container, store2, handlers) {
     composePreview = null;
     if (state.tab !== "napisz") previewFull = false;
     const nodes = [renderTabs(state)];
-    if (state.busy !== null) nodes.push(renderBusy(state.busy));
+    if (state.busy !== null) nodes.push(renderBusy(state));
     if (state.tab === "napisz" && previewFull) {
       nodes.push(renderPreviewFull());
     } else if (state.wide && state.tab === "listy") {
@@ -2526,10 +2574,24 @@ function mountMailUi(container, store2, handlers) {
     }
     return bar;
   };
-  const renderBusy = (label) => {
+  const formatEta = (ms) => ms < 45e3 ? `zostalo ok. ${Math.max(1, Math.round(ms / 1e3))} s` : `zostalo ok. ${Math.max(1, Math.round(ms / 6e4))} min`;
+  const renderBusy = (state) => {
     const el = doc.createElement("div");
     el.className = "arkmail-busy";
-    el.textContent = `${label}`;
+    const label = doc.createElement("span");
+    const dl = state.archiveDownload;
+    label.textContent = `${state.busy ?? ""}` + (dl !== null && dl.etaMs !== null ? ` (${formatEta(dl.etaMs)})` : "");
+    el.appendChild(label);
+    if (dl !== null && dl.total > 0) {
+      const track = doc.createElement("div");
+      track.className = "arkmail-busy-track";
+      const bar = doc.createElement("div");
+      bar.className = "arkmail-busy-bar";
+      const pct = Math.min(100, Math.round(dl.done / dl.total * 100));
+      bar.style.width = `${pct}%`;
+      track.appendChild(bar);
+      el.appendChild(track);
+    }
     return el;
   };
   const renderPane = (state) => {
@@ -3071,6 +3133,19 @@ function mountMailUi(container, store2, handlers) {
     const pane = doc.createElement("div");
     pane.className = "arkmail-pane";
     pane.setAttribute("data-pane-key", "kontakty");
+    if (!allBoxesIndexed(state.indexMeta)) {
+      pane.appendChild(
+        dim(
+          "Kontakty liczone sa z calej bazy listow, nie z pierwszych 50. Zindeksuj wszystkie skrzynki, aby zobaczyc kompletne liczniki."
+        )
+      );
+      const gate = doc.createElement("button");
+      gate.className = "arkmail-index-all";
+      gate.textContent = state.indexRun ? `Przerwij indeksowanie (${state.indexRun.boxIndex + 1}/${INDEX_BOXES.length})` : "Indeksuj wszystkie skrzynki";
+      gate.addEventListener("click", () => handlers.onIndexAll?.());
+      pane.appendChild(gate);
+      return pane;
+    }
     const controls = doc.createElement("div");
     controls.className = "arkmail-contact-controls";
     const input = doc.createElement("input");
@@ -3168,6 +3243,11 @@ function mountMailUi(container, store2, handlers) {
       repaint();
     });
     repaint();
+    const foot = doc.createElement("div");
+    foot.className = "arkmail-dim arkmail-index-foot";
+    const dates = INDEX_BOXES.map((b) => state.indexMeta[b]).filter((d) => d !== void 0).sort();
+    foot.textContent = `Zindeksowano ${(dates[0] ?? "").slice(0, 10)}; listow w bazie: ${state.archive.length}`;
+    pane.appendChild(foot);
     return pane;
   };
   const renderArchiwum = (state) => {
@@ -3232,6 +3312,11 @@ function mountMailUi(container, store2, handlers) {
       repaint();
     });
     controls.appendChild(clearFilters);
+    const idxBtn = doc.createElement("button");
+    idxBtn.className = "arkmail-index-all";
+    idxBtn.textContent = state.indexRun ? `Przerwij indeksowanie (${state.indexRun.boxIndex + 1}/${INDEX_BOXES.length})` : "Indeksuj wszystkie";
+    idxBtn.addEventListener("click", () => handlers.onIndexAll?.());
+    controls.appendChild(idxBtn);
     const dlBtn = doc.createElement("button");
     dlBtn.className = "arkmail-arch-download";
     dlBtn.textContent = state.archiveDownload ? `Przerwij \xB7 ${state.archiveDownload.done}/${state.archiveDownload.total}` : "Pobierz tresci do archiwum";
@@ -3259,14 +3344,24 @@ function mountMailUi(container, store2, handlers) {
     controls.appendChild(dlBtn);
     const expBtn = doc.createElement("button");
     expBtn.className = "arkmail-arch-export";
-    expBtn.textContent = "Zapisz wszystkie TXT";
+    expBtn.textContent = "Zapisz wszystkie (ZIP)";
     expBtn.addEventListener("click", () => handlers.onExportArchive?.());
     controls.appendChild(expBtn);
     pane.appendChild(controls);
     const list = doc.createElement("div");
     pane.appendChild(list);
     const repaint = () => {
-      const rows = filterLetters(state.archive, archFilter);
+      const rows = filterVisibleArchive(state.archive, archFilter);
+      const oldNote = pane.querySelector(".arkmail-tresc-note");
+      if (oldNote) oldNote.remove();
+      if (archFilter.tresc !== void 0) {
+        const base = filterVisibleArchive(state.archive, { ...archFilter, tresc: void 0 });
+        const withBody = base.filter((l) => l.body.length > 0).length;
+        const note = doc.createElement("div");
+        note.className = "arkmail-dim arkmail-tresc-note";
+        note.textContent = `Filtr tresci obejmuje tylko listy z pobrana trescia (${withBody} z ${base.length}).`;
+        pane.insertBefore(note, list);
+      }
       list.replaceChildren(
         ...rows.map((l, idx) => {
           const row = doc.createElement("div");
@@ -3319,6 +3414,7 @@ var listingCtx = null;
 var ARCHIVE_KEY = "archiwum";
 var NOTIFY_KEY = "powiadomienia";
 var COMPOSE_KEY = "compose";
+var INDEX_KEY = "indeks";
 function memoryKv() {
   const map = /* @__PURE__ */ new Map();
   return {
@@ -3380,7 +3476,9 @@ async function init(api) {
     notifyEnabled: storage.getJSON(NOTIFY_KEY) ?? false,
     archive: storage.getJSON(ARCHIVE_KEY) ?? [],
     composeTemplate: composePrefs?.template ?? "plain",
-    composeWidth: composePrefs?.width ?? 60
+    composeWidth: composePrefs?.width ?? 60,
+    // Fala 18c: flagi kompletnej indeksacji skrzynek (brama Kontaktow).
+    indexMeta: storage.getJSON(INDEX_KEY) ?? {}
   });
   const ui = store;
   const mailbox = new MailboxSession(transport, SESSION_OPTS);
@@ -3418,7 +3516,24 @@ async function init(api) {
           res.entries.map((e) => fromMailboxEntry(box, e))
         );
         ui.setArchive(merged.letters);
+        if (!res.header.truncated) {
+          markGoneFromServer(box, new Set(res.entries.map((e) => fromMailboxEntry(box, e).id)));
+        }
+      } else if (res.reason === "puste") {
+        markGoneFromServer(box, /* @__PURE__ */ new Set());
       }
+    }
+  };
+  const markGoneFromServer = (box, freshIds) => {
+    let changed = false;
+    const marked = ui.state.archive.map((l) => {
+      if (l.box !== box || l.missingOnServer === true || freshIds.has(l.id)) return l;
+      changed = true;
+      return { ...l, missingOnServer: true };
+    });
+    if (changed) {
+      ui.setArchive(marked);
+      persistArchive();
     }
   };
   const refreshBoxes = (boxes, mode = "sync") => {
@@ -3491,6 +3606,9 @@ async function init(api) {
   });
   const persistArchive = () => {
     storage.setJSON(ARCHIVE_KEY, ui.state.archive);
+  };
+  const persistIndexMeta = () => {
+    storage.setJSON(INDEX_KEY, ui.state.indexMeta);
   };
   const oldestEntry = (entries) => {
     let oldest = null;
@@ -3633,6 +3751,103 @@ async function init(api) {
       (err) => notify(api, `Blad wczytywania: ${humanizeMailError(err instanceof Error ? err.message : String(err))}`)
     ).finally(() => ui.setBusy(null));
   };
+  let indexFlag = null;
+  let indexContinuation = null;
+  const indexAllBoxes = () => {
+    if (indexFlag) {
+      indexFlag.cancelled = true;
+      return;
+    }
+    if (lock.locked) {
+      notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+      return;
+    }
+    const flag = { cancelled: false };
+    indexFlag = flag;
+    let done = 0;
+    void lock.runExclusive(async () => {
+      try {
+        for (let i = 0; i < INDEX_BOXES.length; i++) {
+          const box = INDEX_BOXES[i];
+          if (flag.cancelled) break;
+          ui.setIndexRun({ boxIndex: i, box, pages: 0 });
+          ui.setBusy(`Indeksuje skrzynke ${box} (${i + 1}/${INDEX_BOXES.length})...`);
+          const seen = /* @__PURE__ */ new Set();
+          const all = [];
+          let pages = 0;
+          let complete = false;
+          let res = await mailbox.fetch(box);
+          for (; ; ) {
+            if (res.kind === "lista") {
+              pages += 1;
+              ui.setIndexRun({ boxIndex: i, box, pages });
+              const entries = res.entries.map((e) => fromMailboxEntry(box, e));
+              const freshCount = entries.filter((e) => !seen.has(e.id)).length;
+              for (const e of entries) seen.add(e.id);
+              all.push(...res.entries);
+              const merged = upsertLetters(ui.state.archive, entries);
+              ui.setArchive(merged.letters);
+              persistArchive();
+              if (!res.header.truncated) {
+                complete = true;
+                break;
+              }
+              if (freshCount === 0) break;
+              if (pages >= LOAD_ALL_MAX_PAGES) break;
+              if (flag.cancelled) break;
+              const oldest = oldestEntry(all);
+              if (!oldest?.date) break;
+              await sleepOrCancel(LOAD_ALL_PACE_MS, flag);
+              if (flag.cancelled) break;
+              res = await mailbox.fetch(box, olderListingCommand(box, nextDay(oldest.date)));
+            } else {
+              complete = res.reason === "puste";
+              break;
+            }
+          }
+          if (complete && !flag.cancelled) {
+            markGoneFromServer(box, seen);
+            ui.setIndexMeta({ ...ui.state.indexMeta, [box]: (/* @__PURE__ */ new Date()).toISOString() });
+            persistIndexMeta();
+            done += 1;
+          } else {
+            break;
+          }
+        }
+        if (flag.cancelled) {
+          notify(
+            api,
+            `Przerwiano indeksowanie (zindeksowane skrzynki: ${done} z ${INDEX_BOXES.length}).`
+          );
+        } else if (done === INDEX_BOXES.length) {
+          rebuildContacts();
+          notify(
+            api,
+            `Zindeksowano wszystkie skrzynki (listow w bazie: ${ui.state.archive.length}).`
+          );
+        } else {
+          notify(
+            api,
+            `Indeksowanie niekompletne (skrzynki: ${done} z ${INDEX_BOXES.length}) - sprobuj ponownie.`
+          );
+        }
+      } finally {
+        indexFlag = null;
+        ui.setIndexRun(null);
+        ui.setBusy(null);
+      }
+    }).catch(
+      (err) => notify(api, `Blad indeksowania: ${humanizeMailError(err instanceof Error ? err.message : String(err))}`)
+    ).finally(() => {
+      const cont = indexContinuation;
+      indexContinuation = null;
+      if (!allBoxesIndexed(ui.state.indexMeta)) return;
+      if (cont === "download") downloadArchiveBodies();
+      else if (cont === "export") {
+        notify(api, "Indeksacja zakonczona - kliknij ponownie Zapisz wszystkie (ZIP).");
+      }
+    });
+  };
   let animalFlight = false;
   let sluchamArmed = false;
   const disarmSlucham = () => {
@@ -3745,6 +3960,12 @@ async function init(api) {
       notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
       return;
     }
+    if (ui.state.archive.length === 0 && !allBoxesIndexed(ui.state.indexMeta)) {
+      notify(api, "Archiwum puste - najpierw indeksuje wszystkie skrzynki.");
+      indexContinuation = "download";
+      indexAllBoxes();
+      return;
+    }
     const groups = /* @__PURE__ */ new Map();
     for (const l of ui.state.archive) {
       if (l.body.length > 0 || l.dateRaw === null || l.missingOnServer === true) continue;
@@ -3755,13 +3976,18 @@ async function init(api) {
     }
     const candidates = [...groups.values()];
     if (candidates.length === 0) {
-      notify(api, "Brak listow bez tresci - archiwum kompletne.");
+      notify(
+        api,
+        ui.state.archive.length > 0 ? "Wszystkie listy w bazie maja tresci." : "Skrzynki sa puste - nie ma czego pobierac."
+      );
       return;
     }
     const flag = { cancelled: false };
     archiveDownloadFlag = flag;
     const total = candidates.length;
-    ui.setArchiveDownload({ done: 0, total });
+    let emaMs = null;
+    let lastAt = Date.now();
+    ui.setArchiveDownload({ done: 0, total, etaMs: null });
     ui.setBusy(`Pobieram tresci do archiwum (0/${total})...`);
     void lock.runExclusive(async () => {
       let done = 0;
@@ -3798,9 +4024,15 @@ async function init(api) {
           } else if (!flag.cancelled) {
             failed += 1;
           }
-          ui.setArchiveDownload({ done: done + failed + missing, total });
+          const processed = done + failed + missing;
+          const now = Date.now();
+          const dt = now - lastAt;
+          lastAt = now;
+          emaMs = emaMs === null ? dt : 0.3 * dt + 0.7 * emaMs;
+          const etaMs = processed >= 3 && emaMs !== null ? Math.max(1e3, Math.round(emaMs * (total - processed))) : null;
+          ui.setArchiveDownload({ done: processed, total, etaMs });
           ui.setBusy(
-            `Pobieram tresci do archiwum (${done + failed + missing}/${total})...`
+            `Pobieram tresci do archiwum (${processed}/${total})...`
           );
           if (flag.cancelled) break;
           await sleepOrCancel(LOAD_ALL_PACE_MS, flag);
@@ -3867,6 +4099,9 @@ async function init(api) {
       void lock.runExclusive(() => openWithResolve(letter.box, pseudo)).catch(() => notify(api, "Nie udalo sie odczytac listu.")).finally(() => ui.setBusy(null));
     },
     onDownloadArchiveBodies: () => downloadArchiveBodies(),
+    // Fala 18c: indeksacja wszystkich skrzynek (brama Kontaktow,
+    // guardy pobierania/eksportu).
+    onIndexAll: () => indexAllBoxes(),
     // Fala 17g: eksporty TXT/ZIP - operacje czysto lokalne (dane
     // z cache), bez locka i bez komend do serwera.
     onExportLetter: () => {
@@ -3893,7 +4128,16 @@ async function init(api) {
     onExportArchive: () => {
       const { entries, skipped } = archiveExportEntries(ui.state.archive);
       if (entries.length === 0) {
-        notify(api, "Brak listow z tresci w archiwum - najpierw pobierz tresci.");
+        if (ui.state.archive.length === 0 && !allBoxesIndexed(ui.state.indexMeta)) {
+          notify(api, "Archiwum puste - najpierw indeksuje wszystkie skrzynki.");
+          indexContinuation = "export";
+          indexAllBoxes();
+          return;
+        }
+        notify(
+          api,
+          ui.state.archive.length === 0 ? "Skrzynki sa puste - nie ma czego zapisywac." : "Brak listow z tresci w archiwum - najpierw pobierz tresci."
+        );
         return;
       }
       const enc = new TextEncoder();
