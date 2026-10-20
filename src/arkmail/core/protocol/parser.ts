@@ -99,18 +99,26 @@ export function parseListingParty(text: string): { kind: 'nadawca' | 'odbiorcy';
   };
 }
 
-// Fala 16b: wariant "otrzymanych" (log 2026-10-19 17:25:11, odpowiedz
-// na "listy nieprzeczytane" - serwer zmienia słowo; 17:21:08 to samo
-// w wariancie filtrowanym).
+// Fala 16b/17b: wariant "otrzymanych" (log 2026-10-19 17:25:11,
+// odpowiedz na "listy nieprzeczytane"; 17:21:08 to samo w wariancie
+// filtrowanym na odebranych). Genityw DWUZNACZNY - patrz nizej.
 const EMPTY_LISTING_RE = /^Nie masz zadnych (nieprzeczytanych|odebranych|wyslanych|niewyslanych|otrzymanych) listow\.$/;
 const FILTERED_EMPTY_RE = /^Nie znaleziono zadnych takich (nieprzeczytanych|odebranych|wyslanych|niewyslanych|otrzymanych) listow\.$/;
 
-const BOX_FROM_GENITIVE: Record<string, MailBox> = {
-  nieprzeczytanych: 'nieprzeczytane',
-  odebranych: 'odebrane',
-  wyslanych: 'wyslane',
-  niewyslanych: 'niewyslane',
-  otrzymanych: 'nieprzeczytane',
+/**
+ * Genityw komunikatu -> skrzynki, ktorych moze dotyczyc (Fala 17b).
+ * "otrzymanych" jest DWUZNACZNE: serwer uzywa go i dla nieprzeczytanych
+ * (log 17:25:11), i dla odebranych (puste wyniki filtra 17:21:08).
+ * Jednoznaczne mapowanie z Fali 16b ("otrzymanych" = "nieprzeczytane")
+ * falszywie odpalalo straznika desynchronizacji (zgloszenie pkt 6:
+ * "pusta nieprzeczytane podczas fetch odebrane").
+ */
+const BOXES_FROM_GENITIVE: Record<string, MailBox[]> = {
+  nieprzeczytanych: ['nieprzeczytane'],
+  odebranych: ['odebrane'],
+  wyslanych: ['wyslane'],
+  niewyslanych: ['niewyslane'],
+  otrzymanych: ['odebrane', 'nieprzeczytane'],
 };
 
 /** Throttle serwera przy czestych listingach (log 2026-10-19 17:25:10). */
@@ -118,9 +126,9 @@ export const LISTS_LOADING_RE = /^Listy sa w tej chwili ladowane\.$/;
 
 export function parseEmptyListing(text: string): EmptyListing | null {
   const puste = text.match(EMPTY_LISTING_RE);
-  if (puste) return { box: BOX_FROM_GENITIVE[puste[1]], reason: 'puste' };
+  if (puste) return { boxes: BOXES_FROM_GENITIVE[puste[1]], reason: 'puste' };
   const filtr = text.match(FILTERED_EMPTY_RE);
-  if (filtr) return { box: BOX_FROM_GENITIVE[filtr[1]], reason: 'filtr' };
+  if (filtr) return { boxes: BOXES_FROM_GENITIVE[filtr[1]], reason: 'filtr' };
   return null;
 }
 

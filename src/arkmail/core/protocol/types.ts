@@ -40,7 +40,14 @@ export interface ListingHeader {
 }
 
 export interface EmptyListing {
-  box: MailBox;
+  /**
+   * Skrzynki, ktorych komunikat moze dotyczyc. Genityw "otrzymanych"
+   * jest DWUZNACZNY (Fala 17b): serwer uzywa go i dla nieprzeczytanych
+   * (log 2026-10-19 17:25:11), i dla odebranych (puste wyniki filtra,
+   * 17:21:08) - zgloszenie pkt 6: falszywy mismatch "pusta
+   * nieprzeczytane podczas fetch odebrane".
+   */
+  boxes: MailBox[];
   /** 'puste': "Nie masz zadnych..."; 'filtr': "Nie znaleziono zadnych takich...". */
   reason: 'puste' | 'filtr';
 }

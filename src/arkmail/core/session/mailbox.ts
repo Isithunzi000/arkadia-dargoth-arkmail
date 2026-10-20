@@ -185,12 +185,16 @@ export class MailboxSession {
             // (desynchronizacja). Stary kod przyjmowal cudzy komunikat
             // po cichu - listing 50 odebranych ladowal jako "nieprzeczytane"
             // i badge pokazywal 50 (zgloszenie 2026-10-19, pkt 6).
-            if (empty.box !== box) {
+            // Fala 17b: straznik odrzuca tylko JEDNOZNACZNY mismatch -
+            // genityw "otrzymanych" pasuje do odebranych i nieprzeczytanych
+            // (parser zwraca zbior; zgloszenie pkt 5/6).
+            if (!empty.boxes.includes(box)) {
               cleanup();
-              reject(new Error(`pusta ${empty.box} podczas fetch ${box}`));
+              reject(new Error(`pusta ${empty.boxes.join('/')} podczas fetch ${box}`));
               return;
             }
-            finish({ kind: 'pusta', box: empty.box, reason: empty.reason });
+            // Zaakceptowany pusty wynik raportuje skrzynke ZADANA.
+            finish({ kind: 'pusta', box, reason: empty.reason });
             return;
           }
           const h = parseListingHeader(line.text);

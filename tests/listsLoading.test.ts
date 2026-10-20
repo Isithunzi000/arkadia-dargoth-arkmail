@@ -14,7 +14,10 @@
  * Kontrakt:
  *  - "ladowane" w mailbox.fetch / pager (stan letter): JEDEN retry
  *    komendy po ~2 s; powtorna linia = blad (bez cichego timeoutu);
- *  - "otrzymanych" = wariant "nieprzeczytanych" (pusty i filtrowany).
+ *  - "otrzymanych" = genityw DWUZNACZNY (korekta Fali 17b: serwer uzywa
+ *    go i dla nieprzeczytanych, i dla odebranych - parser zwraca zbior;
+ *    jednoznaczne mapowanie z 16b falszywie odpalalo straznika,
+ *    zgloszenie pkt 6; pelny kontrakt w tests/ambiguousEmpty.test.ts).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -29,18 +32,20 @@ import { PagerSession } from '../src/arkmail/core/session/pager';
 
 const OPTS = { timeoutMs: 6000, idleMs: 100 };
 
-test('parser: puste "otrzymanych" mapuje na nieprzeczytane', () => {
+test('parser: puste "otrzymanych" to zbior {odebrane, nieprzeczytane} (korekta 17b)', () => {
   assert.deepEqual(parseEmptyListing('Nie masz zadnych otrzymanych listow.'), {
-    box: 'nieprzeczytane',
+    boxes: ['odebrane', 'nieprzeczytane'],
     reason: 'puste',
   });
   assert.deepEqual(parseEmptyListing('Nie znaleziono zadnych takich otrzymanych listow.'), {
-    box: 'nieprzeczytane',
+    boxes: ['odebrane', 'nieprzeczytane'],
     reason: 'filtr',
   });
-  // Bez regresji: klasyczne warianty.
-  assert.equal(parseEmptyListing('Nie masz zadnych nieprzeczytanych listow.')?.box, 'nieprzeczytane');
-  assert.equal(parseEmptyListing('Nie masz zadnych odebranych listow.')?.box, 'odebrane');
+  // Bez regresji: klasyczne warianty jednoznaczne.
+  assert.deepEqual(parseEmptyListing('Nie masz zadnych nieprzeczytanych listow.')?.boxes, [
+    'nieprzeczytane',
+  ]);
+  assert.deepEqual(parseEmptyListing('Nie masz zadnych odebranych listow.')?.boxes, ['odebrane']);
 });
 
 test('parser: linia throttle "Listy sa w tej chwili ladowane."', () => {

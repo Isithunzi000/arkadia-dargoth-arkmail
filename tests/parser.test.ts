@@ -105,9 +105,11 @@ test('listing-wyslane-50: pelna strona 50 wpisow, truncated=true', () => {
 });
 
 test('puste listingi: oba warianty komunikatow', () => {
-  assert.deepEqual(parseEmptyListing('Nie masz zadnych nieprzeczytanych listow.'), { box: 'nieprzeczytane', reason: 'puste' });
-  assert.deepEqual(parseEmptyListing('Nie masz zadnych niewyslanych listow.'), { box: 'niewyslane', reason: 'puste' });
-  assert.deepEqual(parseEmptyListing('Nie znaleziono zadnych takich wyslanych listow.'), { box: 'wyslane', reason: 'filtr' });
+  // Fala 17b: parser zwraca ZBIOR skrzynek (genityw "otrzymanych" jest
+  // dwuznaczny - pelny kontrakt w tests/ambiguousEmpty.test.ts).
+  assert.deepEqual(parseEmptyListing('Nie masz zadnych nieprzeczytanych listow.'), { boxes: ['nieprzeczytane'], reason: 'puste' });
+  assert.deepEqual(parseEmptyListing('Nie masz zadnych niewyslanych listow.'), { boxes: ['niewyslane'], reason: 'puste' });
+  assert.deepEqual(parseEmptyListing('Nie znaleziono zadnych takich wyslanych listow.'), { boxes: ['wyslane'], reason: 'filtr' });
   assert.equal(parseEmptyListing('Nie masz listow.'), null);
 });
 
