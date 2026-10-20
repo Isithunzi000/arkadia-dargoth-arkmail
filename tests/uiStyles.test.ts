@@ -92,6 +92,26 @@ test('style: pasek operacji - 12px, bez lamania, ellipsis', () => {
   assert.match(body!, /text-overflow:\s*ellipsis/, 'dlugi opis ucina ellipsis');
 });
 
+// Fala 17e (zgloszenie 2026-10-19/20 pkt 1): przycisk "Wczytaj
+// wszystkie" w box-ops byl nizszy niz sasiedzi - regula paginacji
+// `.arkmail-root button.arkmail-older-all { margin-top: 8px; width: 100% }`
+// (specyficznosc 0,2,1) lapala tez box-ops, a wyzerowanie istnialo tylko
+// dla older-row. Catch-all dostaje jednolita wysokosc i centrowanie,
+// zeby obwodka nie zalezela od etykiety.
+test('style: przyciski spojne wysokoscia; box-ops wolny od margin-top paginacji', () => {
+  const all = ruleBody(/\.arkmail-root\s+button\b/);
+  assert.ok(all, 'regula catch-all button istnieje');
+  assert.match(all!, /display:\s*inline-flex/, 'catch-all: inline-flex');
+  assert.match(all!, /align-items:\s*center/, 'pionowe centrowanie etykiety');
+  assert.match(all!, /justify-content:\s*center/, 'poziome centrowanie etykiety');
+  assert.match(all!, /min-height:\s*26px/, 'jednolita minimalna wysokosc');
+
+  const boxOps = ruleBody(/\.arkmail-box-ops\s+button\.arkmail-older-all\b/);
+  assert.ok(boxOps, 'regula box-ops dla Wczytaj-wszystkie istnieje');
+  assert.match(boxOps!, /margin-top:\s*0/, 'box-ops bez margin-top paginacji');
+  assert.match(boxOps!, /width:\s*auto/, 'box-ops bez width 100%');
+});
+
 // Audyt etykiet (Fala 16k): kazda statyczna etykieta w render.ts musi
 // byc krotka (<=45 znakow), a stary dlugi format "Przerwij (strona N)"
 // jest zakazany - teraz "Przerwij · N" (dynamiczny, poza regexem).

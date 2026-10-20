@@ -57,6 +57,12 @@ export const STYLES = `
   cursor: pointer;
   /* Fala 16k: etykiety przyciskow nie lamia sie w waskim popupie. */
   white-space: nowrap;
+  /* Fala 17e: jednolita wysokosc i centrowanie etykiety niezaleznie
+   * od jej dlugosci (zgloszenie pkt 1: obwodka spojna wielkosciowo). */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
 }
 .arkmail-root button:hover { background: #3b3d47; }
 .arkmail-root input, .arkmail-root textarea, .arkmail-root select {
@@ -235,6 +241,10 @@ export const STYLES = `
 .arkmail-root .arkmail-older-all { flex: 1; }
 .arkmail-root button.arkmail-older-all { margin-top: 8px; width: 100%; }
 .arkmail-older-row button.arkmail-older-all { margin-top: 0; width: auto; }
+/* Fala 17e: "Wczytaj wszystkie" w box-ops - regula paginacji wyzej
+ * (margin-top: 8px; width: 100%) lapala go specyficznoscia 0,2,1 i
+ * przycisk odjezdzal od sasiadow (zgloszenie pkt 1). */
+.arkmail-box-ops button.arkmail-older-all { margin-top: 0; width: auto; }
 
 /* --- widok listu --- */
 .arkmail-letter-head {
