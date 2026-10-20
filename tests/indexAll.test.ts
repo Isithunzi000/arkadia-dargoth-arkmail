@@ -55,6 +55,25 @@ test('brama Kontaktow: bez indeksu przycisk indeksacji zamiast licznikow', () =>
       } | null;
       assert.ok(btn, 'przycisk indeksacji w bramie Kontaktow');
       assert.equal(btn.textContent, 'Indeksuj wszystkie skrzynki');
+      // Fala 19b: brama ma wyjasniac, ze indeksowanie buduje baze
+      // kontaktow ze wszystkich skrzynek i wszystkich listow - bez
+      // technicznych szczegolow ("pierwszych 50") nic nie mowiacych
+      // graczowi.
+      const gateText = container.textContent ?? '';
+      assert.ok(
+        gateText.includes(
+          'Kontakty liczone sa z bazy wszystkich listow ze wszystkich skrzynek',
+        ),
+        'brama wyjasnia, skad bierze sie baza kontaktow',
+      );
+      assert.ok(
+        gateText.includes('Zindeksuj skrzynki, aby zebrac baze'),
+        'brama wskazuje czynnik odblokowujacy',
+      );
+      assert.ok(
+        !gateText.includes('pierwszych 50'),
+        'brama bez technicznych szczegolow o pierwszych 50 wpisach',
+      );
       assert.ok(
         !container.querySelector('.arkmail-contact-controls'),
         'liczniki kontaktow ukryte przed indeksacja',

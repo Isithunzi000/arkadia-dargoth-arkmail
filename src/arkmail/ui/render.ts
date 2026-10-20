@@ -1011,11 +1011,13 @@ export function mountMailUi(
     // archiwum sa kompletne dopiero po pelnej indeksacji wszystkich
     // skrzynek - wczesniej (baza = pierwsze 50 wpisow) liczniki
     // klamaly, wiec zamiast nich brama z przyciskiem indeksacji.
+    // Fala 19b (zgloszenie 2026-10-20): tekst bramy bez szczegolow
+    // technicznych - gracz ma wiedziec tylko, po co indeksowanie.
     if (!allBoxesIndexed(state.indexMeta)) {
       pane.appendChild(
         dim(
-          'Kontakty liczone sa z calej bazy listow, nie z pierwszych 50. ' +
-            'Zindeksuj wszystkie skrzynki, aby zobaczyc kompletne liczniki.',
+          'Kontakty liczone sa z bazy wszystkich listow ze wszystkich skrzynek. ' +
+            'Zindeksuj skrzynki, aby zebrac baze (jednorazowo).',
         ),
       );
       const gate = doc.createElement('button');
