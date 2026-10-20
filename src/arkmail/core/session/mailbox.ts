@@ -10,6 +10,7 @@
  */
 
 import {
+  extractPagerPrompt,
   LISTS_LOADING_RE,
   parseEmptyListing,
   parseListingEntry,
@@ -87,6 +88,12 @@ export class MailboxSession {
        *  ladowane." (serwer nie zdazyl zbudowac listingu). */
       let loadRetried = false;
       let loadRetryTimer: ReturnType<typeof setTimeout> | null = null;
+      /** Fala 17a: jeden retry po sierocym pagerze (zgloszenie pkt 4).
+       *  Pager konsumuje nasza komende i odpowiada wlasnym promptem
+       *  "[1-50 ...] -- " - domykamy go "q" i po prompcie gry powtarzamy
+       *  komende. Powtorka promptu = pager przetrwal "q" - blad. */
+      let pagerRetried = false;
+      let awaitingPromptAfterQ = false;
       const idleMs = this.opts.idleMs ?? 600;
       let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -148,6 +155,30 @@ export class MailboxSession {
         if (!header) {
           // Echo wlasnej komendy: po klasie albo po samej tresci.
           if (line.cls === 'command' || isEchoLine(line.text)) return;
+          // Fala 17a: prompt gry po naszym "q" = sieroca domknieta;
+          // powtarzamy komende listingu (zobacz pagerRetried nizej).
+          if (awaitingPromptAfterQ) {
+            if (line.cls === 'prompt' || isPromptLine(line.text)) {
+              awaitingPromptAfterQ = false;
+              this.transport.send(cmd);
+            }
+            return;
+          }
+          // Fala 17a: sierocy pager (po przerwanej petli / timeoutcie
+          // sesji) zjadl komende "listy" - odpowiada wlasnym promptem.
+          // extractPagerPrompt znajduje tez prompt sklejony z inna
+          // trescia w jednej linii (klient trzyma linie bez \n).
+          if (extractPagerPrompt(line.text)) {
+            if (pagerRetried) {
+              cleanup();
+              reject(new Error(`sierocy pager podczas fetch ${box}`));
+              return;
+            }
+            pagerRetried = true;
+            awaitingPromptAfterQ = true;
+            this.transport.send('q');
+            return;
+          }
           const empty = parseEmptyListing(line.text);
           if (empty) {
             // Fala 14d: fail-fast, gdy serwer odpowiada za INNA skrzynke

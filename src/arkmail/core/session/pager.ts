@@ -62,8 +62,15 @@ export class PagerSession {
     private readonly opts: SessionOptions,
   ) {}
 
-  readLetter(numer: number): Promise<ReadResult> {
-    return this.run(numer, () => null, (letter, pager) => ({ letter, pager }));
+  /**
+   * Odczyt listu. shouldAbort (Fala 17a, zgloszenie pkt 4): Przerwij
+   * petli pobierania w trakcie odczytu - sesja domyka pager od razu
+   * ("q" tylko gdy pager faktycznie otwarty albo naglowki kompletne;
+   * przed otwarciem zadnego smieciowego "q") i odrzuca "przerwano",
+   * zamiast wisiec do timeoutu z otwartym pagerem serwera.
+   */
+  readLetter(numer: number, shouldAbort?: () => boolean): Promise<ReadResult> {
+    return this.run(numer, () => null, (letter, pager) => ({ letter, pager }), shouldAbort);
   }
 
   deleteLetters(numer: number, zakres: string): Promise<DeleteResult> {
@@ -133,6 +140,7 @@ export class PagerSession {
       onLine?: (line: ProtoLine) => 'close' | undefined;
     } | null,
     build: (letter: LetterContent, pager: PagerPrompt) => T,
+    shouldAbort?: () => boolean,
   ): Promise<T> {
     return new Promise((resolve, reject) => {
       const letter: LetterContent = {
@@ -166,9 +174,33 @@ export class PagerSession {
         if (loadRetryTimer) clearTimeout(loadRetryTimer);
         unsub();
       };
+      /** Fala 17a: Przerwij w trakcie sesji (shouldAbort z zewnnatrz). */
+      let aborted = false;
       const finish = () => {
         cleanup();
+        if (aborted) {
+          reject(new Error(`pager session list ${numer}: przerwano`));
+          return;
+        }
         resolve(build(letter, pager));
+      };
+
+      /**
+       * Fala 17a: sprawdzenie abortu na kazdej linii i przy ciszy.
+       * Pager otwarty (albo naglowki kompletne - protokol zawsze otwiera
+       * pager po odczycie) = domykamy "q" i odrzucamy po domknieciu.
+       * Pager nieotwarty = odrzucamy od razu, BEZ smieciowego "q"
+       * (q bez pagera = "Slucham?" i smieciowa komenda w grze).
+       */
+      const checkAbort = (): void => {
+        if (done || aborted || !shouldAbort || !shouldAbort()) return;
+        aborted = true;
+        if (state === 'pager' || pagerFired || idleOpened || headersDone) {
+          if (state !== 'closing') enterClosing();
+          return;
+        }
+        cleanup();
+        reject(new Error(`pager session list ${numer}: przerwano`));
       };
 
       /** Bezpiecznik: cisza po wyslaniu "q" = transakcja zakonczona. */
@@ -190,6 +222,8 @@ export class PagerSession {
        */
       const onQuiet = () => {
         if (done) return;
+        checkAbort(); // Fala 17a: cisza po Przerwij tez domyka sesje
+        if (done || aborted) return;
         if (state === 'letter' && headersDone) {
           state = 'pager';
           pagerFired = true;
@@ -247,6 +281,9 @@ export class PagerSession {
       const unsub = this.transport.subscribe((line: ProtoLine) => {
         // Echo wlasnych komend: po klasie albo po samej tresci.
         if (done || line.cls === 'command' || isEchoLine(line.text)) return;
+
+        checkAbort(); // Fala 17a: Przerwij petli domyka pager w toku
+        if (done) return;
 
         if (state === 'closing') {
           if (line.cls === 'prompt' || isPromptLine(line.text)) {

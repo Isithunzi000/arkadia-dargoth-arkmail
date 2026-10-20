@@ -701,21 +701,32 @@ export async function init(api: PluginApi) {
    * co openWithResolve (re-kotwica + druga szansa 16c), ale BEZ
    * otwierania listu w UI. true = tresc pobrana i zapisana.
    * WYMAGA locka (caller).
+   * Fala 17a (zgloszenie pkt 4): resolveEntry W try - wyjatek z
+   * re-kotwicy (timeout, sierocy pager, linia-blad serwera) jest
+   * pojedyncza porazka listu, NIE smiercia calej petli pobierania.
+   * shouldAbort: Przerwij domyka pager w toku (patrz pager.readLetter).
    */
-  const fetchArchiveBody = async (letter: ArchiveLetter): Promise<boolean> => {
+  const fetchArchiveBody = async (
+    letter: ArchiveLetter,
+    shouldAbort?: () => boolean,
+  ): Promise<boolean> => {
     const pseudo = archivePseudoEntry(letter);
     for (let attempt = 0; attempt < 2; attempt++) {
-      const fresh = await resolveEntry(letter.box, pseudo);
-      if (!fresh) return false;
-      transport!.beginModal();
       try {
-        const res = await pager.readLetter(fresh.number);
-        const merged = upsertLetters(ui.state.archive, [
-          fromOpenedLetter(letter.box, res.letter, fresh),
-        ]);
-        ui.setArchive(merged.letters);
-        persistArchive();
-        return true;
+        const fresh = await resolveEntry(letter.box, pseudo);
+        if (!fresh) return false;
+        transport!.beginModal();
+        try {
+          const res = await pager.readLetter(fresh.number, shouldAbort);
+          const merged = upsertLetters(ui.state.archive, [
+            fromOpenedLetter(letter.box, res.letter, fresh),
+          ]);
+          ui.setArchive(merged.letters);
+          persistArchive();
+          return true;
+        } finally {
+          transport!.endModal();
+        }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         const listingGone = /nie zostaly wybrane|Zly numer listu/.test(msg);
@@ -724,8 +735,6 @@ export async function init(api: PluginApi) {
           continue;
         }
         return false;
-      } finally {
-        transport!.endModal();
       }
     }
     return false;
@@ -769,7 +778,8 @@ export async function init(api: PluginApi) {
         try {
           for (const letter of candidates) {
             if (flag.cancelled) break;
-            if (await fetchArchiveBody(letter)) done += 1;
+            // Fala 17a: Przerwij domyka tez pager w toku (shouldAbort).
+            if (await fetchArchiveBody(letter, () => flag.cancelled)) done += 1;
             else failed += 1;
             ui.setArchiveDownload({ done: done + failed, total });
             ui.setBusy(`Pobieram tresci do archiwum (${done + failed}/${total})...`);
