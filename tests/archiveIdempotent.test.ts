@@ -138,7 +138,10 @@ test('archiwum: blizniak nieprzeczytane/odebrane pobierany RAZ, tresc w obu reko
     await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec listingu');
 
     click(h, '[data-tab="archiwum"]');
-    assert.equal(archiveRows(h, 'najnowszy').length, 2, 'blizniacze rekordy w archiwum');
+    // Fala 18a: widok ZWIJA blizniaki do jednego wiersza (reprezentant
+    // grupy) - rekordy w danych sa nadal dwa, dowodzi tego petla
+    // pobierania (grupa = 1 kandydat) i cache ponizej.
+    assert.equal(archiveRows(h, 'najnowszy').length, 1, 'blizniak zwiniety do jednego wiersza');
 
     downloadBtn(h).dispatchEvent(new h.window.Event('click')); // uzbrojenie
     downloadBtn(h).dispatchEvent(new h.window.Event('click')); // start

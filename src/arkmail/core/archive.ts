@@ -63,6 +63,14 @@ export interface ArchiveFilter {
 const SENDER_BOXES: ReadonlySet<MailBox> = new Set(['odebrane', 'nieprzeczytane']);
 const RECIPIENT_BOXES: ReadonlySet<MailBox> = new Set(['wyslane', 'niewyslane']);
 
+/** Kolejnosc kanoniczna skrzynki dla blizniaka (Fala 17c/18a). */
+export const BOX_RANK: Record<MailBox, number> = {
+  odebrane: 0,
+  nieprzeczytane: 1,
+  wyslane: 2,
+  niewyslane: 3,
+};
+
 /** FNV-1a 32-bit, hex - deterministyczny skrot bez zaleznosci. */
 function fnv1a(input: string): string {
   let h = 0x811c9dc5;
@@ -198,6 +206,67 @@ export function upsertLetters(
     updated++;
   }
   return { letters: [...map.values()].sort(byNewest), added, updated };
+}
+
+/**
+ * Reprezentant grupy blizniakow (Fala 18a): rekord z trescia wygrywa
+ * (wiersz i otwarcie z cache), potem skrzynka kanoniczna (odebrane
+ * przed nieprzeczytanymi - zombie po przeczytaniu nie rzadzi widokiem),
+ * potem id (determinizm).
+ */
+function representativeOf(group: ArchiveLetter[]): ArchiveLetter {
+  return [...group].sort(
+    (a, b) =>
+      Number(b.body.length > 0) - Number(a.body.length > 0) ||
+      BOX_RANK[a.box] - BOX_RANK[b.box] ||
+      (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+  )[0];
+}
+
+/**
+ * Widok archiwum (Fala 18a, zgloszenie 2026-10-20 pkt 1/3): ten sam
+ * list widoczny w kilku skrzynkach (nieprzeczytany jest i tu, i tu)
+ * pokazuje sie JEDEN raz - grupa po kluczu tresci; rekordy oznaczone
+ * jako znikniete z serwera sa ukryte (grupa zyje, poki ma zywego
+ * blizniaka). Filtr skrzynki i tresci dziala po CA LEJ grupie (reszta
+ * filtrow po reprezentancie - party/temat/daty sa w grupie identyczne).
+ */
+export function filterVisibleArchive(
+  letters: readonly ArchiveLetter[],
+  filter: ArchiveFilter,
+): ArchiveLetter[] {
+  const groups = new Map<string, ArchiveLetter[]>();
+  for (const l of letters) {
+    if (l.missingOnServer === true) continue;
+    const key = contentKeyOf(l);
+    const arr = groups.get(key);
+    if (arr) arr.push(l);
+    else groups.set(key, [l]);
+  }
+  const out: ArchiveLetter[] = [];
+  for (const group of groups.values()) {
+    if (filter.skrzynka !== undefined && !group.some((l) => l.box === filter.skrzynka)) continue;
+    if (
+      filter.tresc !== undefined &&
+      !group.some((l) => norm(l.body.join('\n')).includes(norm(filter.tresc!)))
+    )
+      continue;
+    const rep = representativeOf(group);
+    if (filter.od !== undefined) {
+      if (!SENDER_BOXES.has(rep.box)) continue;
+      if (!norm(rep.party).includes(norm(filter.od))) continue;
+    }
+    if (filter.do !== undefined) {
+      if (!RECIPIENT_BOXES.has(rep.box)) continue;
+      if (!norm(rep.party).includes(norm(filter.do))) continue;
+    }
+    if (filter.osoba !== undefined && !norm(rep.party).includes(norm(filter.osoba))) continue;
+    if (filter.temat !== undefined && !norm(rep.subject).includes(norm(filter.temat))) continue;
+    if (filter.odDaty !== undefined && rep.sortKey.slice(0, 10) < filter.odDaty) continue;
+    if (filter.doDaty !== undefined && rep.sortKey.slice(0, 10) > filter.doDaty) continue;
+    out.push(rep);
+  }
+  return out.sort(byNewest);
 }
 
 const norm = (s: string) => s.toLowerCase();

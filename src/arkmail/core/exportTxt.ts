@@ -10,7 +10,7 @@
  */
 
 import type { ArchiveLetter } from './archive.js';
-import { contentKeyOf } from './archive.js';
+import { BOX_RANK, contentKeyOf } from './archive.js';
 import { parseMailDate } from './protocol/parser.js';
 import type { MailBox } from './protocol/types.js';
 
@@ -84,19 +84,12 @@ export interface ExportEntry {
   txt: string;
 }
 
-/** Kolejnosc kanoniczna skrzynki dla blizniaka (jak petla 17c). */
-const BOX_RANK: Record<MailBox, number> = {
-  odebrane: 0,
-  nieprzeczytane: 1,
-  wyslane: 2,
-  niewyslane: 3,
-};
-
 /**
  * Eksport calego archiwum: tylko listy Z trescia (bez-tresciowe
- * pomijane i liczone), blizniaki nieprzeczytane/odebrane
- * deduplikowane po kluczu tresci (Fala 17c) - plik laduje w folderze
- * skrzynki kanonicznej. Kolizje nazw dostaja suffiks -2, -3, ...
+ * pomijane i liczone), rekordy znikniete z serwera pomijane (Fala
+ * 18a), blizniaki nieprzeczytane/odebrane deduplikowane po kluczu
+ * tresci (Fala 17c) - plik laduje w folderze skrzynki kanonicznej.
+ * Kolizje nazw dostaja suffiks -2, -3, ...
  * Wynik posortowany od najnowszych (deterministycznie).
  */
 export function archiveExportEntries(letters: readonly ArchiveLetter[]): {
@@ -106,6 +99,7 @@ export function archiveExportEntries(letters: readonly ArchiveLetter[]): {
   const byKey = new Map<string, ArchiveLetter>();
   let skipped = 0;
   for (const l of letters) {
+    if (l.missingOnServer === true) continue; // Fala 18a: znikniete nie eksportujemy
     if (l.body.length === 0) {
       skipped++;
       continue;

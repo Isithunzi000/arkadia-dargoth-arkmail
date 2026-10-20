@@ -75,15 +75,20 @@ test('contactsFromArchive: rekord bez daty i bez flagged forwarded (stare storag
   assert.equal(el.lastContactKey, undefined);
 });
 
-test('kontakty z archiwum: refresh z pustym listingiem nie zeruje licznikow', async () => {
+test('kontakty z archiwum: pusta skrzynka (kompletna prawda) zdejmuje liczniki', async () => {
   const h: Harness = await startHarness();
   const { f, waitFor, content } = h;
   try {
     await loadTruncatedBox(h); // 3 listy: Foo x2, Corge x1
 
-    // Refresh odebranych wraca PUSTY listing (gracz wyczyscil skrzynke
-    // na fizycznej poczcie albo listing innej skrzynki przestawil
-    // kontekst) - widok skrzynki pusty, ale archiwum pamieta.
+    // Fala 18a (SWIADOMA zmiana decyzji 14a, zgloszenie 2026-10-20):
+    // pusty listing z reason "puste" to PELNA prawda serwera - gracz
+    // wyczyscil skrzynke w grze, wiec listy przestaja sie liczyc do
+    // kontaktow (rekordy zostaja w archiwum ze znacznikiem znikniecia;
+    // powrot listu do listingu znacznik czysci i liczniki wracaja).
+    // Stabilnosc z Fali 14a jest zachowana tam, gdzie byla potrzebna:
+    // zwykly refresh skrzynki >50 listow jest UCIETY i reguly nie
+    // odpala.
     click(h, '[data-box="odebrane"]');
     await waitFor(
       () => f.sent.filter((c) => c === 'listy odebrane').length >= 2,
@@ -95,15 +100,8 @@ test('kontakty z archiwum: refresh z pustym listingiem nie zeruje licznikow', as
 
     click(h, '[data-tab="kontakty"]');
     await waitFor(
-      () => content.querySelectorAll('.arkmail-contact').length === 2,
-      'kontakty z archiwum przezywaja pusty refresh',
-    );
-    const stats = [...content.querySelectorAll('.arkmail-contact-stats')].map((el) =>
-      String((el as { textContent?: string }).textContent),
-    );
-    assert.ok(
-      stats.some((s) => s.includes('(odebrane: 2, wyslane: 0)')),
-      `Foo 2 odebrane po pustym refreshu, mamy: ${stats.join(' | ')}`,
+      () => content.querySelectorAll('.arkmail-contact').length === 0,
+      'kontakty reaguja na pusta skrzynke',
     );
   } finally {
     await stopHarness();

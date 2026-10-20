@@ -160,7 +160,11 @@ export function contactsFromArchive(letters: readonly ArchiveLetter[]): Contact[
   return mergeContacts({
     people: [],
     przedstawieni: [],
-    korespondencja: korespondencjaFromLetters(letters.map(archiveToLetterLike)),
+    // Fala 18a: listy oznaczone jako znikniete z serwera nie licza sie
+    // do kontaktow (kompletny listing raportuje pelna prawde).
+    korespondencja: korespondencjaFromLetters(
+      letters.filter((l) => l.missingOnServer !== true).map(archiveToLetterLike),
+    ),
     aliasy: [],
   });
 }

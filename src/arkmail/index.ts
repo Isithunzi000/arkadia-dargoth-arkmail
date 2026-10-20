@@ -250,7 +250,38 @@ export async function init(api: PluginApi) {
           res.entries.map((e) => fromMailboxEntry(box, e)),
         );
         ui.setArchive(merged.letters);
+        // Fala 18a: KOMPLTNY listing (bez uciecia) = pelna prawda o
+        // skrzynce (jak syncMailboxPage dla widoku, Fala 14f). Rekordy
+        // nieobecne oznaczamy jako znikniete - znikaja z widoku
+        // archiwum i licznikow kontaktow. Tylko tutaj: to jedyna
+        // sciezka z NIEfiltrowana komenda "listy <skrzynka>" (szukanie,
+        // re-kotwice i paginacje maja wlasne komendy i call-site'y).
+        if (!res.header.truncated) {
+          markGoneFromServer(box, new Set(res.entries.map((e) => fromMailboxEntry(box, e).id)));
+        }
+      } else if (res.reason === "puste") {
+        // Pusta skrzynka (reason "puste", nie "filtr") = pelna prawda:
+        // wszystkie jej rekordy zniknely z serwera.
+        markGoneFromServer(box, new Set());
       }
+    }
+  };
+
+  /**
+   * Fala 18a: oznacza rekordy archiwum danej skrzynki nieobecne
+   * w freshIds jako znikniete z serwera (cicho, jak upsert). Wywolywane
+   * WYLACZNIE przy pewnoscia kompletnego listingu (patrz fetchBoxes).
+   */
+  const markGoneFromServer = (box: MailBox, freshIds: Set<string>): void => {
+    let changed = false;
+    const marked = ui.state.archive.map((l) => {
+      if (l.box !== box || l.missingOnServer === true || freshIds.has(l.id)) return l;
+      changed = true;
+      return { ...l, missingOnServer: true };
+    });
+    if (changed) {
+      ui.setArchive(marked);
+      persistArchive();
     }
   };
 

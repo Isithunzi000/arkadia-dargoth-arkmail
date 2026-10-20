@@ -10,7 +10,7 @@
 import type { MailBox } from '../core/protocol/types.js';
 import type { MailboxEntry } from '../core/session/mailbox.js';
 import { fromISODate, type ListingSearch } from '../core/protocol/commands.js';
-import { filterLetters, type ArchiveFilter, type ArchiveLetter } from '../core/archive.js';
+import { filterVisibleArchive, type ArchiveFilter, type ArchiveLetter } from '../core/archive.js';
 import { viewContacts, type ContactSort } from '../core/contacts.js';
 import {
   clampLineWidth,
@@ -1194,7 +1194,21 @@ export function mountMailUi(
     const list = doc.createElement('div');
     pane.appendChild(list);
     const repaint = () => {
-      const rows = filterLetters(state.archive, archFilter);
+      // Fala 18a: blizniaki jednym wierszem, znikniete ukryte (core).
+      const rows = filterVisibleArchive(state.archive, archFilter);
+      // Podpis filtra tresci: tresc zna tylko pobrane listy - bez
+      // podpowiedzi filtr "milczaco" nic nie znajdowal (zgloszenie
+      // 2026-10-20 pkt 3).
+      const oldNote = pane.querySelector('.arkmail-tresc-note');
+      if (oldNote) oldNote.remove();
+      if (archFilter.tresc !== undefined) {
+        const base = filterVisibleArchive(state.archive, { ...archFilter, tresc: undefined });
+        const withBody = base.filter((l) => l.body.length > 0).length;
+        const note = doc.createElement('div');
+        note.className = 'arkmail-dim arkmail-tresc-note';
+        note.textContent = `Filtr tresci obejmuje tylko listy z pobrana trescia (${withBody} z ${base.length}).`;
+        pane.insertBefore(note, list);
+      }
       list.replaceChildren(
         ...rows.map((l, idx) => {
           const row = doc.createElement('div');
