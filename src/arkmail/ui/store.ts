@@ -49,8 +49,12 @@ export interface MailUiState {
   busy: string | null;
   /** petla "Wczytaj wszystkie" w toku: skrzynka + liczba pobranych stron */
   loadAll: { box: MailBox; pages: number } | null;
-  /** petla "Pobierz tresci do archiwum" w toku: przetworzone / razem */
-  archiveDownload: { done: number; total: number } | null;
+  /**
+   * petla "Pobierz tresci do archiwum" w toku: przetworzone / razem
+   * + ETA w ms (Fala 18d; null = za wczesnie na sensowne ETA,
+   * pokazywane od 3 ukonczonych).
+   */
+  archiveDownload: { done: number; total: number; etaMs: number | null } | null;
   /** tryb wynikow szukania serwerowego: skrzynka + opis zapytania */
   search: { box: MailBox; label: string } | null;
   letter: OpenLetter | null;
@@ -271,7 +275,9 @@ export class MailUiStore {
     this.update({ loadAll });
   }
 
-  setArchiveDownload(archiveDownload: { done: number; total: number } | null): void {
+  setArchiveDownload(
+    archiveDownload: { done: number; total: number; etaMs: number | null } | null,
+  ): void {
     this.update({ archiveDownload });
   }
 

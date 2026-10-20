@@ -120,6 +120,21 @@ export const STYLES = `
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Fala 18d (zgloszenie pkt 2): pasek postepu pod tekstem busy przy
+   masowym pobieraniu tresci (jedyna petla ze znanym total). */
+.arkmail-busy-track {
+  margin-top: 4px;
+  height: 6px;
+  border-radius: 3px;
+  background: ${BG};
+  overflow: hidden;
+}
+.arkmail-busy-bar {
+  height: 100%;
+  border-radius: 3px;
+  background: ${ACCENT};
+  transition: width 200ms ease-out;
+}
 
 /* --- panele --- */
 .arkmail-pane {

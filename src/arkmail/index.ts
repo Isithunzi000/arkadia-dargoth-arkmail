@@ -989,7 +989,13 @@ export async function init(api: PluginApi) {
     const flag = { cancelled: false };
     archiveDownloadFlag = flag;
     const total = candidates.length;
-    ui.setArchiveDownload({ done: 0, total });
+    // Fala 18d (zgloszenie pkt 2): ETA z EMA po czasach ukonczen
+    // kolejnych listow (fetch + pacing = realne tempo petli); alpha
+    // 0.3 laguje pojedyncze dlugie odczyty. Pokazywane od 3
+    // ukonczonych - wczesniej jest losowe.
+    let emaMs: number | null = null;
+    let lastAt = Date.now();
+    ui.setArchiveDownload({ done: 0, total, etaMs: null });
     ui.setBusy(`Pobieram tresci do archiwum (0/${total})...`);
     void lock
       .runExclusive(async () => {
@@ -1038,9 +1044,18 @@ export async function init(api: PluginApi) {
             } else if (!flag.cancelled) {
               failed += 1;
             }
-            ui.setArchiveDownload({ done: done + failed + missing, total });
+            const processed = done + failed + missing;
+            const now = Date.now();
+            const dt = now - lastAt;
+            lastAt = now;
+            emaMs = emaMs === null ? dt : 0.3 * dt + 0.7 * emaMs;
+            const etaMs =
+              processed >= 3 && emaMs !== null
+                ? Math.max(1000, Math.round(emaMs * (total - processed)))
+                : null;
+            ui.setArchiveDownload({ done: processed, total, etaMs });
             ui.setBusy(
-              `Pobieram tresci do archiwum (${done + failed + missing}/${total})...`,
+              `Pobieram tresci do archiwum (${processed}/${total})...`,
             );
             if (flag.cancelled) break;
             await sleepOrCancel(LOAD_ALL_PACE_MS, flag);

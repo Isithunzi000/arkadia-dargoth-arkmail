@@ -244,7 +244,7 @@ export function mountMailUi(
     // zakladki zamyka overlay (powrot do napisz = formularz).
     if (state.tab !== 'napisz') previewFull = false;
     const nodes: Node[] = [renderTabs(state)];
-    if (state.busy !== null) nodes.push(renderBusy(state.busy));
+    if (state.busy !== null) nodes.push(renderBusy(state));
     if (state.tab === 'napisz' && previewFull) {
       // Fala 12d: podglad na cale okno popupu (oba tryby szerokosci).
       nodes.push(renderPreviewFull());
@@ -292,10 +292,35 @@ export function mountMailUi(
     return bar;
   };
 
-  const renderBusy = (label: string): HTMLElement => {
+  /** Fala 18d: ETA w ludzkiej formie - sekundy <45 s, potem minuty. */
+  const formatEta = (ms: number): string =>
+    ms < 45_000
+      ? `zostalo ok. ${Math.max(1, Math.round(ms / 1000))} s`
+      : `zostalo ok. ${Math.max(1, Math.round(ms / 60000))} min`;
+
+  const renderBusy = (state: MailUiState): HTMLElement => {
     const el = doc.createElement('div');
     el.className = 'arkmail-busy';
-    el.textContent = `${label}`;
+    const label = doc.createElement('span');
+    // Fala 18d (zgloszenie pkt 2): przy petli pobierania tresci ETA
+    // doklejane do opisu (od 3 ukonczonych) + pasek procentowy pod
+    // tekstem. Petle bez znanego total (Wczytaj wszystkie, indeksacja)
+    // zostaja przy samym liczniku.
+    const dl = state.archiveDownload;
+    label.textContent =
+      `${state.busy ?? ''}` +
+      (dl !== null && dl.etaMs !== null ? ` (${formatEta(dl.etaMs)})` : '');
+    el.appendChild(label);
+    if (dl !== null && dl.total > 0) {
+      const track = doc.createElement('div');
+      track.className = 'arkmail-busy-track';
+      const bar = doc.createElement('div');
+      bar.className = 'arkmail-busy-bar';
+      const pct = Math.min(100, Math.round((dl.done / dl.total) * 100));
+      bar.style.width = `${pct}%`;
+      track.appendChild(bar);
+      el.appendChild(track);
+    }
     return el;
   };
 
