@@ -138,6 +138,8 @@ export function contactsFromBoxes(
 ): Contact[] {
   const letters: LetterLike[] = [];
   for (const [box, view] of Object.entries(boxes)) {
+    // Fala 18b: szkice (niewyslane) to nie wyslana korespondencja.
+    if (box === 'niewyslane') continue;
     for (const e of view?.entries ?? []) {
       letters.push(entryToLetterLike(box as MailBox, e));
     }
@@ -162,8 +164,11 @@ export function contactsFromArchive(letters: readonly ArchiveLetter[]): Contact[
     przedstawieni: [],
     // Fala 18a: listy oznaczone jako znikniete z serwera nie licza sie
     // do kontaktow (kompletny listing raportuje pelna prawde).
+    // Fala 18b: szkice (niewyslane) to nie wyslana korespondencja.
     korespondencja: korespondencjaFromLetters(
-      letters.filter((l) => l.missingOnServer !== true).map(archiveToLetterLike),
+      letters
+        .filter((l) => l.missingOnServer !== true && l.box !== 'niewyslane')
+        .map(archiveToLetterLike),
     ),
     aliasy: [],
   });
