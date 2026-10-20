@@ -1187,7 +1187,9 @@ export function mountMailUi(
     // Operacja lokalna (tylko listy z trescia w cache) - bez dwukliku.
     const expBtn = doc.createElement('button');
     expBtn.className = 'arkmail-arch-export';
-    expBtn.textContent = 'Zapisz wszystkie TXT';
+    // Fala 18e (zgloszenie 2026-10-20 pkt 5): zapisuje ZIP z TXT per
+    // list - etykieta mowi o formacie archiwum, nie o pojedynczym TXT.
+    expBtn.textContent = 'Zapisz wszystkie (ZIP)';
     expBtn.addEventListener('click', () => handlers.onExportArchive?.());
     controls.appendChild(expBtn);
     pane.appendChild(controls);

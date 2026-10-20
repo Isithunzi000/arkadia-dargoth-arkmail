@@ -260,6 +260,13 @@ test('archiwum: Zapisz wszystkie TXT pobiera ZIP per-list, puste archiwum = toas
   try {
     // Puste archiwum: toast, zero pobran.
     click(h, '[data-tab="archiwum"]');
+    // Fala 18e (zgloszenie 2026-10-20 pkt 5): przycisk zapisuje ZIP -
+    // etykieta ma to mowic wprost.
+    const expBtn = h.content.querySelector('.arkmail-arch-export') as unknown as {
+      textContent?: string;
+    } | null;
+    assert.ok(expBtn, 'przycisk eksportu archiwum');
+    assert.equal(expBtn.textContent, 'Zapisz wszystkie (ZIP)', 'etykieta mowi ZIP, nie TXT');
     click(h, '.arkmail-arch-export');
     await waitRt(() => notifyText(f, 'Brak listow z tresci'), 'toast o braku tresci');
     assert.equal(captured.length, 0, 'bez pobierania dla pustego archiwum');
