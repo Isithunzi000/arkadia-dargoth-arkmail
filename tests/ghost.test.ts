@@ -85,8 +85,8 @@ test('ghost: pole adresata podpowiada kontakt, strzalka w prawo wpisuje kanonicz
   s.setContacts([contact('Bar', 100), contact('Corge', 200), contact('Grault', 50)]);
   const c = mount(s);
   const el = input(c, '[data-field="adresat"]');
-  type(el, 'gen');
-  assert.equal(ghostRest(c, '[data-field="adresat"]'), 'evive');
+  type(el, 'cor');
+  assert.equal(ghostRest(c, '[data-field="adresat"]'), 'ge');
   key(el, 'ArrowRight');
   assert.equal(el.value, 'Corge');
   // Po akceptacji ducha nie ma (pelne trafienie).
@@ -95,11 +95,11 @@ test('ghost: pole adresata podpowiada kontakt, strzalka w prawo wpisuje kanonicz
 
 test('ghost: najswiezszy kontakt wygrywa; alias tez podpowiada', () => {
   const s = new MailUiStore({ tab: 'napisz' });
-  s.setContacts([contact('Bar', 300, 'poltorak'), contact('Corge', 100)]);
+  s.setContacts([contact('Bar', 300, 'poltorak'), contact('Baz', 100)]);
   const c = mount(s);
-  // 'g' -> Bar (swiezsza), nie Corge.
-  type(input(c, '[data-field="adresat"]'), 'g');
-  assert.equal(ghostRest(c, '[data-field="adresat"]'), 'wenn');
+  // 'b' -> Bar (swiezsza), nie Baz.
+  type(input(c, '[data-field="adresat"]'), 'b');
+  assert.equal(ghostRest(c, '[data-field="adresat"]'), 'ar');
   // alias jako kandydat
   type(input(c, '[data-field="dw"]'), 'pol');
   assert.equal(ghostRest(c, '[data-field="dw"]'), 'torak');
@@ -116,8 +116,8 @@ test('ghost: brak kandydata i pelne trafienie = brak ducha; blur chowa', () => {
   assert.equal(ghostRest(c, '[data-field="adresat"]'), '');
   type(el, 'Bar');
   assert.equal(ghostRest(c, '[data-field="adresat"]'), '');
-  type(el, 'gwe');
-  assert.equal(ghostRest(c, '[data-field="adresat"]'), 'nn');
+  type(el, 'Ba');
+  assert.equal(ghostRest(c, '[data-field="adresat"]'), 'r');
   el.dispatchEvent(new window.Event('blur') as unknown as Event);
   assert.equal(ghostRest(c, '[data-field="adresat"]'), '');
 });
@@ -127,7 +127,7 @@ test('ghost: kursor nie na koncu = brak podpowiedzi', () => {
   s.setContacts([contact('Bar', 100)]);
   const c = mount(s);
   const el = input(c, '[data-field="adresat"]');
-  el.value = 'gwe';
+  el.value = 'Ba';
   el.selectionStart = 0;
   el.selectionEnd = 0;
   el.dispatchEvent(new window.Event('input') as unknown as Event);
@@ -168,8 +168,8 @@ test('ghost: pole osoby w szukajce i Przekaz w widoku listu', () => {
     ],
   });
   const c = mount(s);
-  type(input(c, '[data-search="osoba"]'), 'gen');
-  assert.equal(ghostRest(c, '[data-search="osoba"]'), 'evive');
+  type(input(c, '[data-search="osoba"]'), 'cor');
+  assert.equal(ghostRest(c, '[data-search="osoba"]'), 'ge');
 
   const s2 = new MailUiStore({ tab: 'list' });
   s2.setContacts([contact('Corge', 200)]);
@@ -177,6 +177,6 @@ test('ghost: pole osoby w szukajce i Przekaz w widoku listu', () => {
     number: 1, from: 'A', subject: 'X', to: 'B', cc: null, date: null, body: ['t'],
   });
   const c2 = mount(s2);
-  type(input(c2, '[data-field="forward"]'), 'gen');
-  assert.equal(ghostRest(c2, '[data-field="forward"]'), 'evive');
+  type(input(c2, '[data-field="forward"]'), 'cor');
+  assert.equal(ghostRest(c2, '[data-field="forward"]'), 'ge');
 });

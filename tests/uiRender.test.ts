@@ -577,17 +577,17 @@ test('render: kontakty - filtr i sort lokalne (bez store), wiersz z data', () =>
   const { container, off } = mount(s);
   const names = () =>
     [...container.querySelectorAll('.arkmail-contact-name')].map((n) => n.textContent);
-  assert.deepEqual(names(), ['Grault', 'Garply', 'Bar'], 'domyslnie sort po nazwie');
+  assert.deepEqual(names(), ['Bar', 'Garply', 'Grault'], 'domyslnie sort po nazwie');
   const firstRow = container.querySelector('.arkmail-contact')!;
   assert.ok(firstRow.textContent?.includes('wyslane: 1'), 'liczniki w wierszu');
-  assert.ok(firstRow.textContent?.includes('19 IV 2026'), 'data ostatniego kontaktu w wierszu');
+  assert.ok(firstRow.textContent?.includes('16 IV 2026'), 'data ostatniego kontaktu w wierszu');
 
   const input = container.querySelector('.arkmail-contact-filter') as unknown as HTMLInputElement;
   assert.ok(input, 'pole filtra kontaktow istnieje');
-  input.value = 'gw';
+  input.value = 'bar';
   input.dispatchEvent(new window.Event('input') as unknown as Event);
   assert.deepEqual(names(), ['Bar'], 'filtr zawezil liste');
-  assert.equal(input.value, 'gw', 'input zachowuje wartosc (repaint lokalny, nie rerender)');
+  assert.equal(input.value, 'bar', 'input zachowuje wartosc (repaint lokalny, nie rerender)');
 
   input.value = '';
   input.dispatchEvent(new window.Event('input') as unknown as Event);
@@ -604,7 +604,7 @@ test('render: kontakty - filtr i sort lokalne (bez store), wiersz z data', () =>
 
   assert.deepEqual(
     s.state.contacts.map((c) => c.name),
-    ['Grault', 'Garply', 'Bar'],
+    ['Bar', 'Garply', 'Grault'],
     'filtr i sort nie ruszaja store (lokalne, jak filtr archiwum)',
   );
   off();

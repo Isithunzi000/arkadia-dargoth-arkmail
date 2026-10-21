@@ -221,7 +221,7 @@ test('viewContacts: filtr po nazwie i aliasie (case-insensitive)', () => {
     ],
     aliasy: [{ name: 'poltorak', targets: ['Grault'] }],
   }));
-  assert.deepEqual(viewContacts(contacts, { filter: 'gw' }).map((c) => c.name), ['Bar']);
+  assert.deepEqual(viewContacts(contacts, { filter: 'bar' }).map((c) => c.name), ['Bar']);
   assert.deepEqual(viewContacts(contacts, { filter: 'POLT' }).map((c) => c.name), ['Grault'],
     'filtr trafia tez w alias pocztowy');
   assert.deepEqual(viewContacts(contacts, { filter: 'zzz' }), []);
@@ -241,12 +241,12 @@ test('viewContacts: sort nazwa / liczba / ostatni kontakt', () => {
     ],
   }));
   assert.deepEqual(viewContacts(contacts, { sort: 'nazwa' }).map((c) => c.name),
-    ['Grault', 'Garply', 'Bar']);
+    ['Bar', 'Garply', 'Grault']);
   assert.deepEqual(viewContacts(contacts, { sort: 'liczba' }).map((c) => c.name),
     ['Bar', 'Garply', 'Grault'], 'liczba malejaco (3, 2, 1)');
   assert.deepEqual(viewContacts(contacts, { sort: 'ostatni' }).map((c) => c.name),
     ['Grault', 'Bar', 'Garply'], 'ostatni kontakt malejaco; brak daty na koncu');
-  assert.deepEqual(contacts.map((c) => c.name), ['Grault', 'Garply', 'Bar'],
+  assert.deepEqual(contacts.map((c) => c.name), ['Bar', 'Garply', 'Grault'],
     'viewContacts nie mutuje wejscia');
 });
 

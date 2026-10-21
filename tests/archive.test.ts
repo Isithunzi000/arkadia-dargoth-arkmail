@@ -105,12 +105,12 @@ test('archiwum: filtr tresc przeszukuje body, filtr od po stronie listu', () => 
   const { letters } = upsertLetters([], [zTrescia]);
   assert.equal(filterLetters(letters, { tresc: 'wiesci' }).length, 1);
   assert.equal(filterLetters(letters, { tresc: 'nie-ma-tego' }).length, 0);
-  assert.equal(filterLetters(letters, { od: 'afan' }).length, 1);
+  assert.equal(filterLetters(letters, { od: 'fo' }).length, 1);
   assert.equal(filterLetters(letters, { od: 'inny' }).length, 0);
   // skrzynka wyslanych: ta sama strona listu pasuje do filtra "do"
   const wyslany = fromMailboxEntry('wyslane', entry());
-  assert.equal(filterLetters([wyslany], { do: 'afan' }).length, 1);
-  assert.equal(filterLetters([wyslany], { od: 'afan' }).length, 0);
+  assert.equal(filterLetters([wyslany], { do: 'fo' }).length, 1);
+  assert.equal(filterLetters([wyslany], { od: 'fo' }).length, 0);
 });
 
 test('archiwum: zakres dat wlacznie (odDaty/doDaty)', () => {

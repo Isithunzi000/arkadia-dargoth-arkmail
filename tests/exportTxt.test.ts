@@ -94,7 +94,7 @@ test('txt: rekord archiwum - strona listu po kierunku skrzynki', () => {
 test('txt: nazwa pliku - sortKey + slugi ASCII, bezpieczna dla systemu plikow', () => {
   assert.equal(
     txtFileName('Corge', 'Re: test !ok?', DATE_RAW),
-    '2025-12-23_00-11-12_genevive_re-test-ok.txt',
+    '2025-12-23_00-11-12_corge_re-test-ok.txt',
   );
   assert.equal(txtFileName('Alvin, Bean', '', null), '0000-00-00_00-00-00_alvin-bean_list.txt');
   assert.equal(slugAscii('  ..::  '), 'list', 'pusty slug ma fallback');
@@ -171,7 +171,7 @@ test('eksport archiwum: dedup blizniakow, folder per skrzynka, pomijanie bez tre
   assert.equal(entries.length, 2, 'blizniak zdeduplikowany, wyslany osobno');
   const names = entries.map((e) => e.name);
   assert.ok(
-    names.some((n) => n.startsWith('odebrane/2025-12-23_00-11-12_genevive_najnowszy.txt')),
+    names.some((n) => n.startsWith('odebrane/2025-12-23_00-11-12_corge_najnowszy.txt')),
     'blizniak w kanonicznym folderze odebrane',
   );
   assert.ok(names.some((n) => n.startsWith('wyslane/')), 'wyslany w folderze wyslane');
@@ -238,7 +238,7 @@ test('widok listu: Zapisz list TXT pobiera plik o tresci jak na ekranie', async 
     const base = f.sent.length;
     click(h, '.arkmail-export-letter');
     await waitRt(() => captured.length === 1, 'pobieranie TXT');
-    assert.match(captured[0].name, /^2025-12-23_00-11-12_genevive_najnowszy\.txt$/, 'nazwa pliku');
+    assert.match(captured[0].name, /^2025-12-23_00-11-12_corge_najnowszy\.txt$/, 'nazwa pliku');
     const txt = await captured[0].data.text();
     assert.ok(txt.includes('najnowszy'), 'temat w TXT');
     assert.ok(txt.includes('Od: Corge'), 'meta Od w TXT');
