@@ -1552,7 +1552,10 @@ export async function init(api: PluginApi) {
   return {
     name: PLUGIN_NAME,
     version: PLUGIN_VERSION,
-    author: PLUGIN_AUTHOR,
+    // Literal wymagany przez katalog dargoth-plugins (metadata.test.mjs
+    // czyta author regexem, nie rozwinie const-ref); zgodnosc z meta.ts
+    // pilnuje tests/version.test.mjs (Fala 22a).
+    author: "Isithunzi000",
     description: PLUGIN_DESCRIPTION,
   };
 }

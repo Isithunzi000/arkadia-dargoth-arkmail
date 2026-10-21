@@ -55,6 +55,10 @@ test('wersja: meta.ts == plugin.json == nazwa zipa == zip w srodku == PluginInfo
 
   const entry = fs.readFileSync(ENTRY, 'utf8');
   assert.match(entry, /version:\s*PLUGIN_VERSION/, 'index.ts: PluginInfo.version ma byc PLUGIN_VERSION z meta.ts');
+  // Fala 22a (publish-readiness): katalog wymaga LITERALU author w
+  // PluginInfo (metadata.test.mjs dargoth-plugins czyta regexem, nie
+  // rozwinie const-ref). Literal musi byc zgodny z meta.ts.
+  assert.match(entry, /author:\s*"Isithunzi000"/, 'index.ts: PluginInfo.author ma byc literalem');
 });
 
 // Fala 21c: opis pluginu musi byc identyczny w meta.ts i plugin.json
