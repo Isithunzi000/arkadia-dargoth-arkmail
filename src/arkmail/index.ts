@@ -557,7 +557,12 @@ export async function init(api: PluginApi) {
         // Fala 17f: technikalia sesji przez mapper na ludzki polski.
         notify(api, `Blad wczytywania starszych: ${humanizeMailError(err instanceof Error ? err.message : String(err))}`),
       )
-      .finally(() => ui.setBusy(null));
+      .finally(() => {
+        ui.setBusy(null);
+        // Fala 24b: doczytana strona = nowe osoby w archiwum - kontakty
+        // odbudowujemy od razu, nie dopiero przy refreshu/indeksacji.
+        rebuildContacts();
+      });
   };
 
   /** Flaga biezacej petli "Wczytaj wszystkie" (jedna na raz; null = brak). */
@@ -652,7 +657,12 @@ export async function init(api: PluginApi) {
       .catch((err: unknown) =>
         notify(api, `Blad wczytywania: ${humanizeMailError(err instanceof Error ? err.message : String(err))}`),
       )
-      .finally(() => ui.setBusy(null));
+      .finally(() => {
+        ui.setBusy(null);
+        // Fala 24b: jak wyzej - petla dopisala listy do archiwum,
+        // kontakty maja odzwierciedlac baze bez dodatkowego kliku.
+        rebuildContacts();
+      });
   };
 
   /** Flaga biezacej petli "Indeksuj wszystkie skrzynki" (null = brak). */

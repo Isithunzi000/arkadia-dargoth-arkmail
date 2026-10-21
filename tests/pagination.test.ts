@@ -250,3 +250,70 @@ test('wczytaj wszystkie: strona bez nowych wpisow zatrzymuje petle', async () =>
     await stopHarness();
   }
 });
+
+
+// --- Fala 24b: kontakty odbudowywane po doczytaniu starszych stron --------
+
+test('kontakty: wczytaj starsze odbudowuje kontakty z dopisanej strony (Fala 24b)', async () => {
+  const h = await startHarness();
+  const { f, waitFor } = h;
+  try {
+    await loadTruncatedBox(h);
+    click(h, '.arkmail-older');
+    await waitFor(
+      () => f.sent.some((c) => c.startsWith('listy odebrane przed')),
+      'komenda paginacji wstecz',
+    );
+    // Strona niepelna z NOWYM nadawca (Baz) - trafia do archiwum.
+    f.fire('Wybrane listy odebrane:', 'mail');
+    f.fire(' 9. *R* Temat: pradawny', 'mail');
+    f.fire('Nadawca: Baz                          Pn, 1 XII 2025, 09:00:00', 'mail');
+    f.fire('> ', 'prompt');
+    await waitFor(() => notifyText(f, 'nowych: 1'), 'notify o dopisaniu starszych');
+
+    click(h, '[data-tab="kontakty"]');
+    await waitRt(() => !!h.content.querySelector('.arkmail-contact'), 'wiersze kontaktow');
+    const names = Array.from(
+      h.content.querySelectorAll('.arkmail-contact-name') as unknown as Iterable<{
+        textContent?: string;
+      }>,
+    ).map((r) => String(r.textContent ?? ''));
+    assert.ok(names.includes('Foo'), 'kontakt z prologu');
+    assert.ok(names.includes('Baz'), 'kontakt z dopisanej strony starszych');
+  } finally {
+    await stopHarness();
+  }
+});
+
+test('kontakty: wczytaj wszystkie odbudowuje kontakty po zakonczeniu petli (Fala 24b)', async () => {
+  const h = await startHarness();
+  const { f, waitFor } = h;
+  try {
+    await loadTruncatedBox(h);
+    click(h, '.arkmail-older-all');
+    await waitFor(
+      () => f.sent.some((c) => c.startsWith('listy odebrane przed')),
+      'komenda petli',
+    );
+    // Jedyna strona niepelna = koniec starszych, petla staje.
+    f.fire('Wybrane listy odebrane:', 'mail');
+    f.fire(' 9. *R* Temat: pradawny', 'mail');
+    f.fire('Nadawca: Baz                          Pn, 1 XII 2025, 09:00:00', 'mail');
+    f.fire('> ', 'prompt');
+    await waitRt(
+      () => notifyText(f, 'Wczytano wszystkie (nowych listow: 1)'),
+      'notify konca petli',
+    );
+
+    click(h, '[data-tab="kontakty"]');
+    await waitRt(() => !!h.content.querySelector('.arkmail-contact'), 'wiersze kontaktow');
+    const names = Array.from(
+      h.content.querySelectorAll('.arkmail-contact-name') as unknown as Iterable<{
+        textContent?: string;
+      }>,
+    ).map((r) => String(r.textContent ?? ''));
+    assert.ok(names.includes('Baz'), 'kontakt z petli wczytaj-wszystkie');
+  } finally {
+    await stopHarness();
+  }
+});
