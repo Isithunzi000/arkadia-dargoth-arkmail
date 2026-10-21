@@ -174,6 +174,47 @@ test('skrzynka z mieleniem kotwicy jest pomijana, reszta dojezdza, raport ja wym
   }
 });
 
+test('tempo stron w indeksacji: pauza przed kotwica >= 800 ms (Fala 20d)', async () => {
+  // Serwer Arkadii jest wolny; indeksacja mieli az 4 skrzynki po sobie
+  // - tempo 400 ms/strone mloci serwer (throttle "Listy sa w tej
+  // chwili ladowane.", zgloszenie 2026-10-21). Indeksacja: 800 ms
+  // miedzy stronami; reczne loadAll zostaje przy 400 ms.
+  const h = await startHarness();
+  const { f } = h;
+  try {
+    await loadTruncatedBox(h);
+    await startIndexing(h);
+    await waitRt(
+      () => f.sent.filter((c) => c === 'listy odebrane').length === 2,
+      'indeksacja: odebrane',
+    );
+    f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
+    f.fire(' 2. *R* Temat: najstarszy', 'mail');
+    f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire(' 1. *R* Temat: srodkowy', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('> ', 'prompt');
+    const t0 = Date.now();
+    await waitRt(() => f.sent.includes('listy odebrane przed 22 XII 2025'), 'kotwica odebrane');
+    const dt = Date.now() - t0;
+    assert.ok(dt >= 750, `pauza przed kotwica ${dt} ms < 750 ms`);
+    // Domkniecie: kotwica pusta, reszta skrzynek pusta - czysty koniec.
+    f.fire('Nie znaleziono zadnych takich odebranych listow.', 'mail');
+    await waitRt(
+      () => f.sent.filter((c) => c === 'listy nieprzeczytane').length === 2,
+      'indeksacja: nieprzeczytane',
+    );
+    f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
+    await waitRt(() => f.sent.includes('listy wyslane'), 'indeksacja: wyslane');
+    f.fire('Nie masz zadnych wyslanych listow.', 'mail');
+    await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksacja: niewyslane');
+    f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
+    await waitRt(() => notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'toast 4/4');
+  } finally {
+    await stopHarness();
+  }
+});
+
 test('incydentalny duplikat strony kotwicowej: retry ratuje skrzynke (Fala 20b)', async () => {
   // Zgloszenie 2026-10-21 "pominiete wyslane / 3-4": duplikat strony
   // (np. powtorka odpowiedzi serwera) byl traktowany jak trwale

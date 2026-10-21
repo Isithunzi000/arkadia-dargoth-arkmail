@@ -65,6 +65,13 @@ export const LOAD_ALL_MAX_PAGES = 40;
 export const WIDE_MIN_WIDTH = 900;
 export const LOAD_ALL_PACE_MS = 400;
 /**
+ * Fala 20d: tempo stron w INDEKSACJI (zgloszenie 2026-10-21). Petla
+ * mieli az 4 skrzynki po sobie - 400 ms/strone mloci wolny serwer
+ * (throttle "Listy sa w tej chwili ladowane."). Reczne loadAll
+ * zostaje przy LOAD_ALL_PACE_MS (gracz czeka i widzi postep).
+ */
+export const INDEX_PACE_MS = 800;
+/**
  * Timingu lotu zwierzecia pocztowego (Fala 13b). Obiekt (nie const
  * skalarne), zeby testy mogly podmienic wartosci przed init -
  * eksport ESM jest read-only z zewnatrz, wlasciwosci obiektu nie.
@@ -638,8 +645,8 @@ export async function init(api: PluginApi) {
   /**
    * Petla "Indeksuj wszystkie skrzynki" (Fala 18c, zgloszenie
    * 2026-10-20 pkt 1): pelny listing KAZDEJ skrzynki (kotwice
-   * paginacji jak loadAll, tempo LOAD_ALL_PACE_MS), kazda strona
-   * doklejana do archiwum. Po KOMPLETNYM przejsciu skrzynki:
+   * paginacji jak loadAll, tempo INDEX_PACE_MS - Fala 20d), kazda
+   * strona doklejana do archiwum. Po KOMPLETNYM przejsciu skrzynki:
    * gone-marking (markGoneFromServer - ta sama pewnosco kompletnej
    * prawdy co przy nieobcietym listingu w fetchBoxes) i flaga
    * indexMeta[box]. Dopiero pelny indeks czyni archiwum kompletna
@@ -709,7 +716,7 @@ export async function init(api: PluginApi) {
                       skipWhy = "brak daty w wpisach";
                       break;
                     }
-                    await sleepOrCancel(LOAD_ALL_PACE_MS * 2, flag);
+                    await sleepOrCancel(INDEX_PACE_MS * 2, flag);
                     if (flag.cancelled) break;
                     res = await mailbox.fetch(
                       box,
@@ -735,7 +742,7 @@ export async function init(api: PluginApi) {
                   skipWhy = "brak daty w wpisach";
                   break;
                 }
-                await sleepOrCancel(LOAD_ALL_PACE_MS, flag);
+                await sleepOrCancel(INDEX_PACE_MS, flag);
                 if (flag.cancelled) break;
                 res = await mailbox.fetch(box, olderListingCommand(box, nextDay(oldest.date)));
               } else {
