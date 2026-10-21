@@ -3,7 +3,7 @@
  * Zrodla: people (klient, mianownik+opis+guild), przedstawieni (scraping),
  * korespondencja (listingi/listy - mianownik), aliasy pocztowe.
  * Powiadomienie "Masz nowa poczte od X" NIE tworzy kontaktu - imie jest
- * w dopelniaczu (od Wibble != Wibble); sluzy tylko do odswiezania.
+ * w dopelniaczu (np. 'od Xa' dla imienia na X); sluzy tylko do odswiezania.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -88,7 +88,7 @@ test('sortowanie: alfabetycznie po kanonicznej nazwie', () => {
       { name: 'Flob', direction: 'out' },
     ],
   }));
-  assert.deepEqual(out.map((c) => c.name), ['Foo', 'Flob', 'Snork']);
+  assert.deepEqual(out.map((c) => c.name), ['Flob', 'Foo', 'Snork']);
 });
 
 test('pelny obraz z logow: 28 przedstawionych + korespondencja + aliasy', () => {

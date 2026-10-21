@@ -1,5 +1,5 @@
 // Straznik danych wrazliwych ArkMail (node:test, zero deps).
-// Fala 25a/25b: w repo NIE wolno trzymac prawdziwych imion postaci,
+// Fala 25a/25b/25c: w repo NIE wolno trzymac prawdziwych imion postaci,
 // zwierzat ani graczy - w zadnej formie gramatycznej. Test skanuje
 // wszystkie pliki tekstowe repo (poza katalogami generowanymi) i pada,
 // jesli znajdzie zakazany wzorzec.
@@ -21,23 +21,48 @@ const TEXT_EXT = new Set([
   '.ts', '.mts', '.cts', '.mjs', '.cjs', '.js', '.json',
   '.md', '.txt', '.yml', '.yaml', '.html', '.css', '.xml',
 ]);
-// Wzorce zakazane jako FRAGMENTY (bez rozrozniania wielkosci liter);
-// kazdy wzorzec obejmuje wszystkie formy gramatyczne danego imienia.
+// Wzorce zakazane jako FRAGMENTY regexow (bez rozrozniania wielkosci
+// liter). '\\w*' na koncu łapie formy gramatyczne; wzorce bez '\\w*'
+// sa dokladne (krotkie imiona kolidujace z polskimi slowami, np. Rab
+// vs "robie", Bork vs "delikatny").
 const FORBIDDEN_PARTS = [
-  ['ara', 'hi'],
-  ['afa', 'nenn'],
-  ['gwe', 'nn'],
-  ['eld', 'ur'],
-  ['bel', 'fur'],
-  ['cata', 'lina'],
-  ['gene', 'vive'],
-  ['yoa', 'na'],
-  ['yoa', 'no'],
-  ['ble', 'jd'],
-  ['ata', 'man'],
-  ['fe', 'rd'],
-  ['val', 'ur'],
-  ['bar', 'aq'],
+  ['\\b', 'ara', 'hi', '\\w*'],
+  ['\\b', 'afa', 'nenn', '\\w*'],
+  ['\\b', 'gwe', 'nn', '\\w*'],
+  ['\\b', 'eld', 'ur', '\\w*'],
+  ['\\b', 'bel', 'fur', '\\w*'],
+  ['\\b', 'cata', 'lina', '\\w*'],
+  ['\\b', 'gene', 'vive', '\\w*'],
+  ['\\b', 'yoa', 'n', '\\w*'],
+  ['\\b', 'ble', 'jd', '\\w*'],
+  ['\\b', 'ata', 'man', '\\w*'],
+  ['\\b', 'fe', 'rd', '\\w*'],
+  ['\\b', 'val', 'ur', '\\w*'],
+  ['\\b', 'bar', 'aq', '\\w*'],
+  ['\\b', 'kal', 'kofoniks', '\\w*'],
+  ['\\b', 'ast', 'or', '\\w*'],
+  ['\\b', 'bar', 'ag', '\\w*'],
+  ['\\b', 'bla', 'z', '\\w*'],
+  ['\\b', 'de', 'li', '\\b'],
+  ['\\b', 'gal', 'zar', '\\w*'],
+  ['\\b', 'gh', 'ur', '\\w*'],
+  ['\\b', 'gro', 'har', '\\w*'],
+  ['\\b', 'gru', 'ng', '\\w*'],
+  ['\\b', 'gvi', 'don', '\\w*'],
+  ['\\b', 'ise', 'grin', '\\w*'],
+  ['\\b', 'kru', 'x', '\\w*'],
+  ['\\b', 'lio', 'ne', '\\w*'],
+  ['\\b', 'mii', 'la', '\\w*'],
+  ['\\b', 'mir', 'is', '\\w*'],
+  ['\\b', 'mus', 'in', '\\w*'],
+  ['\\b', 'myr', 'dred', '\\w*'],
+  ['\\b', 'r', 'ob', '\\b'],
+  ['\\b', 'sa', 'ul', '\\w*'],
+  ['\\b', 'tah', 'ira', '\\w*'],
+  ['\\b', 'tere', 'nes', '\\w*'],
+  ['\\b', 'tuz', 'zio', '\\w*'],
+  ['\\b', 'zuz', 'ia', '\\w*'],
+  ['\\b', 'nept', 'un', '\\w*'],
 ];
 const FORBIDDEN = FORBIDDEN_PARTS.map((parts) => new RegExp(parts.join(''), 'i'));
 
