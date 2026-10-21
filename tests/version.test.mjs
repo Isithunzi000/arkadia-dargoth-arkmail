@@ -41,6 +41,9 @@ test('wersja: meta.ts == plugin.json == nazwa zipa == zip w srodku == PluginInfo
 
   const pj = JSON.parse(fs.readFileSync(PLUGIN_JSON, 'utf8'));
   assert.equal(pj.metadata.version, ver, 'plugin.json metadata.version != meta.ts PLUGIN_VERSION');
+  // Fala 22b (publish-readiness): katalog czyta tez TOP-LEVEL version
+  // z plugin.json; release.mjs stampuje oba pola z meta.ts.
+  assert.equal(pj.version, ver, 'plugin.json top-level version != meta.ts PLUGIN_VERSION');
 
   const zip = latestZip();
   const zipVer = zip.match(/^arkmail_(\d+(?:_\d+)*)\.zip$/)[1].replace(/_/g, '.');
