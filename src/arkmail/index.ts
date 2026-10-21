@@ -81,6 +81,29 @@ export const INDEX_PACE_MS = 400;
  */
 export const INDEX_ANCHOR_RETRY_WAITS_MS = [2500, 4000, 4000];
 /**
+ * Fala 24e: wiek stampa indexMeta, po ktorym skrzynke przeczesujemy
+ * znowu w calosci. Swiezszy stamp = przeczes incrementalny do klamry
+ * (strony w calosci znanej z archiwum) - pelny przeces 4 skrzynek
+ * mieli serwer i trwa minuty, a swieza baza go nie wymaga.
+ */
+export const INDEX_FULL_SWEEP_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+/**
+ * Tryb przeczesu skrzynki w indeksacji (Fala 24e): 'full' gdy brak
+ * stampa, stamp uszkodzony albo starszy niz INDEX_FULL_SWEEP_AGE_MS;
+ * inaczej 'incremental' (stop na klamrze).
+ */
+export const indexSweepMode = (
+  meta: Partial<Record<MailBox, string>>,
+  box: MailBox,
+  now: number,
+): "full" | "incremental" => {
+  const stamp = meta[box];
+  if (stamp === undefined) return "full";
+  const t = Date.parse(stamp);
+  if (Number.isNaN(t)) return "full";
+  return now - t > INDEX_FULL_SWEEP_AGE_MS ? "full" : "incremental";
+};
+/**
  * Odmowa guarda blokady sesji (Fala 21a): jedna stala zamiast 13
  * kopii zdania. Krotko i po ludzku.
  */
@@ -308,6 +331,34 @@ export async function init(api: PluginApi) {
     let changed = false;
     const marked = ui.state.archive.map((l) => {
       if (l.box !== box || l.missingOnServer === true || freshIds.has(l.id)) return l;
+      changed = true;
+      return { ...l, missingOnServer: true };
+    });
+    if (changed) {
+      ui.setArchive(marked);
+      persistArchive();
+    }
+  };
+
+  /**
+   * Fala 24e: gone-marking ZAKRESOWY po klamrze przeczesu
+   * incrementalnego. Klamra zatrzymuje przeces na przecieciu z baza,
+   * wiec pelny markGoneFromServer oznaczylby niesprawdzone rekordy.
+   * Oznaczamy tylko rekordy NOWSZE niz boundaryDay (najstarszy dzien
+   * widziany w tej petli): strony listingu sa ciagle od najnowszego,
+   * wiec wszystko nowsze musialo przejsc przez pobrane strony. Dzien
+   * graniczny (<= boundaryDay) nietkniety - klamra mogla uciac go
+   * w polowie strony.
+   */
+  const markGoneFromServerNewerThan = (
+    box: MailBox,
+    freshIds: Set<string>,
+    boundaryDay: string,
+  ): void => {
+    let changed = false;
+    const marked = ui.state.archive.map((l) => {
+      if (l.box !== box || l.missingOnServer === true || freshIds.has(l.id)) return l;
+      if (l.sortKey.slice(0, 10) <= boundaryDay) return l;
       changed = true;
       return { ...l, missingOnServer: true };
     });
@@ -740,6 +791,12 @@ export async function init(api: PluginApi) {
             let pages = 0;
             let complete = false;
             let skipWhy: string | null = null;
+            // Fala 24e: tryb przeczesu ze stampa (swiezy = incrementalny
+            // do klamry) + dzien najstarszego wpisu widzianego w petli
+            // (granica zakresowego gone-markingu po klamrze).
+            const sweepMode = indexSweepMode(ui.state.indexMeta, box, Date.now());
+            let oldestSeenDay: string | null = null;
+            let clamped = false;
             // Fala 24d: duplikat strony to zwykle incydent (powtorka
             // odpowiedzi serwera albo zdewanieowany kontekst listingu),
             // nie trwale mielenie - kotwice powtarzamy do 3 razy, przed
@@ -757,6 +814,10 @@ export async function init(api: PluginApi) {
                 // NOWYCH wpisow = kotwica stoi w miejscu - stop bez flagi.
                 const freshCount = entries.filter((e) => !seen.has(e.id)).length;
                 for (const e of entries) seen.add(e.id);
+                for (const e of entries) {
+                  const day = e.sortKey.slice(0, 10);
+                  if (oldestSeenDay === null || day < oldestSeenDay) oldestSeenDay = day;
+                }
                 all.push(...res.entries);
                 const merged = upsertLetters(ui.state.archive, entries);
                 ui.setArchive(merged.letters);
@@ -794,6 +855,16 @@ export async function init(api: PluginApi) {
                   break;
                 }
                 anchorRetries = 0;
+                // Fala 24e: tryb incrementalny - strona W CALOSCI
+                // znana z archiwum (upsert bez nowych), a NIE
+                // powtorzona z tej petli (powtorki wylapuje straznik
+                // mielenia wyzej: freshCount === 0) = KLAMRA.
+                // Dotarlismy do przeciecia z posiadana baza - dalszy
+                // przeces jest zbedny.
+                if (sweepMode === "incremental" && merged.added === 0) {
+                  clamped = true;
+                  break;
+                }
                 if (pages >= LOAD_ALL_MAX_PAGES) {
                   skipWhy = `limit ${LOAD_ALL_MAX_PAGES} stron`;
                   break;
@@ -824,10 +895,19 @@ export async function init(api: PluginApi) {
                 break;
               }
             }
-            if (complete && !flag.cancelled) {
-              markGoneFromServer(box, seen);
-              ui.setIndexMeta({ ...ui.state.indexMeta, [box]: new Date().toISOString() });
-              persistIndexMeta();
+            if ((complete || clamped) && !flag.cancelled) {
+              if (clamped) {
+                // Fala 24e: klamra = przeces do przeciecia z baza.
+                // Gone-marking ZAKRESOWY (tylko nowsze niz najstarszy
+                // widziany dzien) i BEZ stampa - stamp to pelna
+                // weryfikacja, daje ja dopiero naturalny koniec stron
+                // (pelny przeces) albo loadAll (Fala 24c).
+                markGoneFromServerNewerThan(box, seen, oldestSeenDay ?? "");
+              } else {
+                markGoneFromServer(box, seen);
+                ui.setIndexMeta({ ...ui.state.indexMeta, [box]: new Date().toISOString() });
+                persistIndexMeta();
+              }
               done += 1;
             } else if (flag.cancelled) {
               break;
