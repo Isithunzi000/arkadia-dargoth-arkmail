@@ -1022,9 +1022,15 @@ export function mountMailUi(
     // klamaly, wiec zamiast nich brama z przyciskiem indeksacji.
     // Fala 19b (zgloszenie 2026-10-20): tekst bramy bez szczegolow
     // technicznych - gracz ma wiedziec tylko, po co indeksowanie.
+    // Fala 24a (zgloszenie 2026-10-21): kontakty sa widoczne ZAWSZE -
+    // brama to wskazowka + przycisk NAD lista, nie zamiast niej
+    // (gracz z pelnym archiwum po "Wczytaj wszystkie" nie widzial
+    // kontaktow, bo brama wisala na fladze indeksu, nie na danych).
+    // Dopisek "(jednorazowo)" usuniety - indeksowanie nie jest
+    // jednorazowe (Fala 24e: incrementalna, przeczes co 7 dni).
     if (!allBoxesIndexed(state.indexMeta)) {
       pane.appendChild(
-        dim('Kontakty powstaja z listow zebranych ze wszystkich skrzynek (jednorazowo).'),
+        dim('Kontakty powstaja z listow zebranych ze wszystkich skrzynek.'),
       );
       const gate = doc.createElement('button');
       gate.className = 'arkmail-index-all';
@@ -1033,7 +1039,6 @@ export function mountMailUi(
         : 'Indeksuj wszystkie skrzynki';
       gate.addEventListener('click', () => handlers.onIndexAll?.());
       pane.appendChild(gate);
-      return pane;
     }
     // Filtr i sort sa lokalne (poza store, jak filtr archiwum):
     // repaint dotyczy tylko listy, input nie traci fokusu przy pisaniu.

@@ -61,21 +61,67 @@ test('brama Kontaktow: bez indeksu przycisk indeksacji zamiast licznikow', () =>
       // graczowi.
       const gateText = container.textContent ?? '';
       assert.ok(
-        gateText.includes('Kontakty powstaja z listow zebranych ze wszystkich skrzynek'),
+        gateText.includes('Kontakty powstaja z listow zebranych ze wszystkich skrzynek.'),
         'brama wyjasnia, skad bierze sie baza kontaktow',
       );
+      // Fala 24a: bez dopisku "(jednorazowo)" - indeksowanie nie jest
+      // jednorazowe (Fala 24e: incrementalna, przeczes co 7 dni).
       assert.ok(
-        gateText.includes('(jednorazowo)'),
-        'brama zaznacza jednorazowosc indeksacji',
+        !gateText.includes('(jednorazowo)'),
+        'brama bez dopisku jednorazowosci',
       );
       assert.ok(
         !gateText.includes('pierwszych 50'),
         'brama bez technicznych szczegolow o pierwszych 50 wpisach',
       );
+      // Fala 24a: lista kontaktow jest ZAWSZE widoczna - brama to
+      // wskazowka + przycisk NAD lista, nie zamiast niej (zgloszenie
+      // 2026-10-21: kontakty niewidoczne mimo pelnego archiwum).
       assert.ok(
-        !container.querySelector('.arkmail-contact-controls'),
-        'liczniki kontaktow ukryte przed indeksacja',
+        container.querySelector('.arkmail-contact-controls'),
+        'kontakty widoczne takze przed kompletna indeksacja',
       );
+    } finally {
+      off();
+    }
+  } finally {
+    delete (globalThis as { document?: unknown }).document;
+  }
+});
+
+test('brama Kontaktow: lista kontaktow widoczna mimo braku indeksu, wskazowka nad lista', () => {
+  const window = new Window();
+  (globalThis as { document?: unknown }).document = window.document;
+  try {
+    const store = new MailUiStore({});
+    // Kontakty z czesciowego archiwum (bez kompletnej indeksacji) -
+    // gracz ma je widziec od razu (Fala 24a, zgloszenie 2026-10-21:
+    // "wczytaj wszystkie uzupelnilo archiwum, a kontakty niewidoczne").
+    store.setContacts([
+      { name: 'Bar', sources: [], lettersReceived: 12, lettersSent: 3 },
+      { name: 'Grault', sources: [], lettersReceived: 2, lettersSent: 0 },
+    ]);
+    const container = window.document.createElement('div');
+    const off = mountMailUi(container as unknown as HTMLElement, store, HANDLERS);
+    try {
+      store.setTab('kontakty');
+      const text = container.textContent ?? '';
+      assert.ok(text.includes('Bar'), 'kontakt z czesciowego archiwum widoczny');
+      assert.ok(text.includes('Grault'), 'drugi kontakt widoczny');
+      // Wskazowka + przycisk indeksacji NAD lista kontaktow (kolejnosc
+      // w DOM: najpierw brama, potem kontrolki listy).
+      const pane = container.querySelector('[data-pane-key="kontakty"]');
+      assert.ok(pane, 'panel kontaktow');
+      const children = Array.from((pane as unknown as { children: unknown[] }).children);
+      const gateIdx = children.findIndex((el) =>
+        (el as { className?: string }).className === 'arkmail-index-all',
+      );
+      const controlsIdx = children.findIndex(
+        (el) => (el as { className?: string }).className === 'arkmail-contact-controls',
+      );
+      assert.ok(gateIdx >= 0, 'przycisk indeksacji obecny');
+      assert.ok(controlsIdx >= 0, 'kontrolki listy obecne');
+      assert.ok(gateIdx < controlsIdx, 'brama NAD lista kontaktow');
     } finally {
       off();
     }

@@ -167,8 +167,11 @@ test('skrzynka z mieleniem kotwicy jest pomijana, reszta dojezdza, raport ja wym
     );
     await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji');
     click(h, '[data-tab="kontakty"]');
-    await waitRt(() => !!h.content.querySelector('.arkmail-index-all'), 'brama nadal zamknieta');
-    assert.ok(!h.content.querySelector('.arkmail-contact'), 'licznikow brak przy 3/4');
+    await waitRt(() => !!h.content.querySelector('.arkmail-index-all'), 'brama nadal obecna');
+    // Fala 24a: kontakty sa widoczne ZAWSZE (brama = wskazowka nad
+    // lista, nie zamiast niej) - przy 3/4 flag lista juz pokazuje
+    // kontakty z czesciowego archiwum.
+    assert.ok(h.content.querySelector('.arkmail-contact'), 'kontakty widoczne przy 3/4 (Fala 24a)');
   } finally {
     await stopHarness();
   }
