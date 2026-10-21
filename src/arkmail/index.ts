@@ -7,8 +7,6 @@
  * protokolu przez DargothTransport i SessionLock. Powiadomienie
  * "[ POCZTA ] Masz nowa poczte..." odswieza odebrane/nieprzeczytane.
  * Archiwum i ustawienia trwale w localStorage per postac.
- * Plugin w pelni zgodny z regulaminem gry - wszystkie komendy
- * wysylane swiadomie przez gracza (klik w UI).
  */
 
 import type PluginApi from "plugin-api";

@@ -56,3 +56,13 @@ test('wersja: meta.ts == plugin.json == nazwa zipa == zip w srodku == PluginInfo
   const entry = fs.readFileSync(ENTRY, 'utf8');
   assert.match(entry, /version:\s*PLUGIN_VERSION/, 'index.ts: PluginInfo.version ma byc PLUGIN_VERSION z meta.ts');
 });
+
+// Fala 21c: opis pluginu musi byc identyczny w meta.ts i plugin.json
+// (katalog wymaga zgodnosci; rozjazd przy zmianie = blad publikacji).
+test('opis: meta.ts PLUGIN_DESCRIPTION == plugin.json metadata.description', () => {
+  const src = fs.readFileSync(META, 'utf8');
+  const m = src.match(/PLUGIN_DESCRIPTION =\s*"([^"]+)"/s);
+  assert.ok(m, 'meta.ts: brak PLUGIN_DESCRIPTION');
+  const pj = JSON.parse(fs.readFileSync(PLUGIN_JSON, 'utf8'));
+  assert.equal(pj.metadata.description, m[1], 'plugin.json metadata.description != meta.ts PLUGIN_DESCRIPTION');
+});

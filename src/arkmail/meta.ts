@@ -11,4 +11,4 @@ export const PLUGIN_BUILD_DATE = "20-10-2026";
 export const PLUGIN_NAME = "ArkMail";
 export const PLUGIN_AUTHOR = "Isithunzi000";
 export const PLUGIN_DESCRIPTION =
-  "ArkMail to kompleksowy system pocztowy dla klienta Dargoth: skrzynki, kontakty, archiwum i pisanie listow (alias /arkmail). Plugin w pelni zgodny z regulaminem gry - wszystkie komendy wysylane swiadomie przez gracza, bez automatyki.";
+  "ArkMail to kompleksowy system pocztowy: skrzynki, kontakty, archiwum i pisanie listow (alias /arkmail).";

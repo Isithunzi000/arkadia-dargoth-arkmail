@@ -5,7 +5,7 @@
     "name": "ArkMail",
     "version": "1.12.1",
     "author": "Isithunzi000",
-    "description": "ArkMail to kompleksowy system pocztowy dla klienta Dargoth: skrzynki, kontakty, archiwum i pisanie listow (alias /arkmail). Plugin w pelni zgodny z regulaminem gry - wszystkie komendy wysylane swiadomie przez gracza, bez automatyki."
+    "description": "ArkMail to kompleksowy system pocztowy: skrzynki, kontakty, archiwum i pisanie listow (alias /arkmail)."
   },
   "folders": []
 }
