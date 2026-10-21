@@ -89,6 +89,37 @@ test('mailbox: podwojne "ladowane" = blad zamiast cichego timeoutu', async () =>
   await assertion;
 });
 
+test('mailbox: listing po throttle dluzszy niz retry = brak dosylki (Fala 20a)', async () => {
+  // Wyscig (zgloszenie 2026-10-21 "pominiete wyslane / kotwica bez
+  // postepu / 3-4"): throttle uzbraja retry komendy (2 s), ale serwer
+  // jednak dostarcza listing PRZED jego uplywem. Stary kod nie
+  // rozbrajal timera przy naglowku - retry dosylal komende w polowie
+  // strony, serwer budowal ja 2x i duplikat wpisow psul kolejne
+  // pobrania (dedup = 0 nowych = falszywe "mielenie").
+  // idleMs > wyscig: idle-flush nie moze zamknac transakcji przed
+  // deadlinem retry (inaczej test nie odroznia poprawki).
+  const t = new MockTransport();
+  const m = new MailboxSession(t, { timeoutMs: 10000, idleMs: 3000 });
+  const op = m.fetch('odebrane');
+  assert.deepEqual(t.sent, ['listy odebrane']);
+  await t.replay([{ text: 'Listy sa w tej chwili ladowane.', cls: 'mail' }]);
+  await new Promise((r) => setTimeout(r, 1000));
+  // Naglowek i wpisy PRZED uplywem 2 s retry.
+  await t.replay([
+    { text: 'Listy odebrane (prezentowane jest pierwsze 50):', cls: 'mail' },
+    { text: ' 1. *R* Temat: Test01', cls: 'mail' },
+    { text: 'Nadawca: Gracz                          Pn, 19 X 2026, 18:47:36', cls: 'mail' },
+  ]);
+  // Ponad deadline retry (2 s od throttle): timer MUSI byc rozbrojony
+  // przy naglowku.
+  await new Promise((r) => setTimeout(r, 2500));
+  assert.deepEqual(t.sent, ['listy odebrane'], 'brak dosylki komendy po naglowku');
+  await t.replay([{ text: '> ', cls: 'prompt' }]);
+  const res = await op;
+  assert.equal(res.kind, 'lista');
+  if (res.kind === 'lista') assert.equal(res.entries.length, 1);
+});
+
 test('pager: "ladowane" przed naglowkami = retry odczytu po ~2 s', async () => {
   const t = new MockTransport();
   const s = new PagerSession(t, OPTS);

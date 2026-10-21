@@ -204,6 +204,14 @@ export class MailboxSession {
               reject(new Error(`listing ${h.box} podczas fetch ${box}`));
               return;
             }
+            // Fala 20a: serwer dostarczyl listing mimo throttle'u -
+            // rozbrajamy odroczone retry, inaczej dosyla komende w
+            // polowie strony (duplikat wpisow; zgloszenie 2026-10-21
+            // "pominiete wyslane / kotwica bez postepu / 3-4").
+            if (loadRetryTimer) {
+              clearTimeout(loadRetryTimer);
+              loadRetryTimer = null;
+            }
             header = h;
             armIdle();
           }
