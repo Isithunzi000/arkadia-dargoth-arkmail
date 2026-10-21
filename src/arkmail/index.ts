@@ -647,6 +647,20 @@ export async function init(api: PluginApi) {
               `Limit ${LOAD_ALL_MAX_PAGES} stron (listow: ${added}) - kliknij ponownie, aby kontynuowac.`,
             );
           } else {
+            // Fala 24c: petla zatrzymana naturalnie (widok bez suffixu
+            // uciecia, bez Przerwij i bez limitu stron) = kompletny
+            // listing skrzynki - ta sama pewnosc co przy pelnej
+            // indeksacji (Fala 18a): gone-marking z widoku + stamp
+            // indexMeta (brama Kontaktow moze odpasc bez indeksacji).
+            const done = ui.state.boxes[box];
+            if (done && !done.truncated) {
+              markGoneFromServer(
+                box,
+                new Set(done.entries.map((e) => fromMailboxEntry(box, e).id)),
+              );
+              ui.setIndexMeta({ ...ui.state.indexMeta, [box]: new Date().toISOString() });
+              persistIndexMeta();
+            }
             notify(api, `Wczytano wszystkie (nowych listow: ${added}).`);
           }
         } finally {

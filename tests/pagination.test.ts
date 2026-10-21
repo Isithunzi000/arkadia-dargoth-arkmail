@@ -317,3 +317,71 @@ test('kontakty: wczytaj wszystkie odbudowuje kontakty po zakonczeniu petli (Fala
     await stopHarness();
   }
 });
+
+
+// --- Fala 24c: loadAll domykajacy skrzynke stempluje indexMeta -------------
+
+test('wczytaj wszystkie: naturalne domkniecie skrzynki stempluje indexMeta (Fala 24c)', async () => {
+  const h = await startHarness();
+  const { f, waitFor } = h;
+  try {
+    await loadTruncatedBox(h);
+    click(h, '.arkmail-older-all');
+    await waitFor(
+      () => f.sent.some((c) => c.startsWith('listy odebrane przed')),
+      'komenda petli',
+    );
+    // Strona niepelna (bez suffixu) = koniec starszych: petla staje
+    // naturalnie, skrzynka przeczesana w calosci.
+    f.fire('Wybrane listy odebrane:', 'mail');
+    f.fire(' 9. *R* Temat: pradawny', 'mail');
+    f.fire('Nadawca: Baz                          Pn, 1 XII 2025, 09:00:00', 'mail');
+    f.fire('> ', 'prompt');
+    await waitRt(
+      () => notifyText(f, 'Wczytano wszystkie (nowych listow: 1)'),
+      'notify konca petli',
+    );
+
+    // Stopka bramy Kontaktow: skrzynka 'odebrane' ma stamp indeksacji.
+    click(h, '[data-tab="kontakty"]');
+    await waitRt(() => !!h.content.querySelector('.arkmail-index-foot'), 'stopka indeksacji');
+    assert.match(
+      textOf(h, '.arkmail-index-foot'),
+      /^Ostatnia indeksacja: 20\d\d-\d\d-\d\d/,
+      'stamp indexMeta po naturalnym domknieciu loadAll',
+    );
+  } finally {
+    await stopHarness();
+  }
+});
+
+test('wczytaj wszystkie: przerwanie petli NIE stempluje indexMeta (Fala 24c)', async () => {
+  const h = await startHarness();
+  const { f, waitFor } = h;
+  try {
+    await loadTruncatedBox(h);
+    click(h, '.arkmail-older-all');
+    await waitFor(
+      () => f.sent.some((c) => c.startsWith('listy odebrane przed')),
+      'komenda petli 1',
+    );
+    // Strona 1 ucieta -> petla leci dalej; gracz klika Przerwij.
+    f.fire('Wybrane listy odebrane (prezentowane jest pierwsze 50):', 'mail');
+    f.fire('50. *R* Temat: antyczny', 'mail');
+    f.fire('Nadawca: Waldo                          N, 14 XII 2025, 10:00:00', 'mail');
+    f.fire('> ', 'prompt');
+    await waitRt(() => textOf(h, '.arkmail-older-all').includes('Przerwij'), 'Przerwij w petli');
+    click(h, '.arkmail-older-all');
+    await waitRt(() => notifyText(f, 'Przerwano'), 'notify przerwania');
+
+    // Petla przerwana = brak pewnosci kompletu -> bez stampa.
+    click(h, '[data-tab="kontakty"]');
+    await waitRt(() => !!h.content.querySelector('.arkmail-index-foot'), 'stopka indeksacji');
+    assert.ok(
+      textOf(h, '.arkmail-index-foot').startsWith('Ostatnia indeksacja:  |'),
+      'brak stampa po przerwanym loadAll',
+    );
+  } finally {
+    await stopHarness();
+  }
+});
