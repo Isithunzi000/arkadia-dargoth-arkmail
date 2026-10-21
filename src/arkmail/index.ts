@@ -677,6 +677,12 @@ export async function init(api: PluginApi) {
             let pages = 0;
             let complete = false;
             let skipWhy: string | null = null;
+            // Fala 20b: pojedynczy duplikat strony to incydent (np.
+            // powtorka odpowiedzi serwera), nie mielenie - kotwice
+            // powtarzamy RAZ po pauzie; dopiero drugi duplikat z rzedu
+            // potwierdza mielenie (zgloszenie 2026-10-21 "pominiete
+            // wyslane / 3-4").
+            let anchorRetried = false;
             let res = await mailbox.fetch(box);
             for (;;) {
               if (res.kind === "lista") {
@@ -696,9 +702,25 @@ export async function init(api: PluginApi) {
                   break;
                 }
                 if (freshCount === 0) {
+                  if (!anchorRetried) {
+                    anchorRetried = true;
+                    const oldestDup = oldestEntry(all);
+                    if (!oldestDup?.date) {
+                      skipWhy = "brak daty w wpisach";
+                      break;
+                    }
+                    await sleepOrCancel(LOAD_ALL_PACE_MS * 2, flag);
+                    if (flag.cancelled) break;
+                    res = await mailbox.fetch(
+                      box,
+                      olderListingCommand(box, nextDay(oldestDup.date)),
+                    );
+                    continue;
+                  }
                   skipWhy = "kotwica bez postepu";
                   break;
                 }
+                anchorRetried = false;
                 if (pages >= LOAD_ALL_MAX_PAGES) {
                   skipWhy = `limit ${LOAD_ALL_MAX_PAGES} stron`;
                   break;

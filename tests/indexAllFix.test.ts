@@ -144,6 +144,13 @@ test('skrzynka z mieleniem kotwicy jest pomijana, reszta dojezdza, raport ja wym
     replaySameWyslane();
     await waitRt(() => f.sent.includes('listy wyslane przed 21 XII 2025'), 'kotwica wyslane');
     replaySameWyslane(); // identyczna strona = freshCount 0
+    // Fala 20b: pojedynczy duplikat to incydent - plugin powtarza
+    // kotwice RAZ; dopiero drugi duplikat z rzedu potwierdza mielenie.
+    await waitRt(
+      () => f.sent.filter((c) => c === 'listy wyslane przed 21 XII 2025').length === 2,
+      'retry kotwicy wyslane',
+    );
+    replaySameWyslane(); // drugi duplikat z rzedu = trwale mielenie
     // niewyslane: puste - pominiecie wyslanych nie moze zabic petli.
     await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksacja: niewyslane po pominieciu');
     f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
@@ -157,6 +164,66 @@ test('skrzynka z mieleniem kotwicy jest pomijana, reszta dojezdza, raport ja wym
     click(h, '[data-tab="kontakty"]');
     await waitRt(() => !!h.content.querySelector('.arkmail-index-all'), 'brama nadal zamknieta');
     assert.ok(!h.content.querySelector('.arkmail-contact'), 'licznikow brak przy 3/4');
+  } finally {
+    await stopHarness();
+  }
+});
+
+test('incydentalny duplikat strony kotwicowej: retry ratuje skrzynke (Fala 20b)', async () => {
+  // Zgloszenie 2026-10-21 "pominiete wyslane / 3-4": duplikat strony
+  // (np. powtorka odpowiedzi serwera) byl traktowany jak trwale
+  // mielenie kotwicy i skrzynka byla pomijana. Jeden duplikat =
+  // incydent (retry kotwicy); dopiero drugi z rzedu = mielenie.
+  const h = await startHarness();
+  const { f } = h;
+  try {
+    await loadTruncatedBox(h);
+    await startIndexing(h);
+    // odebrane: kompletne od razu.
+    await waitRt(
+      () => f.sent.filter((c) => c === 'listy odebrane').length === 2,
+      'indeksacja: odebrane',
+    );
+    f.fire('Listy odebrane:', 'mail');
+    f.fire(' 1. *R* Temat: srodkowy', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('> ', 'prompt');
+    // nieprzeczytane: puste.
+    await waitRt(
+      () => f.sent.filter((c) => c === 'listy nieprzeczytane').length === 2,
+      'indeksacja: nieprzeczytane',
+    );
+    f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
+    // wyslane: strona 1 truncated...
+    await waitRt(() => f.sent.includes('listy wyslane'), 'indeksacja: wyslane');
+    const pageOne = () => {
+      f.fire('Listy wyslane (prezentowane jest pierwsze 50):', 'mail');
+      f.fire(' 1. Temat: paczka', 'mail');
+      f.fire('Odbiorcy: Bar                           Wt, 20 XII 2025, 09:00:00', 'mail');
+      f.fire('> ', 'prompt');
+    };
+    pageOne();
+    await waitRt(() => f.sent.includes('listy wyslane przed 21 XII 2025'), 'kotwica wyslane');
+    // ...kotwica #1: DUPLIKAT strony (incydent, freshCount 0)...
+    pageOne();
+    // ...plugin powtarza kotwice zamiast pomijac skrzynke...
+    await waitRt(
+      () => f.sent.filter((c) => c === 'listy wyslane przed 21 XII 2025').length === 2,
+      'retry kotwicy po duplikacie',
+    );
+    // ...kotwica #2: dobra strona z NOWYM wpisem (truncated)...
+    f.fire('Listy wyslane (prezentowane jest pierwsze 50):', 'mail');
+    f.fire(' 1. Temat: stara paczka', 'mail');
+    f.fire('Odbiorcy: Gracz                           Pn, 19 XII 2025, 10:00:00', 'mail');
+    f.fire('> ', 'prompt');
+    // ...paginacja jedzie dalej, kotwica #3 pusta = koniec skrzynki.
+    await waitRt(() => f.sent.includes('listy wyslane przed 20 XII 2025'), 'kotwica 2 wyslane');
+    f.fire('Nie znaleziono zadnych takich wyslanych listow.', 'mail');
+    // niewyslane: puste - pelne 4/4 mimo incydentu na wyslanych.
+    await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksacja: niewyslane');
+    f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
+    await waitRt(() => notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'toast 4/4');
+    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji');
   } finally {
     await stopHarness();
   }
