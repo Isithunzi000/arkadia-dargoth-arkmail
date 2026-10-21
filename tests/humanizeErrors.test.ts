@@ -48,11 +48,11 @@ test('humanize: timeouty sesji po ludzku', () => {
 test('humanize: sierocy pager i throttle po ludzku', () => {
   assert.equal(
     humanizeMailError('sierocy pager podczas fetch odebrane'),
-    'Poczta miala zawieszony pager - sprobuj ponownie.',
+    'Poczta sie zawiesila - sprobuj ponownie.',
   );
   assert.equal(
     humanizeMailError('pager session list 12: odrzucono przez sierocy pager'),
-    'Poczta miala zawieszony pager - sprobuj ponownie.',
+    'Poczta sie zawiesila - sprobuj ponownie.',
   );
   assert.equal(
     humanizeMailError('Listy sa w tej chwili ladowane.'),
@@ -159,8 +159,25 @@ test('stringi klasa B: poprawione, naturalne polskie (ASCII)', () => {
   assert.ok(index.includes('Nie moge znalezc tego listu - odswiez skrzynke.'), 'brak daty bez technikaliow');
   assert.ok(index.includes('Poczekaj, az skoncze biezaca operacje.'), 'SESSION_BUSY_MSG');
   assert.ok(index.includes('Zapisane dane wyczyszczone.'), 'toast czyszczenia bez zargonu');
+  // Fala 21b: anglicyzmy, zargon i niezgrabnosci zakazane:
+  assert.ok(!render.includes("? ' (forwardowany)'"), '"forwardowany" - jest "(przekazany)"');
+  assert.ok(!render.includes('Wyslij Zwierze'), 'wielka litera - jest "Wyslij zwierze"');
+  assert.ok(!render.includes('Wyczysc pamiec podreczna'), 'zargon - jest "Wyczysc zapisane dane"');
+  assert.ok(!render.includes('Podglad - tak list zostanie wyslany'), 'stary podglad (21b)');
+  assert.ok(!render.includes('Zapisz w kolejce do wyslania'), 'trzeci termin - jest "niewyslanych"');
+  assert.ok(!render.includes('w tym kierunku'), 'zargon - jest "Brak listow."');
+  assert.ok(!render.includes('po pobraniu listingow'), '"listingi" - jest "skrzynki"');
+  // Nowe wersje obecne (21b):
+  assert.ok(render.includes("(przekazany)"), 'przekazany po polsku');
+  assert.ok(render.includes('Wyczysc zapisane dane'), 'czyszczenie bez zargonu');
+  assert.ok(render.includes('Kasuje listy i kontakty. Ustawienia zostaja.'), 'dim czyszczenia');
+  assert.ok(render.includes('Podglad wysylanego listu'), 'nowy podglad (21b)');
+  assert.ok(render.includes('Zapisz w niewyslanych'), 'spojne ze skrzynka niewyslane');
+  assert.ok(render.includes('Kontakty powstaja z listow zebranych ze wszystkich skrzynek'), 'brama 21b');
+  assert.ok(render.includes('Wybierz list, aby go przeczytac.'), 'bez "list z listy"');
+  assert.ok(render.includes('Ostatnia indeksacja:'), 'stopka indeksu po ludzku');
+  assert.ok(render.includes('Indeksuj wszystkie skrzynki'), 'jedna wersja przycisku indeksacji');
   assert.ok(render.includes('Pobieranie potrwa dlugo - kliknij ponownie'), 'nowy tekst uzbrojenia');
-  assert.ok(render.includes('Podglad - tak list zostanie wyslany'), 'nowy podglad');
   assert.ok(render.includes('Archiwum puste albo zaden list nie pasuje do filtra.'), 'nowe puste archiwum');
   assert.ok(render.includes('Zaden kontakt nie pasuje do filtra.'), 'nowy pusty filtr kontaktow');
 });

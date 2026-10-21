@@ -3,7 +3,7 @@
  *
  * 1. Compose poza poczta ZAWSZE laduje w niewyslanych ("List jest
  *    gotowy do wyslania." - log: 4/4 compose w tej sesji) - przycisk
- *    "Wyslij" mylil, teraz "Zapisz w kolejce do wyslania".
+ *    "Wyslij" mylil, teraz "Zapisz w niewyslanych".
  * 2. Klawisz "Wyczysc" czysci pola compose (adresat/temat/dw/tresc);
  *    dwuklik z uzbrojeniem 3 s (wzorzec "Wyczysc pamiec podreczna").
  * 3. Po odlozeniu listu (compose "gotowy" albo Przekaz) klawisz
@@ -65,7 +65,7 @@ test('compose: przycisk wysylki mowi prawde o kolejce niewyslanych', () => {
   const s = new MailUiStore({ tab: 'napisz' });
   const { container, off } = mount(s);
   const send = container.querySelector('.arkmail-send');
-  assert.equal(send?.textContent, 'Zapisz w kolejce do wyslania');
+  assert.equal(send?.textContent, 'Zapisz w niewyslanych');
   off();
 });
 

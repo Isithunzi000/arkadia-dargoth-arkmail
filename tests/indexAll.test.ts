@@ -61,14 +61,12 @@ test('brama Kontaktow: bez indeksu przycisk indeksacji zamiast licznikow', () =>
       // graczowi.
       const gateText = container.textContent ?? '';
       assert.ok(
-        gateText.includes(
-          'Kontakty liczone sa z bazy wszystkich listow ze wszystkich skrzynek',
-        ),
+        gateText.includes('Kontakty powstaja z listow zebranych ze wszystkich skrzynek'),
         'brama wyjasnia, skad bierze sie baza kontaktow',
       );
       assert.ok(
-        gateText.includes('Zindeksuj skrzynki, aby zebrac baze'),
-        'brama wskazuje czynnik odblokowujacy',
+        gateText.includes('(jednorazowo)'),
+        'brama zaznacza jednorazowosc indeksacji',
       );
       assert.ok(
         !gateText.includes('pierwszych 50'),
@@ -182,7 +180,7 @@ test('Indeksuj wszystkie: paginacja kotwicowa, flagi, gone-marking, odblokowanie
       textContent?: string;
     } | null;
     assert.ok(foot, 'stopka indeksacji');
-    assert.match(String(foot.textContent ?? ''), /^Zindeksowano 20\d\d-\d\d-\d\d/);
+    assert.match(String(foot.textContent ?? ''), /^Ostatnia indeksacja: 20\d\d-\d\d-\d\d/);
     assert.ok(String(foot.textContent ?? '').includes('listow w bazie: 4'), 'rozmiar bazy');
   } finally {
     await stopHarness();

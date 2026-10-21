@@ -383,7 +383,7 @@ export function mountMailUi(
     // 20-50 s wg logow); koniec lotu: linia ladowania albo timeout.
     const animalBtn = doc.createElement('button');
     animalBtn.className = 'arkmail-animal-send';
-    animalBtn.textContent = state.animalFlying ? 'Zwierze w drodze...' : 'Wyslij Zwierze';
+    animalBtn.textContent = state.animalFlying ? 'Zwierze w drodze...' : 'Wyslij zwierze';
     if (state.animalFlying) animalBtn.setAttribute('disabled', '');
     animalBtn.addEventListener('click', () => handlers.onSendAnimal?.());
     ops.appendChild(animalBtn);
@@ -412,7 +412,7 @@ export function mountMailUi(
     // dla przycisku - kazdy rerender wraca do stanu poczatkowego.
     const clearBtn = doc.createElement('button');
     clearBtn.className = 'arkmail-cache-clear';
-    clearBtn.textContent = 'Wyczysc pamiec podreczna';
+    clearBtn.textContent = 'Wyczysc zapisane dane';
     let clearArmed = false;
     let clearTimer: ReturnType<typeof setTimeout> | null = null;
     clearBtn.addEventListener('click', () => {
@@ -421,17 +421,23 @@ export function mountMailUi(
         clearBtn.textContent = 'Na pewno? Kliknij ponownie';
         clearTimer = setTimeout(() => {
           clearArmed = false;
-          clearBtn.textContent = 'Wyczysc pamiec podreczna';
+          clearBtn.textContent = 'Wyczysc zapisane dane';
         }, 3000);
         return;
       }
       if (clearTimer) clearTimeout(clearTimer);
       clearArmed = false;
-      clearBtn.textContent = 'Wyczysc pamiec podreczna';
+      clearBtn.textContent = 'Wyczysc zapisane dane';
       handlers.onClearCache?.();
     });
     ops.appendChild(clearBtn);
     pane.appendChild(ops);
+    // Fala 21b: co dokladnie kasuje ten przycisk ("pamiec podreczna"
+    // nic nie mowila graczowi).
+    const clearDim = doc.createElement('div');
+    clearDim.className = 'arkmail-dim';
+    clearDim.textContent = 'Kasuje listy i kontakty. Ustawienia zostaja.';
+    pane.appendChild(clearDim);
 
     // Przelacznik powiadomien o nowej poczcie (trwale w storage).
     const notifyRow = doc.createElement('label');
@@ -550,7 +556,10 @@ export function mountMailUi(
       row.appendChild(party);
       const subject = doc.createElement('span');
       subject.className = 'arkmail-entry-subject';
-      subject.textContent = e.subject + (e.forwarded ? ' (forwardowany)' : '');
+      // Flaga forwarded pochodzi z parsera (serwer dokleja do tematu
+      // "(forwardowany)"); graczowi pokazujemy po polsku i spojnie
+      // z przyciskiem Przekaz (Fala 21b).
+      subject.textContent = e.subject + (e.forwarded ? ' (przekazany)' : '');
       row.appendChild(subject);
       const date = doc.createElement('span');
       date.className = 'arkmail-entry-date';
@@ -586,7 +595,7 @@ export function mountMailUi(
       // W split (wide) to placeholder prawego panelu; solo (waski) to
       // pusta zakladka 'list'.
       pane.appendChild(
-        dim(state.wide ? 'Wybierz list z listy, aby go przeczytac.' : 'Nie otwarto zadnego listu.'),
+        dim(state.wide ? 'Wybierz list, aby go przeczytac.' : 'Nie otwarto zadnego listu.'),
       );
       return pane;
     }
@@ -655,7 +664,7 @@ export function mountMailUi(
     del.textContent = 'Usun';
     if (source) {
       // Fala 14e: kasowanie z dwuklikowym potwierdzeniem (uzbrojenie
-      // wygasa po 3 s, wzorzec jak "Wyczysc pamiec podreczna") -
+      // wygasa po 3 s, wzorzec jak "Wyczysc zapisane dane") -
       // pojedynczy przypadkowy klik nie kasuje listu (zgloszenie
       // 2026-10-19, pkt 7).
       let delArmed = false;
@@ -677,7 +686,7 @@ export function mountMailUi(
       });
     } else {
       del.setAttribute('disabled', '');
-      del.setAttribute('title', 'Otworz list z zakladki Listy, aby go skasowac.');
+      del.setAttribute('title', 'Otworz list z zakladki Listy, aby go usunac.');
     }
     ops.appendChild(del);
     const fwdInput = doc.createElement('input');
@@ -761,7 +770,7 @@ export function mountMailUi(
     const bar = doc.createElement('div');
     bar.className = 'arkmail-preview-bar';
     const lab = doc.createElement('label');
-    lab.textContent = 'Podglad - tak list zostanie wyslany';
+    lab.textContent = 'Podglad wysylanego listu';
     bar.appendChild(lab);
     const close = doc.createElement('button');
     close.className = 'arkmail-preview-close';
@@ -790,7 +799,7 @@ export function mountMailUi(
     const bar = doc.createElement('div');
     bar.className = 'arkmail-preview-bar';
     const lab = doc.createElement('label');
-    lab.textContent = 'Podglad - tak list zostanie wyslany';
+    lab.textContent = 'Podglad wysylanego listu';
     bar.appendChild(lab);
     bar.appendChild(previewOpenBtn());
     pane.appendChild(bar);
@@ -889,7 +898,7 @@ export function mountMailUi(
       const barP = doc.createElement('div');
       barP.className = 'arkmail-preview-bar';
       const labP = doc.createElement('label');
-      labP.textContent = 'Podglad - tak list zostanie wyslany';
+      labP.textContent = 'Podglad wysylanego listu';
       barP.appendChild(labP);
       barP.appendChild(previewOpenBtn());
       pane.appendChild(barP);
@@ -909,14 +918,14 @@ export function mountMailUi(
     // Fala 14b: poza poczta compose ZAWSZE laduje w kolejce niewyslanych
     // ("List jest gotowy do wyslania.") - przycisk "Wyslij" mylil gracza
     // (zgloszenie 2026-10-19). Etykieta mowi, co naprawde sie stanie.
-    send.textContent = 'Zapisz w kolejce do wyslania';
+    send.textContent = 'Zapisz w niewyslanych';
     // Fala 15b: walidacja przed zapisem do kolejki. Pusty adresat =
     // twarda blokada (serwer wymaga >= 1 adresata - "musimy podac
     // przynajmniej jednego"); pusty temat = dwuklikowe uzbrojenie jak
     // Wyczysc/Usun (temat bywa celowo pusty, ale najczesciej to
     // przeoczenie - bez walidacji pusta linia rozbijala rozmowe compose
     // w cisze do timeoutu). Stan lokalny - rerender wraca do etykiety.
-    const SEND_LABEL = 'Zapisz w kolejce do wyslania';
+    const SEND_LABEL = 'Zapisz w niewyslanych';
     let sendArmed = false;
     let sendTimer: ReturnType<typeof setTimeout> | null = null;
     const disarmSend = (): void => {
@@ -964,7 +973,7 @@ export function mountMailUi(
     pane.appendChild(send);
 
     // Fala 14b: czyszczenie pol compose z dwuklikowym potwierdzeniem
-    // (uzbrojenie wygasa po 3 s; wzorzec "Wyczysc pamiec podreczna").
+    // (uzbrojenie wygasa po 3 s; wzorzec "Wyczysc zapisane dane").
     // Czysci pola LISTU (adresat/temat/dw/tresc) - szablon i szerokosc
     // to ustawienia, zostaja. Stan uzbrojenia lokalny - kazdy rerender
     // wraca do stanu poczatkowego.
@@ -1015,10 +1024,7 @@ export function mountMailUi(
     // technicznych - gracz ma wiedziec tylko, po co indeksowanie.
     if (!allBoxesIndexed(state.indexMeta)) {
       pane.appendChild(
-        dim(
-          'Kontakty liczone sa z bazy wszystkich listow ze wszystkich skrzynek. ' +
-            'Zindeksuj skrzynki, aby zebrac baze (jednorazowo).',
-        ),
+        dim('Kontakty powstaja z listow zebranych ze wszystkich skrzynek (jednorazowo).'),
       );
       const gate = doc.createElement('button');
       gate.className = 'arkmail-index-all';
@@ -1108,7 +1114,7 @@ export function mountMailUi(
             btn.textContent = label;
             if (count === 0) {
               btn.setAttribute('disabled', '1');
-              btn.setAttribute('title', 'Brak listow w tym kierunku');
+              btn.setAttribute('title', 'Brak listow.');
             } else {
               btn.addEventListener('click', () => jumpTo(box));
             }
@@ -1122,7 +1128,7 @@ export function mountMailUi(
         list.replaceChildren(
           dim(
             state.contacts.length === 0
-              ? 'Brak kontaktow - pojawia sie po pobraniu listingow.'
+              ? 'Brak kontaktow - pojawia sie po pobraniu skrzynek.'
               : 'Zaden kontakt nie pasuje do filtra.',
           ),
         );
@@ -1145,7 +1151,7 @@ export function mountMailUi(
       .filter((d): d is string => d !== undefined)
       .sort();
     foot.textContent =
-      `Zindeksowano ${(dates[0] ?? '').slice(0, 10)}; ` +
+      `Ostatnia indeksacja: ${(dates[0] ?? '').slice(0, 10)} | ` +
       `listow w bazie: ${state.archive.length}`;
     pane.appendChild(foot);
     return pane;
@@ -1225,12 +1231,12 @@ export function mountMailUi(
     idxBtn.className = 'arkmail-index-all';
     idxBtn.textContent = state.indexRun
       ? `Przerwij indeksowanie (${state.indexRun.boxIndex + 1}/${INDEX_BOXES.length})`
-      : 'Indeksuj wszystkie';
+      : 'Indeksuj wszystkie skrzynki';
     idxBtn.addEventListener('click', () => handlers.onIndexAll?.());
     controls.appendChild(idxBtn);
     // Fala 16i: masowe pobieranie tresci do archiwum (zgloszenie
     // pkt 10). Dwuklikowe uzbrojenie z ostrzezeniem o dlugim czasie
-    // (precedens: Wyczysc pamiec podreczna); w trakcie petli przycisk
+    // (precedens: Wyczysc zapisane dane); w trakcie petli przycisk
     // zamienia sie w Przerwij z postepem (precedens: Wczytaj wszystkie).
     const dlBtn = doc.createElement('button');
     dlBtn.className = 'arkmail-arch-download';

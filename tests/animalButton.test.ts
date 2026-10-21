@@ -54,7 +54,7 @@ test('przycisk Wyslij Zwierze istnieje i wysyla komende "wyslij zwierze"', async
   const h = await startHarness();
   try {
     assert.ok(animalBtn(h), 'przycisk w pasku operacji');
-    assert.equal(textOf(h, '.arkmail-animal-send'), 'Wyslij Zwierze');
+    assert.equal(textOf(h, '.arkmail-animal-send'), 'Wyslij zwierze');
     click(h, '.arkmail-animal-send');
     await h.waitFor(() => h.f.sent.includes('wyslij zwierze'), 'komenda wyslij zwierze');
   } finally {

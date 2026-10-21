@@ -68,7 +68,7 @@ test('layout: wide bez otwartego listu - split z listingiem i placeholderem', ()
   assert.equal(split!.children.length, 2, 'lewy listing + prawy panel');
   const right = split!.children[1] as { textContent?: string };
   assert.ok(
-    right.textContent?.includes('Wybierz list z listy, aby go przeczytac.'),
+    right.textContent?.includes('Wybierz list, aby go przeczytac.'),
     'placeholder w prawym panelu',
   );
   assert.ok(q(c, '.arkmail-entry'), 'listing po lewej');
@@ -97,7 +97,7 @@ test('layout: Zamknij w wide czysci podglad - wraca placeholder', () => {
   const split = q(c, '.arkmail-split') as { children: ArrayLike<unknown> } | null;
   assert.ok(split, 'split zostaje po zamknieciu');
   const right = split!.children[1] as { textContent?: string };
-  assert.ok(right.textContent?.includes('Wybierz list z listy, aby go przeczytac.'));
+  assert.ok(right.textContent?.includes('Wybierz list, aby go przeczytac.'));
 });
 
 test('layout: waski - jeden panel, Zamknij list wraca do listingu (regresja)', () => {

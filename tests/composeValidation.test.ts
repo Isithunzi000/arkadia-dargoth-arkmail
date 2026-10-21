@@ -106,7 +106,7 @@ test('ui: pusty temat wymaga dwukliku, drugi klik wysyla', () => {
   const args = sends(calls)[0].args[0] as { adresat: string; temat: string };
   assert.equal(args.adresat, 'Foo');
   assert.equal(args.temat, '', 'temat pusty - swiadoma decyzja gracza');
-  assert.equal(send.textContent, 'Zapisz w kolejce do wyslania', 'przycisk wrocil do etykiety');
+  assert.equal(send.textContent, 'Zapisz w niewyslanych', 'przycisk wrocil do etykiety');
   off();
 });
 
@@ -119,7 +119,7 @@ test('ui: uzbrojenie pustego tematu wygasa po 3 s', async () => {
   const send = sendBtn(container);
   clickEl(send);
   assert.match(send.textContent ?? '', /Temat pusty/, 'uzbrojony');
-  await waitRt(() => send.textContent === 'Zapisz w kolejce do wyslania', 'przycisk wrocil do etykiety');
+  await waitRt(() => send.textContent === 'Zapisz w niewyslanych', 'przycisk wrocil do etykiety');
   clickEl(send);
   assert.equal(sends(calls).length, 0, 'klik po wygasnieciu znowu tylko uzbraja');
   off();
@@ -162,7 +162,7 @@ test('ui: blokada pustej tresci wygasa po 3 s', async () => {
   const send = sendBtn(container);
   clickEl(send);
   assert.equal(send.textContent, 'Brak tresci listu.', 'zablokowany');
-  await waitRt(() => send.textContent === 'Zapisz w kolejce do wyslania', 'etykieta wrocila');
+  await waitRt(() => send.textContent === 'Zapisz w niewyslanych', 'etykieta wrocila');
   setField(container, 'tresc', 'czesc');
   clickEl(send);
   assert.equal(sends(calls).length, 1, 'po wpisaniu tresci zapis dziala');

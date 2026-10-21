@@ -33,8 +33,9 @@ const RULES: Rule[] = [
   },
   {
     // Sierocy pager serwera (17a domyka, ale porazka moze sie zdarzyc).
+    // Fala 21b: bez slowa "pager" - gracz nie zna tego pojecia.
     re: /odrzucono przez sierocy pager$|^sierocy pager podczas fetch /,
-    msg: 'Poczta miala zawieszony pager - sprobuj ponownie.',
+    msg: 'Poczta sie zawiesila - sprobuj ponownie.',
   },
   {
     re: /Listy sa w tej chwili ladowane\.$/,

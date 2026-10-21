@@ -104,7 +104,7 @@ test('ui: przycisk czysci dopiero po drugim kliku (potwierdzenie)', () => {
   const { container, calls } = mount(s);
   const btn = q(container, '.arkmail-cache-clear');
   assert.ok(btn, 'przycisk w pasku operacji');
-  assert.match(btn!.textContent ?? '', /Wyczysc pamiec podreczna/);
+  assert.match(btn!.textContent ?? '', /Wyczysc zapisane dane/);
 
   clickEl(btn!);
   assert.equal(calls.filter((c) => c.name === 'clear-cache').length, 0, 'pierwszy klik nie czysci');
@@ -121,7 +121,7 @@ test('ui: uzbrojenie wygasa po 3 s bez drugiego kliku', async () => {
   clickEl(btn);
   assert.match(btn.textContent ?? '', /Na pewno/, 'uzbrojony');
   await waitRt(
-    () => (btn.textContent ?? '').includes('Wyczysc pamiec podreczna'),
+    () => (btn.textContent ?? '').includes('Wyczysc zapisane dane'),
     'przycisk wrocil do stanu poczatkowego',
   );
   clickEl(btn);
