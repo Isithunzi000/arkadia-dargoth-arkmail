@@ -149,9 +149,16 @@ test('stringi klasa B: poprawione, naturalne polskie (ASCII)', () => {
   assert.ok(!render.includes('Moze potrwac bardzo dlugo - kliknij ponownie'), 'stary tekst uzbrojenia');
   assert.ok(!render.includes('Podglad (tak list zostanie wyslany)'), 'stary podglad');
   assert.ok(!render.includes('niczego nie trafia'), '"niczego nie trafia" zastapione');
+  // Fala 21a: bledy jezykowe i zargon zakazane:
+  assert.ok(!index.includes('Przerwiano'), '"Przerwiano" (zle) - jest "Przerwano"');
+  assert.ok(!index.includes('(brak daty)'), '"brak daty" - technikalia z toastu');
+  assert.ok(!index.includes('Trwa inna operacja pocztowa'), '13 kopii toastu - jest SESSION_BUSY_MSG');
+  assert.ok(!index.includes('Kasuje list'), '"Kasuje" - jest "Usuwam"');
   // Nowe wersje obecne:
   assert.ok(index.includes('Nie ma tego listu na liscie - odswiez skrzynke.'), 'nowy komunikat re-kotwicy');
-  assert.ok(index.includes('Nie moge znalezc tego listu (brak daty)'), 'nowy brak daty');
+  assert.ok(index.includes('Nie moge znalezc tego listu - odswiez skrzynke.'), 'brak daty bez technikaliow');
+  assert.ok(index.includes('Poczekaj, az skoncze biezaca operacje.'), 'SESSION_BUSY_MSG');
+  assert.ok(index.includes('Zapisane dane wyczyszczone.'), 'toast czyszczenia bez zargonu');
   assert.ok(render.includes('Pobieranie potrwa dlugo - kliknij ponownie'), 'nowy tekst uzbrojenia');
   assert.ok(render.includes('Podglad - tak list zostanie wyslany'), 'nowy podglad');
   assert.ok(render.includes('Archiwum puste albo zaden list nie pasuje do filtra.'), 'nowe puste archiwum');

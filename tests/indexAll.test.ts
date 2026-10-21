@@ -197,7 +197,7 @@ test('guard: Pobierz tresci przy pustej niezindeksowanej bazie najpierw indeksuj
     await waitRt(() => !!h.content.querySelector('.arkmail-arch-download'), 'przycisk pobierania');
     click(h, '.arkmail-arch-download'); // uzbrojenie (dwuklik)
     click(h, '.arkmail-arch-download'); // odpalenie
-    await waitRt(() => notifyText(f, 'najpierw indeksuje'), 'toast guarda pobierania');
+    await waitRt(() => notifyText(f, 'najpierw kliknij Indeksuj'), 'toast guarda pobierania');
     await replayEmptyBoxes(h);
     // Kontynuacja po indeksacji: pobieranie na pustej bazie = jasny
     // toast zamiast martwego "brak listow bez tresci".
@@ -214,7 +214,7 @@ test('guard: Zapisz wszystkie (ZIP) przy pustej niezindeksowanej bazie najpierw 
     click(h, '[data-tab="archiwum"]');
     await waitRt(() => !!h.content.querySelector('.arkmail-arch-export'), 'przycisk eksportu');
     click(h, '.arkmail-arch-export');
-    await waitRt(() => notifyText(f, 'najpierw indeksuje'), 'toast guarda eksportu');
+    await waitRt(() => notifyText(f, 'najpierw kliknij Indeksuj'), 'toast guarda eksportu');
     await replayEmptyBoxes(h);
     await waitRt(
       () => notifyText(f, 'kliknij ponownie Zapisz wszystkie'),

@@ -166,7 +166,7 @@ test('archiwum: pobieranie tresci - Przerwij konczy petle po biezacym liscie', a
     clickDownload(h); // przerwij (odczyt pierwszego listu jeszcze trwa)
     replayLetter(h, 1, 'najnowszy', 'Tresc pierwszego.');
 
-    await waitRt(() => notifyText(f, 'Przerwiano'), 'toast przerwania');
+    await waitRt(() => notifyText(f, 'Przerwano'), 'toast przerwania');
     await waitRt(
       () => downloadBtn(h).textContent === 'Pobierz tresci do archiwum',
       'koniec petli po przerwaniu',

@@ -150,7 +150,7 @@ test('harness: czyszczenie kasuje widok i archiwum, ustawienia zostaja', async (
     click(h, '.arkmail-cache-clear');
 
     await waitRt(() => content.querySelectorAll('.arkmail-entry').length === 0, 'widok pusty');
-    assert.ok(notifyText(f, 'Pamiec podreczna wyczyszczona'), 'tost o czyszczeniu');
+    assert.ok(notifyText(f, 'Zapisane dane wyczyszczone'), 'tost o czyszczeniu');
     const chkAfter = content.querySelector('.arkmail-notify-toggle') as { checked: boolean };
     assert.equal(chkAfter.checked, true, 'powiadomienia ZACHOWANE po czyszczeniu');
   } finally {

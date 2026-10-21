@@ -7,7 +7,7 @@
  * tosty spoznione o minuty, nieprzewidziane petle).
  *
  * Kontrakt: klik przy zajetej blokadzie = natychmiastowa odmowa
- * z toastem "Trwa inna operacja pocztowa..." i ZEREM nowych komend
+ * z toastem "Poczekaj, az skoncze biezaca operacje..." i ZEREM nowych komend
  * (jak reszta handlerow: Usun, Przekaz, Wyslij list itd.).
  * Wyjatki zachowane: drugi klik Wczytaj wszystkie = Przerwij (flaga
  * cancel PRZED guardem); wewnetrzne refreshBoxes po wysylce/kasowaniu
@@ -38,14 +38,14 @@ test('Odswiez / Szukaj podczas petli = odmowa, zero komend', async () => {
 
     // Odswiez: odmowa z toastem, bez kolejkowania komendy.
     click(h, '.arkmail-refresh-global');
-    assert.ok(notifyText(f, 'Trwa inna operacja pocztowa'), 'toast odmowy: Odswiez');
+    assert.ok(notifyText(f, 'Poczekaj, az skoncze biezaca operacje'), 'toast odmowy: Odswiez');
     assert.equal(f.sent.length, sentBefore, 'Odswiez nie wysyla komendy przy blokadzie');
 
     // Szukaj (z niepustym zapytaniem): jw.
     const osoba = h.content.querySelector('.arkmail-search-row input') as { value: string };
     osoba.value = 'Bar';
     click(h, '.arkmail-search-go');
-    assert.ok(notifyText(f, 'Trwa inna operacja pocztowa'), 'toast odmowy: Szukaj');
+    assert.ok(notifyText(f, 'Poczekaj, az skoncze biezaca operacje'), 'toast odmowy: Szukaj');
     assert.equal(f.sent.length, sentBefore, 'Szukaj nie wysyla komendy przy blokadzie');
 
     // ("Wczytaj starsze" podczas petli nie istnieje w UI - petla chowa
@@ -76,12 +76,12 @@ test('Wczytaj wszystkie podczas odczytu listu = odmowa, zero komend', async () =
     const sentBefore = f.sent.length;
 
     click(h, '.arkmail-older-all');
-    assert.ok(notifyText(f, 'Trwa inna operacja pocztowa'), 'toast odmowy: Wczytaj wszystkie');
+    assert.ok(notifyText(f, 'Poczekaj, az skoncze biezaca operacje'), 'toast odmowy: Wczytaj wszystkie');
     assert.equal(f.sent.length, sentBefore, 'Wczytaj wszystkie nie startuje przy blokadzie');
 
     // Wczytaj starsze (paginacja widoczna - lista zostaje w panelu): jw.
     click(h, '.arkmail-older');
-    assert.ok(notifyText(f, 'Trwa inna operacja pocztowa'), 'toast odmowy: Wczytaj starsze');
+    assert.ok(notifyText(f, 'Poczekaj, az skoncze biezaca operacje'), 'toast odmowy: Wczytaj starsze');
     assert.equal(f.sent.length, sentBefore, 'Wczytaj starsze nie wysyla komendy przy blokadzie');
 
     // Domkniecie: pusta odpowiedz re-kotwicy (wpis "nie znaleziony")

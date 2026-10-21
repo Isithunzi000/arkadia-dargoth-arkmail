@@ -156,7 +156,7 @@ test('wczytaj wszystkie: petla stron az do konca (kotwica przesuwa sie co strone
     f.fire('Nadawca: Baz                          Pn, 1 XII 2025, 09:00:00', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(
-      () => notifyText(f, 'Wczytano wszystkie (listow: 2, stron: 2)'),
+      () => notifyText(f, 'Wczytano wszystkie (nowych listow: 2)'),
       'notify podsumowania petli',
     );
     assert.equal(content.querySelectorAll('.arkmail-entry').length, 5, '3 + 2 wpisy po merge');
@@ -189,7 +189,7 @@ test('wczytaj wszystkie: Przerwij zatrzymuje petle miedzy stronami', async () =>
     await waitRt(() => textOf(h, '.arkmail-older-all').includes('Przerwij'), 'Przerwij w petli');
 
     click(h, '.arkmail-older-all'); // = Przerwij
-    await waitRt(() => notifyText(f, 'Przerwiano (listow: 1, stron: 1)'), 'notify przerwania');
+    await waitRt(() => notifyText(f, 'Przerwano (nowych listow: 1)'), 'notify przerwania');
 
     // Pacing by minal - komendy paginacji nie leca dalej.
     await new Promise((r) => setTimeout(r, 500));
@@ -241,7 +241,7 @@ test('wczytaj wszystkie: strona bez nowych wpisow zatrzymuje petle', async () =>
     f.fire(' 2. *R* Temat: ranny dwa', 'mail');
     f.fire('Nadawca: Bar                          N, 21 XII 2025, 00:30:00', 'mail');
     f.fire('> ', 'prompt');
-    await waitRt(() => notifyText(f, 'Wczytano wszystkie (listow: 2, stron: 2)'), 'notify konca');
+    await waitRt(() => notifyText(f, 'Wczytano wszystkie (nowych listow: 2)'), 'notify konca');
 
     // Pacing by minal kilka razy - zadna kolejna komenda nie wylatuje.
     await new Promise((r) => setTimeout(r, 1200));

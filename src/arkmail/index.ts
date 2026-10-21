@@ -72,6 +72,11 @@ export const LOAD_ALL_PACE_MS = 400;
  */
 export const INDEX_PACE_MS = 800;
 /**
+ * Odmowa guarda blokady sesji (Fala 21a): jedna stala zamiast 13
+ * kopii zdania. Krotko i po ludzku.
+ */
+const SESSION_BUSY_MSG = "Poczekaj, az skoncze biezaca operacje.";
+/**
  * Timingu lotu zwierzecia pocztowego (Fala 13b). Obiekt (nie const
  * skalarne), zeby testy mogly podmienic wartosci przed init -
  * eksport ESM jest read-only z zewnatrz, wlasciwosci obiektu nie.
@@ -488,7 +493,7 @@ export async function init(api: PluginApi) {
       return entry;
     }
     if (!entry.date) {
-      notify(api, "Nie moge znalezc tego listu (brak daty) - odswiez skrzynke.");
+      notify(api, "Nie moge znalezc tego listu - odswiez skrzynke.");
       return null;
     }
     const res = await mailbox.fetch(box, olderListingCommand(box, nextDay(entry.date)));
@@ -576,7 +581,7 @@ export async function init(api: PluginApi) {
     // zakolejkowania ciezkiej petli (40 stron ruszaloby "znikad",
     // audyt race-condition 2026-10-21).
     if (lock.locked) {
-      notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+      notify(api, SESSION_BUSY_MSG);
       return;
     }
     const flag = { cancelled: false };
@@ -623,14 +628,14 @@ export async function init(api: PluginApi) {
             await sleepOrCancel(LOAD_ALL_PACE_MS, flag);
           }
           if (flag.cancelled) {
-            notify(api, `Przerwiano (listow: ${added}, stron: ${pages}).`);
+            notify(api, `Przerwano (nowych listow: ${added}).`);
           } else if (pages >= LOAD_ALL_MAX_PAGES && ui.state.boxes[box]?.truncated) {
             notify(
               api,
               `Limit ${LOAD_ALL_MAX_PAGES} stron (listow: ${added}) - kliknij ponownie, aby kontynuowac.`,
             );
           } else {
-            notify(api, `Wczytano wszystkie (listow: ${added}, stron: ${pages}).`);
+            notify(api, `Wczytano wszystkie (nowych listow: ${added}).`);
           }
         } finally {
           loadAllFlag = null;
@@ -672,7 +677,7 @@ export async function init(api: PluginApi) {
       return;
     }
     if (lock.locked) {
-      notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+      notify(api, SESSION_BUSY_MSG);
       return;
     }
     const flag = { cancelled: false };
@@ -788,7 +793,7 @@ export async function init(api: PluginApi) {
           if (flag.cancelled) {
             notify(
               api,
-              `Przerwiano indeksowanie (zindeksowane skrzynki: ${done} z ${INDEX_BOXES.length}).`,
+              `Przerwano indeksowanie (zindeksowane skrzynki: ${done} z ${INDEX_BOXES.length}).`,
             );
           } else if (skipped.length === 0) {
             rebuildContacts();
@@ -1018,14 +1023,14 @@ export async function init(api: PluginApi) {
       return;
     }
     if (lock.locked) {
-      notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+      notify(api, SESSION_BUSY_MSG);
       return;
     }
     // Fala 18c (guard, zgloszenie 2026-10-20): pusta baza BEZ kompletnego
     // indeksu = najpierw indeksacja wszystkich skrzynek (mozliwe, ze
     // poczta w ogole nie byla pobierana), potem automatycznie pobieranie.
     if (ui.state.archive.length === 0 && !allBoxesIndexed(ui.state.indexMeta)) {
-      notify(api, "Archiwum puste - najpierw indeksuje wszystkie skrzynki.");
+      notify(api, "Archiwum puste - najpierw kliknij Indeksuj wszystkie skrzynki.");
       indexContinuation = "download";
       indexAllBoxes();
       return;
@@ -1132,7 +1137,7 @@ export async function init(api: PluginApi) {
             await sleepOrCancel(LOAD_ALL_PACE_MS, flag);
           }
           if (flag.cancelled) {
-            notify(api, `Przerwiano pobieranie tresci (pobrano: ${done} z ${total}).`);
+            notify(api, `Przerwano pobieranie tresci (pobrano: ${done} z ${total}).`);
           } else if (failed === 0 && missing === 0) {
             notify(api, `Pobrano tresci do archiwum (listow: ${done}).`);
           } else {
@@ -1154,7 +1159,7 @@ export async function init(api: PluginApi) {
     onSendAnimal: () => {
       // Jak przy innych operacjach (Fala 12a): zero cichego kolejkowania.
       if (lock.locked) {
-        notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+        notify(api, SESSION_BUSY_MSG);
         return;
       }
       if (animalFlight) {
@@ -1170,7 +1175,7 @@ export async function init(api: PluginApi) {
       // operacji kolejna komenda odczytu wpadalaby w sierocy pager
       // ("Nie ma takiej komendy", log 2026-10-18). Komunikat zamiast kolejki.
       if (lock.locked) {
-        notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+        notify(api, SESSION_BUSY_MSG);
         return;
       }
       ui.setBusy(`Czytam list: ${entry.subject}...`);
@@ -1198,7 +1203,7 @@ export async function init(api: PluginApi) {
       // Bez tresci: pseudo-wpis (ctx undefined -> zawsze re-kotwica po
       // dacie) i ta sama sciezka odczytu co klik w liste skrzynki.
       if (lock.locked) {
-        notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+        notify(api, SESSION_BUSY_MSG);
         return;
       }
       ui.setBusy(`Czytam list: ${letter.subject}...`);
@@ -1245,7 +1250,7 @@ export async function init(api: PluginApi) {
         // w ogole nie byla pobierana); po pelnym indeksie "pusto"
         // znaczy faktycznie puste skrzynki.
         if (ui.state.archive.length === 0 && !allBoxesIndexed(ui.state.indexMeta)) {
-          notify(api, "Archiwum puste - najpierw indeksuje wszystkie skrzynki.");
+          notify(api, "Archiwum puste - najpierw kliknij Indeksuj wszystkie skrzynki.");
           indexContinuation = "export";
           indexAllBoxes();
           return;
@@ -1283,7 +1288,7 @@ export async function init(api: PluginApi) {
       }
       // Fala 12a: jak przy odczycie - zero cichego kolejkowania sesji.
       if (lock.locked) {
-        notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+        notify(api, SESSION_BUSY_MSG);
         return;
       }
       ui.setBusy("Wysylam list...");
@@ -1326,14 +1331,14 @@ export async function init(api: PluginApi) {
     // zero cichego kolejkowania komend (audyt race 2026-10-21).
     onRefreshBox: (box) => {
       if (lock.locked) {
-        notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+        notify(api, SESSION_BUSY_MSG);
         return;
       }
       refreshBoxes([box]);
     },
     onLoadOlder: (box) => {
       if (lock.locked) {
-        notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+        notify(api, SESSION_BUSY_MSG);
         return;
       }
       loadOlder(box);
@@ -1341,7 +1346,7 @@ export async function init(api: PluginApi) {
     onLoadAll: (box) => loadAll(box),
     onSearch: (box, query) => {
       if (lock.locked) {
-        notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+        notify(api, SESSION_BUSY_MSG);
         return;
       }
       ui.setBusy(`Szukam w skrzynce ${box}...`);
@@ -1378,20 +1383,20 @@ export async function init(api: PluginApi) {
     // sa cache, tylko preferencje.
     onClearCache: () => {
       if (lock.locked) {
-        notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+        notify(api, SESSION_BUSY_MSG);
         return;
       }
       storage.remove(ARCHIVE_KEY);
       ui.clearCacheData();
-      notify(api, "Pamiec podreczna wyczyszczona - skrzynki pobiora sie na nowo.");
+      notify(api, "Zapisane dane wyczyszczone.");
     },
     onDeleteLetter: (box, entry) => {
       // Fala 12a: zero cichego kolejkowania sesji modalnych.
       if (lock.locked) {
-        notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+        notify(api, SESSION_BUSY_MSG);
         return;
       }
-      ui.setBusy(`Kasuje list: ${entry.subject}...`);
+      ui.setBusy(`Usuwam list: ${entry.subject}...`);
       void lock
         .runExclusive(async () => {
           const fresh = await resolveEntry(box, entry);
@@ -1421,7 +1426,7 @@ export async function init(api: PluginApi) {
     onForwardLetter: (box, entry, adresat) => {
       // Fala 12a: zero cichego kolejkowania sesji modalnych.
       if (lock.locked) {
-        notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+        notify(api, SESSION_BUSY_MSG);
         return;
       }
       ui.setBusy(`Przekazuje list: ${entry.subject}...`);

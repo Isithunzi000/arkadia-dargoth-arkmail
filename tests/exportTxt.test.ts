@@ -272,7 +272,7 @@ test('archiwum: Zapisz wszystkie TXT pobiera ZIP per-list, puste archiwum = toas
     // baza = najpierw automatyczna indeksacja skrzynek, nie martwy
     // toast. Dopiero po pelnym indeksie "pusto" = faktycznie puste
     // skrzynki.
-    await waitRt(() => notifyText(f, 'najpierw indeksuje'), 'guard: indeksacja przed eksportem');
+    await waitRt(() => notifyText(f, 'najpierw kliknij Indeksuj'), 'guard: indeksacja przed eksportem');
     await waitRt(() => f.sent.includes('listy odebrane'), 'guard: indeksuje odebrane');
     f.fire('Nie masz zadnych odebranych listow.', 'mail');
     await waitRt(() => f.sent.includes('listy nieprzeczytane'), 'guard: indeksuje nieprzeczytane');

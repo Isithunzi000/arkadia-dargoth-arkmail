@@ -150,7 +150,7 @@ test('klik w list w trakcie innej operacji: komunikat zamiast cichej kolejki', a
       'strona loadAll w toku',
     );
     click(h, '.arkmail-entry'); // klik w trakcie blokady sesji
-    await waitFor(() => notifyText(f, 'Trwa inna operacja'), 'komunikat o zajetej sesji');
+    await waitFor(() => notifyText(f, 'Poczekaj, az skoncze biezaca operacje'), 'komunikat o zajetej sesji');
     assert.ok(
       !f.sent.includes('przeczytaj list 1'),
       'klik nie skolejkowal komendy odczytu',
