@@ -155,10 +155,15 @@ test('skrzynka z mieleniem kotwicy jest pomijana, reszta dojezdza, raport ja wym
     await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksacja: niewyslane po pominieciu');
     f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
     // Raport: niekompletne, wymienia wyslane z powodem; brama kontaktow
-    // nadal zamknieta (3/4 flagi).
+    // nadal zamknieta (3/4 flagi). Fala 20c: powod PO LUDZKU, zero
+    // zargonu ("kotwica", "postep") w komunikatach dla gracza.
     await waitRt(
-      () => notifyText(f, 'pominiete: wyslane (kotwica bez postepu)'),
+      () => notifyText(f, 'pominiete: wyslane (serwer powtarzal te sama strone - sprobuj ponownie)'),
       'raport z powodem pomieciecia',
+    );
+    assert.ok(
+      !notifyText(f, 'kotwica') && !notifyText(f, 'postepu'),
+      'raport bez zargonu technicznego',
     );
     await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji');
     click(h, '[data-tab="kontakty"]');

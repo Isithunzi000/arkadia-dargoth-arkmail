@@ -717,7 +717,11 @@ export async function init(api: PluginApi) {
                     );
                     continue;
                   }
-                  skipWhy = "kotwica bez postepu";
+                  // Fala 20c: powod pomieciecia PO LUDZKU - gracz nie
+                  // zna "kotwic" ani "postepu". Mielenie potwierdzone
+                  // dopiero po retry (Fala 20b), wiec komunikat mowi
+                  // prawde: serwer powtarzal te sama strone.
+                  skipWhy = "serwer powtarzal te sama strone - sprobuj ponownie";
                   break;
                 }
                 anchorRetried = false;
