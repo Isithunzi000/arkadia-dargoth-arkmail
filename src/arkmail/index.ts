@@ -512,19 +512,21 @@ export async function init(api: PluginApi) {
 
   /** Paginacja wstecz: jedna starsza strona listingow do archiwum. */
   const loadOlder = (box: MailBox): void => {
-    const view = ui.state.boxes[box];
-    const oldest = oldestEntry(view?.entries ?? []);
-    if (!oldest?.date) {
-      notify(api, "Nie mozna wczytac starszych - najpierw pobierz skrzynke.");
-      return;
-    }
-    // Kotwica: najstarsza data + 1 dzien ("przed" wyklucza caly dzien
-    // graniczny; nakladanie zamiast dziur, duplikaty zdejmuje dedup).
-    const anchor = nextDay(oldest.date);
     ui.setBusy("Wczytuje starsze listy...");
     void lock
       .runExclusive(async () => {
-        const res = await mailbox.fetch(box, olderListingCommand(box, anchor));
+        // Fala 20e: kotwica liczona POD blokada, ze swiezego widoku
+        // (porzadek jeden: stan czytamy po wejsciu do sesji, nie przed).
+        const view = ui.state.boxes[box];
+        const oldest = oldestEntry(view?.entries ?? []);
+        if (!oldest?.date) {
+          notify(api, "Nie mozna wczytac starszych - najpierw pobierz skrzynke.");
+          return;
+        }
+        // Kotwica: najstarsza data + 1 dzien ("przed" wyklucza caly
+        // dzien graniczny; nakladanie zamiast dziur, dedup zdejmuje
+        // duplikaty).
+        const res = await mailbox.fetch(box, olderListingCommand(box, nextDay(oldest.date)));
         if (res.kind === "lista") {
           stampEntries(box, res.entries);
           ui.appendMailboxPage(box, res.entries, res.header.truncated);
@@ -567,6 +569,14 @@ export async function init(api: PluginApi) {
   const loadAll = (box: MailBox): void => {
     if (loadAllFlag) {
       loadAllFlag.cancelled = true;
+      return;
+    }
+    // Fala 20e: guard PO fladze cancel - drugi klik wlasnej petli to
+    // Przerwij, nie odmowa. Przy cudzej sesji: odmowa zamiast cichego
+    // zakolejkowania ciezkiej petli (40 stron ruszaloby "znikad",
+    // audyt race-condition 2026-10-21).
+    if (lock.locked) {
+      notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
       return;
     }
     const flag = { cancelled: false };
@@ -1310,10 +1320,30 @@ export async function init(api: PluginApi) {
         .finally(() => ui.setBusy(null));
     },
     onCloseLetter: () => ui.closeLetter(),
-    onRefreshBox: (box) => refreshBoxes([box]),
-    onLoadOlder: (box) => loadOlder(box),
+    // Fala 20e: guardy w handlerach, NIE w refreshBoxes - wewnetrzny
+    // refresh po wysylce/kasowaniu kolejkuje celowo (wołany z wnetrza
+    // sesji). Klik gracza przy zajetej blokadzie: odmowa z toastem,
+    // zero cichego kolejkowania komend (audyt race 2026-10-21).
+    onRefreshBox: (box) => {
+      if (lock.locked) {
+        notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+        return;
+      }
+      refreshBoxes([box]);
+    },
+    onLoadOlder: (box) => {
+      if (lock.locked) {
+        notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+        return;
+      }
+      loadOlder(box);
+    },
     onLoadAll: (box) => loadAll(box),
     onSearch: (box, query) => {
+      if (lock.locked) {
+        notify(api, "Trwa inna operacja pocztowa - poczekaj na jej koniec.");
+        return;
+      }
       ui.setBusy(`Szukam w skrzynce ${box}...`);
       void lock
         .runExclusive(async () => {
