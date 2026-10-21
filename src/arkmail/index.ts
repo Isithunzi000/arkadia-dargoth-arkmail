@@ -64,12 +64,22 @@ export const LOAD_ALL_MAX_PAGES = 40;
 export const WIDE_MIN_WIDTH = 900;
 export const LOAD_ALL_PACE_MS = 400;
 /**
- * Fala 20d: tempo stron w INDEKSACJI (zgloszenie 2026-10-21). Petla
- * mieli az 4 skrzynki po sobie - 400 ms/strone mloci wolny serwer
- * (throttle "Listy sa w tej chwili ladowane."). Reczne loadAll
- * zostaje przy LOAD_ALL_PACE_MS (gracz czeka i widzi postep).
+ * Fala 20d podniosla tempo stron w INDEKSACJI do 800 ms (zgloszenie
+ * 2026-10-21: 400 ms/strone mlocilo wolny serwer - throttle "Listy
+ * sa w tej chwili ladowane."). Fala 24d zdejmuje przyczyne: duplikat
+ * strony dostaje proby z klepnieciem (INDEX_ANCHOR_RETRY_WAITS_MS),
+ * wiec tempo wraca do 400 ms - tyle co reczne loadAll.
  */
-export const INDEX_PACE_MS = 800;
+export const INDEX_PACE_MS = 400;
+/**
+ * Fala 24d: proby powtorki kotwicy po duplikacie strony w indeksacji
+ * (zgloszenie 2026-10-21 "pominiete wyslane / 3-4"). Kazda proba:
+ * pauza (2,5 s, potem 4 s) + klepniecie listingu bazowego (odswieza
+ * kontekst listingu serwera, Fala 14f: jeden globalny listing) i
+ * dopiero powtorka kotwicy. Duplikat po wyczerpaniu prob = serwer
+ * muli, skrzynka pomijana.
+ */
+export const INDEX_ANCHOR_RETRY_WAITS_MS = [2500, 4000, 4000];
 /**
  * Odmowa guarda blokady sesji (Fala 21a): jedna stala zamiast 13
  * kopii zdania. Krotko i po ludzku.
@@ -730,12 +740,13 @@ export async function init(api: PluginApi) {
             let pages = 0;
             let complete = false;
             let skipWhy: string | null = null;
-            // Fala 20b: pojedynczy duplikat strony to incydent (np.
-            // powtorka odpowiedzi serwera), nie mielenie - kotwice
-            // powtarzamy RAZ po pauzie; dopiero drugi duplikat z rzedu
-            // potwierdza mielenie (zgloszenie 2026-10-21 "pominiete
-            // wyslane / 3-4").
-            let anchorRetried = false;
+            // Fala 24d: duplikat strony to zwykle incydent (powtorka
+            // odpowiedzi serwera albo zdewanieowany kontekst listingu),
+            // nie trwale mielenie - kotwice powtarzamy do 3 razy, przed
+            // kazda proba pauza i klepniecie listingu bazowego
+            // (INDEX_ANCHOR_RETRY_WAITS_MS). Dopiero duplikat po
+            // wyczerpaniu prob potwierdza mielenie.
+            let anchorRetries = 0;
             let res = await mailbox.fetch(box);
             for (;;) {
               if (res.kind === "lista") {
@@ -755,14 +766,20 @@ export async function init(api: PluginApi) {
                   break;
                 }
                 if (freshCount === 0) {
-                  if (!anchorRetried) {
-                    anchorRetried = true;
+                  const attempt = anchorRetries;
+                  if (attempt < INDEX_ANCHOR_RETRY_WAITS_MS.length) {
+                    anchorRetries += 1;
                     const oldestDup = oldestEntry(all);
                     if (!oldestDup?.date) {
                       skipWhy = "brak daty w wpisach";
                       break;
                     }
-                    await sleepOrCancel(INDEX_PACE_MS * 2, flag);
+                    await sleepOrCancel(INDEX_ANCHOR_RETRY_WAITS_MS[attempt]!, flag);
+                    if (flag.cancelled) break;
+                    // Fala 24d: klepniecie - swiezy listing bazowy
+                    // odswieza kontekst listingu serwera (Fala 14f),
+                    // dopiero potem powtorka kotwicy. Wynik pomijany.
+                    await mailbox.fetch(box);
                     if (flag.cancelled) break;
                     res = await mailbox.fetch(
                       box,
@@ -770,14 +787,13 @@ export async function init(api: PluginApi) {
                     );
                     continue;
                   }
-                  // Fala 20c: powod pomieciecia PO LUDZKU - gracz nie
-                  // zna "kotwic" ani "postepu". Mielenie potwierdzone
-                  // dopiero po retry (Fala 20b), wiec komunikat mowi
-                  // prawde: serwer powtarzal te sama strone.
-                  skipWhy = "serwer powtarzal te sama strone - sprobuj ponownie";
+                  // Fala 20c/24d: powod pomieciecia PO LUDZKU - gracz
+                  // nie zna "kotwic" ani "postepu". Mielenie potwierdza
+                  // dopiero duplikat po wyczerpaniu prob z klepnieciem.
+                  skipWhy = "serwer chwilowo muli - sprobuj ponownie za chwile";
                   break;
                 }
-                anchorRetried = false;
+                anchorRetries = 0;
                 if (pages >= LOAD_ALL_MAX_PAGES) {
                   skipWhy = `limit ${LOAD_ALL_MAX_PAGES} stron`;
                   break;

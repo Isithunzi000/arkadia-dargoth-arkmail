@@ -16,6 +16,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { INDEX_PACE_MS, INDEX_ANCHOR_RETRY_WAITS_MS } from '../src/arkmail/index';
 import {
   startHarness,
   stopHarness,
@@ -110,7 +111,7 @@ test('pusta strona kotwicowa (reason "filtr") domyka skrzynke z flaga', async ()
   }
 });
 
-test('skrzynka z mieleniem kotwicy jest pomijana, reszta dojezdza, raport ja wymienia', async () => {
+test('skrzynka z mieleniem kotwicy: 3 proby z klepnieciem, potem pomijana, raport ja wymienia (Fala 24d)', async () => {
   const h = await startHarness();
   const { f } = h;
   try {
@@ -143,28 +144,60 @@ test('skrzynka z mieleniem kotwicy jest pomijana, reszta dojezdza, raport ja wym
     };
     replaySameWyslane();
     await waitRt(() => f.sent.includes('listy wyslane przed 21 XII 2025'), 'kotwica wyslane');
-    replaySameWyslane(); // identyczna strona = freshCount 0
-    // Fala 20b: pojedynczy duplikat to incydent - plugin powtarza
-    // kotwice RAZ; dopiero drugi duplikat z rzedu potwierdza mielenie.
-    await waitRt(
-      () => f.sent.filter((c) => c === 'listy wyslane przed 21 XII 2025').length === 2,
-      'retry kotwicy wyslane',
-    );
-    replaySameWyslane(); // drugi duplikat z rzedu = trwale mielenie
+    // Fala 24d: kazdy duplikat strony dostaje probe: pauza (2,5 s, potem
+    // 4 s) + klepniecie listingu bazowego (odswieza kontekst serwera),
+    // dopiero potem powtorka kotwicy. Trzy proby; czwarty duplikat
+    // z rzedu = serwer muli, skrzynka pomijana.
+    const proba = async (nr: number) => {
+      replaySameWyslane(); // duplikat strony kotwicowej (freshCount 0)
+      await waitRt(
+        () => f.sent.filter((c) => c === 'listy wyslane').length === 1 + nr,
+        `klepniecie ${nr} (listing bazowy wyslane)`,
+      );
+      replaySameWyslane(); // odpowiedz na klepniecie (wynik pomijany)
+      await waitRt(
+        () => f.sent.filter((c) => c === 'listy wyslane przed 21 XII 2025').length === 1 + nr,
+        `powtorka kotwicy ${nr}`,
+      );
+    };
+    await proba(1);
+    await proba(2);
+    await proba(3);
+    replaySameWyslane(); // czwarty duplikat z rzedu = trwale mielenie
     // niewyslane: puste - pominiecie wyslanych nie moze zabic petli.
+    // (prolog NIE pobiera niewyslanych - pierwsze 'listy niewyslane'
+    // jest z indeksacji).
     await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksacja: niewyslane po pominieciu');
     f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
     // Raport: niekompletne, wymienia wyslane z powodem; brama kontaktow
     // nadal zamknieta (3/4 flagi). Fala 20c: powod PO LUDZKU, zero
     // zargonu ("kotwica", "postep") w komunikatach dla gracza.
     await waitRt(
-      () => notifyText(f, 'pominiete: wyslane (serwer powtarzal te sama strone - sprobuj ponownie)'),
+      () => notifyText(f, 'pominiete: wyslane (serwer chwilowo muli - sprobuj ponownie za chwile)'),
       'raport z powodem pomieciecia',
     );
     assert.ok(
       !notifyText(f, 'kotwica') && !notifyText(f, 'postepu'),
       'raport bez zargonu technicznego',
     );
+    // Fala 24d: test trwa > 10 s (pauzy prob 2,5 + 4 + 4 s), wiec z
+    // prologu odpala sie opozniony retry skrzynki odbiorczej
+    // (DELAYED_INBOX_RETRY_MS = 10 s) - kolejkuje sie pod blokada i
+    // wychodzi po indeksacji. Odpowiadamy na niego, inaczej pasek
+    // busy nigdy nie zniknie.
+    await waitRt(
+      () => f.sent.filter((c) => c === 'listy odebrane').length === 3,
+      'opozniony retry: odebrane',
+    );
+    f.fire('Listy odebrane:', 'mail');
+    f.fire(' 1. *R* Temat: srodkowy', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('> ', 'prompt');
+    await waitRt(
+      () => f.sent.filter((c) => c === 'listy nieprzeczytane').length === 3,
+      'opozniony retry: nieprzeczytane',
+    );
+    f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
     await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji');
     click(h, '[data-tab="kontakty"]');
     await waitRt(() => !!h.content.querySelector('.arkmail-index-all'), 'brama nadal obecna');
@@ -177,11 +210,18 @@ test('skrzynka z mieleniem kotwicy jest pomijana, reszta dojezdza, raport ja wym
   }
 });
 
-test('tempo stron w indeksacji: pauza przed kotwica >= 800 ms (Fala 20d)', async () => {
-  // Serwer Arkadii jest wolny; indeksacja mieli az 4 skrzynki po sobie
-  // - tempo 400 ms/strone mloci serwer (throttle "Listy sa w tej
-  // chwili ladowane.", zgloszenie 2026-10-21). Indeksacja: 800 ms
-  // miedzy stronami; reczne loadAll zostaje przy 400 ms.
+test('tempo stron w indeksacji: 400 ms miedzy stronami (Fala 24d)', async () => {
+  // Fala 20d podniosla tempo indeksacji do 800 ms, bo petla mielila
+  // wolny serwer (throttle "Listy sa w tej chwili ladowane.",
+  // zgloszenie 2026-10-21). Fala 24d zdejmuje przyczyne: duplikat
+  // strony dostaje do 3 prob z klepnieciem listingu bazowego i pauzami
+  // 2,5 s -> 4 s, wiec tempo stron wraca do 400 ms (jak loadAll).
+  assert.equal(INDEX_PACE_MS, 400, 'stala tempa indeksacji');
+  assert.deepEqual(
+    INDEX_ANCHOR_RETRY_WAITS_MS,
+    [2500, 4000, 4000],
+    'pauzy prob powtorki kotwicy (Fala 24d)',
+  );
   const h = await startHarness();
   const { f } = h;
   try {
@@ -200,7 +240,7 @@ test('tempo stron w indeksacji: pauza przed kotwica >= 800 ms (Fala 20d)', async
     const t0 = Date.now();
     await waitRt(() => f.sent.includes('listy odebrane przed 22 XII 2025'), 'kotwica odebrane');
     const dt = Date.now() - t0;
-    assert.ok(dt >= 750, `pauza przed kotwica ${dt} ms < 750 ms`);
+    assert.ok(dt >= 350, `pauza przed kotwica ${dt} ms < 350 ms`);
     // Domkniecie: kotwica pusta, reszta skrzynek pusta - czysty koniec.
     f.fire('Nie znaleziono zadnych takich odebranych listow.', 'mail');
     await waitRt(
@@ -218,11 +258,13 @@ test('tempo stron w indeksacji: pauza przed kotwica >= 800 ms (Fala 20d)', async
   }
 });
 
-test('incydentalny duplikat strony kotwicowej: retry ratuje skrzynke (Fala 20b)', async () => {
+test('incydentalny duplikat strony kotwicowej: klepniecie + retry ratuja skrzynke (Fala 24d)', async () => {
   // Zgloszenie 2026-10-21 "pominiete wyslane / 3-4": duplikat strony
   // (np. powtorka odpowiedzi serwera) byl traktowany jak trwale
-  // mielenie kotwicy i skrzynka byla pomijana. Jeden duplikat =
-  // incydent (retry kotwicy); dopiero drugi z rzedu = mielenie.
+  // mielenie kotwicy i skrzynka byla pomijana. Fala 20b: jeden
+  // duplikat = incydent (retry kotwicy). Fala 24d: przed powtorka
+  // kotwicy plugin klepie listing bazowy (odswieza kontekst serwera,
+  // Fala 14f) po pauzie 2,5 s; do 3 prob, potem pominiecie.
   const h = await startHarness();
   const { f } = h;
   try {
@@ -255,10 +297,25 @@ test('incydentalny duplikat strony kotwicowej: retry ratuje skrzynke (Fala 20b)'
     await waitRt(() => f.sent.includes('listy wyslane przed 21 XII 2025'), 'kotwica wyslane');
     // ...kotwica #1: DUPLIKAT strony (incydent, freshCount 0)...
     pageOne();
-    // ...plugin powtarza kotwice zamiast pomijac skrzynke...
+    // ...plugin NIE powtarza kotwicy od razu: najpierw pauza 2,5 s
+    // i klepniecie listingu bazowego (kolejnosc komend ma znaczenie).
+    const t0 = Date.now();
+    await waitRt(
+      () => f.sent.filter((c) => c === 'listy wyslane').length === 2,
+      'klepniecie listingu bazowego przed powtorka kotwicy',
+    );
+    const dt = Date.now() - t0;
+    assert.ok(dt >= 2400, `pauza przed klepnieciem ${dt} ms < 2400 ms`);
+    assert.equal(
+      f.sent.filter((c) => c === 'listy wyslane przed 21 XII 2025').length,
+      1,
+      'powtorka kotwicy dopiero PO klepnieciu',
+    );
+    pageOne(); // odpowiedz na klepniecie (wynik pomijany)
+    // ...dopiero teraz powtorka kotwicy...
     await waitRt(
       () => f.sent.filter((c) => c === 'listy wyslane przed 21 XII 2025').length === 2,
-      'retry kotwicy po duplikacie',
+      'retry kotwicy po klepnieciu',
     );
     // ...kotwica #2: dobra strona z NOWYM wpisem (truncated)...
     f.fire('Listy wyslane (prezentowane jest pierwsze 50):', 'mail');
