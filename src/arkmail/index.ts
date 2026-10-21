@@ -21,6 +21,7 @@ import {
 import type { MailBox } from "./core/protocol/types";
 import { parseNotification, extractPagerPrompt, parseMailDate } from "./core/protocol/parser";
 import { isEchoLine } from "./core/session/lines";
+import { clearPagerOrphan, isPagerOrphanSuspected } from "./core/session/orphanPager";
 import {
   olderListingCommand,
   nextDay,
@@ -74,6 +75,14 @@ export const INDEX_PACE_MS = 800;
  * kopii zdania. Krotko i po ludzku.
  */
 const SESSION_BUSY_MSG = "Poczekaj, az skoncze biezaca operacje.";
+
+/**
+ * Fala 24g: komendy gracza wchodzace w tryb poczty (ich pager jest
+ * legalny - straznik sierot go nie rusza). Wersje skrocone obslugiwane
+ * przez serwer: "list N" (log 2026-10-21), "listy <skrzynka>",
+ * "przeczytaj list N", "poczta". Dopasowanie po prefiksie slowa.
+ */
+const MAIL_ENTRY_CMD_RE = /^\s*(?:list\b|listy\b|przec\w*|poczt\w*)/i;
 /**
  * Timingu lotu zwierzecia pocztowego (Fala 13b). Obiekt (nie const
  * skalarne), zeby testy mogly podmienic wartosci przed init -
@@ -1451,22 +1460,37 @@ export async function init(api: PluginApi) {
     },
   };
 
-  // Fala 11g: straznik sierocych pagerow. Prompt pagera poza transakcja
-  // (blokada sesji wolna) = pager otwarty na serwerze bez naszej kontroli
-  // (np. timeout sesji przed wyslaniem "q"). Taki pager konsumuje
-  // WSZYSTKIE komendy gracza - zamykamy go automatycznym "q".
-  // Fala 12a: extractPagerPrompt - prompt sklejony z inna trescia
-  // (np. z odrzuceniem pagera w jednej linii) tez wyzwala straznika.
+  // Straznik sierocych pagerow (Fala 11g, przebudowa Fala 24g).
+  // Sierocy pager (po awarii NASZEJ sesji) konsumuje WSZYSTKIE komendy
+  // gracza az do "q" - zamykamy go automatycznie. Ale prompt pagera
+  // serwera jest identyczny z promptem trybu czytania poczty otwartego
+  // RECZNIE przez gracza ("[1-50 ...] (aktualny: N) -- ") - Fala 11g
+  // strzelala "q" na sam widok promptu i zabijala reczne sesje (log
+  // 2026-10-21: "d" ladowalo jako ruch na dol, "?" dawalo pomoc gry
+  // zamiast pomocy edytora; gracz musial odinstalowac wtyczke, zeby
+  // skasowac list). Dlatego straznik odpala "q" WYLACZNIE przy
+  // pozytywnym podejrzeniu (core/session/orphanPager.ts): flage stawiaja
+  // awaryjne konce wlasnych sesji, zdejmuje kazda udana transakcja,
+  // echo komendy pocztowej gracza i wyslanie "q" przez straznika.
   let lastWatchdogQ = 0;
   transport.subscribe((line) => {
-    if (line.cls === "command" || isEchoLine(line.text)) return;
+    if (line.cls === "command" || isEchoLine(line.text)) {
+      // Komenda gracza wchodzaca w tryb poczty: jego pager jest legalny
+      // (a gdyby sierota istniala, zjadlaby te komende i straznik
+      // domknie ja przy promptcie - tutaj czyscimy tylko prewencyjnie).
+      const cmd = isEchoLine(line.text) ? line.text.replace(/^→\s*/, "") : line.text;
+      if (MAIL_ENTRY_CMD_RE.test(cmd)) clearPagerOrphan();
+      return;
+    }
     if (!extractPagerPrompt(line.text)) return;
-    console.error("WATCHDOG locked=", lock.locked);
     if (lock.locked) return; // legalna sesja pagerowa pod blokada
+    if (!isPagerOrphanSuspected()) return; // sesja gracza - nietknieta
     const now = Date.now();
     if (now - lastWatchdogQ < 2000) return; // cooldown: jedno q na serie
     lastWatchdogQ = now;
     transport!.send("q");
+    // "q" to komenda-wyjscie pagera - po jej wyslaniu sieroty nie ma.
+    clearPagerOrphan();
   });
 
   // Powiadomienia pocztowe: odswiezenie + opcjonalny tost.

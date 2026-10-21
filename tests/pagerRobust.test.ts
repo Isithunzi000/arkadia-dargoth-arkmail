@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 
 import { MockTransport, type ProtoLine } from '../src/arkmail/core/session/transport';
 import { PagerSession } from '../src/arkmail/core/session/pager';
+import { suspectPagerOrphan, clearPagerOrphan } from '../src/arkmail/core/session/orphanPager';
 import {
   startHarness,
   stopHarness,
@@ -120,11 +121,14 @@ test('timeout sesji wysyla q przed porzuceniem (zero sierocych pagerow)', async 
   );
 });
 
-test('straznik: sklejony prompt pagera poza blokada -> automatyczne q', async () => {
+test('straznik: sklejony prompt pagera przy podejrzeniu sieroty -> automatyczne q', async () => {
   const h = await startHarness();
   const { f, waitFor } = h;
   try {
     await loadTruncatedBox(h);
+    // Fala 24g: straznik odpala q WYLACZNIE przy pozytywnym podejrzeniu
+    // (prompt bez podejrzenia = reczna sesja gracza, nietknieta).
+    suspectPagerOrphan();
     const qBefore = f.sent.filter((c) => c === 'q').length;
     f.fire(
       '[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- Nie ma takiej komendy. Wpisz "?", zeby uzyskac pomoc albo "q", zeby wyjsc.',
@@ -135,6 +139,7 @@ test('straznik: sklejony prompt pagera poza blokada -> automatyczne q', async ()
       'straznik wyslal q na sklejony prompt',
     );
   } finally {
+    clearPagerOrphan();
     await stopHarness();
   }
 });

@@ -24,6 +24,7 @@ import type {
   MailDate,
 } from '../protocol/types.js';
 import { isEchoLine, isPromptLine } from './lines.js';
+import { clearPagerOrphan, suspectPagerOrphan } from './orphanPager.js';
 import type { ProtoLine, Transport } from './transport.js';
 
 /** Linie-bledy serwera przerywajace transakcje (log 2026-10-17/18). */
@@ -106,6 +107,9 @@ export class MailboxSession {
       };
       const finish = (r: MailboxResult) => {
         cleanup();
+        // Fala 24g: listing doszedl = komendy docieraja do serwera,
+        // sieroty nie ma - zdejmij podejrzenie straznika.
+        clearPagerOrphan();
         resolve(r);
       };
 
@@ -119,6 +123,10 @@ export class MailboxSession {
       };
 
       const timer = setTimeout(() => {
+        // Fala 24g: timeout w stanie awaitingPromptAfterQ = wyslalismy
+        // "q" do sieroty i nie doczekalismy sie potwierdzenia - pager
+        // moze trwac. Podejrzenie dla straznika.
+        if (awaitingPromptAfterQ) suspectPagerOrphan();
         cleanup();
         reject(new Error(`timeout: mailbox fetch ${box}`));
       }, this.opts.timeoutMs);
@@ -170,6 +178,10 @@ export class MailboxSession {
           // trescia w jednej linii (klient trzyma linie bez \n).
           if (extractPagerPrompt(line.text)) {
             if (pagerRetried) {
+              // Fala 24g: sierota przetrwala pierwsze "q" i odpowiedziala
+              // kolejnym promptem - trwa nadal. Podejrzenie dla
+              // straznika (domknie ja przy kolejnym promptcie).
+              suspectPagerOrphan();
               cleanup();
               reject(new Error(`sierocy pager podczas fetch ${box}`));
               return;

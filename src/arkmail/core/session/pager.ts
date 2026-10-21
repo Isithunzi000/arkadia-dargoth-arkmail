@@ -17,6 +17,7 @@ import {
 } from '../protocol/parser.js';
 import type { MailError, PagerPrompt } from '../protocol/types.js';
 import { isEchoLine, isPromptLine } from './lines.js';
+import { clearPagerOrphan, suspectPagerOrphan } from './orphanPager.js';
 import type { ProtoLine, Transport } from './transport.js';
 import type { SessionOptions } from './mailbox.js';
 
@@ -182,6 +183,9 @@ export class PagerSession {
           reject(new Error(`pager session list ${numer}: przerwano`));
           return;
         }
+        // Fala 24g: czyste zamkniecie transakcji = komendy dochodza,
+        // sieroty po nas nie ma - zdejmij podejrzenie straznika.
+        clearPagerOrphan();
         resolve(build(letter, pager));
       };
 
@@ -250,7 +254,12 @@ export class PagerSession {
        * Prompt gry w grace = serwer jednak odpowiedzial -> finish().
        */
       const timer = setTimeout(() => {
+        // Fala 24g: timeout z pagerem (byc moze) otwartym na serwerze -
+        // "q" wyslane, ale bez potwierdzenia. Straznik dostaje
+        // podejrzenie: przy najblizszym promptcie pagera poza sesja
+        // domknie sierote (bez podejrzenia prompt = sesja gracza).
         if (state === 'closing') {
+          suspectPagerOrphan();
           cleanup();
           reject(new Error(`timeout: pager session list ${numer}`));
           return;
@@ -264,6 +273,7 @@ export class PagerSession {
           /* transport martwy - i tak porzucamy sesje */
         }
         graceTimer = setTimeout(() => {
+          suspectPagerOrphan();
           cleanup();
           reject(new Error(`timeout: pager session list ${numer}`));
         }, Math.max(idleMs, 400));
@@ -307,6 +317,10 @@ export class PagerSession {
           // Kazde odrzucenie zamykamy "q" - sierota nie zostaje po nas.
           this.transport.send('q');
           if (retried) {
+            // Fala 24g: drugie odrzucenie = pager przetrwal pierwsze
+            // "q"; drugie wlasnie poszlo bez potwierdzenia - sierota
+            // moze trwac. Podejrzenie dla straznika.
+            suspectPagerOrphan();
             cleanup();
             reject(new Error(`pager session list ${numer}: odrzucono przez sierocy pager`));
             return;
