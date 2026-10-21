@@ -413,6 +413,10 @@ export function mountMailUi(
     const clearBtn = doc.createElement('button');
     clearBtn.className = 'arkmail-cache-clear';
     clearBtn.textContent = 'Wyczysc zapisane dane';
+    // Fala 24h (zgloszenie 2026-10-21): zakres czyszczenia w tooltipie
+    // przycisku zamiast stalego napisu pod paskiem operacji (napis
+    // wisualnie zasmiecal kazda skrzynke).
+    clearBtn.setAttribute('title', 'Kasuje listy i kontakty. Ustawienia zostaja.');
     let clearArmed = false;
     let clearTimer: ReturnType<typeof setTimeout> | null = null;
     clearBtn.addEventListener('click', () => {
@@ -432,12 +436,8 @@ export function mountMailUi(
     });
     ops.appendChild(clearBtn);
     pane.appendChild(ops);
-    // Fala 21b: co dokladnie kasuje ten przycisk ("pamiec podreczna"
-    // nic nie mowila graczowi).
-    const clearDim = doc.createElement('div');
-    clearDim.className = 'arkmail-dim';
-    clearDim.textContent = 'Kasuje listy i kontakty. Ustawienia zostaja.';
-    pane.appendChild(clearDim);
+    // Fala 21b/24h: zakres czyszczenia wyjasniony w tooltipie przycisku
+    // (powyzej), bez stalego napisu w panelu.
 
     // Przelacznik powiadomien o nowej poczcie (trwale w storage).
     const notifyRow = doc.createElement('label');

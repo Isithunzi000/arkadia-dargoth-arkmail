@@ -99,6 +99,32 @@ test('store: clearCacheData czysci widoki/archiwum/kontakty, zachowuje ustawieni
   assert.ok(s.state.letter, 'otwarty list nietkniety');
 });
 
+test('ui: zakres czyszczenia jako tooltip przycisku, nie staly napis (Fala 24h)', () => {
+  const s = new MailUiStore({ tab: 'listy' });
+  const { container } = mount(s);
+  const btn = q(container, '.arkmail-cache-clear');
+  assert.ok(btn, 'przycisk w pasku operacji');
+  // Fala 24h (zgloszenie 2026-10-21): informacja "Kasuje listy
+  // i kontakty. Ustawienia zostaja." ma byc tooltipem przycisku,
+  // nie stalym napisem pod paskiem operacji skrzynki.
+  assert.equal(
+    btn!.getAttribute('title'),
+    'Kasuje listy i kontakty. Ustawienia zostaja.',
+    'zakres czyszczenia w tooltipie przycisku',
+  );
+  const pane = q(container, '.arkmail-pane');
+  assert.ok(pane, 'panel skrzynki');
+  const dims = Array.from(
+    (pane as unknown as { querySelectorAll(s: string): unknown[] }).querySelectorAll(
+      '.arkmail-dim',
+    ),
+  ) as HTMLElement[];
+  assert.ok(
+    !dims.some((d) => (d.textContent ?? '').includes('Kasuje listy i kontakty')),
+    'brak stalego napisu o zakresie czyszczenia w panelu',
+  );
+});
+
 test('ui: przycisk czysci dopiero po drugim kliku (potwierdzenie)', () => {
   const s = new MailUiStore({ tab: 'listy' });
   const { container, calls } = mount(s);
