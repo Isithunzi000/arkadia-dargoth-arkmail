@@ -97,6 +97,9 @@ test('"Slucham?" po potwierdzeniu wyslania (Wysylasz) nie konczy lotu', async ()
     h.f.fire('Wsrod trzepotu skrzydel Kruk laduje na twoim prawym ramieniu.', 'mail');
     await answerEmpty(h, 'odebrane');
     await answerEmpty(h, 'nieprzeczytane');
+    // Fala 24f1: powrot odswieza tez niewyslane i wyslane.
+    await answerEmpty(h, 'niewyslane');
+    await answerEmpty(h, 'wyslane');
     await waitIdle(h);
   } finally {
     await stopHarness();
@@ -118,6 +121,9 @@ test('"Slucham?" po zamknieciu okna nie konczy lotu', async () => {
     h.f.fire('Wsrod trzepotu skrzydel Kruk laduje na twojej rece.', 'mail');
     await answerEmpty(h, 'odebrane');
     await answerEmpty(h, 'nieprzeczytane');
+    // Fala 24f1: powrot odswieza tez niewyslane i wyslane.
+    await answerEmpty(h, 'niewyslane');
+    await answerEmpty(h, 'wyslane');
     await waitIdle(h);
   } finally {
     ANIMAL_TIMING.sluchamWindowMs = 2000;

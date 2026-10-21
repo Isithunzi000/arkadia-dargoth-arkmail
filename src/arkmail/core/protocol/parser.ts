@@ -208,6 +208,10 @@ export function parseNotification(text: string): MailNotification | null {
   // Dostawa niewyslanych przez zwierze POZA sesja compose (Fala 13c) -
   // w compose te sama linie konsumuje flota edytora (parseComposeResult).
   if (t === 'List zostal pomyslnie wyslany.') return { kind: 'list-wyslany' };
+  // Reczne kasowanie zaznaczonych listow w trybie poczty gracza
+  // (Fala 24f3, log 2026-10-21) - wyzwala odswiezenie wszystkich
+  // skrzynek (parkowane, poki gracz jest w swojej sesji).
+  if (t === 'Kasuje listy...') return { kind: 'kasowanie' };
   // Fala 13d: generyczny blad parsera serwera. Bez zwierzecia pocztowego
   // komenda "wyslij zwierze" nie istnieje i dostaje wlasnie to (dowod:
   // log 2025-12-21; w tej sesji "Slucham?" pada ~250 razy przy rozmaitych

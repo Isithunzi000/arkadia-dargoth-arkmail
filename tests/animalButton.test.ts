@@ -74,6 +74,9 @@ test('po wyslaniu przycisk jest nieaktywny do konca lotu', async () => {
     h.f.fire('Wsrod trzepotu skrzydel Kruk laduje na twoim prawym ramieniu.', 'mail');
     await answerEmpty(h, 'odebrane');
     await answerEmpty(h, 'nieprzeczytane');
+    // Fala 24f1: powrot odswieza tez niewyslane i wyslane.
+    await answerEmpty(h, 'niewyslane');
+    await answerEmpty(h, 'wyslane');
     await waitIdle(h);
   } finally {
     await stopHarness();
@@ -90,6 +93,9 @@ test('linia ladowania konczy lot i odswieza inbox', async () => {
     await h.waitFor(() => animalBtn(h)?.disabled === false, 'przycisk aktywny po ladowaniu');
     await answerEmpty(h, 'odebrane');
     await answerEmpty(h, 'nieprzeczytane');
+    // Fala 24f1: powrot odswieza tez niewyslane i wyslane.
+    await answerEmpty(h, 'niewyslane');
+    await answerEmpty(h, 'wyslane');
     await waitIdle(h);
   } finally {
     await stopHarness();
@@ -106,6 +112,9 @@ test('drugi wariant ladowania ("na twojej rece") tez konczy lot', async () => {
     await h.waitFor(() => animalBtn(h)?.disabled === false, 'przycisk aktywny po ladowaniu');
     await answerEmpty(h, 'odebrane');
     await answerEmpty(h, 'nieprzeczytane');
+    // Fala 24f1: powrot odswieza tez niewyslane i wyslane.
+    await answerEmpty(h, 'niewyslane');
+    await answerEmpty(h, 'wyslane');
     await waitIdle(h);
   } finally {
     await stopHarness();
@@ -122,6 +131,9 @@ test('reczna komenda gracza (linia Wysylasz) uzbraja lot bez kliku', async () =>
     h.f.fire('Wsrod trzepotu skrzydel Kruk laduje na twoim prawym ramieniu.', 'mail');
     await answerEmpty(h, 'odebrane');
     await answerEmpty(h, 'nieprzeczytane');
+    // Fala 24f1: powrot odswieza tez niewyslane i wyslane.
+    await answerEmpty(h, 'niewyslane');
+    await answerEmpty(h, 'wyslane');
     await waitIdle(h);
   } finally {
     await stopHarness();
@@ -170,6 +182,9 @@ test('klik w trakcie lotu nie wysyla duplikatu', async () => {
     h.f.fire('Wsrod trzepotu skrzydel Kruk laduje na twoim prawym ramieniu.', 'mail');
     await answerEmpty(h, 'odebrane');
     await answerEmpty(h, 'nieprzeczytane');
+    // Fala 24f1: powrot odswieza tez niewyslane i wyslane.
+    await answerEmpty(h, 'niewyslane');
+    await answerEmpty(h, 'wyslane');
     await waitIdle(h);
   } finally {
     await stopHarness();

@@ -76,7 +76,8 @@ export type MailNotification =
   | { kind: 'wysylasz'; zwierze: string }
   | { kind: 'powrot-zwierzecia'; zwierze: string }
   | { kind: 'list-wyslany' }
-  | { kind: 'slucham' };
+  | { kind: 'slucham' }
+  | { kind: 'kasowanie' };
 
 export type MailError =
   | { kind: 'zly-numer'; numer: number }

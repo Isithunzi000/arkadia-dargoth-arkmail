@@ -81,6 +81,12 @@ export const INDEX_PACE_MS = 400;
  */
 export const INDEX_ANCHOR_RETRY_WAITS_MS = [2500, 4000, 4000];
 /**
+ * Fala 24f2: bezczynnosc w recznym trybie poczty gracza, po ktorej
+ * tryb wygasa (gracz mogl przerwac sesje bez q/x). Aktywnosc =
+ * prompt pagera albo kolejna komenda pocztowa.
+ */
+export const PLAYER_MAIL_MODE_IDLE_MS = 180_000;
+/**
  * Fala 24e: wiek stampa indexMeta, po ktorym skrzynke przeczesujemy
  * znowu w calosci. Swiezszy stamp = przeczes incrementalny do klamry
  * (strony w calosci znanej z archiwum) - pelny przeces 4 skrzynek
@@ -396,6 +402,10 @@ export async function init(api: PluginApi) {
   // Disconnect: listing serwera i tak nie przetrwa - samo uniewaznienie.
   api.events.on("client.disconnect", () => {
     listingCtx = null;
+    // Fala 24f2: rozlaczenie konczy tez reczny tryb poczty (bez
+    // drenazu - i tak nie ma polaczenia).
+    playerMailMode = false;
+    clearPlayerMailModeTimer();
   });
 
   /**
@@ -408,8 +418,23 @@ export async function init(api: PluginApi) {
    */
   const pendingRefresh = new Set<MailBox>();
   let drainScheduled = false;
+  /**
+   * Fala 24f2: reczny tryb czytania poczty gracza (zgloszenie
+   * 2026-10-21: "ArkMail blokowal wpisywanie komend jak sie wyswietla
+   * list recznie"). Wejscie: echo komendy pocztowej gracza poza
+   * blokada; wyjscie: echo q/x albo bezczynnosc
+   * (PLAYER_MAIL_MODE_IDLE_MS). W trakcie trybu scheduleRefresh
+   * PARKUJE - pager gracza zjadlby komende listujaca, a straznik
+   * desynchronizacji moglby odpowiedziec "q" i zabic jego sesje
+   * (mechanika Fali 17a/24g).
+   */
+  let playerMailMode = false;
+  let playerMailModeTimer: ReturnType<typeof setTimeout> | null = null;
   const scheduleRefresh = (boxes: MailBox[]): void => {
     for (const b of boxes) pendingRefresh.add(b);
+    // Fala 24f2: w recznym trybie poczty gracza zadna komenda pluginu
+    // nie wychodzi - parkujemy do jego wyjscia z trybu.
+    if (playerMailMode) return;
     if (drainScheduled) return;
     drainScheduled = true;
     void lock
@@ -427,6 +452,33 @@ export async function init(api: PluginApi) {
         drainScheduled = false;
         if (pendingRefresh.size > 0) scheduleRefresh([]);
       });
+  };
+
+  const clearPlayerMailModeTimer = (): void => {
+    if (playerMailModeTimer !== null) {
+      clearTimeout(playerMailModeTimer);
+      playerMailModeTimer = null;
+    }
+  };
+  const exitPlayerMailMode = (): void => {
+    if (!playerMailMode) return;
+    playerMailMode = false;
+    clearPlayerMailModeTimer();
+    // Fala 24f2: po sesji gracza inbox na pewno wymaga weryfikacji
+    // (mogl czytac/kasowac) + drenaz wszystkiego, co zaparkowane
+    // (pendingRefresh zbiera tez skrzynki z Fali 24f3).
+    scheduleRefresh(["odebrane", "nieprzeczytane"]);
+  };
+  const armPlayerMailModeIdle = (): void => {
+    clearPlayerMailModeTimer();
+    playerMailModeTimer = setTimeout(() => {
+      playerMailModeTimer = null;
+      exitPlayerMailMode();
+    }, PLAYER_MAIL_MODE_IDLE_MS);
+  };
+  const enterPlayerMailMode = (): void => {
+    playerMailMode = true;
+    armPlayerMailModeIdle();
   };
 
   /** Fala 16a: retry refreshu odebranych po lagu serwera (szczegoly przy
@@ -1599,10 +1651,22 @@ export async function init(api: PluginApi) {
       // (a gdyby sierota istniala, zjadlaby te komende i straznik
       // domknie ja przy promptcie - tutaj czyscimy tylko prewencyjnie).
       const cmd = isEchoLine(line.text) ? line.text.replace(/^→\s*/, "") : line.text;
-      if (MAIL_ENTRY_CMD_RE.test(cmd)) clearPagerOrphan();
+      if (MAIL_ENTRY_CMD_RE.test(cmd)) {
+        clearPagerOrphan();
+        // Fala 24f2: gracz wchodzi w poczte recznie - jego pager jest
+        // legalny, plugin parkuje odswiezenia do wyjscia z trybu.
+        // Pod blokada to nasza wlasna komenda - nie tryb gracza.
+        if (!lock.locked) enterPlayerMailMode();
+      } else if (playerMailMode && !lock.locked && /^(?:q|x)$/i.test(cmd.trim())) {
+        // Fala 24f2: q/x konczy reczny tryb poczty gracza.
+        exitPlayerMailMode();
+      }
       return;
     }
     if (!extractPagerPrompt(line.text)) return;
+    // Fala 24f2: prompt pagera w trybie gracza = aktywnosc, przedluza
+    // wygasanie trybu (timer uzbroila juz komenda wejsciowa).
+    if (playerMailMode) armPlayerMailModeIdle();
     if (lock.locked) return; // legalna sesja pagerowa pod blokada
     if (!isPagerOrphanSuspected()) return; // sesja gracza - nietknieta
     const now = Date.now();
@@ -1645,13 +1709,22 @@ export async function init(api: PluginApi) {
       // sam sprawdza nieprzeczytane, wiec inbox mogl sie zmienic.
       disarmSlucham();
       endAnimalFlight();
-      scheduleRefresh(["odebrane", "nieprzeczytane"]);
+      // Fala 24f1: zwierze moglo dostarczyc niewyslane (przechodza do
+      // wyslanych) i przyniesc nowe - odswiezamy wszystkie 4 skrzynki.
+      scheduleRefresh(["odebrane", "nieprzeczytane", "niewyslane", "wyslane"]);
     } else if (n.kind === "list-wyslany") {
       // Fala 13c: dostawa niewyslanych przez zwierze (poza compose).
       // Pod lockiem pomijamy - sesja compose/edytora sama odswieza
       // skrzynki na koncu (inaczej kazdy compose mialby dodatkowy
       // dwa listingi z tej samej linii).
       if (!lock.locked) scheduleRefresh(["niewyslane", "wyslane"]);
+    } else if (n.kind === "kasowanie") {
+      // Fala 24f3: gracz kasuje listy RECZNIE (serwer przy zamykaniu
+      // zaznaczonych) - wszystkie skrzynki moga sie zmienic. Pod
+      // lockiem pomijamy (wlasne kasowanie z UI odswieza samo);
+      // w recznym trybie poczty parkuje (Fala 24f2).
+      if (!lock.locked)
+        scheduleRefresh(["odebrane", "nieprzeczytane", "wyslane", "niewyslane"]);
     }
   });
 
