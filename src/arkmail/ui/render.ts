@@ -1091,14 +1091,26 @@ export function mountMailUi(
           // Fala 12c: jawny wybor kierunku - gracz decyduje, czy pokazac
           // odebrane OD osoby czy wyslane DO niej (wczesniej klik szukal
           // na aktywnej skrzynce, czyli "gdzie popadnie").
+          // Fala 26b (zgloszenie 2026-10-22): skok filtruje LOKALNE
+          // archiwum (zakladka Archiwum), zamiast strzelac szukaniem
+          // do serwera. Liczniki kontaktow stoja na archiwum, a
+          // serwerowe skrzynki bywaja chude (gracz sprzata poczte),
+          // wiec serwerowe szukanie pokazywalo pusty filtr mimo
+          // istniejacych listow. Bonus: filtr osoby w archiwum to
+          // podciag po party, wiec listy wieloodbiorcze tez trafiaja.
+          // Skok jest deterministyczny: osoba + skrzynka, reszta
+          // filtrow archiwum czyszczona.
           const jumpTo = (box: MailBox) => {
-            searchDraft.osoba = c.name;
-            store.setActiveBox(box);
-            store.setTab('listy');
-            handlers.onSearch(box, { osoba: c.name });
+            archFilter.osoba = c.name;
+            archFilter.skrzynka = box;
+            archFilter.temat = undefined;
+            archFilter.tresc = undefined;
+            archFilter.odDaty = undefined;
+            archFilter.doDaty = undefined;
+            store.setTab('archiwum');
           };
           // Klik w imie = kierunek domyslny: odebrane, gdy sa.
-          name.setAttribute('title', 'Pokaz listy tej osoby (domyslnie: odebrane)');
+          name.setAttribute('title', 'Pokaz listy tej osoby w archiwum (domyslnie: odebrane)');
           name.addEventListener('click', () => {
             if (c.lettersReceived > 0) jumpTo('odebrane');
             else if (c.lettersSent > 0) jumpTo('wyslane');
