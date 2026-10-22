@@ -856,6 +856,10 @@ export async function init(api: PluginApi) {
             // (INDEX_ANCHOR_RETRY_WAITS_MS). Dopiero duplikat po
             // wyczerpaniu prob potwierdza mielenie.
             let anchorRetries = 0;
+            // Fala 26c: znacznik sondy sciany granulacji dziennej
+            // (jedna sonda na epizod duplikatow; reset przy stronie
+            // ze swiezymi wpisami).
+            let wallProbed = false;
             let res = await mailbox.fetch(box);
             for (;;) {
               if (res.kind === "lista") {
@@ -879,14 +883,14 @@ export async function init(api: PluginApi) {
                   break;
                 }
                 if (freshCount === 0) {
+                  const oldestDup = oldestEntry(all);
+                  if (!oldestDup?.date) {
+                    skipWhy = "brak daty w wpisach";
+                    break;
+                  }
                   const attempt = anchorRetries;
                   if (attempt < INDEX_ANCHOR_RETRY_WAITS_MS.length) {
                     anchorRetries += 1;
-                    const oldestDup = oldestEntry(all);
-                    if (!oldestDup?.date) {
-                      skipWhy = "brak daty w wpisach";
-                      break;
-                    }
                     await sleepOrCancel(INDEX_ANCHOR_RETRY_WAITS_MS[attempt]!, flag);
                     if (flag.cancelled) break;
                     // Fala 24d: klepniecie - swiezy listing bazowy
@@ -900,13 +904,33 @@ export async function init(api: PluginApi) {
                     );
                     continue;
                   }
+                  // Fala 26c (zgloszenie 2026-10-22): zanim uznamy
+                  // mielenie, sonda kotwica WYKLUCZAJACA dzien graniczny
+                  // ("przed D" zamiast "przed D+1"). Strona jednodniowa
+                  // ucieta strukturalnie zwraca duplikat na kotwice
+                  // z nextDay (serwer wyklucza tylko dzien graniczny),
+                  // co NIE jest mieleniem - sonda rozroznia: swieze
+                  // starsze wpisy = sciana pokonana i paginacja jedzie
+                  // dalej; pusto = skrzynka kompletna (Fala 19a);
+                  // zwrot dnia D mimo wykluczenia = serwer lamie filtr
+                  // daty i dopiero to jest trwale mielenie. Koszt
+                  // sondy przy prawdziwej scianie: ogien dnia D ponad
+                  // limit strony jest i tak nieosiagalny kotwicami
+                  // dziennymi.
+                  if (!wallProbed) {
+                    wallProbed = true;
+                    res = await mailbox.fetch(box, olderListingCommand(box, oldestDup.date));
+                    continue;
+                  }
                   // Fala 20c/24d: powod pomieciecia PO LUDZKU - gracz
                   // nie zna "kotwic" ani "postepu". Mielenie potwierdza
-                  // dopiero duplikat po wyczerpaniu prob z klepnieciem.
+                  // dopiero duplikat po wyczerpaniu prob z klepnieciem
+                  // ORAZ odpowiedz sondy z dniem wykluczonym (Fala 26c).
                   skipWhy = "serwer chwilowo muli - sprobuj ponownie za chwile";
                   break;
                 }
                 anchorRetries = 0;
+                wallProbed = false;
                 // Fala 24e: tryb incrementalny - strona W CALOSCI
                 // znana z archiwum (upsert bez nowych), a NIE
                 // powtorzona z tej petli (powtorki wylapuje straznik

@@ -111,7 +111,7 @@ test('pusta strona kotwicowa (reason "filtr") domyka skrzynke z flaga', async ()
   }
 });
 
-test('skrzynka z mieleniem kotwicy: 3 proby z klepnieciem, potem pomijana, raport ja wymienia (Fala 24d)', async () => {
+test('skrzynka z mieleniem kotwicy: 3 proby z klepnieciem + sonda wykluczajaca dzien, potem pomijana (Fala 24d/26c)', async () => {
   const h = await startHarness();
   const { f } = h;
   try {
@@ -163,7 +163,17 @@ test('skrzynka z mieleniem kotwicy: 3 proby z klepnieciem, potem pomijana, rapor
     await proba(1);
     await proba(2);
     await proba(3);
-    replaySameWyslane(); // czwarty duplikat z rzedu = trwale mielenie
+    replaySameWyslane(); // czwarty duplikat z rzedu
+    // Fala 26c: zanim plugin uzna mielenie, strzela SONDE kotwica
+    // wykluczajaca dzien graniczny ("przed 20 XII" zamiast "przed
+    // 21 XII"). Tu serwer odpowiada na nia TYM SAMYM dniem, ktory
+    // sonda wyklucza - zlamany filtr daty = dopiero to jest trwale
+    // mielenie.
+    await waitRt(
+      () => f.sent.includes('listy wyslane przed 20 XII 2025'),
+      'sonda wykluczajaca dzien graniczny (Fala 26c)',
+    );
+    replaySameWyslane(); // serwer ignoruje wykluczenie dnia = muli naprawde
     // niewyslane: puste - pominiecie wyslanych nie moze zabic petli.
     // (prolog NIE pobiera niewyslanych - pierwsze 'listy niewyslane'
     // jest z indeksacji).
@@ -329,6 +339,186 @@ test('incydentalny duplikat strony kotwicowej: klepniecie + retry ratuja skrzynk
     await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksacja: niewyslane');
     f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
     await waitRt(() => notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'toast 4/4');
+    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji');
+  } finally {
+    await stopHarness();
+  }
+});
+
+test('sciana granulacji: sonda "przed D" ze swiezym wpisem przeciska paginacje (Fala 26c)', async () => {
+  // Zgloszenie 2026-10-22: strona jednodniowa + ucieta ("pierwsze 50",
+  // wszystkie wpisy z 20 XII) - kotwica "przed 21 XII" strukturalnie
+  // zwraca TA SAMA strone (serwer wyklucza tylko dzien graniczny),
+  // wiec strażnik mielenia pomijal skrzynke z komunikatem "serwer
+  // chwilowo muli", mimo ze dane byly kompletne. Fala 26c: po
+  // wyczerpaniu prob z klepnieciem plugin strzela sonde kotwica
+  // WYKLUCZAJACA dzien graniczny ("przed 20 XII"). Swieze starsze
+  // wpisy = to byla sciana, nie mielenie - paginacja jedzie dalej.
+  const h = await startHarness();
+  const { f } = h;
+  try {
+    await loadTruncatedBox(h);
+    await startIndexing(h);
+    // odebrane: kompletne od razu.
+    await waitRt(
+      () => f.sent.filter((c) => c === 'listy odebrane').length === 2,
+      'indeksacja: odebrane',
+    );
+    f.fire('Listy odebrane:', 'mail');
+    f.fire(' 1. *R* Temat: srodkowy', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('> ', 'prompt');
+    // nieprzeczytane: puste.
+    await waitRt(
+      () => f.sent.filter((c) => c === 'listy nieprzeczytane').length === 2,
+      'indeksacja: nieprzeczytane',
+    );
+    f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
+    // wyslane: strona jednodniowa ucieta, kotwica zwraca duplikaty.
+    await waitRt(() => f.sent.includes('listy wyslane'), 'indeksacja: wyslane');
+    const replaySameWyslane = () => {
+      f.fire('Listy wyslane (prezentowane jest pierwsze 50):', 'mail');
+      f.fire(' 1. Temat: paczka', 'mail');
+      f.fire('Odbiorcy: Bar                           Wt, 20 XII 2025, 09:00:00', 'mail');
+      f.fire('> ', 'prompt');
+    };
+    replaySameWyslane();
+    await waitRt(() => f.sent.includes('listy wyslane przed 21 XII 2025'), 'kotwica wyslane');
+    const proba = async (nr: number) => {
+      replaySameWyslane();
+      await waitRt(
+        () => f.sent.filter((c) => c === 'listy wyslane').length === 1 + nr,
+        `klepniecie ${nr} (listing bazowy wyslane)`,
+      );
+      replaySameWyslane();
+      await waitRt(
+        () => f.sent.filter((c) => c === 'listy wyslane przed 21 XII 2025').length === 1 + nr,
+        `powtorka kotwicy ${nr}`,
+      );
+    };
+    await proba(1);
+    await proba(2);
+    await proba(3);
+    replaySameWyslane(); // czwarty duplikat z rzedu
+    // Sonda wykluczajaca dzien graniczny.
+    await waitRt(
+      () => f.sent.includes('listy wyslane przed 20 XII 2025'),
+      'sonda "przed D" (Fala 26c)',
+    );
+    // ...odpowiada SWIEZA starsza strona (nieucieta) = sciana
+    // pokonana, skrzynka kompletna.
+    f.fire('Listy wyslane:', 'mail');
+    f.fire(' 1. Temat: stara paczka', 'mail');
+    f.fire('Odbiorcy: Gracz                           Pn, 19 XII 2025, 10:00:00', 'mail');
+    f.fire('> ', 'prompt');
+    // niewyslane: puste.
+    await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksacja: niewyslane');
+    f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
+    // Pelne 4/4 mimo sciany na wyslanych; zero klamstwa "serwer muli".
+    await waitRt(() => notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'toast 4/4');
+    assert.ok(!notifyText(f, 'muli'), 'bez falszywego komunikatu o mieleniu');
+    // Opozniony retry skrzynki odbiorczej z prologu (test > 10 s).
+    await waitRt(
+      () => f.sent.filter((c) => c === 'listy odebrane').length === 3,
+      'opozniony retry: odebrane',
+    );
+    f.fire('Listy odebrane:', 'mail');
+    f.fire(' 1. *R* Temat: srodkowy', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('> ', 'prompt');
+    await waitRt(
+      () => f.sent.filter((c) => c === 'listy nieprzeczytane').length === 3,
+      'opozniony retry: nieprzeczytane',
+    );
+    f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
+    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji');
+  } finally {
+    await stopHarness();
+  }
+});
+
+test('sciana granulacji: sonda "przed D" pusta = skrzynka kompletna, nie "serwer muli" (Fala 26c)', async () => {
+  // Dokladny przypadek ze zgloszenia 2026-10-22: strona jednodniowa
+  // ucieta, starszych listow na serwerze NIE MA - sonda wykluczajaca
+  // dzien graniczny dostaje pusta odpowiedz wariantem filtrowanym
+  // ("Nie znaleziono..."), co jest kompletna prawda o skrzynce
+  // (Fala 19a). Skrzynka dostaje flage, raport koncowy jest pelny -
+  // zadne "pominiete: wyslane (serwer chwilowo muli...)".
+  const h = await startHarness();
+  const { f } = h;
+  try {
+    await loadTruncatedBox(h);
+    await startIndexing(h);
+    // odebrane: kompletne od razu.
+    await waitRt(
+      () => f.sent.filter((c) => c === 'listy odebrane').length === 2,
+      'indeksacja: odebrane',
+    );
+    f.fire('Listy odebrane:', 'mail');
+    f.fire(' 1. *R* Temat: srodkowy', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('> ', 'prompt');
+    // nieprzeczytane: puste.
+    await waitRt(
+      () => f.sent.filter((c) => c === 'listy nieprzeczytane').length === 2,
+      'indeksacja: nieprzeczytane',
+    );
+    f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
+    // wyslane: strona jednodniowa ucieta, kotwica zwraca duplikaty.
+    await waitRt(() => f.sent.includes('listy wyslane'), 'indeksacja: wyslane');
+    const replaySameWyslane = () => {
+      f.fire('Listy wyslane (prezentowane jest pierwsze 50):', 'mail');
+      f.fire(' 1. Temat: paczka', 'mail');
+      f.fire('Odbiorcy: Bar                           Wt, 20 XII 2025, 09:00:00', 'mail');
+      f.fire('> ', 'prompt');
+    };
+    replaySameWyslane();
+    await waitRt(() => f.sent.includes('listy wyslane przed 21 XII 2025'), 'kotwica wyslane');
+    const proba = async (nr: number) => {
+      replaySameWyslane();
+      await waitRt(
+        () => f.sent.filter((c) => c === 'listy wyslane').length === 1 + nr,
+        `klepniecie ${nr} (listing bazowy wyslane)`,
+      );
+      replaySameWyslane();
+      await waitRt(
+        () => f.sent.filter((c) => c === 'listy wyslane przed 21 XII 2025').length === 1 + nr,
+        `powtorka kotwicy ${nr}`,
+      );
+    };
+    await proba(1);
+    await proba(2);
+    await proba(3);
+    replaySameWyslane(); // czwarty duplikat z rzedu
+    // Sonda wykluczajaca dzien graniczny dostaje PUSTA odpowiedz =
+    // brak starszych listow = skrzynka zindeksowana w calosci.
+    await waitRt(
+      () => f.sent.includes('listy wyslane przed 20 XII 2025'),
+      'sonda "przed D" (Fala 26c)',
+    );
+    f.fire('Nie znaleziono zadnych takich wyslanych listow.', 'mail');
+    // niewyslane: puste.
+    await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksacja: niewyslane');
+    f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
+    await waitRt(() => notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'toast 4/4');
+    assert.ok(!notifyText(f, 'muli'), 'bez falszywego komunikatu o mieleniu');
+    // Kontakty odblokowane (4/4 flagi).
+    click(h, '[data-tab="kontakty"]');
+    await waitRt(() => !!h.content.querySelector('.arkmail-contact'), 'kontakty po 4/4');
+    // Opozniony retry skrzynki odbiorczej z prologu (test > 10 s).
+    await waitRt(
+      () => f.sent.filter((c) => c === 'listy odebrane').length === 3,
+      'opozniony retry: odebrane',
+    );
+    f.fire('Listy odebrane:', 'mail');
+    f.fire(' 1. *R* Temat: srodkowy', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('> ', 'prompt');
+    await waitRt(
+      () => f.sent.filter((c) => c === 'listy nieprzeczytane').length === 3,
+      'opozniony retry: nieprzeczytane',
+    );
+    f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
     await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji');
   } finally {
     await stopHarness();
