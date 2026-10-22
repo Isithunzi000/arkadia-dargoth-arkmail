@@ -678,6 +678,30 @@ export function mountMailUi(
     replyAll.textContent = 'Odpowiedz wszystkim';
     replyAll.addEventListener('click', () => replyTo(true));
     ops.appendChild(replyAll);
+    // Fala 28c (decyzja 2026-10-22): Odpowiedz z cytowaniem. Adresat jak
+    // przy zwyklym Odpowiedz (bez DW), temat = "Odp: <oryginalny temat>"
+    // DOSLOWNIE - temat "--" to swiadomie wpisane "--", nie marker
+    // pustego tematu (pusty temat jest niemozliwy: serwer go nie
+    // przyjmuje, plugin blokuje twardo). Tresc: dwie puste linie, "---",
+    // oryginalna tresc, "---". Przy liscie bez tresci przycisk
+    // nieaktywny - nie ma czego cytowac.
+    const replyQuote = doc.createElement('button');
+    replyQuote.className = 'arkmail-reply-quote';
+    replyQuote.textContent = 'Odpowiedz z cytowaniem';
+    if (l.body.some((line) => line.trim() !== '')) {
+      replyQuote.addEventListener('click', () => {
+        const received = l.box === 'odebrane' || l.box === 'nieprzeczytane';
+        composeDraft.adresat = received ? l.from : l.to || l.cc || '';
+        composeDraft.dw = '';
+        composeDraft.temat = `Odp: ${l.subject}`;
+        composeDraft.tresc = `\n\n---\n${l.body.join('\n')}\n---`;
+        store.setTab('napisz');
+      });
+    } else {
+      replyQuote.setAttribute('disabled', '');
+      replyQuote.setAttribute('title', 'List bez tresci - nie ma czego cytowac.');
+    }
+    ops.appendChild(replyQuote);
     const del = doc.createElement('button');
     del.className = 'arkmail-del';
     del.textContent = 'Usun';
