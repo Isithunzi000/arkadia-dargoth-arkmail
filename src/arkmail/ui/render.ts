@@ -475,7 +475,7 @@ export function mountMailUi(
     const go = doc.createElement('button');
     go.className = 'arkmail-search-go';
     go.textContent = 'Szukaj';
-    go.addEventListener('click', () => {
+    const fireSearch = () => {
       const osoba = (sOsoba as HTMLInputElement).value.trim();
       const temat = (sTemat as HTMLInputElement).value.trim();
       const odDaty = fromISODate((sOd as HTMLInputElement).value) ?? undefined;
@@ -488,7 +488,18 @@ export function mountMailUi(
       };
       if (Object.keys(query).length === 0) return;
       handlers.onSearch(state.activeBox, query);
-    });
+    };
+    go.addEventListener('click', fireSearch);
+    // Fala 26a (zgloszenie 2026-10-22): Enter w dowolnym polu szukajki
+    // = Szukaj (dotychczas Enter nie mial handlera i "nic nie robil").
+    for (const el of [sOsoba, sTemat, sOd, sDo]) {
+      el.addEventListener('keydown', (ev) => {
+        if ((ev as KeyboardEvent).key === 'Enter') {
+          ev.preventDefault();
+          fireSearch();
+        }
+      });
+    }
     searchRow.appendChild(sOsoba);
     searchRow.appendChild(sTemat);
     searchRow.appendChild(sOd);

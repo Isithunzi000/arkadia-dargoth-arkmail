@@ -41,7 +41,7 @@ const arch = (subject: string, sortKey: string): ArchiveLetter => ({
   body: [],
 });
 
-function mount(store: MailUiStore) {
+function mount(store: MailUiStore, overrides?: { onSearch?: (box: unknown, q: unknown) => void }) {
   const container = document.createElement('div');
   mountMailUi(container as unknown as HTMLElement, store, {
     onOpenLetter: () => {},
@@ -50,7 +50,7 @@ function mount(store: MailUiStore) {
     onRefreshBox: () => {},
     onLoadOlder: () => {},
     onLoadAll: () => {},
-    onSearch: () => {},
+    onSearch: overrides?.onSearch ?? (() => {}),
     onClearSearch: () => {},
     onDeleteLetter: () => {},
     onForwardLetter: () => {},
@@ -155,6 +155,59 @@ test('ghost: pole tematu szukajki podpowiada tematy z archiwum', () => {
   assert.equal(ghostRest(c, '[data-search="temat"]'), 'ly z morza');
   key(el, 'ArrowRight');
   assert.equal(el.value, 'Perly z morza');
+});
+
+test('ghost: akceptacja strzalka synchronizuje draft szukajki (Fala 26a)', () => {
+  // Zgloszenie 2026-10-22: wpisane 'cor' + strzalka w prawo wpisywala
+  // kanoniczne 'Corge' do POLA, ale bez dispatchu 'input' draft zostawal
+  // przy prefiksie - pierwszy rerender przywracal 'cor' do pola, a
+  // banner wynikow mowil 'Corge'.
+  const s = new MailUiStore();
+  s.setContacts([contact('Corge', 200)]);
+  s.applyMailbox('odebrane', {
+    kind: 'lista',
+    header: { box: 'odebrane', truncated: false },
+    entries: [
+      { number: 1, isRead: true, subject: 'X', forwarded: false, party: 'A', partyKind: 'nadawca', date: null },
+    ],
+  });
+  const c = mount(s);
+  const el = input(c, '[data-search="osoba"]');
+  type(el, 'cor');
+  assert.equal(ghostRest(c, '[data-search="osoba"]'), 'ge');
+  key(el, 'ArrowRight');
+  assert.equal(el.value, 'Corge', 'akceptacja wpisuje kanoniczna forme');
+  // Dowolna zmiana store = pelny rerender (draft odtwarza pola).
+  s.setNotifyEnabled(!s.state.notifyEnabled);
+  const el2 = input(c, '[data-search="osoba"]');
+  assert.equal(el2.value, 'Corge', 'po rerenderze pole zachowuje zaakceptowana fraze');
+});
+
+test('szukajka: Enter w polu osoby = Szukaj (Fala 26a)', () => {
+  // Zgloszenie 2026-10-22: Enter w polu szukajki nie mial zadnego
+  // handlera ("klikam enter i nic"). Enter = klik Szukaj na dowolnym
+  // polu; puste zapytanie nie strzela (jak przycisk).
+  const searches: unknown[] = [];
+  const s = new MailUiStore();
+  s.applyMailbox('odebrane', {
+    kind: 'lista',
+    header: { box: 'odebrane', truncated: false },
+    entries: [
+      { number: 1, isRead: true, subject: 'X', forwarded: false, party: 'A', partyKind: 'nadawca', date: null },
+    ],
+  });
+  const c = mount(s, { onSearch: (box, q) => searches.push([box, q]) });
+  // Enter na pustych polach nie strzela (strażnik jak w Szukaj).
+  key(input(c, '[data-search="osoba"]'), 'Enter');
+  assert.deepEqual(searches, [], 'puste zapytanie nie strzela');
+  // Enter z wpisana osoba odpala to samo szukanie co przycisk.
+  type(input(c, '[data-search="osoba"]'), 'cor');
+  key(input(c, '[data-search="osoba"]'), 'Enter');
+  assert.deepEqual(searches, [['odebrane', { osoba: 'cor' }]], 'Enter = Szukaj');
+  // Enter dziala tez z pola tematu.
+  type(input(c, '[data-search="temat"]'), 'paczka');
+  key(input(c, '[data-search="temat"]'), 'Enter');
+  assert.deepEqual(searches[1], ['odebrane', { osoba: 'cor', temat: 'paczka' }], 'Enter z pola tematu');
 });
 
 test('ghost: pole osoby w szukajce i Przekaz w widoku listu', () => {

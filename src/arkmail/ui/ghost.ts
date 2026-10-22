@@ -75,6 +75,17 @@ export function attachGhost(
         input.value = candidate;
         input.selectionStart = candidate.length;
         input.selectionEnd = candidate.length;
+        // Fala 26a (zgloszenie 2026-10-22): akceptacja musi odpalic
+        // 'input', bo draft szukajki (mkSearch w render.ts) aktualizuje
+        // sie TYLKO tym eventem. Bez dispatchu draft zostawal przy
+        // wpisanym prefiksie i pierwszy rerender przywracal go do pola
+        // (banner wynikow: "Corge", pole: "cor").
+        const view = doc.defaultView;
+        input.dispatchEvent(
+          view
+            ? new view.Event('input', { bubbles: true })
+            : new Event('input', { bubbles: true }),
+        );
         hide();
       }
     } else if (ev.key === 'Escape' && candidate) {
