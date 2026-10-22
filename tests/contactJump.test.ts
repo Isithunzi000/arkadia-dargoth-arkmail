@@ -5,12 +5,15 @@
  * Fala 26b (zgloszenie 2026-10-22): skok z kontaktu filtruje LOKALNE
  * archiwum (zakladka Archiwum: filtr osoby + skrzynki), zamiast
  * strzelac szukaniem do serwera. Liczniki kontaktow stoja na archiwum
- * (contactsFromArchive), a serwerowe skrzynki bywaja chude (gracz
- * sprzata poczte) - serwerowe szukanie pokazywalo pusty filtr mimo
- * istniejacych listow ("klikam w wyslane danym kontakcie i pokazuje,
- * ze niby nic nie ma"). Bonus: filtr osoby w archiwum to podciag
- * po party, wiec listy wieloodbiorcze ("Foo, Corge i Bar") tez
- * trafiaja - serwerowy filtr osoby je gubil.
+ * (contactsFromArchive) i licza listy wieloodbiorcze KAZDEMU odbiorcy
+ * (splitParty), a serwerowy filtr od/do lapie dokladnie jedna osobe,
+ * wiec listow grupowych nie widzi - stad "klikam w wyslane danym
+ * kontakcie i pokazuje, ze niby nic nie ma" (pusty wynik serwera przy
+ * niezerowym liczniku). Filtr osoby w archiwum to podciag po party,
+ * wiec listy wieloodbiorcze ("Foo, Corge i Bar") tez trafiaja.
+ * (Fala 26d: korekta uzasadnienia - skrzynki serwerowe sa pelne od
+ * zawsze, nikt ich nie sprzata; mechanizm to rozjazd dokladnego
+ * filtra serwera z licznikami archiwum.)
  *
  * Skok jest deterministyczny: ustawia osobe + skrzynke i kasuje
  * pozostale filtry archiwum (temat/tresc/daty), zeby wynik byl

@@ -1093,11 +1093,14 @@ export function mountMailUi(
           // na aktywnej skrzynce, czyli "gdzie popadnie").
           // Fala 26b (zgloszenie 2026-10-22): skok filtruje LOKALNE
           // archiwum (zakladka Archiwum), zamiast strzelac szukaniem
-          // do serwera. Liczniki kontaktow stoja na archiwum, a
-          // serwerowe skrzynki bywaja chude (gracz sprzata poczte),
-          // wiec serwerowe szukanie pokazywalo pusty filtr mimo
-          // istniejacych listow. Bonus: filtr osoby w archiwum to
-          // podciag po party, wiec listy wieloodbiorcze tez trafiaja.
+          // do serwera. Liczniki kontaktow stoja na archiwum i licza
+          // listy wieloodbiorcze KAZDEMU odbiorcy (splitParty), a
+          // serwerowy filtr od/do lapie dokladnie jedna osobe, wiec
+          // listow grupowych nie widzi - stad licznik > 0 przy pustym
+          // wyniku serwera. Filtr osoby w archiwum to podciag po
+          // party, wiec listy wieloodbiorcze tez trafiaja.
+          // (Fala 26d: korekta uzasadnienia - skrzynki serwerowe sa
+          // pelne od zawsze, nikt ich nie sprzata.)
           // Skok jest deterministyczny: osoba + skrzynka, reszta
           // filtrow archiwum czyszczona.
           const jumpTo = (box: MailBox) => {

@@ -81,6 +81,12 @@ listy [nieprzeczytane/otrzymane/wyslane/niewyslane]
 - Przyklady z pomocy (kanoniczne):
   `listy wyslane do alvina przed 7 III 2002 o temacie pomoc`,
   `listy otrzymane od alvina po 28 V 2005`.
+- `od/do [kogo]` to DOKLADNIE jedna osoba (serwer akceptuje mianownik,
+  np. `listy odebrane od foo` — zweryfikowane w logach); listow
+  wieloodbiorczych (`Odbiorcy: Foo, Bar i Corge`) filtr osoby NIE
+  lapie. Dlatego skok z kontaktu (ArkMail) filtruje lokalne archiwum
+  podciagiem po stronie listu, a reczna szukajka zostaje serwerowa
+  (zawsze aktualne dane).
 
 ### Semantyka granic dat (zweryfikowane w logach)
 
@@ -97,15 +103,20 @@ listy [nieprzeczytane/otrzymane/wyslane/niewyslane]
 
 ```
 **Wybrane listy** odebrane:          <- naglowek przefiltrowanego listingu
- 1. *R* Temat: ...                   <- wpisy PRZENUMEROWANE od 1
+ 3. *R* Temat: ...                   <- N = NAJSTARSZY wynik selekcji
+ 2. *R* Temat: ...
+ 1. *R* Temat: ...                   <- 1 = NAJNOWSZY wynik selekcji
 ```
 
 - Naglowek to `**Wybrane listy** <skrzynka>` (+ suffix odcinajacy, odmienia
   sie z liczba — dopasowujemy luzno, `pierwsz`).
-- Numery sa **renumerowane** w kontekscie wyniku — NIE odnosza sie do
-  numerow pelnego listingu. Dlatego wyniki szukania w ArkMail nie maja
-  paginacji ani wczytywania starszych; otwarcie listu dziala w kontekscie
-  ostatniego (przefiltrowanego) listingu.
+- Numery sa **renumerowane** w kontekscie wyniku: **1 = najnowszy pasujacy
+  list, N = najstarszy**; serwer wypisuje je od najstarszego do najnowszego
+  (numery maleja w dol). Zweryfikowane w logach (sesja 2026-10-18: strona
+  50→1 z datami rosnacymi; `przeczytaj list N` otwiera wpis o numerze N).
+  Numery NIE odnosza sie do numerow pelnego listingu. Dlatego wyniki
+  szukania w ArkMail nie maja paginacji ani wczytywania starszych; otwarcie
+  listu dziala w kontekscie ostatniego (przefiltrowanego) listingu.
 
 ## List (`przeczytaj list N`)
 
