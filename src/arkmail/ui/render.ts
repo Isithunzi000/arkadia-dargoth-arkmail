@@ -1268,8 +1268,10 @@ export function mountMailUi(
     controls.appendChild(aTemat);
     attachGhost(doc, aTemat, subjectSource);
     controls.appendChild(mkText('tresc', 'Tresc listu'));
-    controls.appendChild(mkText('odDaty', 'Od daty', 'date'));
-    controls.appendChild(mkText('doDaty', 'Do daty', 'date'));
+    // Fala 28d: "Od dnia"/"Do dnia" jak w szukajce serwerowej - jedno
+    // nazewnictwo na te sama granice w calym oknie (audyt stringow).
+    controls.appendChild(mkText('odDaty', 'Od dnia', 'date'));
+    controls.appendChild(mkText('doDaty', 'Do dnia', 'date'));
     // Fala 16g: czyszczenie wszystkich filtrow archiwum jednym klikiem
     // (zgloszenie pkt 11). Niedestrukcyjne (dane zostaja) - bez dwukliku.
     const clearFilters = doc.createElement('button');

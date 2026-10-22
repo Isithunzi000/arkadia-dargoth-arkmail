@@ -748,7 +748,9 @@ export async function init(api: PluginApi) {
               ui.appendMailboxPage(box, [], false);
             }
             ui.setLoadAll({ box, pages });
-            ui.setBusy(`Wczytuje wszystkie (${box}): strona ${pages}`);
+            // Fala 28d: wielokropek jak w "Wczytuje starsze listy..." -
+            // to postep operacji w toku, nie komunikat zamkniety.
+            ui.setBusy(`Wczytuje wszystkie (${box}): strona ${pages}...`);
             if (!more || flag.cancelled) break;
             await sleepOrCancel(LOAD_ALL_PACE_MS, flag);
           }
