@@ -63,6 +63,11 @@ const FORBIDDEN_PARTS = [
   ['\\b', 'tuz', 'zio', '\\w*'],
   ['\\b', 'zuz', 'ia', '\\w*'],
   ['\\b', 'nept', 'un', '\\w*'],
+  ['\\b', 'boro', 'mer', '\\w*'],
+  ['\\b', 'kha', 'el', '\\w*'],
+  ['\\b', 'anay', 'ensen', '\\w*'],
+  ['\\b', 'arc', 'ain', '\\w*'],
+  ['\\b', 'mire', 'lle', '\\w*'],
 ];
 const FORBIDDEN = FORBIDDEN_PARTS.map((parts) => new RegExp(parts.join(''), 'i'));
 
