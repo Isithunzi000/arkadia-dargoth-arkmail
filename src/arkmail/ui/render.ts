@@ -133,7 +133,7 @@ export function mountMailUi(
   let previewFull = false;
   /** Draft pol szukajki: lokalny (jak filtr archiwum) - rerender nie kasuje
    *  wpisanego zapytania. */
-  const searchDraft: Record<string, string> = { osoba: '', temat: '', odDaty: '', doDaty: '' };
+  const searchDraft: Record<string, string> = { osoba: '', temat: '', tresc: '', odDaty: '', doDaty: '' };
 
   // Fala 11c: migawka widoku na czas pelnego rerenderu. Bez niej kazda
   // zmiana store (strona loadAll co ~400 ms, merge notyfikacji) niszczyla
@@ -470,6 +470,11 @@ export function mountMailUi(
     };
     const sOsoba = mkSearch('osoba', 'Osoba');
     const sTemat = mkSearch('temat', 'Temat');
+    // Fala 28a: szukanie po tresci - serwer wspiera "o tresci"
+    // (?listy, help w grze), builder komendy obslugiwal od zawsze,
+    // brakowalo tylko pola w UI. Bez ghosta (podpowiedzi z tematow
+    // archiwum nie maja sensu dla frazy z tresci).
+    const sTresc = mkSearch('tresc', 'Tresc');
     const sOd = mkSearch('odDaty', 'Od dnia', 'date');
     const sDo = mkSearch('doDaty', 'Do dnia', 'date');
     const go = doc.createElement('button');
@@ -478,6 +483,7 @@ export function mountMailUi(
     const fireSearch = () => {
       const osoba = (sOsoba as HTMLInputElement).value.trim();
       const temat = (sTemat as HTMLInputElement).value.trim();
+      const tresc = (sTresc as HTMLInputElement).value.trim();
       const odDaty = fromISODate((sOd as HTMLInputElement).value) ?? undefined;
       const doDaty = fromISODate((sDo as HTMLInputElement).value) ?? undefined;
       const query: ListingSearch = {
@@ -485,6 +491,7 @@ export function mountMailUi(
         ...(odDaty ? { odDaty } : {}),
         ...(doDaty ? { doDaty } : {}),
         ...(temat !== '' ? { temat } : {}),
+        ...(tresc !== '' ? { tresc } : {}),
       };
       if (Object.keys(query).length === 0) return;
       handlers.onSearch(state.activeBox, query);
@@ -492,7 +499,7 @@ export function mountMailUi(
     go.addEventListener('click', fireSearch);
     // Fala 26a (zgloszenie 2026-10-22): Enter w dowolnym polu szukajki
     // = Szukaj (dotychczas Enter nie mial handlera i "nic nie robil").
-    for (const el of [sOsoba, sTemat, sOd, sDo]) {
+    for (const el of [sOsoba, sTemat, sTresc, sOd, sDo]) {
       el.addEventListener('keydown', (ev) => {
         if ((ev as KeyboardEvent).key === 'Enter') {
           ev.preventDefault();
@@ -502,6 +509,7 @@ export function mountMailUi(
     }
     searchRow.appendChild(sOsoba);
     searchRow.appendChild(sTemat);
+    searchRow.appendChild(sTresc);
     searchRow.appendChild(sOd);
     searchRow.appendChild(sDo);
     searchRow.appendChild(go);
@@ -523,8 +531,8 @@ export function mountMailUi(
       clear.addEventListener('click', () => {
         // Fala 16g: Wyczysc kasuje tez pola szukajki (zgloszenie pkt 11)
         // - wyniki znikaly, ale frazy zostawaly w polach i mylily.
-        for (const key of ['osoba', 'temat', 'odDaty', 'doDaty']) searchDraft[key] = '';
-        for (const el of [sOsoba, sTemat, sOd, sDo]) (el as HTMLInputElement).value = '';
+        for (const key of ['osoba', 'temat', 'tresc', 'odDaty', 'doDaty']) searchDraft[key] = '';
+        for (const el of [sOsoba, sTemat, sTresc, sOd, sDo]) (el as HTMLInputElement).value = '';
         handlers.onClearSearch(state.activeBox);
       });
       banner.appendChild(clear);

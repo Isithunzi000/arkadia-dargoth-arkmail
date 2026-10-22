@@ -173,3 +173,37 @@ test('szukaj integracja: pusty wynik pokazuje komunikat i banner zostaje', async
     await stopHarness();
   }
 });
+
+test('szukaj integracja: pole Tresc buduje komende "o tresci" (Fala 28a)', async () => {
+  const h = await startHarness();
+  const { f, waitFor } = h;
+  try {
+    await loadTruncatedBox(h);
+    setInput(h, '[data-search="tresc"]', 'zloto z morza');
+    click(h, '.arkmail-search-go');
+    await waitFor(
+      () => f.sent.includes('listy odebrane o tresci zloto z morza'),
+      'komenda szukania po tresci',
+    );
+
+    // Tresc laczy sie z innymi filtrami; temat/tresc zawsze na koncu,
+    // temat przed trescia (kolejnosc z helpu ?listy).
+    f.fire('Nie znaleziono zadnych takich odebranych listow.', 'mail');
+    f.fire('> ', 'prompt');
+    await waitFor(
+      () => h.content.querySelector('.arkmail-search-clear') !== null,
+      'banner wynikow po pierwszym szukaniu',
+    );
+    click(h, '.arkmail-search-clear');
+    setInput(h, '[data-search="osoba"]', 'Corge');
+    setInput(h, '[data-search="temat"]', 'perly');
+    setInput(h, '[data-search="tresc"]', 'morze');
+    click(h, '.arkmail-search-go');
+    await waitFor(
+      () => f.sent.includes('listy odebrane od Corge o temacie perly o tresci morze'),
+      'komenda laczona: osoba -> temat -> tresc',
+    );
+  } finally {
+    await stopHarness();
+  }
+});

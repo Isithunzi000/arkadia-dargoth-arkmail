@@ -87,6 +87,7 @@ test('szukajka: Wyczysc w bannerze kasuje tez pola formularza', () => {
   const { container, calls, off } = mount(s);
   setInput(container, '[data-search="osoba"]', 'Foo');
   setInput(container, '[data-search="temat"]', 'Perly');
+  setInput(container, '[data-search="tresc"]', 'zloto');
 
   const clear = container.querySelector('.arkmail-search-clear');
   assert.ok(clear, 'przycisk Wyczysc istnieje');
@@ -95,12 +96,14 @@ test('szukajka: Wyczysc w bannerze kasuje tez pola formularza', () => {
   assert.equal(calls.filter((c) => c.name === 'clear-search').length, 1, 'tryb wynikow zamkniety');
   assert.equal(inputVal(container, '[data-search="osoba"]'), '', 'pole osoby puste');
   assert.equal(inputVal(container, '[data-search="temat"]'), '', 'pole tematu puste');
+  assert.equal(inputVal(container, '[data-search="tresc"]'), '', 'pole tresci puste (Fala 28a)');
 
   // Draft tez pusty - rerender nie przywraca fraz.
   s.setTab('kontakty');
   s.setTab('listy');
   assert.equal(inputVal(container, '[data-search="osoba"]'), '', 'draft osoby pusty po rerenderze');
   assert.equal(inputVal(container, '[data-search="temat"]'), '', 'draft tematu pusty po rerenderze');
+  assert.equal(inputVal(container, '[data-search="tresc"]'), '', 'draft tresci pusty po rerenderze');
   off();
 });
 
