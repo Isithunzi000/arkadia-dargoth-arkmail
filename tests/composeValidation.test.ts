@@ -11,9 +11,11 @@
  * Kontrakt:
  *  - pusty adresat -> TWARDa blokada: przycisk pokazuje "Podaj
  *    adresata." (3 s), zadne klikniecie nie wysyla;
- *  - pusty temat -> dwuklikowe uzbrojenie: pierwszy klik "Temat pusty -
- *    na pewno? Kliknij ponownie", drugi klik w 3 s wysyla (pusty temat
- *    bywa celowy); wzorzec jak Wyczysc/Usun;
+ *  - pusty temat -> TWARDa blokada "Podaj temat." (3 s) jak adresat
+ *    (Fala 28g): serwer pustego tematu nie przyjmuje, a handler w
+ *    index.ts i tak odrzucal go toastem - miekki dwuklik z Fali 15b
+ *    obiecywal wysylke, ktora nigdy nie nastepowala. Pusty temat nie
+ *    moze wyjsc z pluginu, kropka;
  *  - wypelnione adresat+temat+tresc -> wysylka za pierwszym klikiem.
  *
  * Fala 16d (zgloszenie 2026-10-19 pkt 4): pusta tresc tez ma TWARDa
@@ -91,7 +93,7 @@ test('ui: pusty adresat blokuje wyslanie twardo (zadne klikniecie nie wysyla)', 
   off();
 });
 
-test('ui: pusty temat wymaga dwukliku, drugi klik wysyla', () => {
+test('ui: pusty temat blokuje wyslanie twardo (zadne klikniecie nie wysyla)', () => {
   const s = new MailUiStore();
   const { container, calls, off } = mount(s);
   s.setTab('napisz');
@@ -99,18 +101,15 @@ test('ui: pusty temat wymaga dwukliku, drugi klik wysyla', () => {
   setField(container, 'tresc', 'czesc');
   const send = sendBtn(container);
   clickEl(send);
-  assert.equal(sends(calls).length, 0, 'pierwszy klik tylko uzbraja');
-  assert.match(send.textContent ?? '', /Temat pusty - na pewno/, 'przycisk uzbrojony');
+  assert.equal(sends(calls).length, 0, 'pierwszy klik nie wysyla');
+  assert.equal(send.textContent, 'Podaj temat.', 'komunikat na przycisku');
   clickEl(send);
-  assert.equal(sends(calls).length, 1, 'drugi klik wysyla');
-  const args = sends(calls)[0].args[0] as { adresat: string; temat: string };
-  assert.equal(args.adresat, 'Foo');
-  assert.equal(args.temat, '', 'temat pusty - swiadoma decyzja gracza');
-  assert.equal(send.textContent, 'Zapisz w niewyslanych', 'przycisk wrocil do etykiety');
+  assert.equal(sends(calls).length, 0, 'drugi klik tez nie wysyla (twarda blokada)');
+  assert.equal(send.textContent, 'Podaj temat.', 'blokada bez dwukliku');
   off();
 });
 
-test('ui: uzbrojenie pustego tematu wygasa po 3 s', async () => {
+test('ui: blokada pustego tematu wygasa po 3 s, po wpisaniu tematu wysyla', async () => {
   const s = new MailUiStore();
   const { container, calls, off } = mount(s);
   s.setTab('napisz');
@@ -118,10 +117,11 @@ test('ui: uzbrojenie pustego tematu wygasa po 3 s', async () => {
   setField(container, 'tresc', 'czesc');
   const send = sendBtn(container);
   clickEl(send);
-  assert.match(send.textContent ?? '', /Temat pusty/, 'uzbrojony');
-  await waitRt(() => send.textContent === 'Zapisz w niewyslanych', 'przycisk wrocil do etykiety');
+  assert.equal(send.textContent, 'Podaj temat.', 'zablokowany');
+  await waitRt(() => send.textContent === 'Zapisz w niewyslanych', 'etykieta wrocila');
+  setField(container, 'temat', 'Perly');
   clickEl(send);
-  assert.equal(sends(calls).length, 0, 'klik po wygasnieciu znowu tylko uzbraja');
+  assert.equal(sends(calls).length, 1, 'po wpisaniu tematu wysylka dziala');
   off();
 });
 

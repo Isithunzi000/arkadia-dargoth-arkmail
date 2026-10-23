@@ -964,15 +964,14 @@ export function mountMailUi(
     send.textContent = 'Zapisz w niewyslanych';
     // Fala 15b: walidacja przed zapisem do kolejki. Pusty adresat =
     // twarda blokada (serwer wymaga >= 1 adresata - "musimy podac
-    // przynajmniej jednego"); pusty temat = dwuklikowe uzbrojenie jak
-    // Wyczysc/Usun (temat bywa celowo pusty, ale najczesciej to
-    // przeoczenie - bez walidacji pusta linia rozbijala rozmowe compose
-    // w cisze do timeoutu). Stan lokalny - rerender wraca do etykiety.
+    // przynajmniej jednego"). Fala 28g: pusty temat tez TWARDA blokada
+    // ("Podaj temat.") - serwer pustego tematu nie przyjmuje, a handler
+    // w index.ts i tak odrzucal go toastem, wiec dwuklikowe uzbrojenie
+    // z 15b obiecywalo wysylke, ktora nigdy nie nastepowala. Stan
+    // lokalny - rerender wraca do etykiety.
     const SEND_LABEL = 'Zapisz w niewyslanych';
-    let sendArmed = false;
     let sendTimer: ReturnType<typeof setTimeout> | null = null;
     const disarmSend = (): void => {
-      sendArmed = false;
       send.textContent = SEND_LABEL;
     };
     send.addEventListener('click', () => {
@@ -983,7 +982,6 @@ export function mountMailUi(
         // przycisku, jak adresat (zgloszenie pkt 4). Cichy return z 15b
         // zostawial gracza bez informacji, czemu klikniecie nic nie daje.
         if (sendTimer) clearTimeout(sendTimer);
-        sendArmed = false;
         send.textContent = 'Brak tresci listu.';
         sendTimer = setTimeout(disarmSend, 3000);
         return;
@@ -992,15 +990,13 @@ export function mountMailUi(
         (pane.querySelector(`[data-field="${f}"]`) as HTMLInputElement | HTMLTextAreaElement).value;
       if (!val('adresat').trim()) {
         if (sendTimer) clearTimeout(sendTimer);
-        sendArmed = false;
         send.textContent = 'Podaj adresata.';
         sendTimer = setTimeout(disarmSend, 3000);
         return;
       }
-      if (!val('temat').trim() && !sendArmed) {
-        sendArmed = true;
-        send.textContent = 'Temat pusty - na pewno? Kliknij ponownie';
+      if (!val('temat').trim()) {
         if (sendTimer) clearTimeout(sendTimer);
+        send.textContent = 'Podaj temat.';
         sendTimer = setTimeout(disarmSend, 3000);
         return;
       }
