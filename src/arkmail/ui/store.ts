@@ -222,6 +222,13 @@ export class MailUiStore {
    *   wpisu moze byc wypchnieciem poza pierwsza strone - nic nie
    *   usuwamy.
    *
+   * Fala 30b: przy UCIETYM listingu opcjonalna granica dnia
+   * (pruneNewerThan, ISO YYYY-MM-DD = najstarszy dzien swiezej strony).
+   * Strona jest ciagla od najnowszego, wiec wpis SCISELE NOWSZY niz
+   * granica, nieobecny na stronie, na pewno zniknal z serwera -
+   * usuwamy. Dzien graniczny, starsze i wpisy bez daty zostaja
+   * (strona moze byc ucieta w polowie dnia).
+   *
    * Zwraca null, gdy brak widoku lub widok pusty - caller powinien
    * zrobic applyMailbox. Zwraca liczby {updated, added, removed}.
    */
@@ -229,11 +236,17 @@ export class MailUiStore {
     box: MailBox,
     entries: MailboxEntry[],
     truncated: boolean,
+    pruneNewerThan?: string,
   ): { updated: number; added: number; removed: number } | null {
     const view = this.current.boxes[box];
     if (!view || view.empty !== null) return null;
     const key = (e: MailboxEntry): string =>
       [e.party, e.subject, e.forwarded ? 'f' : '', e.date?.raw ?? ''].join('|');
+    const isoDay = (e: MailboxEntry): string | null => {
+      if (!e.date) return null;
+      const p = (n: number) => String(n).padStart(2, '0');
+      return `${e.date.year}-${p(e.date.month)}-${p(e.date.day)}`;
+    };
     const pos = new Map(view.entries.map((e, i) => [key(e), i] as const));
     let next = [...view.entries];
     let updated = 0;
@@ -253,6 +266,15 @@ export class MailUiStore {
     if (!truncated) {
       const freshKeys = new Set(entries.map(key));
       const kept = next.filter((e) => freshKeys.has(key(e)));
+      removed = next.length - kept.length;
+      next = kept;
+    } else if (pruneNewerThan !== undefined) {
+      const freshKeys = new Set(entries.map(key));
+      const kept = next.filter((e) => {
+        const day = isoDay(e);
+        if (day === null || day <= pruneNewerThan) return true;
+        return freshKeys.has(key(e));
+      });
       removed = next.length - kept.length;
       next = kept;
     }

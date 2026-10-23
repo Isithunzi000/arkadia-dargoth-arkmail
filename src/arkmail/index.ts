@@ -299,9 +299,22 @@ export async function init(api: PluginApi) {
       // Fala 14f: pusty listing TEZ nadpisuje biezacy kontekst serwera.
       if (res.kind === "lista") stampEntries(box, res.entries);
       else bumpCtx(box);
+      // Fala 30b: granica dnia strony (najstarszy dzien swiezego
+      // listingu) - przy UCIETYM listingu wpisy scisle nowsze, ktorych
+      // strona nie raportuje, na pewno zniknely z serwera (strona jest
+      // ciagla od najnowszego). Usuwamy je z widoku i oznaczamy w
+      // archiwum. Dzien graniczny nietkniety (strona moze byc ucieta
+      // w polowie dnia) - wzorzec zakresowy jak w Fali 24e.
+      const boundaryDay = ((): string | undefined => {
+        if (res.kind !== "lista") return undefined;
+        const oldest = oldestEntry(res.entries);
+        if (!oldest?.date) return undefined;
+        const p = (n: number): string => String(n).padStart(2, "0");
+        return `${oldest.date.year}-${p(oldest.date.month)}-${p(oldest.date.day)}`;
+      })();
       if (res.kind === "lista" && mode === "sync") {
         // null = brak widoku / widok pusty -> pelne zastosowanie.
-        const synced = ui.syncMailboxPage(box, res.entries, res.header.truncated);
+        const synced = ui.syncMailboxPage(box, res.entries, res.header.truncated, boundaryDay);
         if (!synced) ui.applyMailbox(box, res);
       } else {
         ui.applyMailbox(box, res);
@@ -311,6 +324,7 @@ export async function init(api: PluginApi) {
         // archiwum (cicho, bez notify). Widok skrzynki NIE jest
         // hydratowany z cache - numery zyja w kontekscie ostatniego
         // listingu serwera.
+        const freshIds = new Set(res.entries.map((e) => fromMailboxEntry(box, e).id));
         const merged = upsertLetters(
           ui.state.archive,
           res.entries.map((e) => fromMailboxEntry(box, e)),
@@ -323,7 +337,11 @@ export async function init(api: PluginApi) {
         // sciezka z NIEfiltrowana komenda "listy <skrzynka>" (szukanie,
         // re-kotwice i paginacje maja wlasne komendy i call-site'y).
         if (!res.header.truncated) {
-          markGoneFromServer(box, new Set(res.entries.map((e) => fromMailboxEntry(box, e).id)));
+          markGoneFromServer(box, freshIds);
+        } else if (boundaryDay !== undefined) {
+          // Fala 30b: przy ucietym listingu oznaczamy zakresowo -
+          // tylko rekordy scisle nowsze niz granica dnia strony.
+          markGoneFromServerNewerThan(box, freshIds, boundaryDay);
         }
       } else if (res.reason === "puste") {
         // Pusta skrzynka (reason "puste", nie "filtr") = pelna prawda:

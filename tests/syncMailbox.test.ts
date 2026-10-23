@@ -262,3 +262,154 @@ test('powiadomienie o nowej poczcie: nowy list ląduje na GORZE widoku, strony z
     await stopHarness();
   }
 });
+
+/**
+ * Fala 30b (zgloszenie 2026-10-23): list skasowany na serwerze zostawal
+ * w widoku po Odswiez, gdy skrzynka byla pelna (listing uciety) - galaz
+ * usuwajaca syncMailboxPage odpalala TYLKO przy kompletnym listingu,
+ * wiec martwy wpis klikalny konczyl sie "Nie ma tego listu na liscie".
+ *
+ * Nowy kontrakt: przy UCIETYM listingu sync dostaje granice dnia
+ * (najstarszy dzien swiezej strony) i usuwa z widoku wylacznie wpisy
+ * SCISELE NOWSZE niz granica, ktorych strona nie raportuje - strona jest
+ * ciagla od najnowszego, wiec ich brak = pewne skasowanie. Dzien
+ * graniczny i starsze NIETKNIETE (strona moze byc ucieta w polowie
+ * dnia), wpisy bez daty rowniez. W archiwum te same rekordy dostaja
+ * missingOnServer (zakresowy gone-marking, wzorzec z indeksacji 24e).
+ */
+
+/** sync z granica dnia (4. argument) - rzutowanie: pada w runtime na starym kodzie. */
+const syncPrune = (
+  s: MailUiStore,
+  box: MailBox,
+  entries: MailboxEntry[],
+  truncated: boolean,
+  pruneNewerThan: string,
+): SyncResult =>
+  (
+    s as unknown as {
+      syncMailboxPage?: (
+        b: MailBox,
+        e: MailboxEntry[],
+        t: boolean,
+        p?: string,
+      ) => SyncResult;
+    }
+  ).syncMailboxPage?.(box, entries, truncated, pruneNewerThan) ?? null;
+
+/** Nadpisuje pola daty wpisu (fabryka liczy day z seq - tu data ma znaczenie). */
+const onDay = (e: MailboxEntry, day: number, time = '10:00:00'): MailboxEntry => {
+  e.date = { ...e.date!, day, time };
+  return e;
+};
+
+test('sync: uciety listing z granica dnia usuwa tylko nowsze znikniete wpisy', () => {
+  const s = new MailUiStore();
+  const starszy = onDay(entry('starszy', { raw: 'N, 21 XII 2025, 01:15:04' }), 21); // < granica
+  const granicznyA = onDay(entry('graniczny-rano', { raw: 'Pn, 22 XII 2025, 02:20:05' }), 22, '02:20:05');
+  const granicznyB = onDay(entry('graniczny-wieczor', { raw: 'Pn, 22 XII 2025, 23:50:00' }), 22, '23:50:00');
+  const nowszy = onDay(entry('nowszy', { party: 'Corge', raw: 'Wt, 23 XII 2025, 00:11:12' }), 23); // > granica
+  s.applyMailbox('odebrane', {
+    kind: 'lista',
+    header: { box: 'odebrane', truncated: true },
+    entries: [starszy, granicznyA, granicznyB, nowszy],
+  });
+
+  // Swieza strona ucieta, najstarszy dzien na niej = 22 XII: raportuje
+  // tylko granicznyA; brak nowszego (23 XII) = skasowany na serwerze.
+  const r = syncPrune(s, 'odebrane', [granicznyA], true, '2025-12-22');
+  assert.deepEqual(r, { updated: 1, added: 0, removed: 1 }, 'usuniety tylko nowszy znikniety');
+  const subjects = s.state.boxes.odebrane!.entries.map((e) => e.subject);
+  assert.deepEqual(
+    subjects,
+    ['starszy', 'graniczny-rano', 'graniczny-wieczor'],
+    'starszy i dzien graniczny ZOSTAJA (strona moze byc ucieta w polowie dnia)',
+  );
+});
+
+test('sync: granica dnia nie rusza wpisow bez daty', () => {
+  const s = new MailUiStore();
+  const bezDaty = entry('bez-daty');
+  bezDaty.date = null;
+  const nowszy = onDay(entry('nowszy', { party: 'Corge', raw: 'Wt, 23 XII 2025, 00:11:12' }), 23);
+  const graniczny = onDay(entry('graniczny', { raw: 'Pn, 22 XII 2025, 02:20:05' }), 22, '02:20:05');
+  s.applyMailbox('odebrane', {
+    kind: 'lista',
+    header: { box: 'odebrane', truncated: true },
+    entries: [bezDaty, graniczny, nowszy],
+  });
+  const r = syncPrune(s, 'odebrane', [graniczny], true, '2025-12-22');
+  assert.deepEqual(r, { updated: 1, added: 0, removed: 1 }, 'tylko nowszy z data usuniety');
+  const subjects = s.state.boxes.odebrane!.entries.map((e) => e.subject);
+  assert.deepEqual(subjects, ['bez-daty', 'graniczny'], 'wpis bez daty zostaje');
+});
+
+test('sync: bez granicy dnia (3 argumenty) uciety listing nic nie usuwa - jak dotad', () => {
+  const s = new MailUiStore();
+  const e1 = entry('najstarszy', { raw: 'N, 21 XII 2025, 01:15:04' });
+  const e2 = entry('najnowszy', { party: 'Corge', raw: 'Wt, 23 XII 2025, 00:11:12' });
+  s.applyMailbox('odebrane', {
+    kind: 'lista',
+    header: { box: 'odebrane', truncated: true },
+    entries: [e1, e2],
+  });
+  const r = sync(s, 'odebrane', [e1], true);
+  assert.deepEqual(r, { updated: 1, added: 0, removed: 0 }, 'stary kontrakt bez zmian');
+  assert.equal(s.state.boxes.odebrane!.entries.length, 2);
+});
+
+test('integracja: Odswiez pelnej skrzynki usuwa skasowany nowszy list, starsze zostaja', async () => {
+  const h = await startHarness();
+  const { f, waitFor, content } = h;
+  try {
+    await loadTruncatedBox(h);
+    const count = () => content.querySelectorAll('.arkmail-entry').length;
+    assert.equal(count(), 3, '3 wpisy po prologu');
+
+    click(h, '.arkmail-refresh-global');
+    await waitFor(
+      () => f.sent.filter((c) => c === 'listy odebrane').length === 2,
+      'refresh poslal listing',
+    );
+    // Swieza strona ucieta, bez "najnowszy" (23 XII - skasowany na
+    // serwerze) i bez "najstarszy" (21 XII - poza ucieciem strony).
+    // Najstarszy dzien strony = 22 XII = granica.
+    f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
+    f.fire(' 1. *R* Temat: srodkowy', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('> ', 'prompt');
+
+    await waitFor(() => count() === 2, 'martwy wpis zniknal z widoku');
+    const subjects = [...content.querySelectorAll('.arkmail-entry-subject')].map(
+      (el) => (el as { textContent: string }).textContent,
+    );
+    assert.ok(!subjects.includes('najnowszy'), 'skasowany nowszy list usuniety');
+    assert.ok(subjects.includes('srodkowy'), 'dzien graniczny zostaje');
+    assert.ok(subjects.includes('najstarszy'), 'starszy niz granica zostaje');
+    await waitFor(
+      () => !content.querySelector('.arkmail-busy'),
+      'koniec sesji refreshu',
+    );
+
+    // Archiwum: skasowany list oznaczony missingOnServer = ukryty.
+    (content.querySelector('[data-tab="archiwum"]') as { dispatchEvent(e: unknown): void })
+      .dispatchEvent(new h.window.Event('click'));
+    await waitFor(
+      () => content.querySelectorAll('.arkmail-arch-entry').length === 2,
+      'archiwum ukrylo znikniety list',
+    );
+    const archSubjects = [...content.querySelectorAll('.arkmail-arch-entry')].map((el) =>
+      (el as { textContent: string }).textContent,
+    );
+    assert.ok(
+      !archSubjects.some((t) => t.includes('najnowszy')),
+      'znikniety list ukryty w archiwum',
+    );
+    assert.ok(
+      archSubjects.some((t) => t.includes('srodkowy')),
+      'zywy list zostaje w archiwum',
+    );
+  } finally {
+    await stopHarness();
+  }
+});
