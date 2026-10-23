@@ -183,6 +183,7 @@ let unsentFlashTimer: ReturnType<typeof setTimeout> | null = null;
  */
 let delayedInboxTimers: ReturnType<typeof setTimeout>[] = [];
 const DELAYED_INBOX_RETRY_MS = [10_000, 25_000];
+let playerMailModeTimer: ReturnType<typeof setTimeout> | null = null;
 
 function createContent(): HTMLDivElement {
   const root = document.createElement("div");
@@ -468,7 +469,6 @@ export async function init(api: PluginApi) {
    * (mechanika Fali 17a/24g).
    */
   let playerMailMode = false;
-  let playerMailModeTimer: ReturnType<typeof setTimeout> | null = null;
   const scheduleRefresh = (boxes: MailBox[]): void => {
     for (const b of boxes) pendingRefresh.add(b);
     // Fala 24f2: w recznym trybie poczty gracza zadna komenda pluginu
@@ -1925,6 +1925,10 @@ export async function destroy() {
   }
   for (const t of delayedInboxTimers) clearTimeout(t);
   delayedInboxTimers = [];
+  if (playerMailModeTimer !== null) {
+    clearTimeout(playerMailModeTimer);
+    playerMailModeTimer = null;
+  }
   if (unsubBadge) {
     unsubBadge();
     unsubBadge = null;
