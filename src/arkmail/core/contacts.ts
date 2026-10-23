@@ -42,11 +42,23 @@ export interface Contact {
  * w Arkadii sa jednowyrazowe, wiec oba separatory sa bezpieczne.
  * Dedup w obrebie jednej strony, kolejnosc zachowana.
  */
+const CONTACT_NAME_RE = /^[A-Za-z]+$/;
+const WEEKDAYS = new Set([
+  'n', 'nd', 'nie', 'niedziela',
+  'pn', 'pon', 'poniedzialek',
+  'wt', 'wto', 'wtorek',
+  'sr', 'sro', 'sroda',
+  'cz', 'czw', 'czwartek',
+  'pt', 'pi', 'piatek',
+  'so', 'sob', 'sobota',
+]);
+
 export function splitParty(party: string): string[] {
   const out: string[] = [];
   for (const part of party.split(/, | i /)) {
     const name = part.trim();
-    if (name !== '' && !out.includes(name)) out.push(name);
+    if (!CONTACT_NAME_RE.test(name) || WEEKDAYS.has(name.toLowerCase())) continue;
+    if (!out.includes(name)) out.push(name);
   }
   return out;
 }

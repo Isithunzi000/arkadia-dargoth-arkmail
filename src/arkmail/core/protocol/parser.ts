@@ -86,16 +86,19 @@ export function parseListingEntry(text: string): ListingEntry | null {
   return { number: Number(m[1]), isRead: m[2] === '*R*', subject, forwarded };
 }
 
-/** Linia "Nadawca: X   data" albo "Odbiorcy: X   data" na listingu. */
-const LISTING_PARTY_RE = /^(Nadawca|Odbiorc[ay]): (.+?)(?:\s{2,}(.+))?$/;
+/** Linia "Nadawca: X data" albo "Odbiorcy: X data" na listingu. */
+const LISTING_PARTY_RE = /^(Nadawca|Odbiorc[ay]): (.+)$/;
+const LISTING_DATE_SUFFIX_RE = /\s+([A-Za-z]+, \d{1,2} (?:XII|XI|IX|VIII|VII|VI|IV|V|III|II|I|X) \d{4}, \d{2}:\d{2}:\d{2})$/;
 
 export function parseListingParty(text: string): { kind: 'nadawca' | 'odbiorcy'; names: string; date: MailDate | null } | null {
   const m = text.match(LISTING_PARTY_RE);
   if (!m) return null;
+  const suffix = m[2].match(LISTING_DATE_SUFFIX_RE);
+  const names = suffix ? m[2].slice(0, suffix.index).trimEnd() : m[2];
   return {
     kind: m[1] === 'Nadawca' ? 'nadawca' : 'odbiorcy',
-    names: m[2],
-    date: m[3] ? parseMailDate(m[3]) : null,
+    names,
+    date: suffix ? parseMailDate(suffix[1]) : null,
   };
 }
 

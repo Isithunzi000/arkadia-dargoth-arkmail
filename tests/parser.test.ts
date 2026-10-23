@@ -11,6 +11,7 @@ import path from 'node:path';
 import {
   parseListingHeader,
   parseListingEntry,
+  parseListingParty,
   parseEmptyListing,
   parseLetterHeaderLine,
   isPagerPrompt,
@@ -57,6 +58,20 @@ test('wpis listing: numer, *R*, temat, nadawca/odbiorcy z data', () => {
   const e4 = parseListingEntry('50. *R* Temat: karteczka');
   assert.deepEqual(e4, { number: 50, isRead: true, subject: 'karteczka', forwarded: false });
   assert.equal(parseListingEntry('Nadawca: X'), null);
+});
+
+test('listing: date od strony listu oddziela tez jedna spacja', () => {
+  assert.deepEqual(
+    parseListingParty('Odbiorcy: Foo, Bar, ... N, 2 III 2026, 03:04:05'),
+    {
+      kind: 'odbiorcy',
+      names: 'Foo, Bar, ...',
+      date: { raw: 'N, 2 III 2026, 03:04:05', weekday: 'N', day: 2, month: 3, year: 2026, time: '03:04:05' },
+    },
+  );
+  assert.deepEqual(parseListingParty('Nadawca: Foo'), {
+    kind: 'nadawca', names: 'Foo', date: null,
+  });
 });
 
 test('data listu: pelna z godzina i dniem tygodnia', () => {

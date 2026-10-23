@@ -164,6 +164,12 @@ test('splitParty: przecinek (listingi), " i " (naglowki), mieszane', () => {
   assert.deepEqual(splitParty('Bar, Bar'), ['Bar'], 'dedup w obrebie jednej strony');
 });
 
+test('splitParty: odrzuca daty, godziny, dni tygodnia i wielokropki', () => {
+  assert.deepEqual(splitParty('Foo, ..., N, 2 III 2026, 03:04:05'), ['Foo']);
+  assert.deepEqual(splitParty('Poniedzialek, Corge i Waldo'), ['Corge', 'Waldo']);
+  assert.deepEqual(splitParty('Baz'), ['Baz']);
+});
+
 test('contactsFromBoxes: wielu odbiorcow z listingu - split i dedup (dane z logow)', () => {
   // Realny listing wyslanych: 'Odbiorcy: Fred, Grault   N, 19 IV 2026, 02:49:49'
   // oraz 'Odbiorcy: Grault, Fred   N, 19 IV 2026, 03:03:00'.
