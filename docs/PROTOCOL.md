@@ -68,8 +68,15 @@ listy [nieprzeczytane/otrzymane/wyslane/niewyslane]
       [o temacie temat] [o tresci tresc]
 ```
 
-- Argumenty mozna **dowolnie laczyc**, ale `o temacie` / `o tresci` zawsze
-  jako **ostatni** z nich (serwer parsuje reszte linii jako wartosc).
+- Argumenty mozna **dowolnie laczyc**, ale `o temacie` musi byc **ostatnim**
+  argumentem — serwer bierze cala reszte linii jako temat (chciwy ogon),
+  wiec `o temacie X o tresci Y` traktuje `o tresci Y` jako czesc tematu i
+  zwraca pusto; odwrotna kolejnosc (`o tresci X o temacie Y`) dziala, bo
+  `o tresci` i daty sa tokenizowane. Wszystkie filtry lacza sie AND.
+  Potwierdzone w grze 2026-10-23 seria 9 komend: daty lacza sie z trescia
+  i tematem, wylacznosc `po`/`przed` trzyma w kombinacjach. Plugin toleruje
+  linie otoczenia w srodku listingu (np. naglowek skrzynki) — parser
+  liniowy je pomija.
 - Za kazdym razem zwracane jest **do 50 najnowszych** pasujacych listow.
 - `data` = `<d> <miesiac rzymski> <yyyy>` (np. `7 III 2002`); serwer waliduje
   kalendarz (30 II odrzuci).

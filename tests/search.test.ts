@@ -5,8 +5,10 @@
  *   listy [nieprzeczytane/otrzymane/wyslane/niewyslane] [do kogo] [od kogo]
  *         [dzis|wczoraj|przedwczoraj | dnia data | przed data | po data]
  *         [o temacie temat] [o tresci tresc]
- *   Argumenty mozna dowolnie laczyc, ale temat lub tresc powinny byc
- *   zawsze uzywane jako ostatni z nich. Zawsze max 50 najnowszych.
+ *   Argumenty mozna dowolnie laczyc. Zawsze max 50 najnowszych.
+ * Potwierdzone w grze 2026-10-23: "o temacie" to chciwy ogon (wartosc =
+ * reszta linii) - musi byc OSTATNIM argumentem; "o tresci" i daty sa
+ * tokenizowane, lacza sie ze soba i z tematem (AND).
  * Uwaga: help mowi "otrzymane", ale komenda "listy odebrane ..." dziala
  * (dowod: logi paginacji 2026-10-17/18) - trzymamy sie "odebrane".
  * Wynik filtra przychodzi z naglowkiem "Wybrane listy <skrzynka>"
@@ -78,10 +80,14 @@ test('szukaj: komenda listy z filtrami serwera (skladnia ?listy)', () => {
     'listy wyslane do Alvin przed 8 III 2002 o temacie pomoc',
     'temat zawsze ostatni (wzorzec z helpu: listy wyslane do alvina przed 7 III 2002 o temacie pomoc)',
   );
+  // Fala 30d (potwierdzone w grze 2026-10-23): "o temacie" jest
+  // chciwym ogonem (wartosc = reszta linii) i MUSI byc ostatnie;
+  // "o tresci" jest tokenizowane. Kolejnosc temat->tresc dawala pusty
+  // wynik mimo pasujacego listu; tresc->temat dziala (AND obu filtrow).
   assert.equal(
     searchListingCommand('odebrane', { temat: 'perly', tresc: 'morze' }),
-    'listy odebrane o temacie perly o tresci morze',
-    'temat przed trescia (help wymienia temat jako pierwszy z koncowych)',
+    'listy odebrane o tresci morze o temacie perly',
+    'tresc przed tematem - temat chciwy ogon, zawsze ostatni (gra 2026-10-23)',
   );
   assert.equal(
     searchListingCommand('nieprzeczytane', {}),
@@ -208,8 +214,8 @@ test('szukaj integracja: pole Tresc buduje komende "o tresci" (Fala 28a)', async
       'komenda szukania po tresci',
     );
 
-    // Tresc laczy sie z innymi filtrami; temat/tresc zawsze na koncu,
-    // temat przed trescia (kolejnosc z helpu ?listy).
+    // Tresc laczy sie z innymi filtrami; temat (chciwy ogon) zawsze
+    // ostatni - tresc przed tematem (potwierdzone w grze 2026-10-23).
     f.fire('Nie znaleziono zadnych takich odebranych listow.', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(
@@ -222,8 +228,8 @@ test('szukaj integracja: pole Tresc buduje komende "o tresci" (Fala 28a)', async
     setInput(h, '[data-search="tresc"]', 'morze');
     click(h, '.arkmail-search-go');
     await waitFor(
-      () => f.sent.includes('listy odebrane od Corge o temacie perly o tresci morze'),
-      'komenda laczona: osoba -> temat -> tresc',
+      () => f.sent.includes('listy odebrane od Corge o tresci morze o temacie perly'),
+      'komenda laczona: osoba -> tresc -> temat (temat ostatni)',
     );
   } finally {
     await stopHarness();

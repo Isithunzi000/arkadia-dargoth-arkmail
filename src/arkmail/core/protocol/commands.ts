@@ -87,7 +87,10 @@ const datePart = (d: DateYMD): string => `${d.day} ${ROMAN_MONTHS[d.month - 1]} 
 
 /**
  * Komenda "listy" z filtrami serwera. Kolejnosc: osoba -> daty ->
- * temat -> tresc (help: temat lub tresc zawsze jako ostatni z nich).
+ * tresc -> temat. "o temacie" to na serwerze CHCIWY OGON (wartosc =
+ * reszta linii), wiec musi byc OSTATNIM argumentem; "o tresci" i daty
+ * sa tokenizowane i lacza sie dowolnie (potwierdzone w grze
+ * 2026-10-23: temat->tresc dawal pusty wynik, tresc->temat dziala).
  * OBIE granice dat sa na serwerze dzienno-granularne i WYLACZNE
  * (potwierdzone w grze: "przed" 2026-10-22, "po" 2026-10-23), wiec dla
  * wlacznego zakresu w UI wysylamy "po dzien wczesniej" i "przed dzien
@@ -98,8 +101,8 @@ export function searchListingCommand(box: MailBox, q: ListingSearch): string {
   if (q.osoba) parts.push(SENDER_BOXES.has(box) ? `od ${q.osoba}` : `do ${q.osoba}`);
   if (q.odDaty) parts.push(`po ${datePart(prevDay(q.odDaty))}`);
   if (q.doDaty) parts.push(`przed ${datePart(nextDay(q.doDaty))}`);
-  if (q.temat) parts.push(`o temacie ${q.temat}`);
   if (q.tresc) parts.push(`o tresci ${q.tresc}`);
+  if (q.temat) parts.push(`o temacie ${q.temat}`);
   return parts.join(' ');
 }
 
