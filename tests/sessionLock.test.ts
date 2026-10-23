@@ -57,3 +57,23 @@ test('lock: zwolnienie jest idempotentne', async () => {
   release();
   assert.equal(lock.locked, false);
 });
+
+test('lock: anulowanie odrzuca oczekujace i nie blokuje nowej operacji', async () => {
+  const lock = new SessionLock();
+  const releaseActive = await lock.acquire();
+  const waiting = lock.acquire();
+  const rejected = assert.rejects(waiting, /operacja anulowana/);
+  lock.cancelWaiting();
+  await rejected;
+
+  let started = false;
+  const next = lock.runExclusive(async () => {
+    started = true;
+  });
+  await new Promise((r) => setImmediate(r));
+  assert.equal(started, false, 'aktywna operacja nadal ma skonczyc');
+  releaseActive();
+  await next;
+  assert.equal(started, true);
+  assert.equal(lock.locked, false);
+});

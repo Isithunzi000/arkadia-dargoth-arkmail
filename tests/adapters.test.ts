@@ -167,6 +167,21 @@ test('adapter: modal-guard - poczatek/koniec idempotentne', () => {
   assert.equal(f.hookCb, null, 'po endModal hook zdjety, nic nie tlumi');
 });
 
+test('adapter: rozlaczenie porzuca kolejke modalna i blokuje stare wysylki', async () => {
+  const f = new FakeApi();
+  const t = new DargothTransport(f.api);
+  t.beginModal();
+  f.hookCb!('pomoc');
+  t.setOnline(false);
+  t.send('q');
+  t.endModal();
+  t.setOnline(true);
+  t.endModal();
+  await new Promise((r) => setImmediate(r));
+  assert.deepEqual(f.sent, []);
+  assert.equal(t.modalQueueLength, 0);
+});
+
 // --- CharStorage --------------------------------------------------------------
 
 test('storage: przestrzen per postac, JSON roundtrip', async () => {

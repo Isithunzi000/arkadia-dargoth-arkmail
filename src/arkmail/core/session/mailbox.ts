@@ -32,11 +32,10 @@ const MAIL_ERROR_RE = /^Data zostala podana w zlym formacie\./;
 
 export interface SessionOptions {
   timeoutMs: number;
-  /**
-   * Idle-flush: koniec transakcji po tylu ms ciszy (bezpiecznik, gdy
-   * prompt nie dojdzie do triggerow pluginu). Domyslnie 600.
-   */
+  /** Idle-flush po ciszy; bezpiecznik, gdy prompt nie dociera. */
   idleMs?: number;
+  /** Rejestracja natychmiastowego anulowania przy zmianie polaczenia. */
+  onCancel?: (cb: () => void) => () => void;
 }
 
 /**
@@ -97,12 +96,14 @@ export class MailboxSession {
       let awaitingPromptAfterQ = false;
       const idleMs = this.opts.idleMs ?? 600;
       let idleTimer: ReturnType<typeof setTimeout> | null = null;
+      let cancelUnsub: () => void = () => {};
 
       const cleanup = () => {
         done = true;
         clearTimeout(timer);
         if (idleTimer) clearTimeout(idleTimer);
         if (loadRetryTimer) clearTimeout(loadRetryTimer);
+        cancelUnsub();
         unsub();
       };
       const finish = (r: MailboxResult) => {
@@ -257,7 +258,11 @@ export class MailboxSession {
         }
       });
 
-      this.transport.send(cmd);
+      cancelUnsub = this.opts.onCancel?.(() => {
+        cleanup();
+        reject(new Error('operacja anulowana'));
+      }) ?? (() => {});
+      if (!done) this.transport.send(cmd);
     });
   }
 }

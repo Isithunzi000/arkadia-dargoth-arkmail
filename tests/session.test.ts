@@ -309,3 +309,44 @@ test('mailbox: linia-blad serwera (zly format daty) przerywa sesje od razu', asy
   ]);
   await assertion;
 });
+
+test('pager: anulowanie polaczenia konczy sesje bez q i bez poznych wysylek', async () => {
+  const t = new MockTransport();
+  let cancel!: () => void;
+  const s = new PagerSession(t, {
+    timeoutMs: 500,
+    onCancel: (cb) => {
+      cancel = cb;
+      return () => {};
+    },
+  });
+  const op = s.readLetter(1);
+  const rejected = assert.rejects(op, /operacja anulowana/);
+  cancel();
+  await rejected;
+  const sent = [...t.sent];
+  await t.replay([{ text: 'List : 1', cls: 'mail' }, { text: '> ', cls: 'prompt' }]);
+  assert.deepEqual(t.sent, sent);
+  assert.ok(!t.sent.includes('q'));
+});
+
+test('editor: anulowanie polaczenia nie dopuszcza poznej tresci listu', async () => {
+  const t = new MockTransport();
+  let cancel!: () => void;
+  const s = new EditorSession(t, {
+    timeoutMs: 500,
+    onCancel: (cb) => {
+      cancel = cb;
+      return () => {};
+    },
+  });
+  const op = s.send({ adresat: 'foo', temat: 'Temat', linie: ['Tresc'] });
+  const rejected = assert.rejects(op, /operacja anulowana/);
+  cancel();
+  await rejected;
+  const sent = [...t.sent];
+  await t.replay([{ text: 'Adresat: Temat: DW: ', cls: 'mail' }]);
+  assert.deepEqual(t.sent, sent);
+  assert.ok(!t.sent.includes('Tresc'));
+  assert.ok(!t.sent.includes('**'));
+});

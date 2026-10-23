@@ -13,6 +13,9 @@
  * tests/uiStrings.test.mjs).
  */
 
+export const isOperationCancelled = (error: unknown): boolean =>
+  error instanceof Error && error.message === 'operacja anulowana';
+
 interface Rule {
   re: RegExp;
   msg: string | ((m: RegExpMatchArray) => string);

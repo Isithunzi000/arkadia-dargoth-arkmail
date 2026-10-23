@@ -38,7 +38,7 @@ import {
   type ArchiveLetter,
 } from "./core/archive";
 import { MailboxSession, type ListingCtx, type MailboxEntry } from "./core/session/mailbox";
-import { humanizeMailError } from "./core/errors";
+import { humanizeMailError, isOperationCancelled } from "./core/errors";
 import { archiveExportEntries, letterTxt, txtFileName } from "./core/exportTxt";
 import { buildZip } from "./core/zipStore";
 import { downloadBlob } from "./ui/download";
@@ -229,6 +229,15 @@ export async function init(api: PluginApi) {
   cleanupLegacyStorage();
   transport = new DargothTransport(api);
   const lock = new SessionLock();
+  let connectionGeneration = 0;
+  const cancelListeners = new Set<() => void>();
+  const sessionOpts = {
+    ...SESSION_OPTS,
+    onCancel: (cb: () => void): (() => void) => {
+      cancelListeners.add(cb);
+      return () => cancelListeners.delete(cb);
+    },
+  };
   // Fala 16j: linie pocztowe (cls 'mail') przychodzace pod blokada sesji
   // to odpowiedzi na komendy pluginu - tlumione w glownym oknie gry.
   // Reczne "listy" gracza i powiadomienia POCZTA przychodza poza
@@ -249,9 +258,9 @@ export async function init(api: PluginApi) {
     indexMeta: storage.getJSON<Partial<Record<MailBox, string>>>(INDEX_KEY) ?? {},
   });
   const ui = store;
-  const mailbox = new MailboxSession(transport, SESSION_OPTS);
-  const pager = new PagerSession(transport, SESSION_OPTS);
-  const editor = new EditorSession(transport, SESSION_OPTS);
+  const mailbox = new MailboxSession(transport, sessionOpts);
+  const pager = new PagerSession(transport, sessionOpts);
+  const editor = new EditorSession(transport, sessionOpts);
 
   /**
    * Kontakty WYLACZNIE z korespondencji (nadawcy/adresaci) - bez
@@ -413,13 +422,13 @@ export async function init(api: PluginApi) {
   };
 
   const refreshBoxes = (boxes: MailBox[], mode: "sync" | "replace" = "sync"): void => {
-    // Swiezy listing nadpisuje widok - tryb wynikow szukania na tych
-    // skrzynkach przestaje obowiazywac (bez przywracania schowka).
     ui.clearSearchBoxes(boxes);
+    const generation = connectionGeneration;
     void lock
       .runExclusive(() => fetchBoxes(boxes, mode))
       .catch(() => {})
       .finally(() => {
+        if (generation !== connectionGeneration) return;
         ui.setBusy(null);
         rebuildContacts();
         persistArchive();
@@ -432,16 +441,33 @@ export async function init(api: PluginApi) {
   // leci na pusto ("Zadne listy nie zostaly wybrane.", log 2026-10-19
   // 17:13:14; zgloszenie pkt 3/13 "klikam i nie moge wyswietlic listu").
   // Po uniewaznieniu auto-refresh daje widokowi swieze stemple.
-  const invalidateOnReconnect = (): void => {
+  const cancelConnectionOperations = (): void => {
+    connectionGeneration++;
     listingCtx = null;
-    refreshBoxes(["odebrane", "nieprzeczytane", "wyslane", "niewyslane"]);
+    transport!.setOnline(false);
+    lock.cancelWaiting();
+    for (const cancel of [...cancelListeners]) cancel();
+    if (loadAllFlag) loadAllFlag.cancelled = true;
+    if (indexFlag) indexFlag.cancelled = true;
+    if (archiveDownloadFlag) archiveDownloadFlag.cancelled = true;
+    loadAllFlag = null;
+    indexFlag = null;
+    archiveDownloadFlag = null;
+    indexContinuation = null;
+    pendingRefresh.clear();
+    drainScheduled = false;
+    ui.setBusy(null);
+    ui.setLoadAll(null);
+    ui.setIndexRun(null);
+    ui.setArchiveDownload(null);
   };
-  api.events.on("client.connect", invalidateOnReconnect);
-  // Disconnect: listing serwera i tak nie przetrwa - samo uniewaznienie.
+  api.events.on("client.connect", () => {
+    cancelConnectionOperations();
+    transport!.setOnline(true);
+    refreshBoxes(["odebrane", "nieprzeczytane", "wyslane", "niewyslane"]);
+  });
   api.events.on("client.disconnect", () => {
-    listingCtx = null;
-    // Fala 24f2: rozlaczenie konczy tez reczny tryb poczty (bez
-    // drenazu - i tak nie ma polaczenia).
+    cancelConnectionOperations();
     playerMailMode = false;
     clearPlayerMailModeTimer();
   });
@@ -474,6 +500,7 @@ export async function init(api: PluginApi) {
     if (playerMailMode) return;
     if (drainScheduled) return;
     drainScheduled = true;
+    const generation = connectionGeneration;
     void lock
       .runExclusive(async () => {
         const batch = [...pendingRefresh];
@@ -483,6 +510,7 @@ export async function init(api: PluginApi) {
       })
       .catch(() => {})
       .finally(() => {
+        if (generation !== connectionGeneration) return;
         ui.setBusy(null);
         rebuildContacts();
         persistArchive();
@@ -674,6 +702,7 @@ export async function init(api: PluginApi) {
 
   /** Paginacja wstecz: jedna starsza strona listingow do archiwum. */
   const loadOlder = (box: MailBox): void => {
+    const generation = connectionGeneration;
     ui.setBusy("Wczytuje starsze listy...");
     void lock
       .runExclusive(async () => {
@@ -703,11 +732,13 @@ export async function init(api: PluginApi) {
           notify(api, "Brak starszych listow.");
         }
       })
-      .catch((err: unknown) =>
-        // Fala 17f: technikalia sesji przez mapper na ludzki polski.
-        notify(api, `Blad wczytywania starszych: ${humanizeMailError(err instanceof Error ? err.message : String(err))}`),
-      )
+      .catch((err: unknown) => {
+        if (!isOperationCancelled(err)) {
+          notify(api, `Blad wczytywania starszych: ${humanizeMailError(err instanceof Error ? err.message : String(err))}`);
+        }
+      })
       .finally(() => {
+        if (generation !== connectionGeneration) return;
         ui.setBusy(null);
         // Fala 24b: doczytana strona = nowe osoby w archiwum - kontakty
         // odbudowujemy od razu, nie dopiero przy refreshu/indeksacji.
@@ -749,6 +780,7 @@ export async function init(api: PluginApi) {
     const flag = { cancelled: false };
     loadAllFlag = flag;
     ui.setLoadAll({ box, pages: 0 });
+    const generation = connectionGeneration;
     void lock
       .runExclusive(async () => {
         let pages = 0;
@@ -816,14 +848,18 @@ export async function init(api: PluginApi) {
             notify(api, `Wczytano wszystkie (nowych listow: ${added}).`);
           }
         } finally {
+          if (generation !== connectionGeneration) return;
           loadAllFlag = null;
           ui.setLoadAll(null);
         }
       })
-      .catch((err: unknown) =>
-        notify(api, `Blad wczytywania: ${humanizeMailError(err instanceof Error ? err.message : String(err))}`),
-      )
+      .catch((err: unknown) => {
+        if (!isOperationCancelled(err)) {
+          notify(api, `Blad wczytywania: ${humanizeMailError(err instanceof Error ? err.message : String(err))}`);
+        }
+      })
       .finally(() => {
+        if (generation !== connectionGeneration) return;
         ui.setBusy(null);
         // Fala 24b: jak wyzej - petla dopisala listy do archiwum,
         // kontakty maja odzwierciedlac baze bez dodatkowego kliku.
@@ -874,6 +910,7 @@ export async function init(api: PluginApi) {
     // blokuje, nawet gdy znaczniki indexMeta sa kompletne z
     // wczesniejszego przebiegu.
     let runCompleted = false;
+    const generation = connectionGeneration;
     // Fala 19a: skrzynki pominiete (kotwica bez postepu / limit stron)
     // z powodem - petla jedzie dalej, raport koncowy je wymienia.
     const skipped: string[] = [];
@@ -1061,15 +1098,19 @@ export async function init(api: PluginApi) {
             );
           }
         } finally {
+          if (generation !== connectionGeneration) return;
           indexFlag = null;
           ui.setIndexRun(null);
           ui.setBusy(null);
         }
       })
-      .catch((err: unknown) =>
-        notify(api, `Blad indeksowania: ${humanizeMailError(err instanceof Error ? err.message : String(err))}`),
-      )
+      .catch((err: unknown) => {
+        if (!isOperationCancelled(err)) {
+          notify(api, `Blad indeksowania: ${humanizeMailError(err instanceof Error ? err.message : String(err))}`);
+        }
+      })
       .finally(() => {
+        if (generation !== connectionGeneration) return;
         // Kontynuacja guardow PO zwolnieniu blokady sesji (finally
         // runExclusive wykonuje sie po release). Tylko kompletny
         // biezacy przebieg odpala akcje nastepcza - sama kompletna
@@ -1350,6 +1391,7 @@ export async function init(api: PluginApi) {
     let lastAt = Date.now();
     ui.setArchiveDownload({ done: 0, total, etaMs: null });
     ui.setBusy(`Pobieram tresci do archiwum (0/${total})...`);
+    const generation = connectionGeneration;
     void lock
       .runExclusive(async () => {
         let done = 0;
@@ -1440,12 +1482,15 @@ export async function init(api: PluginApi) {
             notify(api, `Pobrano tresci (${done} z ${total}; ${parts.join("; ")}).`);
           }
         } finally {
+          if (generation !== connectionGeneration) return;
           archiveDownloadFlag = null;
           ui.setArchiveDownload(null);
           ui.setBusy(null);
         }
       })
-      .catch(() => notify(api, "Blad pobierania tresci do archiwum."));
+      .catch((err: unknown) => {
+        if (!isOperationCancelled(err)) notify(api, "Blad pobierania tresci do archiwum.");
+      });
   };
 
   /**
@@ -1510,10 +1555,15 @@ export async function init(api: PluginApi) {
         return;
       }
       ui.setBusy(`Czytam list: ${entry.subject}...`);
+      const generation = connectionGeneration;
       void lock
         .runExclusive(() => openWithResolve(box, entry))
-        .catch(() => notify(api, "Nie udalo sie odczytac listu."))
-        .finally(() => ui.setBusy(null));
+        .catch((err: unknown) => {
+          if (!isOperationCancelled(err)) notify(api, "Nie udalo sie odczytac listu.");
+        })
+        .finally(() => {
+          if (generation === connectionGeneration) ui.setBusy(null);
+        });
     },
     onOpenArchiveLetter: (letter) => {
       // Fala 16h: klikalne archiwum (zgloszenie pkt 9). Wpis z trescia
@@ -1539,10 +1589,15 @@ export async function init(api: PluginApi) {
       }
       ui.setBusy(`Czytam list: ${letter.subject}...`);
       const pseudo = archivePseudoEntry(letter);
+      const generation = connectionGeneration;
       void lock
         .runExclusive(() => openWithResolve(letter.box, pseudo))
-        .catch(() => notify(api, "Nie udalo sie odczytac listu."))
-        .finally(() => ui.setBusy(null));
+        .catch((err: unknown) => {
+          if (!isOperationCancelled(err)) notify(api, "Nie udalo sie odczytac listu.");
+        })
+        .finally(() => {
+          if (generation === connectionGeneration) ui.setBusy(null);
+        });
     },
     onDownloadArchiveBodies: () => downloadArchiveBodies(),
     // Fala 18c: indeksacja wszystkich skrzynek (brama Kontaktow,
@@ -1597,6 +1652,7 @@ export async function init(api: PluginApi) {
         return;
       }
       ui.setBusy("Wysylam list...");
+      const generation = connectionGeneration;
       void lock
         .runExclusive(async () => {
           transport!.beginModal();
@@ -1631,8 +1687,12 @@ export async function init(api: PluginApi) {
             transport!.endModal();
           }
         })
-        .catch(() => notify(api, "Blad wysylki listu."))
-        .finally(() => ui.setBusy(null));
+        .catch((err: unknown) => {
+          if (!isOperationCancelled(err)) notify(api, "Blad wysylki listu.");
+        })
+        .finally(() => {
+          if (generation === connectionGeneration) ui.setBusy(null);
+        });
     },
     onCloseLetter: () => ui.closeLetter(),
     // Fala 20e: guardy w handlerach, NIE w refreshBoxes - wewnetrzny
@@ -1660,6 +1720,7 @@ export async function init(api: PluginApi) {
         return;
       }
       ui.setBusy(`Szukam w skrzynce ${box}...`);
+      const generation = connectionGeneration;
       void lock
         .runExclusive(async () => {
           const res = await mailbox.fetch(box, searchListingCommand(box, query));
@@ -1681,10 +1742,14 @@ export async function init(api: PluginApi) {
             notify(api, "Brak pasujacych listow.");
           }
         })
-        .catch((err: unknown) =>
-          notify(api, `Blad szukania: ${humanizeMailError(err instanceof Error ? err.message : String(err))}`),
-        )
-        .finally(() => ui.setBusy(null));
+        .catch((err: unknown) => {
+          if (!isOperationCancelled(err)) {
+            notify(api, `Blad szukania: ${humanizeMailError(err instanceof Error ? err.message : String(err))}`);
+          }
+        })
+        .finally(() => {
+          if (generation === connectionGeneration) ui.setBusy(null);
+        });
     },
     onClearSearch: (box) => ui.clearSearch(box),
     // Fala 12e: czyszczenie pamieci podrecznej na zadanie gracza.
@@ -1707,6 +1772,7 @@ export async function init(api: PluginApi) {
         return;
       }
       ui.setBusy(`Usuwam list: ${entry.subject}...`);
+      const generation = connectionGeneration;
       void lock
         .runExclusive(async () => {
           const fresh = await resolveEntry(box, entry);
@@ -1730,8 +1796,12 @@ export async function init(api: PluginApi) {
             transport!.endModal();
           }
         })
-        .catch(() => notify(api, "Blad kasowania listu."))
-        .finally(() => ui.setBusy(null));
+        .catch((err: unknown) => {
+          if (!isOperationCancelled(err)) notify(api, "Blad kasowania listu.");
+        })
+        .finally(() => {
+          if (generation === connectionGeneration) ui.setBusy(null);
+        });
     },
     onForwardLetter: (box, entry, adresat) => {
       // Fala 12a: zero cichego kolejkowania sesji modalnych.
@@ -1740,6 +1810,7 @@ export async function init(api: PluginApi) {
         return;
       }
       ui.setBusy(`Przekazuje list: ${entry.subject}...`);
+      const generation = connectionGeneration;
       void lock
         .runExclusive(async () => {
           const fresh = await resolveEntry(box, entry);
@@ -1758,8 +1829,12 @@ export async function init(api: PluginApi) {
             transport!.endModal();
           }
         })
-        .catch(() => notify(api, "Blad przekazania listu."))
-        .finally(() => ui.setBusy(null));
+        .catch((err: unknown) => {
+          if (!isOperationCancelled(err)) notify(api, "Blad przekazania listu.");
+        })
+        .finally(() => {
+          if (generation === connectionGeneration) ui.setBusy(null);
+        });
     },
   };
 

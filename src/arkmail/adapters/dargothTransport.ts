@@ -26,6 +26,7 @@ export class DargothTransport implements Transport {
   private hookId: string | null = null;
   private queue: string[] = [];
   private bypass = new Set<string>();
+  private online = true;
   /** Fala 16j: kiedy tlumic linie pocztowe (index.ts: blokada sesji). */
   private gagWhen: (() => boolean) | null = null;
 
@@ -42,6 +43,7 @@ export class DargothTransport implements Transport {
   }
 
   send(line: string, echo = false): void {
+    if (!this.online) return;
     if (this.modalActive) this.bypass.add(line);
     // Fala 28h: echo=true dla composera i "wyslij zwierze" - gracz
     // widzi w oknie, co plugin wyslal (jak przy recznym wpisaniu).
@@ -80,9 +82,23 @@ export class DargothTransport implements Transport {
     }
     this.bypass.clear();
     const pending = this.queue.splice(0);
+    if (!this.online) return;
     for (const command of pending) {
       void this.api.command.send(command, undefined, { preserveCase: true });
     }
+  }
+
+  /** Odcina stare wysylki i porzuca kolejke bez drenowania. */
+  setOnline(online: boolean): void {
+    this.online = online;
+    if (online) return;
+    if (this.hookId !== null) {
+      this.api.commandHooks.unregister(this.hookId);
+      this.hookId = null;
+    }
+    this.modalActive = false;
+    this.queue = [];
+    this.bypass.clear();
   }
 
   /** Zdejmuje trigger i modal-guard; do wywolania w destroy() pluginu. */

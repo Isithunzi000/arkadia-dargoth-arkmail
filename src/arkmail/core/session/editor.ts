@@ -39,14 +39,16 @@ export class EditorSession {
   ) {}
 
   send(input: ComposeInput): Promise<ComposeOutcome> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       let stage: Stage = 'adresat';
       let done = false;
       const dw = input.dw ?? '';
+      let cancelUnsub: () => void = () => {};
 
       const cleanup = () => {
         done = true;
         clearTimeout(timer);
+        cancelUnsub();
         unsub();
       };
       const finish = (r: ComposeOutcome) => {
@@ -115,8 +117,14 @@ export class EditorSession {
         }
       });
 
-      this.transport.send('napisz list', true);
-      this.transport.send(input.adresat, true);
+      cancelUnsub = this.opts.onCancel?.(() => {
+        cleanup();
+        reject(new Error('operacja anulowana'));
+      }) ?? (() => {});
+      if (!done) {
+        this.transport.send('napisz list', true);
+        this.transport.send(input.adresat, true);
+      }
     });
   }
 }

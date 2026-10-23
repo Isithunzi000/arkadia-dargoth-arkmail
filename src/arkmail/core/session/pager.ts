@@ -164,6 +164,7 @@ export class PagerSession {
       let idleTimer: ReturnType<typeof setTimeout> | null = null;
       let quietTimer: ReturnType<typeof setTimeout> | null = null;
       let graceTimer: ReturnType<typeof setTimeout> | null = null;
+      let cancelUnsub: () => void = () => {};
       const actions = makeActions({ send: (l) => this.transport.send(l) });
 
       const cleanup = () => {
@@ -173,6 +174,7 @@ export class PagerSession {
         if (quietTimer) clearTimeout(quietTimer);
         if (graceTimer) clearTimeout(graceTimer);
         if (loadRetryTimer) clearTimeout(loadRetryTimer);
+        cancelUnsub();
         unsub();
       };
       /** Fala 17a: Przerwij w trakcie sesji (shouldAbort z zewnnatrz). */
@@ -421,7 +423,11 @@ export class PagerSession {
         armQuiet(); // cisza po akcji tez domyka (drugi prompt bywa niewidoczny)
       });
 
-      this.transport.send(`przeczytaj list ${numer}`);
+      cancelUnsub = this.opts.onCancel?.(() => {
+        cleanup();
+        reject(new Error('operacja anulowana'));
+      }) ?? (() => {});
+      if (!done) this.transport.send(`przeczytaj list ${numer}`);
     });
   }
 }
