@@ -101,8 +101,11 @@ listy [nieprzeczytane/otrzymane/wyslane/niewyslane]
   z 7 X). Wlaczny koniec zakresu w UI realizujemy wysylajac
   `przed <dzien po>` (ArkMail liczy kolejny dzien kalendarzowo —
   funkcja `nextDay`).
-- `po <data>` ArkMail wysyla **doslownie** (bez przesuniecia) — semantyka
-  wlaczna/wylaczna tej granicy: **do weryfikacji w grze**.
+- `po <data>` jest takze **dzienno-granularne i WYLACZNE** — list z dnia
+  granicznego NIE wchodzi w wynik (**potwierdzone w grze 2026-10-23**).
+  Wlaczny poczatek zakresu w UI realizujemy wysylajac
+  `po <dzien przed>` (funkcja `prevDay`, Fala 29). Obie granice sa wiec
+  symetryczne: `po` dostaje -1 dzien, `przed` +1 dzien.
 - `dzis|wczoraj|przedwczoraj` i `dnia <data>` sa alternatywa dla pary
   `po`/`przed` — ArkMail uzywa wylacznie `po`/`przed` (deterministyczne).
 

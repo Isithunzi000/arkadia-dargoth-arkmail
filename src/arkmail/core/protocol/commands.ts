@@ -44,6 +44,28 @@ export function nextDay(date: DateYMD): DateYMD {
   return { day: 1, month: 1, year: date.year + 1 };
 }
 
+/**
+ * Poprzedni dzien (kalendarz gregorianski). Dolna granica szukajki:
+ * serwer traktuje "po <data>" jako WYLACZNE dzienno-granularne (jak
+ * "przed" - potwierdzone w grze 2026-10-23), wiec dla wlacznej daty
+ * poczatkowej w UI wysylamy dzien PRZED nia. Walidacja jak w nextDay.
+ */
+export function prevDay(date: DateYMD): DateYMD {
+  const leap =
+    date.year % 4 === 0 && (date.year % 100 !== 0 || date.year % 400 === 0);
+  const monthDays = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  const max = monthDays[date.month - 1];
+  if (!max || date.day < 1 || date.day > max) {
+    throw new RangeError(`nieprawidlowa data: ${date.day}.${date.month}.${date.year}`);
+  }
+  if (date.day > 1) return { day: date.day - 1, month: date.month, year: date.year };
+  if (date.month > 1) {
+    return { day: monthDays[date.month - 2], month: date.month - 1, year: date.year };
+  }
+  // 1 stycznia -> 31 grudnia roku poprzedniego (grudzien ma zawsze 31).
+  return { day: 31, month: 12, year: date.year - 1 };
+}
+
 // --- Szukanie serwerowe (Fala 8g, skladnia ?listy z helpu w grze) ------------
 
 /**
@@ -66,15 +88,15 @@ const datePart = (d: DateYMD): string => `${d.day} ${ROMAN_MONTHS[d.month - 1]} 
 /**
  * Komenda "listy" z filtrami serwera. Kolejnosc: osoba -> daty ->
  * temat -> tresc (help: temat lub tresc zawsze jako ostatni z nich).
- * "przed" wyklucza dzien graniczny (dowod paginacji), wiec dla wlacznej
- * daty koncowej wysylamy przed nastepny dzien. Dolna granica "po"
- * przechodzi doslownie (zakladamy wlacznosc - do weryfikacji w grze,
- * patrz docs/PROTOCOL.md).
+ * OBIE granice dat sa na serwerze dzienno-granularne i WYLACZNE
+ * (potwierdzone w grze: "przed" 2026-10-22, "po" 2026-10-23), wiec dla
+ * wlacznego zakresu w UI wysylamy "po dzien wczesniej" i "przed dzien
+ * pozniej" (patrz docs/PROTOCOL.md).
  */
 export function searchListingCommand(box: MailBox, q: ListingSearch): string {
   const parts = [`listy ${box}`];
   if (q.osoba) parts.push(SENDER_BOXES.has(box) ? `od ${q.osoba}` : `do ${q.osoba}`);
-  if (q.odDaty) parts.push(`po ${datePart(q.odDaty)}`);
+  if (q.odDaty) parts.push(`po ${datePart(prevDay(q.odDaty))}`);
   if (q.doDaty) parts.push(`przed ${datePart(nextDay(q.doDaty))}`);
   if (q.temat) parts.push(`o temacie ${q.temat}`);
   if (q.tresc) parts.push(`o tresci ${q.tresc}`);

@@ -44,8 +44,30 @@ test('szukaj: komenda listy z filtrami serwera (skladnia ?listy)', () => {
       odDaty: { day: 1, month: 4, year: 2026 },
       doDaty: { day: 30, month: 4, year: 2026 },
     }),
-    'listy odebrane po 1 IV 2026 przed 1 V 2026',
-    'zakres WLACZNIE: przed dostaje +1 dzien (serwer wyklucza dzien graniczny)',
+    'listy odebrane po 31 III 2026 przed 1 V 2026',
+    'zakres WLACZNIE: OBIE granice wykluczaja dzien graniczny (potwierdzone w grze) - po dostaje -1 dzien, przed +1 dzien',
+  );
+  // Fala 29: "po <data>" jest WYLACZNE jak "przed" (potwierdzone w grze
+  // 2026-10-23). Wlaczna dolna granica UI = po dzien WCZESNIEJ.
+  assert.equal(
+    searchListingCommand('odebrane', { odDaty: { day: 7, month: 10, year: 2026 } }),
+    'listy odebrane po 6 X 2026',
+    'po wylaczne: srodek miesiaca',
+  );
+  assert.equal(
+    searchListingCommand('odebrane', { odDaty: { day: 1, month: 3, year: 2026 } }),
+    'listy odebrane po 28 II 2026',
+    'po wylaczne: granica miesiaca (2026 nieprzestepny)',
+  );
+  assert.equal(
+    searchListingCommand('odebrane', { odDaty: { day: 1, month: 3, year: 2024 } }),
+    'listy odebrane po 29 II 2024',
+    'po wylaczne: granica miesiaca (2024 przestepny)',
+  );
+  assert.equal(
+    searchListingCommand('odebrane', { odDaty: { day: 1, month: 1, year: 2026 } }),
+    'listy odebrane po 31 XII 2025',
+    'po wylaczne: granica roku',
   );
   assert.equal(
     searchListingCommand('wyslane', {

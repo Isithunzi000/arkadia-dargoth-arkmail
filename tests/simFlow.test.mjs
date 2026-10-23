@@ -141,10 +141,10 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 {
   ok('S7a osoba+daty+temat',
     searchListingCommand('odebrane', { osoba: 'Foo', odDaty: { day: 1, month: 3, year: 2026 }, doDaty: { day: 10, month: 3, year: 2026 }, temat: 'karteczka' })
-      === 'listy odebrane od Foo po 1 III 2026 przed 11 III 2026 o temacie karteczka');
+      === 'listy odebrane od Foo po 28 II 2026 przed 11 III 2026 o temacie karteczka');
   ok('S7b wyslane=do', searchListingCommand('wyslane', { osoba: 'Bar' }) === 'listy wyslane do Bar');
   ok('S7c temat ostatni', searchListingCommand('niewyslane', { temat: 'a b c' }) === 'listy niewyslane o temacie a b c');
-  ok('S7d miesiac WIELKA rzymska', searchListingCommand('odebrane', { odDaty: { day: 7, month: 12, year: 2025 } }) === 'listy odebrane po 7 XII 2025');
+  ok('S7d miesiac WIELKA rzymska', searchListingCommand('odebrane', { odDaty: { day: 7, month: 12, year: 2025 } }) === 'listy odebrane po 6 XII 2025');
 }
 
 // --- S8: pager: przeczytanie listu (fixture w listing-odebrane-male) --------
