@@ -75,6 +75,11 @@ listy [nieprzeczytane/otrzymane/wyslane/niewyslane]
   kalendarz (30 II odrzuci).
 - Pomoc mowi `otrzymane`, ale `odebrane` tez dziala (zweryfikowane w logach);
   ArkMail uzywa nazw skrzynek `odebrane|wyslane|niewyslane|nieprzeczytane`.
+- `odebrane` **zawiera** `nieprzeczytane` — nieprzeczytany list odebrany
+  pojawia sie tez na listing odebranych (**potwierdzone w grze
+  2026-10-22**). Skrzynki serwerowe sa pelne od zawsze (serwer nie
+  sprzata skrzynek), wiec liczby w obu listingach pokrywaja sie co do
+  nieprzeczytanych.
 - `do [kogo]` = adresat (skrzynki wyslane/niewyslane), `od [kogo]` = nadawca
   (odebrane/nieprzeczytane). Serwer i tak akceptuje obie formy, ArkMail
   dobiera wlasciwa po skrzynce.
@@ -91,9 +96,11 @@ listy [nieprzeczytane/otrzymane/wyslane/niewyslane]
 ### Semantyka granic dat (zweryfikowane w logach)
 
 - `przed <data>` jest **dzienno-granularne i WYLACZNE**: list z dnia
-  granicznego NIE wchodzi w wynik. Wlaczny koniec zakresu w UI
-  realizujemy wysylajac `przed <dzien po>` (ArkMail liczy kolejny dzien
-  kalendarzowo — funkcja `nextDay`).
+  granicznego NIE wchodzi w wynik. **Potwierdzone w grze 2026-10-22**
+  (test na zywej sesji: `listy odebrane przed 7 X 2026` pomija listy
+  z 7 X). Wlaczny koniec zakresu w UI realizujemy wysylajac
+  `przed <dzien po>` (ArkMail liczy kolejny dzien kalendarzowo —
+  funkcja `nextDay`).
 - `po <data>` ArkMail wysyla **doslownie** (bez przesuniecia) — semantyka
   wlaczna/wylaczna tej granicy: **do weryfikacji w grze**.
 - `dzis|wczoraj|przedwczoraj` i `dnia <data>` sa alternatywa dla pary
@@ -205,6 +212,28 @@ fizyczna wysyłka na poczcie lub `wyslij zwierze`).
 
 Błąd adresata na starcie: `Adresat: Nie ma takiego adresata (gracza, aliasu): thud.`
 — compose przerywa się, wraca zwykły prompt `> `.
+
+Temat `--` to **swiadomie wpisany, literalny temat**, nie znacznik
+pustego tematu — pusty temat jest niemozliwy (serwer go nie przyjmuje;
+ArkMail dodatkowo blokuje go twardo w formularzu, Fala 28g). Przy
+odpowiedzi z cytowaniem (Fala 28c) temat przenoszony doslownie:
+`Odp: --`.
+
+### Widocznosc w oknie gry (plugin)
+
+- **Gag = blokada sesji.** Linie pocztowe (klasa `mail`) sa tlumione w
+  glownym oknie tylko podczas operacji pluginowej trzymajacej blokade
+  (listingi, tresci listow, kasowanie) — to spam, ktory smieci okno
+  (Fala 16j). Parser dostaje linie ZAWSZE, gag tłumi wylacznie
+  wyswietlanie.
+- **Compose jest odgagowany** (Fala 28h): dialog `Adresat: Temat: DW:`,
+  numeracja edytora i wynik (`List zostal pomyslnie wyslany.` / bledy)
+  sa widoczne, a wysylki composera ida z echem (`→ napisz list`, ...) —
+  gracz widzi dokladnie to, co przy recznym pisaniu listu.
+- **Lot zwierzecia pocztowego nigdy nie jest gagowany** — `wyslij
+  zwierze` nie bierze blokady sesji, wiec `Wysylasz X na poczte.`,
+  powrot (`Wsrod trzepotu skrzydel ...`) i dostawa niewyslanych sa
+  zawsze widoczne. Od Fali 28h komenda z przycisku pluginu tez ma echo.
 
 ## Aliasy pocztowe
 
