@@ -125,7 +125,9 @@ test('smoke: init rejestruje kontrakt, destroy zdejmuje rejestracje', async () =
   try {
     const capture = { removed: [] };
     const api = makeMockApi(capture);
-    const info = await mod.init(api);
+    const initializing = mod.init(api);
+    capture.listeners?.['gmcp.char.info']?.({ name: 'Foo' });
+    const info = await initializing;
 
     assert.equal(info.name, 'ArkMail');
     const meta = fs.readFileSync(path.join(REPO, 'src/arkmail/meta.ts'), 'utf8');
@@ -181,7 +183,9 @@ test('smoke: powiadomienie odswieza skrzynki i badge stopki', async () => {
   try {
     const capture = { removed: [] };
     const api = makeMockApi(capture);
-    await mod.init(api);
+    const initializing = mod.init(api);
+    capture.listeners?.['gmcp.char.info']?.({ name: 'Foo' });
+    await initializing;
 
     assert.ok(capture.trigger, 'init rejestruje zbiorczy trigger linii');
     assert.equal(capture.trigger.tag, 'arkmail');

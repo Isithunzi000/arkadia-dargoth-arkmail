@@ -6,7 +6,7 @@
  * Fala 4c: wiring - UI (MailUiStore + render) polaczone z sesjami
  * protokolu przez DargothTransport i SessionLock. Powiadomienie
  * "[ POCZTA ] Masz nowa poczte..." odswieza odebrane/nieprzeczytane.
- * Archiwum i ustawienia trwale w localStorage per postac.
+ * Archiwum i ustawienia trwale w IndexedDB per postac.
  */
 
 import type PluginApi from "plugin-api";
@@ -46,7 +46,8 @@ import { PagerSession } from "./core/session/pager";
 import { EditorSession } from "./core/session/editor";
 import { SessionLock } from "./core/sessionLock";
 import { DargothTransport } from "./adapters/dargothTransport";
-import { CharStorage, type KVLike } from "./adapters/storage";
+import { cleanupLegacyStorage, openCharStorage, type CharStorage } from "./adapters/storage";
+import { STORAGE_WRITE_ERROR } from "./adapters/writeThroughStorage";
 import { notify } from "./adapters/notify";
 import { allBoxesIndexed, INDEX_BOXES, MailUiStore, formatBadgeSuffix } from "./ui/store";
 import { mountMailUi, type MailUiHandlers } from "./ui/render";
@@ -147,17 +148,8 @@ const NOTIFY_KEY = "powiadomienia";
 const COMPOSE_KEY = "compose";
 const INDEX_KEY = "indeks";
 
-/** localStorage moze nie istniec (testy, starsze srodowiska) - awaria do RAM. */
-function memoryKv(): KVLike {
-  const map = new Map<string, string>();
-  return {
-    getItem: (k) => (map.has(k) ? map.get(k)! : null),
-    setItem: (k, v) => void map.set(k, v),
-    removeItem: (k) => void map.delete(k),
-  };
-}
-
 let apiRef: PluginApi | null = null;
+let storageRef: CharStorage | null = null;
 let popup: PersistentPopupHandle | null = null;
 let menuHandle: PopupMenuEntryHandle | null = null;
 let footerHandle: FooterButtonHandle | null = null;
@@ -222,8 +214,19 @@ let handlersRef: MailUiHandlers | null = null;
 export async function init(api: PluginApi) {
   apiRef = api;
 
-  const kv: KVLike = typeof localStorage !== "undefined" ? localStorage : memoryKv();
-  const storage = new CharStorage(kv);
+  const character = await new Promise<string>((resolve) => {
+    api.events.on(
+      "gmcp.char.info",
+      (d) => {
+        const name = typeof d?.name === "string" ? d.name.trim() : "";
+        if (name) resolve(name);
+      },
+      { once: true },
+    );
+  });
+  const storage = await openCharStorage(character, () => notify(api, STORAGE_WRITE_ERROR));
+  storageRef = storage;
+  cleanupLegacyStorage();
   transport = new DargothTransport(api);
   const lock = new SessionLock();
   // Fala 16j: linie pocztowe (cls 'mail') przychodzace pod blokada sesji
@@ -249,11 +252,6 @@ export async function init(api: PluginApi) {
   const mailbox = new MailboxSession(transport, SESSION_OPTS);
   const pager = new PagerSession(transport, SESSION_OPTS);
   const editor = new EditorSession(transport, SESSION_OPTS);
-
-  // Nazwa postaci -> przestrzen kluczy storage.
-  api.events.on("gmcp.char.info", (d) => {
-    if (d?.name) storage.setCharacter(d.name);
-  });
 
   /**
    * Kontakty WYLACZNIE z korespondencji (nadawcy/adresaci) - bez
@@ -1962,6 +1960,11 @@ export async function destroy() {
   if (popup) {
     popup.close();
     popup = null;
+  }
+  if (storageRef) {
+    const storage = storageRef;
+    storageRef = null;
+    await storage.close();
   }
   apiRef = null;
 }

@@ -1,30 +1,30 @@
-/**
- * CharStorage: trwalosc per postac nad localStorage klienta.
- *
- * Klucze: "arkmail.<postac>.<klucz>" (postac mala litera). Do czasu
- * pierwszego gmcp.char.info piszemy do przestrzeni "_unknown".
- * Uszkodzony JSON w readzie -> null (nigdy wyjatek do pluginu).
- *
- * Decyzja: archiwum trzymamy w localStorage (listy to krotkie teksty,
- * limit ~5 MB wystarcza na tysiace); IndexedDB odlozone - patrz
- * docs/PROTOCOL.md.
- */
+import type { StorageDriver } from "./storageDriver";
+import {
+  openWriteThroughStorage,
+  WriteThroughStorage,
+} from "./writeThroughStorage";
 
-/** Minimalny kontrakt KV (localStorage w produkcji, mapa w testach). */
-export interface KVLike {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-  removeItem(key: string): void;
-}
-
+/** Magazyn danych jednej postaci. Nazwa postaci jest znana przed otwarciem. */
 export class CharStorage {
-  private char = '_unknown';
+  private constructor(
+    private readonly char: string,
+    private readonly storage: WriteThroughStorage,
+  ) {}
 
-  constructor(private readonly kv: KVLike) {}
+  static async open(
+    character: string,
+    driver: StorageDriver,
+    onError: () => void,
+  ): Promise<CharStorage> {
+    const normalized = character.trim().toLowerCase();
+    if (!normalized) throw new Error("Brak nazwy postaci dla magazynu.");
+    return new CharStorage(normalized, await WriteThroughStorage.open(driver, onError));
+  }
 
-  setCharacter(name: string): void {
-    const normalized = name.trim().toLowerCase();
-    if (normalized) this.char = normalized;
+  static fromWriteThrough(character: string, storage: WriteThroughStorage): CharStorage {
+    const normalized = character.trim().toLowerCase();
+    if (!normalized) throw new Error("Brak nazwy postaci dla magazynu.");
+    return new CharStorage(normalized, storage);
   }
 
   get character(): string {
@@ -32,7 +32,7 @@ export class CharStorage {
   }
 
   getJSON<T>(key: string): T | null {
-    const raw = this.kv.getItem(this.scoped(key));
+    const raw = this.storage.get(this.scoped(key));
     if (raw === null) return null;
     try {
       return JSON.parse(raw) as T;
@@ -42,14 +42,46 @@ export class CharStorage {
   }
 
   setJSON(key: string, value: unknown): void {
-    this.kv.setItem(this.scoped(key), JSON.stringify(value));
+    this.storage.set(this.scoped(key), JSON.stringify(value));
   }
 
   remove(key: string): void {
-    this.kv.removeItem(this.scoped(key));
+    this.storage.delete(this.scoped(key));
+  }
+
+  async flush(): Promise<void> {
+    await this.storage.flush();
+  }
+
+  async close(): Promise<void> {
+    await this.storage.close();
   }
 
   private scoped(key: string): string {
     return `arkmail.${this.char}.${key}`;
+  }
+}
+
+export async function openCharStorage(
+  character: string,
+  onError: () => void,
+  factory?: IDBFactory,
+): Promise<CharStorage> {
+  const storage = await openWriteThroughStorage(onError, factory);
+  return CharStorage.fromWriteThrough(character, storage);
+}
+
+/** Usuwa dawne klucze localStorage. Dane obce dla wtyczki zostaja nietkniete. */
+export function cleanupLegacyStorage(): void {
+  try {
+    const legacy = globalThis.localStorage;
+    const keys: string[] = [];
+    for (let i = 0; i < legacy.length; i++) {
+      const key = legacy.key(i);
+      if (key?.startsWith("arkmail.")) keys.push(key);
+    }
+    for (const key of keys) legacy.removeItem(key);
+  } catch {
+    // Brak dostepu do localStorage nie blokuje docelowego magazynu.
   }
 }

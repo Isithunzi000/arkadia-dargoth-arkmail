@@ -5,6 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
+import { IDBFactory } from 'fake-indexeddb';
 
 import type PluginApi from 'plugin-api';
 import { init, destroy } from '../src/arkmail/index';
@@ -120,11 +121,17 @@ export interface Harness {
   waitFor(pred: () => boolean, what: string): Promise<void>;
 }
 
+let previousIndexedDB: IDBFactory | undefined;
+
 export async function startHarness(): Promise<Harness> {
   const window = new Window();
   (globalThis as { document?: unknown }).document = window.document;
+  previousIndexedDB = globalThis.indexedDB;
+  globalThis.indexedDB = new IDBFactory();
   const f = new FakeApi();
-  await init(f.api);
+  const initializing = init(f.api);
+  f.fireEvent('gmcp.char.info', { name: 'Foo' });
+  await initializing;
   const content = (await f.popupConfig!.createContent()) as Harness['content'];
   const tick = () => new Promise((r) => setImmediate(r));
   const waitFor = async (pred: () => boolean, what: string) => {
@@ -140,6 +147,8 @@ export async function startHarness(): Promise<Harness> {
 export async function stopHarness(): Promise<void> {
   await destroy();
   delete (globalThis as { document?: unknown }).document;
+  if (previousIndexedDB === undefined) delete (globalThis as { indexedDB?: IDBFactory }).indexedDB;
+  else globalThis.indexedDB = previousIndexedDB;
 }
 
 /** Wspolny prolog: powiadomienie -> listing 3 listow (obciety) -> puste nieprzeczytane. */

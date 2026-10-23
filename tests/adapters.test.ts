@@ -1,6 +1,6 @@
 /**
  * Adaptery Dargoth: DargothTransport (Transport nad PluginApi + modal-guard
- * na commandHooks), CharStorage (localStorage per-postac), notify.
+ * na commandHooks), CharStorage (IndexedDB per-postac), notify.
  * Testy nad podróbkami API; kontrakty zweryfikowane w PluginApi.ts klienta.
  */
 import { test } from 'node:test';
@@ -8,7 +8,8 @@ import assert from 'node:assert/strict';
 
 import type PluginApi from 'plugin-api';
 import { DargothTransport } from '../src/arkmail/adapters/dargothTransport';
-import { CharStorage, type KVLike } from '../src/arkmail/adapters/storage';
+import { CharStorage } from '../src/arkmail/adapters/storage';
+import { MemoryStorageDriver } from '../src/arkmail/adapters/storageDriver';
 import { notify } from '../src/arkmail/adapters/notify';
 import type { ProtoLine } from '../src/arkmail/core/session/transport';
 
@@ -145,35 +146,27 @@ test('adapter: modal-guard - poczatek/koniec idempotentne', () => {
 
 // --- CharStorage --------------------------------------------------------------
 
-class FakeKV implements KVLike {
-  map = new Map<string, string>();
-  getItem(k: string): string | null {
-    return this.map.has(k) ? this.map.get(k)! : null;
-  }
-  setItem(k: string, v: string): void {
-    this.map.set(k, v);
-  }
-  removeItem(k: string): void {
-    this.map.delete(k);
-  }
-}
+test('storage: przestrzen per postac, JSON roundtrip', async () => {
+  const driver = new MemoryStorageDriver();
+  const foo = await CharStorage.open('Foo', driver, () => {});
+  foo.setJSON('ustawienia', { powiadomienia: true });
+  await foo.flush();
+  assert.deepEqual(foo.getJSON('ustawienia'), { powiadomienia: true });
+  assert.deepEqual(await driver.loadAll(), {
+    'arkmail.foo.ustawienia': '{"powiadomienia":true}',
+  });
 
-test('storage: przestrzen per postac, JSON roundtrip', () => {
-  const kv = new FakeKV();
-  const s = new CharStorage(kv);
-  s.setCharacter('Gracz');
-  s.setJSON('ustawienia', { powiadomienia: true });
-  assert.deepEqual(s.getJSON('ustawienia'), { powiadomienia: true });
-  assert.ok(kv.map.has('arkmail.gracz.ustawienia'), 'klucz z prefixem per postac (mala litera)');
-  s.setCharacter('Baz');
-  assert.equal(s.getJSON('ustawienia'), null, 'inna postac = inna przestrzen');
+  const baz = await CharStorage.open('Baz', driver, () => {});
+  assert.equal(baz.getJSON('ustawienia'), null, 'inna postac = inna przestrzen');
+  const reopenedFoo = await CharStorage.open('Foo', driver, () => {});
+  assert.deepEqual(reopenedFoo.getJSON('ustawienia'), { powiadomienia: true });
 });
 
-test('storage: uszkodzony JSON nie wywraca odczytu', () => {
-  const kv = new FakeKV();
-  kv.setItem('arkmail._unknown.zepsuty', '{nie-json');
-  const s = new CharStorage(kv);
-  assert.equal(s.getJSON('zepsuty'), null);
+test('storage: uszkodzony JSON nie wywraca odczytu', async () => {
+  const driver = new MemoryStorageDriver();
+  await driver.put('arkmail.foo.zepsuty', '{nie-json');
+  const storage = await CharStorage.open('Foo', driver, () => {});
+  assert.equal(storage.getJSON('zepsuty'), null);
 });
 
 // --- notify -------------------------------------------------------------------
