@@ -1253,6 +1253,14 @@ export async function init(api: PluginApi) {
   let archiveDownloadFlag: { cancelled: boolean } | null = null;
 
   /**
+   * Prog circuit breakera petli pobierania (Fala 31a): tyle bledow
+   * Z RZEDU = problem systemowy (siec/serwer lezy) i petla staje,
+   * zamiast mielic wszystkie listy do konca. Pojedynczy timeout sie
+   * zdarza, wiec prog to 3, nie 1.
+   */
+  const DOWNLOAD_BREAKER_LIMIT = 3;
+
+  /**
    * Petla "Pobierz tresci do archiwum" (Fala 16i, zgloszenie pkt 10):
    * kolejne listy bez tresci pod JEDNA blokada sesji, tempo jak loadAll.
    * Drugi klik przycisku = Przerwij. Blad pojedynczego listu nie zabija
@@ -1260,6 +1268,9 @@ export async function init(api: PluginApi) {
    * Fala 17c (zgloszenie pkt 3): petla jest IDEMPOTENTNA - kandydaci
    * grupowani po kluczu tresci (blizniak pobierany raz), rekordy
    * znikniete z serwera oznaczane i pomijane przy restarcie.
+   * Fala 31a: circuit breaker - 3 bledy z rzedu (siec/serwer lezy)
+   * zatrzymuja petle z jasnym komunikatem, zamiast mielic reszte
+   * kandydatow do konca. Sukces i 'missing' licznik resetuja.
    */
   const downloadArchiveBodies = (): void => {
     if (archiveDownloadFlag) {
@@ -1322,6 +1333,11 @@ export async function init(api: PluginApi) {
         let done = 0;
         let failed = 0;
         let missing = 0;
+        // Fala 31a (circuit breaker): serie bledow Z RZEDU zatrzymuja
+        // petle. Sukces i 'missing' (serwer odpowiedzial - list zniknal)
+        // resetuja licznik, bo dowodza, ze polaczenie zyje.
+        let consecutiveErrors = 0;
+        let breakerTripped = false;
         try {
           for (const group of candidates) {
             if (flag.cancelled) break;
@@ -1345,6 +1361,7 @@ export async function init(api: PluginApi) {
             }
             if (result.kind === "ok") {
               done += 1;
+              consecutiveErrors = 0;
               // Tresc do WSZYSTKICH rekordow blizniaczych grupy.
               const fill = group
                 .filter((l) => l.body.length === 0)
@@ -1356,6 +1373,7 @@ export async function init(api: PluginApi) {
               }
             } else if (result.kind === "missing" && !flag.cancelled) {
               missing += 1;
+              consecutiveErrors = 0;
               // Znacznik na calej grupie: restart petli je pomija.
               const marked = group.map((l) => ({ ...l, missingOnServer: true }));
               const merged = upsertLetters(ui.state.archive, marked);
@@ -1363,6 +1381,8 @@ export async function init(api: PluginApi) {
               persistArchive();
             } else if (!flag.cancelled) {
               failed += 1;
+              consecutiveErrors += 1;
+              if (consecutiveErrors >= DOWNLOAD_BREAKER_LIMIT) breakerTripped = true;
             }
             const processed = done + failed + missing;
             const now = Date.now();
@@ -1377,10 +1397,17 @@ export async function init(api: PluginApi) {
             ui.setBusy(
               `Pobieram tresci do archiwum (${processed}/${total})...`,
             );
+            if (breakerTripped) break;
             if (flag.cancelled) break;
             await sleepOrCancel(LOAD_ALL_PACE_MS, flag);
           }
-          if (flag.cancelled) {
+          if (breakerTripped) {
+            notify(
+              api,
+              "Przerwano pobieranie - serwer poczty nie odpowiada. " +
+                "Pobrane tresci sa zapisane. Sprobuj ponownie pozniej.",
+            );
+          } else if (flag.cancelled) {
             notify(api, `Przerwano pobieranie tresci (pobrano: ${done} z ${total}).`);
           } else if (failed === 0 && missing === 0) {
             notify(api, `Pobrano tresci do archiwum (listow: ${done}).`);
