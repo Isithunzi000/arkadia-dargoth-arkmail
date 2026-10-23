@@ -24,6 +24,7 @@ import {
   waitRt,
   click,
   notifyText,
+  textOf,
   type Harness,
 } from './harness';
 
@@ -345,7 +346,7 @@ test('incydentalny duplikat strony kotwicowej: klepniecie + retry ratuja skrzynk
   }
 });
 
-test('sciana granulacji: sonda "przed D" ze swiezym wpisem przeciska paginacje (Fala 26c)', async () => {
+test('ponad 50 listow jednego dnia: starsze dni sa pobierane, a luka jest zapisana', async () => {
   // Zgloszenie 2026-10-22: strona jednodniowa + ucieta ("pierwsze 50",
   // wszystkie wpisy z 20 XII) - kotwica "przed 21 XII" strukturalnie
   // zwraca TA SAMA strone (serwer wyklucza tylko dzien graniczny),
@@ -414,8 +415,10 @@ test('sciana granulacji: sonda "przed D" ze swiezym wpisem przeciska paginacje (
     // niewyslane: puste.
     await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksacja: niewyslane');
     f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
-    // Pelne 4/4 mimo sciany na wyslanych; zero klamstwa "serwer muli".
-    await waitRt(() => notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'toast 4/4');
+    // Starsze dni sa dostepne, ale czesc dnia granicznego pozostaje nieznana.
+    await waitRt(() => notifyText(f, 'Indeksowanie niekompletne'), 'uczciwy raport');
+    assert.ok(notifyText(f, 'ponad 50 listow z dnia 2025-12-20'), 'raport wskazuje luke');
+    assert.ok(!notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'brak falszywego kompletu');
     assert.ok(!notifyText(f, 'muli'), 'bez falszywego komunikatu o mieleniu');
     // Opozniony retry skrzynki odbiorczej z prologu (test > 10 s).
     await waitRt(
@@ -432,12 +435,15 @@ test('sciana granulacji: sonda "przed D" ze swiezym wpisem przeciska paginacje (
     );
     f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
     await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji');
+    click(h, '[data-tab="kontakty"]');
+    await waitRt(() => !!h.content.querySelector('.arkmail-index-gaps'), 'zapisana luka w widoku');
+    assert.ok(textOf(h, '.arkmail-index-gaps').includes('wyslane: 2025-12-20'), 'dzien i skrzynka luki');
   } finally {
     await stopHarness();
   }
 });
 
-test('sciana granulacji: sonda "przed D" pusta = skrzynka kompletna, nie "serwer muli" (Fala 26c)', async () => {
+test('ponad 50 listow jednego dnia bez starszych wpisow: luka, nie komplet', async () => {
   // Dokladny przypadek ze zgloszenia 2026-10-22: strona jednodniowa
   // ucieta, starszych listow na serwerze NIE MA - sonda wykluczajaca
   // dzien graniczny dostaje pusta odpowiedz wariantem filtrowanym
@@ -500,11 +506,13 @@ test('sciana granulacji: sonda "przed D" pusta = skrzynka kompletna, nie "serwer
     // niewyslane: puste.
     await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksacja: niewyslane');
     f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
-    await waitRt(() => notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'toast 4/4');
+    await waitRt(() => notifyText(f, 'Indeksowanie niekompletne'), 'uczciwy raport');
+    assert.ok(notifyText(f, 'ponad 50 listow z dnia 2025-12-20'), 'raport wskazuje luke');
+    assert.ok(!notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'brak falszywego kompletu');
     assert.ok(!notifyText(f, 'muli'), 'bez falszywego komunikatu o mieleniu');
-    // Kontakty odblokowane (4/4 flagi).
     click(h, '[data-tab="kontakty"]');
-    await waitRt(() => !!h.content.querySelector('.arkmail-contact'), 'kontakty po 4/4');
+    await waitRt(() => !!h.content.querySelector('.arkmail-index-gaps'), 'zapisana luka w widoku');
+    assert.ok(textOf(h, '.arkmail-index-gaps').includes('wyslane: 2025-12-20'), 'dzien i skrzynka luki');
     // Opozniony retry skrzynki odbiorczej z prologu (test > 10 s).
     await waitRt(
       () => f.sent.filter((c) => c === 'listy odebrane').length === 3,

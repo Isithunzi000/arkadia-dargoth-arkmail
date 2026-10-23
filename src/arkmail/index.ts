@@ -29,6 +29,13 @@ import {
   searchDescription,
 } from "./core/protocol/commands";
 import type { LetterTemplate } from "./core/letterRender";
+import {
+  ANCHOR_RETRY_WAITS_MS,
+  PAGE_PACE_MS,
+  entryKey,
+  oldestEntry,
+  scanMailboxPages,
+} from "./core/pagination";
 import { contactsFromArchive } from "./core/contacts";
 import {
   contentKeyOf,
@@ -57,13 +64,10 @@ const FOOTER_BUTTON_ID = "arkmail";
 const FOOTER_STATE = "arkmail-poczta";
 const ALIAS_REGEX = /^\/arkmail$/i;
 const SESSION_OPTS = { timeoutMs: 8000, idleMs: 400 };
-/** Bezpieczniki petli "Wczytaj wszystkie" (Fala 8e): twardy limit stron
- *  na jedno klikniecie i pauza miedzy stronami (grzecznosc wobec serwera). */
-export const LOAD_ALL_MAX_PAGES = 40;
 /** Prog szerokosci popupu dla ukladu dwupanelowego (Fala 10): >= 900px
  *  lista z lewej + podglad z prawej, nizej jeden panel (komorka). */
 export const WIDE_MIN_WIDTH = 900;
-export const LOAD_ALL_PACE_MS = 400;
+export const LOAD_ALL_PACE_MS = PAGE_PACE_MS;
 /**
  * Fala 20d podniosla tempo stron w INDEKSACJI do 800 ms (zgloszenie
  * 2026-10-21: 400 ms/strone mlocilo wolny serwer - throttle "Listy
@@ -71,7 +75,7 @@ export const LOAD_ALL_PACE_MS = 400;
  * strony dostaje proby z klepnieciem (INDEX_ANCHOR_RETRY_WAITS_MS),
  * wiec tempo wraca do 400 ms - tyle co reczne loadAll.
  */
-export const INDEX_PACE_MS = 400;
+export const INDEX_PACE_MS = PAGE_PACE_MS;
 /**
  * Fala 24d: proby powtorki kotwicy po duplikacie strony w indeksacji
  * (zgloszenie 2026-10-21 "pominiete wyslane / 3-4"). Kazda proba:
@@ -80,7 +84,7 @@ export const INDEX_PACE_MS = 400;
  * dopiero powtorka kotwicy. Duplikat po wyczerpaniu prob = serwer
  * muli, skrzynka pomijana.
  */
-export const INDEX_ANCHOR_RETRY_WAITS_MS = [2500, 4000, 4000];
+export const INDEX_ANCHOR_RETRY_WAITS_MS = ANCHOR_RETRY_WAITS_MS;
 /**
  * Fala 24f2: bezczynnosc w recznym trybie poczty gracza, po ktorej
  * tryb wygasa (gracz mogl przerwac sesje bez q/x). Aktywnosc =
@@ -147,6 +151,7 @@ const ARCHIVE_KEY = "archiwum";
 const NOTIFY_KEY = "powiadomienia";
 const COMPOSE_KEY = "compose";
 const INDEX_KEY = "indeks";
+const ARCHIVE_GAPS_KEY = "luki-archiwum";
 
 let apiRef: PluginApi | null = null;
 let storageRef: CharStorage | null = null;
@@ -256,6 +261,7 @@ export async function init(api: PluginApi) {
     composeWidth: composePrefs?.width ?? 60,
     // Fala 18c: flagi kompletnej indeksacji skrzynek (brama Kontaktow).
     indexMeta: storage.getJSON<Partial<Record<MailBox, string>>>(INDEX_KEY) ?? {},
+    archiveGaps: storage.getJSON<Partial<Record<MailBox, string[]>>>(ARCHIVE_GAPS_KEY) ?? {},
   });
   const ui = store;
   const mailbox = new MailboxSession(transport, sessionOpts);
@@ -616,34 +622,29 @@ export async function init(api: PluginApi) {
     storage.setJSON(INDEX_KEY, ui.state.indexMeta);
   };
 
-  /**
-   * Najstarszy wpis widoku: listing idzie od NAJSTARSZEGO listu (gora)
-   * do najnowszego (dol), ale liczymy minimum po dacie - odporne na
-   * kolejnosc wpisow. Dowod: log sesji 2026-10-17.
-   */
-  const oldestEntry = (entries: MailboxEntry[]): MailboxEntry | null => {
-    let oldest: MailboxEntry | null = null;
-    for (const e of entries) {
-      if (!e.date) continue;
-      if (
-        !oldest ||
-        e.date.year < oldest.date!.year ||
-        (e.date.year === oldest.date!.year &&
-          (e.date.month < oldest.date!.month ||
-            (e.date.month === oldest.date!.month &&
-              (e.date.day < oldest.date!.day ||
-                (e.date.day === oldest.date!.day &&
-                  e.date.time < oldest.date!.time)))))
-      ) {
-        oldest = e;
-      }
-    }
-    return oldest;
+  const persistArchiveGaps = (): void => {
+    storage.setJSON(ARCHIVE_GAPS_KEY, ui.state.archiveGaps);
   };
 
-  /** Klucz tozsamosci wpisu - BEZ numeru (serwer renumeruje strony). */
-  const entryKey = (e: MailboxEntry): string =>
-    [e.party, e.subject, e.forwarded ? "f" : "", e.date?.raw ?? ""].join("|");
+  const recordArchiveGap = (box: MailBox, day: string): void => {
+    const days = [...new Set([...(ui.state.archiveGaps[box] ?? []), day])].sort();
+    ui.setArchiveGaps({ ...ui.state.archiveGaps, [box]: days });
+    persistArchiveGaps();
+    if (ui.state.indexMeta[box] !== undefined) {
+      const meta = { ...ui.state.indexMeta };
+      delete meta[box];
+      ui.setIndexMeta(meta);
+      persistIndexMeta();
+    }
+  };
+
+  const clearArchiveGaps = (box: MailBox): void => {
+    if (ui.state.archiveGaps[box] === undefined) return;
+    const gaps = { ...ui.state.archiveGaps };
+    delete gaps[box];
+    ui.setArchiveGaps(gaps);
+    persistArchiveGaps();
+  };
 
   /**
    * Bump kontekstu po KAZDYM listingu (Fala 14f) - takze pustym, bo
@@ -703,33 +704,49 @@ export async function init(api: PluginApi) {
   /** Paginacja wstecz: jedna starsza strona listingow do archiwum. */
   const loadOlder = (box: MailBox): void => {
     const generation = connectionGeneration;
+    const flag = { cancelled: false };
     ui.setBusy("Wczytuje starsze listy...");
     void lock
       .runExclusive(async () => {
-        // Fala 20e: kotwica liczona POD blokada, ze swiezego widoku
-        // (porzadek jeden: stan czytamy po wejsciu do sesji, nie przed).
         const view = ui.state.boxes[box];
         const oldest = oldestEntry(view?.entries ?? []);
         if (!oldest?.date) {
           notify(api, "Nie mozna wczytac starszych - najpierw pobierz skrzynke.");
           return;
         }
-        // Kotwica: najstarsza data + 1 dzien ("przed" wyklucza caly
-        // dzien graniczny; nakladanie zamiast dziur, dedup zdejmuje
-        // duplikaty).
-        const res = await mailbox.fetch(box, olderListingCommand(box, nextDay(oldest.date)));
-        if (res.kind === "lista") {
-          stampEntries(box, res.entries);
-          ui.appendMailboxPage(box, res.entries, res.header.truncated);
-          const incoming = res.entries.map((e) => fromMailboxEntry(box, e));
-          const merged = upsertLetters(ui.state.archive, incoming);
-          ui.setArchive(merged.letters);
-          persistArchive();
-          notify(api, `Wczytano starsze listy (nowych: ${merged.added}).`);
-        } else {
-          bumpCtx(box); // Fala 14f: pusta strona tez nadpisuje kontekst
+        const scan = await scanMailboxPages({
+          box,
+          initialCommand: olderListingCommand(box, nextDay(oldest.date)),
+          singlePage: true,
+          cancelled: () => flag.cancelled || generation !== connectionGeneration,
+          fetchPage: (command) => mailbox.fetch(box, command),
+          wait: (ms) => sleepOrCancel(ms, flag),
+          onBaseRefresh: () => bumpCtx(box),
+          onGap: (day) => recordArchiveGap(box, day),
+          onEmpty: () => bumpCtx(box),
+          onPage: (res) => {
+            stampEntries(box, res.entries);
+            const addedToView = ui.appendMailboxPage(box, res.entries, res.header.truncated);
+            const merged = upsertLetters(
+              ui.state.archive,
+              res.entries.map((entry) => fromMailboxEntry(box, entry)),
+            );
+            ui.setArchive(merged.letters);
+            persistArchive();
+            return { addedToView, archiveAdded: merged.added };
+          },
+        });
+        if (scan.end === "cancelled") return;
+        if (scan.end === "complete" && scan.pages === 0) {
           ui.appendMailboxPage(box, [], false);
           notify(api, "Brak starszych listow.");
+        } else if (scan.end === "incomplete") {
+          notify(
+            api,
+            `Wczytano dostepne listy (dodanych do listy: ${scan.addedToView}). ${scan.skipWhy ?? "Sprobuj ponownie za chwile"}.`,
+          );
+        } else {
+          notify(api, `Wczytano starsze listy (dodanych do listy: ${scan.addedToView}).`);
         }
       })
       .catch((err: unknown) => {
@@ -740,8 +757,6 @@ export async function init(api: PluginApi) {
       .finally(() => {
         if (generation !== connectionGeneration) return;
         ui.setBusy(null);
-        // Fala 24b: doczytana strona = nowe osoby w archiwum - kontakty
-        // odbudowujemy od razu, nie dopiero przy refreshu/indeksacji.
         rebuildContacts();
       });
   };
@@ -757,22 +772,12 @@ export async function init(api: PluginApi) {
     }
   };
 
-  /**
-   * Petla "Wczytaj wszystkie": kolejne strony starszych listingow pod
-   * JEDNA blokada sesji. Koniec: strona niepelna / pusta, limit stron
-   * albo Przerwij (drugi klik tego samego przycisku). Kazda strona
-   * doklejana jest przez appendMailboxPage (dedup), archiwum zapisywane
-   * po kazdej stronie.
-   */
+  /** Wczytuje starsze strony bez sztywnego limitu ich liczby. */
   const loadAll = (box: MailBox): void => {
     if (loadAllFlag) {
       loadAllFlag.cancelled = true;
       return;
     }
-    // Fala 20e: guard PO fladze cancel - drugi klik wlasnej petli to
-    // Przerwij, nie odmowa. Przy cudzej sesji: odmowa zamiast cichego
-    // zakolejkowania ciezkiej petli (40 stron ruszaloby "znikad",
-    // audyt race-condition 2026-10-21).
     if (lock.locked) {
       notify(api, SESSION_BUSY_MSG);
       return;
@@ -783,69 +788,55 @@ export async function init(api: PluginApi) {
     const generation = connectionGeneration;
     void lock
       .runExclusive(async () => {
-        let pages = 0;
-        let added = 0;
         try {
-          for (;;) {
-            const view = ui.state.boxes[box];
-            if (!view || !view.truncated) break;
-            if (pages >= LOAD_ALL_MAX_PAGES) break;
-            if (flag.cancelled) break;
-            const oldest = oldestEntry(view.entries);
-            if (!oldest?.date) break;
-            // Kotwica jak w loadOlder: najstarsza data + 1 dzien.
-            const res = await mailbox.fetch(box, olderListingCommand(box, nextDay(oldest.date)));
-            pages += 1;
-            let more = false;
-            if (res.kind === "lista") {
+          const view = ui.state.boxes[box];
+          const oldest = oldestEntry(view?.entries ?? []);
+          if (!view?.truncated || !oldest?.date) return;
+          const scan = await scanMailboxPages({
+            box,
+            initialCommand: olderListingCommand(box, nextDay(oldest.date)),
+            cancelled: () => flag.cancelled || generation !== connectionGeneration,
+            fetchPage: (command) => mailbox.fetch(box, command),
+            wait: (ms) => sleepOrCancel(ms, flag),
+            onBaseRefresh: () => bumpCtx(box),
+            onGap: (day) => recordArchiveGap(box, day),
+            onEmpty: () => bumpCtx(box),
+            onPage: (res, pages) => {
               stampEntries(box, res.entries);
-              const freshCount = ui.appendMailboxPage(box, res.entries, res.header.truncated);
+              const addedToView = ui.appendMailboxPage(box, res.entries, res.header.truncated);
               const merged = upsertLetters(
                 ui.state.archive,
-                res.entries.map((e) => fromMailboxEntry(box, e)),
+                res.entries.map((entry) => fromMailboxEntry(box, entry)),
               );
               ui.setArchive(merged.letters);
               persistArchive();
-              added += merged.added;
-              // Fala 9d (straznik mielenia): strona bez NOWYCH wpisow =
-              // kotwica stoi w miejscu (np. ogon ponad 50 listow jednego
-              // dnia) - dalsze strony bylyby identyczne, petla staje mimo
-              // suffixu uciecia.
-              more = res.header.truncated && freshCount > 0;
-            } else {
-              bumpCtx(box); // Fala 14f: pusta strona tez nadpisuje kontekst
-              ui.appendMailboxPage(box, [], false);
-            }
-            ui.setLoadAll({ box, pages });
-            // Fala 28d: wielokropek jak w "Wczytuje starsze listy..." -
-            // to postep operacji w toku, nie komunikat zamkniety.
-            ui.setBusy(`Wczytuje wszystkie (${box}): strona ${pages}...`);
-            if (!more || flag.cancelled) break;
-            await sleepOrCancel(LOAD_ALL_PACE_MS, flag);
+              ui.setLoadAll({ box, pages });
+              ui.setBusy(`Wczytuje wszystkie (${box}): strona ${pages}...`);
+              return { addedToView, archiveAdded: merged.added };
+            },
+          });
+          if (scan.end === "cancelled") {
+            notify(api, `Przerwano (dodanych do listy: ${scan.addedToView}).`);
+            return;
           }
-          if (flag.cancelled) {
-            notify(api, `Przerwano (nowych listow: ${added}).`);
-          } else if (pages >= LOAD_ALL_MAX_PAGES && ui.state.boxes[box]?.truncated) {
-            notify(
-              api,
-              `Limit ${LOAD_ALL_MAX_PAGES} stron (listow: ${added}) - kliknij ponownie, aby kontynuowac.`,
-            );
-          } else {
-            // Fala 24c: petla zatrzymana naturalnie (widok bez suffixu
-            // uciecia, bez Przerwij i bez limitu stron) = kompletny
-            // listing skrzynki - ta sama pewnosc co przy pelnej
-            // indeksacji (Fala 18a): gone-marking z widoku + stamp
-            // indexMeta (brama Kontaktow moze odpasc bez indeksacji).
+          if (scan.end === "complete") {
+            ui.appendMailboxPage(box, [], false);
+            clearArchiveGaps(box);
             const done = ui.state.boxes[box];
             if (done && !done.truncated) {
               markGoneFromServer(
                 box,
-                new Set(done.entries.map((e) => fromMailboxEntry(box, e).id)),
+                new Set(done.entries.map((entry) => fromMailboxEntry(box, entry).id)),
               );
               ui.setIndexMeta({ ...ui.state.indexMeta, [box]: new Date().toISOString() });
               persistIndexMeta();
             }
-            notify(api, `Wczytano wszystkie (nowych listow: ${added}).`);
+            notify(api, `Wczytano wszystkie (dodanych do listy: ${scan.addedToView}).`);
+          } else {
+            notify(
+              api,
+              `Wczytano dostepne listy (dodanych do listy: ${scan.addedToView}). ${scan.skipWhy ?? "Sprobuj ponownie za chwile"}.`,
+            );
           }
         } finally {
           if (generation !== connectionGeneration) return;
@@ -861,38 +852,15 @@ export async function init(api: PluginApi) {
       .finally(() => {
         if (generation !== connectionGeneration) return;
         ui.setBusy(null);
-        // Fala 24b: jak wyzej - petla dopisala listy do archiwum,
-        // kontakty maja odzwierciedlac baze bez dodatkowego kliku.
         rebuildContacts();
       });
   };
 
   /** Flaga biezacej petli "Indeksuj wszystkie skrzynki" (null = brak). */
   let indexFlag: { cancelled: boolean } | null = null;
-  /**
-   * Kontynuacja po kompletnej indeksacji wszystkich skrzynek:
-   * 'download' - kazde pobranie tresci zaczyna sie od indeksacji
-   * (decyzja 2026-10-23), petla odpala sie automatycznie po niej;
-   * 'export' - kazdy zapis archiwum do ZIP zaczyna sie od indeksacji,
-   * po niej plik powstaje automatycznie. Przerwana albo niekompletna
-   * indeksacja kontynuacji NIE odpala.
-   */
+  /** Akcja wykonywana dopiero po kompletnej biezacej indeksacji. */
   let indexContinuation: null | "download" | "export" = null;
 
-  /**
-   * Petla "Indeksuj wszystkie skrzynki" (Fala 18c, zgloszenie
-   * 2026-10-20 pkt 1): pelny listing KAZDEJ skrzynki (kotwice
-   * paginacji jak loadAll, tempo INDEX_PACE_MS - Fala 20d), kazda
-   * strona doklejana do archiwum. Po KOMPLETNYM przejsciu skrzynki:
-   * gone-marking (markGoneFromServer - ta sama pewnosco kompletnej
-   * prawdy co przy nieobcietym listingu w fetchBoxes) i flaga
-   * indexMeta[box]. Dopiero pelny indeks czyni archiwum kompletna
-   * podstawa licznikow kontaktow (brama Kontaktow w render.ts).
-   * Widoku skrzynek NIE dotyka (badge'y zyja z listingow
-   * jednostronicowych). Drugi klik przycisku = Przerwij. Skrzynka
-   * niedomknieta (mielenie kotwicy / limit stron / Przerwij) = stop
-   * calej petli bez flagi dla niej.
-   */
   const indexAllBoxes = (): void => {
     if (indexFlag) {
       indexFlag.cancelled = true;
@@ -905,176 +873,52 @@ export async function init(api: PluginApi) {
     const flag = { cancelled: false };
     indexFlag = flag;
     let done = 0;
-    // Kontynuacja (pobieranie/eksport) odpala sie tylko po KOMPLETNYM
-    // biezacym przebiegu - przerwanie albo pominieta skrzynka ja
-    // blokuje, nawet gdy znaczniki indexMeta sa kompletne z
-    // wczesniejszego przebiegu.
     let runCompleted = false;
     const generation = connectionGeneration;
-    // Fala 19a: skrzynki pominiete (kotwica bez postepu / limit stron)
-    // z powodem - petla jedzie dalej, raport koncowy je wymienia.
     const skipped: string[] = [];
     void lock
       .runExclusive(async () => {
         try {
           for (let i = 0; i < INDEX_BOXES.length; i++) {
             const box = INDEX_BOXES[i]!;
-            if (flag.cancelled) break;
+            if (flag.cancelled || generation !== connectionGeneration) break;
             ui.setIndexRun({ boxIndex: i, box, pages: 0 });
             ui.setBusy(`Indeksuje skrzynke ${box} (${i + 1}/${INDEX_BOXES.length})...`);
             const seen = new Set<string>();
-            const all: MailboxEntry[] = [];
-            let pages = 0;
-            let complete = false;
-            let skipWhy: string | null = null;
-            // Fala 24e: tryb przeczesu ze stampa (swiezy = incrementalny
-            // do klamry) + dzien najstarszego wpisu widzianego w petli
-            // (granica zakresowego gone-markingu po klamrze).
             const sweepMode = indexSweepMode(ui.state.indexMeta, box, Date.now());
-            let oldestSeenDay: string | null = null;
-            let clamped = false;
-            // Fala 24d: duplikat strony to zwykle incydent (powtorka
-            // odpowiedzi serwera albo zdewanieowany kontekst listingu),
-            // nie trwale mielenie - kotwice powtarzamy do 3 razy, przed
-            // kazda proba pauza i klepniecie listingu bazowego
-            // (INDEX_ANCHOR_RETRY_WAITS_MS). Dopiero duplikat po
-            // wyczerpaniu prob potwierdza mielenie.
-            let anchorRetries = 0;
-            // Fala 26c: znacznik sondy sciany granulacji dziennej
-            // (jedna sonda na epizod duplikatow; reset przy stronie
-            // ze swiezymi wpisami).
-            let wallProbed = false;
-            let res = await mailbox.fetch(box);
-            for (;;) {
-              if (res.kind === "lista") {
-                pages += 1;
+            const scan = await scanMailboxPages({
+              box,
+              cancelled: () => flag.cancelled || generation !== connectionGeneration,
+              fetchPage: (command) => mailbox.fetch(box, command),
+              wait: (ms) => sleepOrCancel(ms, flag),
+              onGap: (day) => recordArchiveGap(box, day),
+              onPage: (res, pages) => {
                 ui.setIndexRun({ boxIndex: i, box, pages });
-                const entries = res.entries.map((e) => fromMailboxEntry(box, e));
-                // Straznik mielenia jak w loadAll (Fala 9d): strona bez
-                // NOWYCH wpisow = kotwica stoi w miejscu - stop bez flagi.
-                const freshCount = entries.filter((e) => !seen.has(e.id)).length;
-                for (const e of entries) seen.add(e.id);
-                for (const e of entries) {
-                  const day = e.sortKey.slice(0, 10);
-                  if (oldestSeenDay === null || day < oldestSeenDay) oldestSeenDay = day;
-                }
-                all.push(...res.entries);
+                const entries = res.entries.map((entry) => fromMailboxEntry(box, entry));
+                for (const entry of entries) seen.add(entry.id);
                 const merged = upsertLetters(ui.state.archive, entries);
                 ui.setArchive(merged.letters);
                 persistArchive();
-                if (!res.header.truncated) {
-                  complete = true;
-                  break;
-                }
-                if (freshCount === 0) {
-                  const oldestDup = oldestEntry(all);
-                  if (!oldestDup?.date) {
-                    skipWhy = "brak daty w wpisach";
-                    break;
-                  }
-                  const attempt = anchorRetries;
-                  if (attempt < INDEX_ANCHOR_RETRY_WAITS_MS.length) {
-                    anchorRetries += 1;
-                    await sleepOrCancel(INDEX_ANCHOR_RETRY_WAITS_MS[attempt]!, flag);
-                    if (flag.cancelled) break;
-                    // Fala 24d: klepniecie - swiezy listing bazowy
-                    // odswieza kontekst listingu serwera (Fala 14f),
-                    // dopiero potem powtorka kotwicy. Wynik pomijany.
-                    await mailbox.fetch(box);
-                    if (flag.cancelled) break;
-                    res = await mailbox.fetch(
-                      box,
-                      olderListingCommand(box, nextDay(oldestDup.date)),
-                    );
-                    continue;
-                  }
-                  // Fala 26c (zgloszenie 2026-10-22): zanim uznamy
-                  // mielenie, sonda kotwica WYKLUCZAJACA dzien graniczny
-                  // ("przed D" zamiast "przed D+1"). Strona jednodniowa
-                  // ucieta strukturalnie zwraca duplikat na kotwice
-                  // z nextDay (serwer wyklucza tylko dzien graniczny),
-                  // co NIE jest mieleniem - sonda rozroznia: swieze
-                  // starsze wpisy = sciana pokonana i paginacja jedzie
-                  // dalej; pusto = skrzynka kompletna (Fala 19a);
-                  // zwrot dnia D mimo wykluczenia = serwer lamie filtr
-                  // daty i dopiero to jest trwale mielenie. Koszt
-                  // sondy przy prawdziwej scianie: ogien dnia D ponad
-                  // limit strony jest i tak nieosiagalny kotwicami
-                  // dziennymi.
-                  if (!wallProbed) {
-                    wallProbed = true;
-                    res = await mailbox.fetch(box, olderListingCommand(box, oldestDup.date));
-                    continue;
-                  }
-                  // Fala 20c/24d: powod pomieciecia PO LUDZKU - gracz
-                  // nie zna "kotwic" ani "postepu". Mielenie potwierdza
-                  // dopiero duplikat po wyczerpaniu prob z klepnieciem
-                  // ORAZ odpowiedz sondy z dniem wykluczonym (Fala 26c).
-                  skipWhy = "serwer chwilowo muli - sprobuj ponownie za chwile";
-                  break;
-                }
-                anchorRetries = 0;
-                wallProbed = false;
-                // Fala 24e: tryb incrementalny - strona W CALOSCI
-                // znana z archiwum (upsert bez nowych), a NIE
-                // powtorzona z tej petli (powtorki wylapuje straznik
-                // mielenia wyzej: freshCount === 0) = KLAMRA.
-                // Dotarlismy do przeciecia z posiadana baza - dalszy
-                // przeces jest zbedny.
-                if (sweepMode === "incremental" && merged.added === 0) {
-                  clamped = true;
-                  break;
-                }
-                if (pages >= LOAD_ALL_MAX_PAGES) {
-                  skipWhy = `limit ${LOAD_ALL_MAX_PAGES} stron`;
-                  break;
-                }
-                if (flag.cancelled) break;
-                const oldest = oldestEntry(all);
-                if (!oldest?.date) {
-                  skipWhy = "brak daty w wpisach";
-                  break;
-                }
-                await sleepOrCancel(INDEX_PACE_MS, flag);
-                if (flag.cancelled) break;
-                res = await mailbox.fetch(box, olderListingCommand(box, nextDay(oldest.date)));
-              } else {
-                // Fala 19a (zgloszenie 2026-10-20): KAZDA zaakceptowana
-                // pusta odpowiedz = kompletna prawda o skrzynce. Wariant
-                // 'puste' ("Nie masz zadnych ... listow.") na pustej
-                // skrzynce; wariant 'filtr' ("Nie znaleziono zadnych
-                // takich ...") na pustej skrzynce wyslanych (serwer
-                // traktuje wyslane jako selekcje - fixture z loga
-                // 2026-10-18) ORAZ na pustej stronie kotwicowej (brak
-                // starszych = koniec paginacji, jak w loadAll). Straznik
-                // desynchronizacji w mailbox.fetch odfiltrowal odpowiedzi
-                // za inne skrzynki - tu dociera tylko odpowiedz za
-                // zadana. Przed Fala 19a 'filtr' zabijal petle bez flagi
-                // ("2 z 4" i martwa petla).
-                complete = true;
-                break;
-              }
-            }
-            if ((complete || clamped) && !flag.cancelled) {
-              if (clamped) {
-                // Fala 24e: klamra = przeces do przeciecia z baza.
-                // Gone-marking ZAKRESOWY (tylko nowsze niz najstarszy
-                // widziany dzien) i BEZ stampa - stamp to pelna
-                // weryfikacja, daje ja dopiero naturalny koniec stron
-                // (pelny przeces) albo loadAll (Fala 24c).
-                markGoneFromServerNewerThan(box, seen, oldestSeenDay ?? "");
+                return {
+                  archiveAdded: merged.added,
+                  stop: sweepMode === "incremental" && merged.added === 0,
+                };
+              },
+            });
+            if ((scan.end === "complete" || scan.end === "clamped") && !flag.cancelled) {
+              if (scan.end === "clamped") {
+                markGoneFromServerNewerThan(box, seen, scan.oldestSeenDay ?? "");
               } else {
                 markGoneFromServer(box, seen);
+                clearArchiveGaps(box);
                 ui.setIndexMeta({ ...ui.state.indexMeta, [box]: new Date().toISOString() });
                 persistIndexMeta();
               }
               done += 1;
-            } else if (flag.cancelled) {
+            } else if (scan.end === "cancelled" || flag.cancelled) {
               break;
             } else {
-              // Fala 19a: skrzynka niedomknieta nie zabija petli -
-              // jedziemy dalej, raport koncowy ja wymieni.
-              skipped.push(`${box} (${skipWhy ?? "niekompletne"})`);
+              skipped.push(`${box} (${scan.skipWhy ?? "niekompletne"})`);
             }
           }
           runCompleted = !flag.cancelled && skipped.length === 0;
@@ -1090,7 +934,7 @@ export async function init(api: PluginApi) {
               `Zindeksowano wszystkie skrzynki (listow w bazie: ${ui.state.archive.length}).`,
             );
           } else {
-            rebuildContacts(); // czesciowy indeks tez odswieza liczniki
+            rebuildContacts();
             notify(
               api,
               `Indeksowanie niekompletne - pominiete: ${skipped.join(", ")}. ` +
@@ -1111,11 +955,6 @@ export async function init(api: PluginApi) {
       })
       .finally(() => {
         if (generation !== connectionGeneration) return;
-        // Kontynuacja guardow PO zwolnieniu blokady sesji (finally
-        // runExclusive wykonuje sie po release). Tylko kompletny
-        // biezacy przebieg odpala akcje nastepcza - sama kompletna
-        // meta z wczesniejszego przebiegu NIE wystarcza (przerwana
-        // indeksacja nie moze wystartowac pobierania).
         const cont = indexContinuation;
         indexContinuation = null;
         if (!runCompleted || !allBoxesIndexed(ui.state.indexMeta)) return;

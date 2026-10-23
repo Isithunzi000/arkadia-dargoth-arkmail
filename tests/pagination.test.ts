@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 
 import { olderListingCommand, nextDay } from '../src/arkmail/core/protocol/commands';
 import { parseMailDate } from '../src/arkmail/core/protocol/parser';
-import { LOAD_ALL_MAX_PAGES, LOAD_ALL_PACE_MS } from '../src/arkmail/index';
+import { INDEX_ANCHOR_RETRY_WAITS_MS, LOAD_ALL_PACE_MS } from '../src/arkmail/index';
 import {
   startHarness,
   stopHarness,
@@ -28,6 +28,7 @@ import {
   waitRt,
   notifyText,
   textOf,
+  driveIndexAll,
 } from './harness';
 
 test('paginacja: miesiac rzymski WIELKA litera (wymog serwera)', () => {
@@ -67,7 +68,7 @@ test('paginacja: wczytaj starsze dokleja strone "Wybrane" do widoku i archiwum',
     f.fire('Nadawca: Waldo                          N, 14 XII 2025, 10:00:00', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(() => content.querySelectorAll('.arkmail-entry').length === 4, 'merge strony');
-    await waitFor(() => notifyText(f, 'nowych: 1'), 'notify o dopisaniu starszych do archiwum');
+    await waitFor(() => notifyText(f, 'dodanych do listy: 1'), 'notify o dopisaniu starszych do archiwum');
 
     // Klik 2: kotwica = 14 XII + 1 dzien = 15 XII 2025.
     click(h, '.arkmail-older');
@@ -112,9 +113,8 @@ test('paginacja: linia-blad serwera konczy sesje z komunikatem (bez cichego time
 
 // --- Fala 8e: "Wczytaj wszystkie" - petla stron pod jedna blokada -------------
 
-test('wczytaj wszystkie: bezpieczniki petli (limit stron i pacing)', () => {
-  assert.equal(LOAD_ALL_MAX_PAGES, 40, 'twardy limit stron na jedno klikniecie');
-  assert.equal(LOAD_ALL_PACE_MS, 400, 'pauza miedzy stronami (grzecznosc wobec serwera)');
+test('wczytaj wszystkie: pauza miedzy stronami bez sztywnego limitu', () => {
+  assert.equal(LOAD_ALL_PACE_MS, 400, 'pauza miedzy stronami');
 });
 
 test('wczytaj wszystkie: petla stron az do konca (kotwica przesuwa sie co strone)', async () => {
@@ -156,7 +156,7 @@ test('wczytaj wszystkie: petla stron az do konca (kotwica przesuwa sie co strone
     f.fire('Nadawca: Baz                          Pn, 1 XII 2025, 09:00:00', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(
-      () => notifyText(f, 'Wczytano wszystkie (nowych listow: 2)'),
+      () => notifyText(f, 'Wczytano wszystkie (dodanych do listy: 2)'),
       'notify podsumowania petli',
     );
     assert.equal(content.querySelectorAll('.arkmail-entry').length, 5, '3 + 2 wpisy po merge');
@@ -189,7 +189,7 @@ test('wczytaj wszystkie: Przerwij zatrzymuje petle miedzy stronami', async () =>
     await waitRt(() => textOf(h, '.arkmail-older-all').includes('Przerwij'), 'Przerwij w petli');
 
     click(h, '.arkmail-older-all'); // = Przerwij
-    await waitRt(() => notifyText(f, 'Przerwano (nowych listow: 1)'), 'notify przerwania');
+    await waitRt(() => notifyText(f, 'Przerwano (dodanych do listy: 1)'), 'notify przerwania');
 
     // Pacing by minal - komendy paginacji nie leca dalej.
     await new Promise((r) => setTimeout(r, 500));
@@ -209,7 +209,9 @@ test('wczytaj wszystkie: Przerwij zatrzymuje petle miedzy stronami', async () =>
 
 // --- Fala 9d: straznik mielenia - strona bez nowych wpisow zatrzymuje petle --
 
-test('wczytaj wszystkie: strona bez nowych wpisow zatrzymuje petle', async () => {
+test('wczytaj wszystkie: ponad 50 listow jednego dnia zapisuje luke zamiast kompletu', async () => {
+  const waits = [...INDEX_ANCHOR_RETRY_WAITS_MS];
+  INDEX_ANCHOR_RETRY_WAITS_MS.splice(0);
   const h = await startHarness();
   const { f, waitFor } = h;
   try {
@@ -220,37 +222,31 @@ test('wczytaj wszystkie: strona bez nowych wpisow zatrzymuje petle', async () =>
       'komenda petli 1',
     );
     const cmd = () => f.sent.filter((c) => c === 'listy odebrane przed 22 XII 2025').length;
-
-    // Strona z listami TEGO SAMEGO dnia co najstarszy widoczny (21 XII):
-    // wpisy sa nowe, ale kotwica (najstarsza data + 1 dzien) NIE cofa sie.
-    f.fire('Wybrane listy odebrane (prezentowane jest pierwsze 50):', 'mail');
-    f.fire(' 3. *R* Temat: ranny jeden', 'mail');
-    f.fire('Nadawca: Bar                          N, 21 XII 2025, 00:45:00', 'mail');
-    f.fire(' 2. *R* Temat: ranny dwa', 'mail');
-    f.fire('Nadawca: Bar                          N, 21 XII 2025, 00:30:00', 'mail');
-    f.fire('> ', 'prompt');
-    await waitRt(() => cmd() === 2, 'komenda petli 2 (ta sama kotwica)');
-
-    // Serwer zwraca TA SAMA strone (50 najnowszych <= kotwicy juz znamy):
-    // zero nowych wpisow = koniec sensownej roboty, petla ma STAC mimo
-    // suffixu uciecia (ogon ponad 50 listow jednego dnia - znane
-    // ograniczenie, do ktorego sluzy szukanie).
-    f.fire('Wybrane listy odebrane (prezentowane jest pierwsze 50):', 'mail');
-    f.fire(' 3. *R* Temat: ranny jeden', 'mail');
-    f.fire('Nadawca: Bar                          N, 21 XII 2025, 00:45:00', 'mail');
-    f.fire(' 2. *R* Temat: ranny dwa', 'mail');
-    f.fire('Nadawca: Bar                          N, 21 XII 2025, 00:30:00', 'mail');
-    f.fire('> ', 'prompt');
-    await waitRt(() => notifyText(f, 'Wczytano wszystkie (nowych listow: 2)'), 'notify konca');
-
-    // Pacing by minal kilka razy - zadna kolejna komenda nie wylatuje.
-    await new Promise((r) => setTimeout(r, 1200));
-    assert.equal(cmd(), 2, 'petla stanela na stronie bez nowych wpisow');
+    const sameDay = () => {
+      f.fire('Wybrane listy odebrane (prezentowane jest pierwsze 50):', 'mail');
+      f.fire(' 2. *R* Temat: ranny jeden', 'mail');
+      f.fire('Nadawca: Bar                          N, 21 XII 2025, 00:45:00', 'mail');
+      f.fire(' 1. *R* Temat: ranny dwa', 'mail');
+      f.fire('Nadawca: Bar                          N, 21 XII 2025, 00:30:00', 'mail');
+      f.fire('> ', 'prompt');
+    };
+    sameDay();
+    await waitRt(() => cmd() === 2, 'powtorka tej samej strony');
+    sameDay();
+    await waitRt(
+      () => f.sent.includes('listy odebrane przed 21 XII 2025'),
+      'sprawdzenie starszych dni',
+    );
+    f.fire('Nie znaleziono zadnych takich odebranych listow.', 'mail');
+    await waitRt(() => notifyText(f, 'Wczytano dostepne listy'), 'uczciwe podsumowanie');
+    assert.ok(notifyText(f, '2025-12-21'), 'komunikat wskazuje dzien z luka');
+    assert.ok(!notifyText(f, 'Wczytano wszystkie'), 'brak falszywego kompletu');
+    assert.equal(cmd(), 2, 'petla nie powtarza tej samej strony');
   } finally {
+    INDEX_ANCHOR_RETRY_WAITS_MS.splice(0, INDEX_ANCHOR_RETRY_WAITS_MS.length, ...waits);
     await stopHarness();
   }
 });
-
 
 // --- Fala 24b: kontakty odbudowywane po doczytaniu starszych stron --------
 
@@ -269,7 +265,7 @@ test('kontakty: wczytaj starsze odbudowuje kontakty z dopisanej strony (Fala 24b
     f.fire(' 9. *R* Temat: pradawny', 'mail');
     f.fire('Nadawca: Baz                          Pn, 1 XII 2025, 09:00:00', 'mail');
     f.fire('> ', 'prompt');
-    await waitFor(() => notifyText(f, 'nowych: 1'), 'notify o dopisaniu starszych');
+    await waitFor(() => notifyText(f, 'dodanych do listy: 1'), 'notify o dopisaniu starszych');
 
     click(h, '[data-tab="kontakty"]');
     await waitRt(() => !!h.content.querySelector('.arkmail-contact'), 'wiersze kontaktow');
@@ -301,7 +297,7 @@ test('kontakty: wczytaj wszystkie odbudowuje kontakty po zakonczeniu petli (Fala
     f.fire('Nadawca: Baz                          Pn, 1 XII 2025, 09:00:00', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(
-      () => notifyText(f, 'Wczytano wszystkie (nowych listow: 1)'),
+      () => notifyText(f, 'Wczytano wszystkie (dodanych do listy: 1)'),
       'notify konca petli',
     );
 
@@ -338,7 +334,7 @@ test('wczytaj wszystkie: naturalne domkniecie skrzynki stempluje indexMeta (Fala
     f.fire('Nadawca: Baz                          Pn, 1 XII 2025, 09:00:00', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(
-      () => notifyText(f, 'Wczytano wszystkie (nowych listow: 1)'),
+      () => notifyText(f, 'Wczytano wszystkie (dodanych do listy: 1)'),
       'notify konca petli',
     );
 
@@ -380,6 +376,80 @@ test('wczytaj wszystkie: przerwanie petli NIE stempluje indexMeta (Fala 24c)', a
     assert.ok(
       textOf(h, '.arkmail-index-foot').startsWith('Ostatnia indeksacja:  |'),
       'brak stampa po przerwanym loadAll',
+    );
+  } finally {
+    await stopHarness();
+  }
+});
+
+
+test('wczytaj wszystkie: przechodzi poza 40 stron i konczy dopiero na pelnej odpowiedzi', async () => {
+  const h = await startHarness();
+  const { f } = h;
+  try {
+    await loadTruncatedBox(h);
+    click(h, '.arkmail-older-all');
+    const anchors = () => f.sent.filter((c) => c.startsWith('listy odebrane przed')).length;
+    const romans = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+    const weekdays = ['N', 'Pn', 'Wt', 'Sr', 'Cz', 'Pt', 'So'];
+    const firePage = (page: number, truncated: boolean) => {
+      const d = new Date(Date.UTC(2025, 11, 20) - (page - 1) * 86400000);
+      const raw = `${weekdays[d.getUTCDay()]}, ${d.getUTCDate()} ${romans[d.getUTCMonth()]} ${d.getUTCFullYear()}, 08:00:00`;
+      f.fire(`Wybrane listy odebrane${truncated ? ' (prezentowane jest pierwsze 50)' : ''}:`, 'mail');
+      f.fire('50. *R* Temat: starszy wpis', 'mail');
+      f.fire(`Nadawca: Foo                          ${raw}`, 'mail');
+      f.fire('> ', 'prompt');
+    };
+    for (let page = 1; page <= 41; page++) {
+      await waitRt(() => anchors() === page, `strona ${page}`);
+      firePage(page, true);
+    }
+    await waitRt(() => anchors() === 42, 'strona 42 poza dawny limit');
+    firePage(42, false);
+    await waitRt(
+      () => notifyText(f, 'Wczytano wszystkie (dodanych do listy: 42)'),
+      'komplet po 42 stronach',
+    );
+  } finally {
+    await stopHarness();
+  }
+});
+
+test('wczytaj wszystkie: komunikat liczy wpisy dodane do widoku, nie tylko nowe rekordy', async () => {
+  const h = await startHarness();
+  const { f } = h;
+  try {
+    await loadTruncatedBox(h);
+    click(h, '[data-tab="archiwum"]');
+    await waitRt(() => !!h.content.querySelector('.arkmail-index-all'), 'przycisk indeksacji');
+    click(h, '.arkmail-index-all');
+    await driveIndexAll(h, {
+      odebrane: [
+        'Listy odebrane:',
+        ' 4. *R* Temat: juz w archiwum',
+        'Nadawca: Foo                        So, 20 XII 2025, 08:00:00',
+        ' 3. *R* Temat: najstarszy',
+        'Nadawca: Foo                        N, 21 XII 2025, 01:15:04',
+        ' 2. *R* Temat: srodkowy',
+        'Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05',
+        ' 1. *R* Temat: najnowszy',
+        'Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12',
+      ],
+    });
+    await waitRt(() => notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'koniec indeksacji');
+    click(h, '[data-tab="listy"]');
+    click(h, '.arkmail-older-all');
+    await waitRt(
+      () => f.sent.some((c) => c.startsWith('listy odebrane przed')),
+      'strona z rekordem juz obecnym w archiwum',
+    );
+    f.fire('Wybrane listy odebrane:', 'mail');
+    f.fire(' 1. *R* Temat: juz w archiwum', 'mail');
+    f.fire('Nadawca: Foo                        So, 20 XII 2025, 08:00:00', 'mail');
+    f.fire('> ', 'prompt');
+    await waitRt(
+      () => notifyText(f, 'Wczytano wszystkie (dodanych do listy: 1)'),
+      'licznik nowych wierszy widoku',
     );
   } finally {
     await stopHarness();

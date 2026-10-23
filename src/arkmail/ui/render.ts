@@ -1231,6 +1231,15 @@ export function mountMailUi(
       `Ostatnia indeksacja: ${(dates[0] ?? '').slice(0, 10)} | ` +
       `listow w bazie: ${state.archive.length}`;
     pane.appendChild(foot);
+    const gaps = INDEX_BOXES.flatMap((box) =>
+      (state.archiveGaps[box] ?? []).map((day) => `${box}: ${day}`),
+    );
+    if (gaps.length > 0) {
+      const gapNote = doc.createElement('div');
+      gapNote.className = 'arkmail-dim arkmail-index-gaps';
+      gapNote.textContent = `Niedostepne przez limit serwera - ${gaps.join(', ')}`;
+      pane.appendChild(gapNote);
+    }
     return pane;
   };
 

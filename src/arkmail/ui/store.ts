@@ -87,6 +87,8 @@ export interface MailUiState {
    * dopiero wtedy archiwum jest pelna podstawa licznikow kontaktow.
    */
   indexMeta: Partial<Record<MailBox, string>>;
+  /** Dni, ktorych czesc jest niedostepna przez limit 50 wynikow serwera. */
+  archiveGaps: Partial<Record<MailBox, string[]>>;
   /**
    * Petla "Indeksuj wszystkie skrzynki" w toku (Fala 18c): indeks
    * biezacej skrzynki (0..3 wg INDEX_BOXES) + liczba pobranych stron.
@@ -122,6 +124,7 @@ const DEFAULT_STATE: MailUiState = {
   composeWidth: 60,
   composeClearSeq: 0,
   indexMeta: {},
+  archiveGaps: {},
   indexRun: null,
 };
 
@@ -330,6 +333,10 @@ export class MailUiStore {
 
   setIndexRun(indexRun: { boxIndex: number; box: MailBox; pages: number } | null): void {
     this.update({ indexRun });
+  }
+
+  setArchiveGaps(archiveGaps: Partial<Record<MailBox, string[]>>): void {
+    this.update({ archiveGaps });
   }
 
   setSearch(search: { box: MailBox; label: string } | null): void {
