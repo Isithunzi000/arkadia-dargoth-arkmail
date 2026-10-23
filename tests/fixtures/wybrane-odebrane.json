@@ -1,0 +1,262 @@
+{
+  "name": "wybrane-odebrane-selekcja",
+  "lines": [
+    {
+      "cls": "mail",
+      "text": "Wybrane listy odebrane (prezentowane jest pierwsze 50):"
+    },
+    {
+      "cls": "mail",
+      "text": "50. *R* Temat: --"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Foo                       Sr, 25 III 2026, 19:07:17"
+    },
+    {
+      "cls": "mail",
+      "text": "49. *R* Temat: --"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Foo                       Sr, 25 III 2026, 19:14:29"
+    },
+    {
+      "cls": "mail",
+      "text": "48. *R* Temat: Koperta"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Baz                      Sr, 25 III 2026, 19:40:58"
+    },
+    {
+      "cls": "mail",
+      "text": "47. *R* Temat: Karteczka"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                          Sr, 25 III 2026, 21:21:21"
+    },
+    {
+      "cls": "mail",
+      "text": "46. *R* Temat: Karteczka"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                          Sr, 25 III 2026, 23:09:28"
+    },
+    {
+      "cls": "mail",
+      "text": "45. *R* Temat: karteczka"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                          Sr, 25 III 2026, 23:36:06"
+    },
+    {
+      "cls": "mail",
+      "text": "44. *R* Temat: karteczka"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                          Sr, 25 III 2026, 23:38:36"
+    },
+    {
+      "cls": "mail",
+      "text": "43. *R* Temat: Karteczka"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                          Sr, 25 III 2026, 23:43:03"
+    },
+    {
+      "cls": "mail",
+      "text": "42. *R* Temat: karteczka"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                          Sr, 25 III 2026, 23:46:30"
+    },
+    {
+      "cls": "mail",
+      "text": "41. *R* Temat: karteczka"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                          Cz, 26 III 2026, 00:07:52"
+    },
+    {
+      "cls": "mail",
+      "text": "40. *R* Temat: Karteczka z Waldo"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                          Cz, 26 III 2026, 00:22:58"
+    },
+    {
+      "cls": "mail",
+      "text": "39. *R* Temat: --"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Foo                       Cz, 26 III 2026, 09:24:03"
+    },
+    {
+      "cls": "mail",
+      "text": "38. *R* Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Qux                         Cz, 26 III 2026, 15:52:06"
+    },
+    {
+      "cls": "mail",
+      "text": "37. *R* Temat: Karteczka"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                          Cz, 26 III 2026, 16:16:43"
+    },
+    {
+      "cls": "mail",
+      "text": "36. *R* Temat: Karteczka"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                          Cz, 26 III 2026, 16:21:56"
+    },
+    {
+      "cls": "mail",
+      "text": "35. *R* Temat: karteczka"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                          Cz, 26 III 2026, 16:35:43"
+    },
+    {
+      "cls": "mail",
+      "text": "34. *R* Temat: Karteczka"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                          Cz, 26 III 2026, 16:35:43"
+    },
+    {
+      "cls": "mail",
+      "text": "33. *R* Temat: Karteczka"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                          Cz, 26 III 2026, 16:56:07"
+    },
+    {
+      "cls": "mail",
+      "text": "32. *R* Temat: Karteczka"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                          Cz, 26 III 2026, 16:56:07"
+    },
+    {
+      "cls": "mail",
+      "text": "31. *R* Temat: --"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Foo                       Cz, 26 III 2026, 18:36:16"
+    },
+    {
+      "cls": "mail",
+      "text": "30. *R* Temat: --"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Foo                       Cz, 26 III 2026, 18:42:41"
+    },
+    {
+      "cls": "mail",
+      "text": "29. *R* Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Baz                      Cz, 26 III 2026, 20:08:52"
+    },
+    {
+      "cls": "mail",
+      "text": "28. *R* Temat: karteczka z rosomakiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Baz                      Cz, 26 III 2026, 20:38:44"
+    },
+    {
+      "cls": "mail",
+      "text": "27. *R* Temat: Karteczka z muchomorkiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                          Cz, 26 III 2026, 22:52:54"
+    },
+    {
+      "cls": "mail",
+      "text": "26. *R* Temat: Karteczka z muchomorkiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                          Pt, 27 III 2026, 00:57:25"
+    },
+    {
+      "cls": "mail",
+      "text": "25. *R* Temat: Karteczka"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                          Pt, 27 III 2026, 05:48:16"
+    },
+    {
+      "cls": "mail",
+      "text": "24. *R* Temat: Karteczka"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                          Pt, 27 III 2026, 15:15:52"
+    },
+    {
+      "cls": "mail",
+      "text": "23. *R* Temat: Karteczka z muchomorkiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                          Wt, 31 III 2026, 02:02:42"
+    },
+    {
+      "cls": "mail",
+      "text": "22. *R* Temat: Karteczka z muchomorkiem"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                          Sr, 1 IV 2026, 01:05:39"
+    },
+    {
+      "cls": "mail",
+      "text": "21. *R* Temat: List (forwardowany)"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                          Sr, 1 IV 2026, 01:10:12"
+    },
+    {
+      "cls": "mail",
+      "text": "20. *R* Temat: Odpowiedz (forwardowany)"
+    },
+    {
+      "cls": "mail",
+      "text": "Nadawca: Bar                          Sr, 1 IV 2026, 01:10:40"
+    },
+    {
+      "cls": "prompt",
+      "text": "> "
+    }
+  ],
+  "sanityzacja": "Imiona graczy zastapione tokenami (Foo/Bar/Baz/Qux/Waldo) - Fala 28f; uklad linii, numery, daty i tematy 1:1 z logu."
+}
