@@ -254,12 +254,47 @@ test('widok listu: Zapisz list TXT pobiera plik o tresci jak na ekranie', async 
   }
 });
 
+test('eksport ZIP: przerwana indeksacja nie zapisuje pliku', async () => {
+  const h = await startHarness();
+  const { f } = h;
+  setDownloadImpl((name, data) => captured.push({ name, data }));
+  try {
+    await loadTruncatedBox(h);
+    click(h, '[data-tab="archiwum"]');
+    await waitRt(() => !!h.content.querySelector('.arkmail-arch-export'), 'przycisk eksportu');
+    const odb = f.sent.filter((c) => c === 'listy odebrane').length;
+    click(h, '.arkmail-arch-export');
+    await waitRt(
+      () => notifyText(f, 'najpierw indeksuje wszystkie skrzynki'),
+      'komunikat o indeksacji przed eksportem',
+    );
+    await waitRt(
+      () => f.sent.filter((c) => c === 'listy odebrane').length === odb + 1,
+      'indeksacja ruszyla',
+    );
+    click(h, '.arkmail-index-all'); // Przerwij indeksowanie
+    f.fire('Nie masz zadnych odebranych listow.', 'mail');
+    f.fire('> ', 'prompt');
+    await waitRt(() => notifyText(f, 'Przerwano indeksowanie'), 'komunikat przerwania');
+    // Przerwana indeksacja: kontynuacja nie odpala eksportu.
+    await new Promise((r) => setTimeout(r, 1200));
+    assert.equal(captured.length, 0, 'przerwana indeksacja bez zapisu ZIP');
+    assert.ok(!notifyText(f, 'kliknij ponownie'), 'bez prosby o ponowny klik');
+  } finally {
+    setDownloadImpl(null);
+    captured.length = 0;
+    await stopHarness();
+  }
+});
+
 test('archiwum: Zapisz wszystkie TXT pobiera ZIP per-list, puste archiwum = toast', async () => {
   const h = await startHarness();
   const { f } = h;
   setDownloadImpl((name, data) => captured.push({ name, data }));
   try {
-    // Puste archiwum: toast, zero pobran.
+    // Puste archiwum: eksport zaczyna sie od indeksacji (jak
+    // pobieranie tresci), a po kompletnym indeksie pustych skrzynek
+    // konczy sie jasnym toastem - zero pobran, zero prosb o klik.
     click(h, '[data-tab="archiwum"]');
     // Fala 18e (zgloszenie 2026-10-20 pkt 5): przycisk zapisuje ZIP -
     // etykieta ma to mowic wprost.
@@ -269,23 +304,20 @@ test('archiwum: Zapisz wszystkie TXT pobiera ZIP per-list, puste archiwum = toas
     assert.ok(expBtn, 'przycisk eksportu archiwum');
     assert.equal(expBtn.textContent, 'Zapisz wszystkie (ZIP)', 'etykieta mowi ZIP, nie TXT');
     click(h, '.arkmail-arch-export');
-    // Fala 18c (guard, swiadoma zmiana pinu): pusta NIEZINDEKSOWANA
-    // baza = najpierw automatyczna indeksacja skrzynek, nie martwy
-    // toast. Dopiero po pelnym indeksie "pusto" = faktycznie puste
-    // skrzynki.
-    await waitRt(() => notifyText(f, 'najpierw kliknij Indeksuj'), 'guard: indeksacja przed eksportem');
-    await waitRt(() => f.sent.includes('listy odebrane'), 'guard: indeksuje odebrane');
-    f.fire('Nie masz zadnych odebranych listow.', 'mail');
-    await waitRt(() => f.sent.includes('listy nieprzeczytane'), 'guard: indeksuje nieprzeczytane');
-    f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
-    await waitRt(() => f.sent.includes('listy wyslane'), 'guard: indeksuje wyslane');
-    f.fire('Nie masz zadnych wyslanych listow.', 'mail');
-    await waitRt(() => f.sent.includes('listy niewyslane'), 'guard: indeksuje niewyslane');
-    f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
     await waitRt(
-      () => notifyText(f, 'kliknij ponownie Zapisz wszystkie'),
-      'kontynuacja eksportu po indeksacji',
+      () => notifyText(f, 'najpierw indeksuje wszystkie skrzynki'),
+      'komunikat o indeksacji przed eksportem',
     );
+    await waitRt(() => f.sent.includes('listy odebrane'), 'indeksuje odebrane');
+    f.fire('Nie masz zadnych odebranych listow.', 'mail');
+    await waitRt(() => f.sent.includes('listy nieprzeczytane'), 'indeksuje nieprzeczytane');
+    f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
+    await waitRt(() => f.sent.includes('listy wyslane'), 'indeksuje wyslane');
+    f.fire('Nie masz zadnych wyslanych listow.', 'mail');
+    await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksuje niewyslane');
+    f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
+    await waitRt(() => notifyText(f, 'Skrzynki sa puste'), 'toast pustych skrzynek po indeksie');
+    assert.ok(!notifyText(f, 'kliknij ponownie'), 'bez prosby o ponowny klik');
     assert.equal(captured.length, 0, 'bez pobierania dla pustego archiwum');
 
     // Napelnij archiwum tresciami (petla 16i/17c). Prolog wymaga
@@ -354,6 +386,19 @@ test('archiwum: Zapisz wszystkie TXT pobiera ZIP per-list, puste archiwum = toas
     await waitRt(() => notifyText(f, 'Pobrano tresci do archiwum'), 'koniec pobierania');
 
     click(h, '.arkmail-arch-export');
+    // Eksport tez zaczyna sie od indeksacji (aktualna baza = aktualny
+    // ZIP), po niej zapis odpala sie automatycznie.
+    await driveIndexAll(h, {
+      odebrane: [
+        'Listy odebrane:',
+        ' 3. *R* Temat: najstarszy',
+        'Nadawca: Foo                        N, 21 XII 2025, 01:15:04',
+        ' 2. *R* Temat: srodkowy',
+        'Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05',
+        ' 1. *R* Temat: najnowszy',
+        'Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12',
+      ],
+    });
     await waitRt(() => captured.length === 1, 'pobieranie ZIP');
     assert.match(
       captured[0].name,

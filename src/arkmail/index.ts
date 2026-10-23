@@ -839,9 +839,9 @@ export async function init(api: PluginApi) {
    * Kontynuacja po kompletnej indeksacji wszystkich skrzynek:
    * 'download' - kazde pobranie tresci zaczyna sie od indeksacji
    * (decyzja 2026-10-23), petla odpala sie automatycznie po niej;
-   * 'export' - guard eksportu przy pustej niezindeksowanej bazie
-   * odpala indeksacje i wskazowke ponownego kliku. Przerwana albo
-   * niekompletna indeksacja kontynuacji NIE odpala.
+   * 'export' - kazdy zapis archiwum do ZIP zaczyna sie od indeksacji,
+   * po niej plik powstaje automatycznie. Przerwana albo niekompletna
+   * indeksacja kontynuacji NIE odpala.
    */
   let indexContinuation: null | "download" | "export" = null;
 
@@ -1081,9 +1081,7 @@ export async function init(api: PluginApi) {
         indexContinuation = null;
         if (!runCompleted || !allBoxesIndexed(ui.state.indexMeta)) return;
         if (cont === "download") runArchiveDownload();
-        else if (cont === "export") {
-          notify(api, "Indeksacja zakonczona - kliknij ponownie Zapisz wszystkie (ZIP).");
-        }
+        else if (cont === "export") runExportArchive();
       });
   };
 
@@ -1452,6 +1450,41 @@ export async function init(api: PluginApi) {
       .catch(() => notify(api, "Blad pobierania tresci do archiwum."));
   };
 
+  /**
+   * Zapis calego archiwum do ZIP po kompletnej indeksacji. Operacja
+   * czysto lokalna: uzywa tylko danych z cache, nie wysyla komend.
+   * Wolana jako kontynuacja onExportArchive - nigdy bezposrednio z UI.
+   */
+  const runExportArchive = (): void => {
+    const { entries, skipped } = archiveExportEntries(ui.state.archive);
+    if (entries.length === 0) {
+      notify(
+        api,
+        ui.state.archive.length === 0
+          ? "Skrzynki sa puste - nie ma czego zapisywac."
+          : "Brak listow z tresci w archiwum - najpierw pobierz tresci.",
+      );
+      return;
+    }
+    const enc = new TextEncoder();
+    const zip = buildZip(entries.map((e) => ({ name: e.name, data: enc.encode(e.txt) })));
+    const now = new Date();
+    const p2 = (n: number) => String(n).padStart(2, "0");
+    const name =
+      `arkmail_listy_${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())}` +
+      `_${p2(now.getHours())}${p2(now.getMinutes())}.zip`;
+    // buildZip alokuje bufor dokladnie na wynik - buffer jest ArrayBuffer.
+    const ok = downloadBlob(name, new Blob([zip.buffer as ArrayBuffer], { type: "application/zip" }));
+    notify(
+      api,
+      ok
+        ? `Zapisano listy do ZIP (plikow: ${entries.length})` +
+            (skipped > 0 ? `; pominietych bez tresci: ${skipped}` : "") +
+            "."
+        : "Nie udalo sie zapisac pliku - klient nie obsluguje pobierania.",
+    );
+  };
+
   handlersRef = {
     onSendAnimal: () => {
       // Jak przy innych operacjach (Fala 12a): zero cichego kolejkowania.
@@ -1543,43 +1576,17 @@ export async function init(api: PluginApi) {
       );
     },
     onExportArchive: () => {
-      const { entries, skipped } = archiveExportEntries(ui.state.archive);
-      if (entries.length === 0) {
-        // Fala 18c (guard, zgloszenie 2026-10-20): pusta baza BEZ
-        // kompletnego indeksu = najpierw indeksacja (mozliwe, ze poczta
-        // w ogole nie byla pobierana); po pelnym indeksie "pusto"
-        // znaczy faktycznie puste skrzynki.
-        if (ui.state.archive.length === 0 && !allBoxesIndexed(ui.state.indexMeta)) {
-          notify(api, "Archiwum puste - najpierw kliknij Indeksuj wszystkie skrzynki.");
-          indexContinuation = "export";
-          indexAllBoxes();
-          return;
-        }
-        notify(
-          api,
-          ui.state.archive.length === 0
-            ? "Skrzynki sa puste - nie ma czego zapisywac."
-            : "Brak listow z tresci w archiwum - najpierw pobierz tresci.",
-        );
+      // Eksport, jak pobieranie tresci, zaczyna sie od pelnej kontroli
+      // indeksu wszystkich skrzynek (decyzja 2026-10-23) - ZIP powstaje
+      // z aktualnej, kompletnej bazy. Sam zapis odpala sie jako
+      // kontynuacja po kompletnej indeksacji (runExportArchive).
+      if (lock.locked) {
+        notify(api, SESSION_BUSY_MSG);
         return;
       }
-      const enc = new TextEncoder();
-      const zip = buildZip(entries.map((e) => ({ name: e.name, data: enc.encode(e.txt) })));
-      const now = new Date();
-      const p2 = (n: number) => String(n).padStart(2, "0");
-      const name =
-        `arkmail_listy_${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())}` +
-        `_${p2(now.getHours())}${p2(now.getMinutes())}.zip`;
-      // buildZip alokuje bufor dokladnie na wynik - buffer jest ArrayBuffer.
-      const ok = downloadBlob(name, new Blob([zip.buffer as ArrayBuffer], { type: "application/zip" }));
-      notify(
-        api,
-        ok
-          ? `Zapisano listy do ZIP (plikow: ${entries.length})` +
-              (skipped > 0 ? `; pominietych bez tresci: ${skipped}` : "") +
-              "."
-          : "Nie udalo sie zapisac pliku - klient nie obsluguje pobierania.",
-      );
+      notify(api, "Zapis do ZIP: najpierw indeksuje wszystkie skrzynki.");
+      indexContinuation = "export";
+      indexAllBoxes();
     },
     onSendCompose: (input) => {
       if (!input.adresat.trim() || !input.temat.trim()) {

@@ -258,19 +258,25 @@ test('pobieranie tresci przy pustej bazie: indeksacja sama wykrywa puste skrzynk
   }
 });
 
-test('guard: Zapisz wszystkie (ZIP) przy pustej niezindeksowanej bazie najpierw indeksuje', async () => {
+test('eksport ZIP: najpierw indeksacja, potem automatyczny zapis albo jasny toast', async () => {
   const h = await startHarness();
   const { f } = h;
   try {
     click(h, '[data-tab="archiwum"]');
     await waitRt(() => !!h.content.querySelector('.arkmail-arch-export'), 'przycisk eksportu');
     click(h, '.arkmail-arch-export');
-    await waitRt(() => notifyText(f, 'najpierw kliknij Indeksuj'), 'toast guarda eksportu');
-    await replayEmptyBoxes(h);
+    // Eksport zaczyna sie od indeksacji (jak pobieranie tresci) -
+    // bez komunikatow "najpierw kliknij" / "kliknij ponownie".
     await waitRt(
-      () => notifyText(f, 'kliknij ponownie Zapisz wszystkie'),
-      'toast kontynuacji eksportu',
+      () => notifyText(f, 'najpierw indeksuje wszystkie skrzynki'),
+      'komunikat o indeksacji przed eksportem',
     );
+    assert.ok(!notifyText(f, 'najpierw kliknij Indeksuj'), 'stary guard zniknal');
+    await replayEmptyBoxes(h);
+    // Automatyczna kontynuacja: pusta baza po kompletnym indeksie =
+    // jasny toast, BEZ prosby o ponowny klik.
+    await waitRt(() => notifyText(f, 'Skrzynki sa puste'), 'toast pustych skrzynek');
+    assert.ok(!notifyText(f, 'kliknij ponownie'), 'brak prosby o ponowny klik');
   } finally {
     await stopHarness();
   }
