@@ -475,8 +475,15 @@ export function mountMailUi(
     // brakowalo tylko pola w UI. Bez ghosta (podpowiedzi z tematow
     // archiwum nie maja sensu dla frazy z tresci).
     const sTresc = mkSearch('tresc', 'Tresc');
+    // Fala 30a: Tresc na calej szerokosci, pola dat jako para Od|Do
+    // (lewo-prawo) z WIDOCZNYMI etykietami - placeholder na
+    // input[type=date] jest ignorowany przez przegladarke i pole bylo
+    // anonimowe (zgloszenie 2026-10-23 pkt 1).
+    sTresc.classList.add('arkmail-search-wide');
     const sOd = mkSearch('odDaty', 'Od dnia', 'date');
     const sDo = mkSearch('doDaty', 'Do dnia', 'date');
+    const sOdF = mkDateField(doc, sOd, 'Od dnia (wlacznie)', 'Szukanie zwroci listy wyslane od tego dnia WLACZNIE.');
+    const sDoF = mkDateField(doc, sDo, 'Do dnia (wlacznie)', 'Szukanie zwroci listy wyslane do tego dnia WLACZNIE.');
     const go = doc.createElement('button');
     go.className = 'arkmail-search-go';
     go.textContent = 'Szukaj';
@@ -484,8 +491,19 @@ export function mountMailUi(
       const osoba = (sOsoba as HTMLInputElement).value.trim();
       const temat = (sTemat as HTMLInputElement).value.trim();
       const tresc = (sTresc as HTMLInputElement).value.trim();
-      const odDaty = fromISODate((sOd as HTMLInputElement).value) ?? undefined;
-      const doDaty = fromISODate((sDo as HTMLInputElement).value) ?? undefined;
+      // Fala 30a: sprzeczny zakres dat = twardy guard z komunikatem na
+      // przycisku (3 s, jak blokady compose), bez strzalu do serwera.
+      const isoOd = (sOd as HTMLInputElement).value;
+      const isoDo = (sDo as HTMLInputElement).value;
+      if (isoOd !== '' && isoDo !== '' && isoOd > isoDo) {
+        go.textContent = 'Od dnia pozniej niz Do dnia.';
+        setTimeout(() => {
+          go.textContent = 'Szukaj';
+        }, 3000);
+        return;
+      }
+      const odDaty = fromISODate(isoOd) ?? undefined;
+      const doDaty = fromISODate(isoDo) ?? undefined;
       const query: ListingSearch = {
         ...(osoba !== '' ? { osoba } : {}),
         ...(odDaty ? { odDaty } : {}),
@@ -510,8 +528,8 @@ export function mountMailUi(
     searchRow.appendChild(sOsoba);
     searchRow.appendChild(sTemat);
     searchRow.appendChild(sTresc);
-    searchRow.appendChild(sOd);
-    searchRow.appendChild(sDo);
+    searchRow.appendChild(sOdF);
+    searchRow.appendChild(sDoF);
     searchRow.appendChild(go);
     pane.appendChild(searchRow);
     // Ghost-podpowiedzi (Fala 9g) - po appendChild, wrap wymaga rodzica.
@@ -1266,8 +1284,14 @@ export function mountMailUi(
     controls.appendChild(mkText('tresc', 'Tresc listu'));
     // Fala 28d: "Od dnia"/"Do dnia" jak w szukajce serwerowej - jedno
     // nazewnictwo na te sama granice w calym oknie (audyt stringow).
-    controls.appendChild(mkText('odDaty', 'Od dnia', 'date'));
-    controls.appendChild(mkText('doDaty', 'Do dnia', 'date'));
+    // Fala 30a: widoczne etykiety + tooltipy (placeholder na dacie
+    // jest ignorowany przez przegladarke).
+    controls.appendChild(
+      mkDateField(doc, mkText('odDaty', 'Od dnia', 'date'), 'Od dnia (wlacznie)', 'Archiwum pokaze listy od tego dnia WLACZNIE.'),
+    );
+    controls.appendChild(
+      mkDateField(doc, mkText('doDaty', 'Do dnia', 'date'), 'Do dnia (wlacznie)', 'Archiwum pokaze listy do tego dnia WLACZNIE.'),
+    );
     // Fala 16g: czyszczenie wszystkich filtrow archiwum jednym klikiem
     // (zgloszenie pkt 11). Niedestrukcyjne (dane zostaja) - bez dwukliku.
     const clearFilters = doc.createElement('button');
@@ -1339,15 +1363,33 @@ export function mountMailUi(
     const list = doc.createElement('div');
     pane.appendChild(list);
     const repaint = () => {
+      // Fala 30a: sprzeczny zakres dat (Od pozniej niz Do) = komunikat
+      // i POMINIECIE filtrow dat, zamiast milczaco pustej listy
+      // (filtr lokalny, nie ma przycisku Szukaj - sygnalizacja inline).
+      const datesClash =
+        archFilter.odDaty !== undefined &&
+        archFilter.doDaty !== undefined &&
+        archFilter.odDaty > archFilter.doDaty;
+      const effFilter = datesClash
+        ? { ...archFilter, odDaty: undefined, doDaty: undefined }
+        : archFilter;
+      const oldErr = pane.querySelector('.arkmail-dates-error');
+      if (oldErr) oldErr.remove();
+      if (datesClash) {
+        const err = doc.createElement('div');
+        err.className = 'arkmail-dates-error';
+        err.textContent = 'Od dnia pozniej niz Do dnia - daty pomijane.';
+        pane.insertBefore(err, list);
+      }
       // Fala 18a: blizniaki jednym wierszem, znikniete ukryte (core).
-      const rows = filterVisibleArchive(state.archive, archFilter);
+      const rows = filterVisibleArchive(state.archive, effFilter);
       // Podpis filtra tresci: tresc zna tylko pobrane listy - bez
       // podpowiedzi filtr "milczaco" nic nie znajdowal (zgloszenie
       // 2026-10-20 pkt 3).
       const oldNote = pane.querySelector('.arkmail-tresc-note');
       if (oldNote) oldNote.remove();
       if (archFilter.tresc !== undefined) {
-        const base = filterVisibleArchive(state.archive, { ...archFilter, tresc: undefined });
+        const base = filterVisibleArchive(state.archive, { ...effFilter, tresc: undefined });
         const withBody = base.filter((l) => l.body.length > 0).length;
         const note = doc.createElement('div');
         note.className = 'arkmail-dim arkmail-tresc-note';
@@ -1389,6 +1431,29 @@ export function mountMailUi(
     el.className = 'arkmail-dim';
     el.textContent = text;
     return el;
+  };
+
+  /**
+   * Pole daty z WIDOCZNA etykieta nad inputem i tooltipem (Fala 30a).
+   * Placeholder na input[type=date] jest ignorowany przez przegladarke,
+   * wiec bez etykiety pole bylo anonimowe. Wspoldzielone: szukajka
+   * serwerowa i filtry archiwum.
+   */
+  const mkDateField = (
+    docRef: Document,
+    input: HTMLElement,
+    label: string,
+    tooltip: string,
+  ): HTMLElement => {
+    const field = docRef.createElement('label');
+    field.className = 'arkmail-date-field';
+    const caption = docRef.createElement('span');
+    caption.className = 'arkmail-date-label';
+    caption.textContent = label;
+    input.setAttribute('title', tooltip);
+    field.appendChild(caption);
+    field.appendChild(input);
+    return field;
   };
 
   const off = store.subscribe(render);

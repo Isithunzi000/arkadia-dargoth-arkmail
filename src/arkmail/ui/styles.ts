@@ -237,7 +237,15 @@ export const STYLES = `
   align-items: center;
 }
 .arkmail-search-row .arkmail-search-go { grid-column: 1 / -1; }
+/* Fala 30a: Tresc pelna szerokosc, dzieki temu pola dat laduja para
+   Od|Do w jednym rzedzie (lewo-prawo, jak czyta sie zakres). */
+.arkmail-search-row .arkmail-search-wide { grid-column: 1 / -1; }
 .arkmail-search-row input[type='date'] { color-scheme: dark; }
+/* Pole daty z widoczna etykieta (placeholder na date nie dziala). */
+.arkmail-date-field { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.arkmail-date-field input { width: 100%; box-sizing: border-box; }
+.arkmail-date-label { color: ${FG_DIM}; font-size: 11px; }
+.arkmail-dates-error { color: ${DANGER}; font-size: 12px; margin-bottom: 6px; }
 .arkmail-search-banner {
   display: flex;
   align-items: center;
