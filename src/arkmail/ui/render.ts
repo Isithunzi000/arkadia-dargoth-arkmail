@@ -479,7 +479,7 @@ export function mountMailUi(
     // (lewo-prawo) z WIDOCZNYMI etykietami - placeholder na
     // input[type=date] jest ignorowany przez przegladarke i pole bylo
     // anonimowe (zgloszenie 2026-10-23 pkt 1).
-    sTresc.classList.add('arkmail-search-wide');
+    sTresc.className = 'arkmail-search-wide';
     const sOd = mkSearch('odDaty', 'Od dnia', 'date');
     const sDo = mkSearch('doDaty', 'Do dnia', 'date');
     const sOdF = mkDateField(doc, sOd, 'Od dnia (wlacznie)', 'Szukanie zwroci listy wyslane od tego dnia WLACZNIE.');
