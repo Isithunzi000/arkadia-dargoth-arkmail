@@ -6,13 +6,16 @@
  *
  * Kontrakt:
  *  - pierwszy klik tylko uzbraja (ostrzezenie o dlugim czasie), zadna
- *    komenda nie wylatuje; drugi klik startuje petle;
+ *    komenda nie wylatuje; drugi klik startuje operacje;
+ *  - operacja zaczyna sie od pelnej indeksacji wszystkich skrzynek
+ *    (decyzja 2026-10-23: swiezy indeks = brak ryzyka pracy na
+ *    nieswiezej liscie), dopiero potem petla pobierania;
  *  - petla czyta kolejne listy bez tresci (re-kotwica po dacie, jak
  *    przy kliku w wpis archiwum), kazda przeczytana tresc laduje
  *    w archiwum i na dysku;
  *  - w trakcie petli przycisk zamienia sie w Przerwij z postepem;
  *    przerwanie konczy petle po biezacym liscie, toast podsumowuje;
- *  - gdy nie ma czego pobrac: toast, zero komend.
+ *  - gdy nie ma czego pobrac: po indeksacji toast, zero re-kotwic.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,6 +24,7 @@ import {
   startHarness,
   stopHarness,
   loadTruncatedBox,
+  driveIndexAll,
   click,
   waitRt,
   notifyText,
@@ -58,6 +62,22 @@ function clickArchiveRow(h: Harness, fragment: string): void {
 const letterBodyShows = (h: Harness, fragment: string): boolean =>
   !!h.content.querySelector('.arkmail-letter-body') &&
   textOf(h, '.arkmail-letter-body').includes(fragment);
+
+/**
+ * Kompletny listing odebranych (bez suffixu uciecia) z 3 wpisami
+ * prologu - odpowiedz na indeksacje poprzedzajaca kazde pobieranie
+ * tresci (decyzja 2026-10-23). Zgodny z archiwum, wiec gone-marking
+ * niczego nie oznacza jako znikniete.
+ */
+const LISTING3_FULL = [
+  'Listy odebrane:',
+  ' 3. *R* Temat: najstarszy',
+  'Nadawca: Foo                        N, 21 XII 2025, 01:15:04',
+  ' 2. *R* Temat: srodkowy',
+  'Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05',
+  ' 1. *R* Temat: najnowszy',
+  'Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12',
+];
 
 /** Listing z trzema wpisami prologu (numery jak na starcie). */
 function replayListing3(h: Harness): void {
@@ -102,8 +122,11 @@ test('archiwum: pobieranie tresci - uzbrojenie, petla, podsumowanie, cache', asy
     );
     assert.equal(f.sent.length, base, 'uzbrojenie nie wysyla komend');
 
-    // Drugi klik startuje petle: kazdy list przez re-kotwice po dacie.
+    // Drugi klik startuje operacje: najpierw pelna indeksacja skrzynek
+    // (swiezy indeks = pewnosc kompletnej listy kandydatow), dopiero
+    // potem petla pobierania - kazdy list przez re-kotwice po dacie.
     clickDownload(h);
+    await driveIndexAll(h, { odebrane: LISTING3_FULL });
     await waitRt(() => f.sent.includes('listy odebrane przed 24 XII 2025'), 're-kotwica najnowszego');
     replayListing3(h);
     await waitRt(() => f.sent.includes('przeczytaj list 1'), 'odczyt najnowszego');
@@ -132,15 +155,20 @@ test('archiwum: pobieranie tresci - uzbrojenie, petla, podsumowanie, cache', asy
     await wf(() => letterBodyShows(h, 'Tresc drugiego.'), 'list z cache po pobraniu');
     assert.equal(f.sent.length, base2, 'podglad z cache bez komend');
 
-    // Brak kandydatow: kolejny start = toast, zero komend.
+    // Brak kandydatow: kolejny start = znowu najpierw indeksacja
+    // (kazde pobranie tresci zaczyna sie od kontroli indeksu), potem
+    // toast o kompletnej bazie. Re-kotwice pobierania NIE wylatuja.
     click(h, '[data-tab="archiwum"]');
-    const base3 = f.sent.length;
+    const anchorsBefore = f.sent.filter((c) => / przed \d+ [IVX]+ \d{4}$/.test(c)).length;
     clickDownload(h); // uzbrojenie
     clickDownload(h); // start
-    // Fala 18c (swiadoma zmiana pinu): jasny toast o kompletnej bazie
-    // zamiast "brak listow bez tresci".
+    await driveIndexAll(h, { odebrane: LISTING3_FULL });
     await wf(() => notifyText(f, 'Wszystkie listy w bazie maja tresci.'), 'toast o kompletnym archiwum');
-    assert.equal(f.sent.length, base3, 'bez komend, gdy nie ma czego pobrac');
+    assert.equal(
+      f.sent.filter((c) => / przed \d+ [IVX]+ \d{4}$/.test(c)).length,
+      anchorsBefore,
+      'bez re-kotwic pobierania, gdy nie ma czego pobrac',
+    );
   } finally {
     await stopHarness();
   }
@@ -154,6 +182,8 @@ test('archiwum: pobieranie tresci - Przerwij konczy petle po biezacym liscie', a
     click(h, '[data-tab="archiwum"]');
     clickDownload(h); // uzbrojenie
     clickDownload(h); // start
+    // Indeksacja przed pobieraniem (jak w pierwszym tescie).
+    await driveIndexAll(h, { odebrane: LISTING3_FULL });
     await waitRt(() => f.sent.includes('listy odebrane przed 24 XII 2025'), 're-kotwica');
     replayListing3(h);
     await waitRt(() => f.sent.includes('przeczytaj list 1'), 'odczyt pierwszego');

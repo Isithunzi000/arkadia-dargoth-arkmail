@@ -170,6 +170,43 @@ export const click = (h: Harness, selector: string): void =>
     new h.window.Event('click'),
   );
 
+/**
+ * Napedza pelny przebieg indeksacji 4 skrzynek (indexAllBoxes) do konca.
+ * Dla kazdej skrzynki (kolejnosc stala: odebrane, nieprzeczytane,
+ * wyslane, niewyslane) czeka na NOWA komende "listy <skrzynka>" (liczona
+ * od chwili wywolania, wiec wczesniejsze listingi nie myla rachunku)
+ * i odpowiada zadanymi liniami + promptem. Domyslna odpowiedz: pusta
+ * skrzynka ("Nie masz zadnych ... listow."). Odpowiedzi podawac tak,
+ * zeby przebieg byl kompletny: listing bez suffixu uciecia albo pusta
+ * skrzynka (listing uciety wymagalby kotwic paginacji).
+ */
+export async function driveIndexAll(
+  h: Harness,
+  answers?: Partial<
+    Record<'odebrane' | 'nieprzeczytane' | 'wyslane' | 'niewyslane', string[]>
+  >,
+): Promise<void> {
+  const { f } = h;
+  const boxes = ['odebrane', 'nieprzeczytane', 'wyslane', 'niewyslane'] as const;
+  const emptyLine: Record<(typeof boxes)[number], string> = {
+    odebrane: 'Nie masz zadnych odebranych listow.',
+    nieprzeczytane: 'Nie masz zadnych nieprzeczytanych listow.',
+    wyslane: 'Nie masz zadnych wyslanych listow.',
+    niewyslane: 'Nie masz zadnych niewyslanych listow.',
+  };
+  const base = new Map(boxes.map((b) => [b, f.sent.filter((c) => c === `listy ${b}`).length]));
+  for (const box of boxes) {
+    const want = base.get(box)! + 1;
+    await waitRt(
+      () => f.sent.filter((c) => c === `listy ${box}`).length >= want,
+      `indeksacja: listing ${box}`,
+    );
+    const lines = answers?.[box] ?? [emptyLine[box]];
+    for (const line of lines) f.fire(line, 'mail');
+    f.fire('> ', 'prompt');
+  }
+}
+
 /** waitFor w czasie rzeczywistym (pacing petli to setTimeout, nie setImmediate). */
 export async function waitRt(pred: () => boolean, what: string): Promise<void> {
   for (let i = 0; i < 240; i++) {

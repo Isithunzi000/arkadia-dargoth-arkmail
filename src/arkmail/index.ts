@@ -836,9 +836,12 @@ export async function init(api: PluginApi) {
   /** Flaga biezacej petli "Indeksuj wszystkie skrzynki" (null = brak). */
   let indexFlag: { cancelled: boolean } | null = null;
   /**
-   * Kontynuacja po pelnej indeksacji (Fala 18c): guardy przyciskow
-   * przy pustej niezindeksowanej bazie odpalaja indeksacje, a po niej
-   * automatycznie wlasciwa akcje ('download') albo wskazowke ('export').
+   * Kontynuacja po kompletnej indeksacji wszystkich skrzynek:
+   * 'download' - kazde pobranie tresci zaczyna sie od indeksacji
+   * (decyzja 2026-10-23), petla odpala sie automatycznie po niej;
+   * 'export' - guard eksportu przy pustej niezindeksowanej bazie
+   * odpala indeksacje i wskazowke ponownego kliku. Przerwana albo
+   * niekompletna indeksacja kontynuacji NIE odpala.
    */
   let indexContinuation: null | "download" | "export" = null;
 
@@ -868,6 +871,11 @@ export async function init(api: PluginApi) {
     const flag = { cancelled: false };
     indexFlag = flag;
     let done = 0;
+    // Kontynuacja (pobieranie/eksport) odpala sie tylko po KOMPLETNYM
+    // biezacym przebiegu - przerwanie albo pominieta skrzynka ja
+    // blokuje, nawet gdy znaczniki indexMeta sa kompletne z
+    // wczesniejszego przebiegu.
+    let runCompleted = false;
     // Fala 19a: skrzynki pominiete (kotwica bez postepu / limit stron)
     // z powodem - petla jedzie dalej, raport koncowy je wymienia.
     const skipped: string[] = [];
@@ -1034,6 +1042,7 @@ export async function init(api: PluginApi) {
               skipped.push(`${box} (${skipWhy ?? "niekompletne"})`);
             }
           }
+          runCompleted = !flag.cancelled && skipped.length === 0;
           if (flag.cancelled) {
             notify(
               api,
@@ -1064,12 +1073,14 @@ export async function init(api: PluginApi) {
       )
       .finally(() => {
         // Kontynuacja guardow PO zwolnieniu blokady sesji (finally
-        // runExclusive wykonuje sie po release). Tylko przy pelnym
-        // indeksie - przerwana petla nie odpala akcji nastepczej.
+        // runExclusive wykonuje sie po release). Tylko kompletny
+        // biezacy przebieg odpala akcje nastepcza - sama kompletna
+        // meta z wczesniejszego przebiegu NIE wystarcza (przerwana
+        // indeksacja nie moze wystartowac pobierania).
         const cont = indexContinuation;
         indexContinuation = null;
-        if (!allBoxesIndexed(ui.state.indexMeta)) return;
-        if (cont === "download") downloadArchiveBodies();
+        if (!runCompleted || !allBoxesIndexed(ui.state.indexMeta)) return;
+        if (cont === "download") runArchiveDownload();
         else if (cont === "export") {
           notify(api, "Indeksacja zakonczona - kliknij ponownie Zapisz wszystkie (ZIP).");
         }
@@ -1261,16 +1272,12 @@ export async function init(api: PluginApi) {
   const DOWNLOAD_BREAKER_LIMIT = 3;
 
   /**
-   * Petla "Pobierz tresci do archiwum" (Fala 16i, zgloszenie pkt 10):
-   * kolejne listy bez tresci pod JEDNA blokada sesji, tempo jak loadAll.
-   * Drugi klik przycisku = Przerwij. Blad pojedynczego listu nie zabija
-   * petli - liczony i podsumowany na koncu.
-   * Fala 17c (zgloszenie pkt 3): petla jest IDEMPOTENTNA - kandydaci
-   * grupowani po kluczu tresci (blizniak pobierany raz), rekordy
-   * znikniete z serwera oznaczane i pomijane przy restarcie.
-   * Fala 31a: circuit breaker - 3 bledy z rzedu (siec/serwer lezy)
-   * zatrzymuja petle z jasnym komunikatem, zamiast mielic reszte
-   * kandydatow do konca. Sukces i 'missing' licznik resetuja.
+   * Klik "Pobierz tresci do archiwum" (po uzbrojeniu). KAZDE pobranie
+   * tresci zaczyna sie od pelnej kontroli indeksu wszystkich skrzynek
+   * (decyzja 2026-10-23) - dopiero swiezy indeks gwarantuje, ze lista
+   * kandydatow jest kompletna i aktualna. Sama petla pobierania odpala
+   * sie jako kontynuacja po kompletnej indeksacji (runArchiveDownload);
+   * przerwana albo niekompletna indeksacja jej nie odpala.
    */
   const downloadArchiveBodies = (): void => {
     if (archiveDownloadFlag) {
@@ -1281,13 +1288,32 @@ export async function init(api: PluginApi) {
       notify(api, SESSION_BUSY_MSG);
       return;
     }
-    // Fala 18c (guard, zgloszenie 2026-10-20): pusta baza BEZ kompletnego
-    // indeksu = najpierw indeksacja wszystkich skrzynek (mozliwe, ze
-    // poczta w ogole nie byla pobierana), potem automatycznie pobieranie.
-    if (ui.state.archive.length === 0 && !allBoxesIndexed(ui.state.indexMeta)) {
-      notify(api, "Archiwum puste - najpierw kliknij Indeksuj wszystkie skrzynki.");
-      indexContinuation = "download";
-      indexAllBoxes();
+    notify(api, "Pobieranie tresci: najpierw indeksuje wszystkie skrzynki.");
+    indexContinuation = "download";
+    indexAllBoxes();
+  };
+
+  /**
+   * Petla "Pobierz tresci do archiwum" (Fala 16i, zgloszenie pkt 10):
+   * kolejne listy bez tresci pod JEDNA blokada sesji, tempo jak loadAll.
+   * Drugi klik przycisku = Przerwij. Blad pojedynczego listu nie zabija
+   * petli - liczony i podsumowany na koncu.
+   * Fala 17c (zgloszenie pkt 3): petla jest IDEMPOTENTNA - kandydaci
+   * grupowani po kluczu tresci (blizniak pobierany raz), rekordy
+   * znikniete z serwera oznaczane i pomijane przy restarcie.
+   * Fala 31a: circuit breaker - 3 bledy z rzedu (siec/serwer lezy)
+   * zatrzymuja petle z jasnym komunikatem, zamiast mielic reszte
+   * kandydatow do konca. Sukces i 'missing' licznik resetuja.
+   * WOLANA WYLACZNIE jako kontynuacja kompletnej indeksacji
+   * (downloadArchiveBodies) - nigdy bezposrednio z UI.
+   */
+  const runArchiveDownload = (): void => {
+    if (archiveDownloadFlag) {
+      archiveDownloadFlag.cancelled = true;
+      return;
+    }
+    if (lock.locked) {
+      notify(api, SESSION_BUSY_MSG);
       return;
     }
     // Bez daty nie ma re-kotwicy (Fala 16h) - takie listy zostaja.

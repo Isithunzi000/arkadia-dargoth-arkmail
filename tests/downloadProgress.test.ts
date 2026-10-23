@@ -20,6 +20,7 @@ import {
   waitRt,
   click,
   notifyText,
+  driveIndexAll,
 } from './harness';
 import { mountMailUi, type MailUiHandlers } from '../src/arkmail/ui/render';
 import { MailUiStore } from '../src/arkmail/ui/store';
@@ -192,6 +193,21 @@ test('pobieranie tresci: pasek rosnie w trakcie, ETA po 3 ukonczonych', async ()
     await waitRt(() => !!h.content.querySelector('.arkmail-arch-download'), 'przycisk pobierania');
     click(h, '.arkmail-arch-download'); // uzbrojenie
     click(h, '.arkmail-arch-download'); // start
+    // Indeksacja przed pobieraniem (decyzja 2026-10-23): kompletny
+    // listing odebranych zgodny z archiwum, reszta skrzynek pusta.
+    await driveIndexAll(h, {
+      odebrane: [
+        'Listy odebrane:',
+        ' 4. *R* Temat: czwarty',
+        'Nadawca: Foo                        Wt, 20 XII 2025, 09:00:00',
+        ' 3. *R* Temat: najstarszy',
+        'Nadawca: Foo                        N, 21 XII 2025, 01:15:04',
+        ' 2. *R* Temat: srodkowy',
+        'Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05',
+        ' 1. *R* Temat: najnowszy',
+        'Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12',
+      ],
+    });
     // 1. list (re-kotwica przed dniem po dacie listu).
     await waitRt(() => f.sent.includes('listy odebrane przed 24 XII 2025'), 'kotwica 1');
     replayListing4(h);

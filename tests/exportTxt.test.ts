@@ -39,6 +39,7 @@ import {
   click,
   waitRt,
   notifyText,
+  driveIndexAll,
   type Harness,
 } from './harness';
 
@@ -324,6 +325,20 @@ test('archiwum: Zapisz wszystkie TXT pobiera ZIP per-list, puste archiwum = toas
     };
     dlBtn().dispatchEvent(new h.window.Event('click'));
     dlBtn().dispatchEvent(new h.window.Event('click'));
+    // Pobieranie tresci zaczyna sie od pelnej indeksacji skrzynek
+    // (decyzja 2026-10-23): kompletny listing odebranych zgodny
+    // z archiwum, reszta pusta.
+    await driveIndexAll(h, {
+      odebrane: [
+        'Listy odebrane:',
+        ' 3. *R* Temat: najstarszy',
+        'Nadawca: Foo                        N, 21 XII 2025, 01:15:04',
+        ' 2. *R* Temat: srodkowy',
+        'Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05',
+        ' 1. *R* Temat: najnowszy',
+        'Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12',
+      ],
+    });
     await waitRt(() => f.sent.includes('listy odebrane przed 24 XII 2025'), 'kotwica 1');
     replayListing3(h);
     await waitRt(() => f.sent.includes('przeczytaj list 1'), 'odczyt 1');

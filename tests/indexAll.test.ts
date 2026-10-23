@@ -8,9 +8,9 @@
  * - indeksacja: kompletny listing kazdej skrzynki (z paginacja
  *   kotwiczaca jak "Wczytaj wszystkie") dokleja wszystko do archiwum,
  *   oznacza znikniete z serwera i stawia flage per skrzynka.
- * - guardy: "Pobierz tresci do archiwum" i "Zapisz wszystkie (ZIP)"
- *   przy pustej niezindeksowanej bazie najpierw indeksuja (zamiast
- *   martwego toastu "brak listow").
+ * - pobieranie tresci ZAWSZE zaczyna sie od indeksacji (decyzja
+ *   2026-10-23); eksport (ZIP) przy pustej niezindeksowanej bazie
+ *   najpierw indeksuje (zamiast martwego toastu "brak listow").
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,6 +20,7 @@ import {
   startHarness,
   stopHarness,
   loadTruncatedBox,
+  driveIndexAll,
   waitRt,
   click,
   notifyText,
@@ -233,7 +234,7 @@ test('Indeksuj wszystkie: paginacja kotwicowa, flagi, gone-marking, odblokowanie
   }
 });
 
-test('guard: Pobierz tresci przy pustej niezindeksowanej bazie najpierw indeksuje', async () => {
+test('pobieranie tresci przy pustej bazie: indeksacja sama wykrywa puste skrzynki', async () => {
   const h = await startHarness();
   const { f } = h;
   try {
@@ -241,10 +242,16 @@ test('guard: Pobierz tresci przy pustej niezindeksowanej bazie najpierw indeksuj
     await waitRt(() => !!h.content.querySelector('.arkmail-arch-download'), 'przycisk pobierania');
     click(h, '.arkmail-arch-download'); // uzbrojenie (dwuklik)
     click(h, '.arkmail-arch-download'); // odpalenie
-    await waitRt(() => notifyText(f, 'najpierw kliknij Indeksuj'), 'toast guarda pobierania');
+    // Kazde pobranie tresci zaczyna sie od indeksacji (decyzja
+    // 2026-10-23) - bez komunikatu "najpierw kliknij Indeksuj".
+    await waitRt(
+      () => notifyText(f, 'najpierw indeksuje wszystkie skrzynki'),
+      'komunikat o indeksacji przed pobieraniem',
+    );
+    assert.ok(!notifyText(f, 'najpierw kliknij Indeksuj'), 'stary guard zniknal');
     await replayEmptyBoxes(h);
     // Kontynuacja po indeksacji: pobieranie na pustej bazie = jasny
-    // toast zamiast martwego "brak listow bez tresci".
+    // toast zamiast martwego "brak listow".
     await waitRt(() => notifyText(f, 'Skrzynki sa puste'), 'toast pustych skrzynek');
   } finally {
     await stopHarness();
@@ -317,12 +324,20 @@ test('pobieranie tresci przy kompletnej bazie: jasny toast zamiast martwego', as
     f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec odczytu');
-    // Archiwum ma 1 list i ma juz tresc -> pobieranie konczy sie jasnym
-    // toastem (nie martwym "brak listow bez tresci").
+    // Archiwum ma 1 list i ma juz tresc -> po indeksacji (kazde
+    // pobranie tresci zaczyna sie od niej, decyzja 2026-10-23)
+    // pobieranie konczy sie jasnym toastem.
     click(h, '[data-tab="archiwum"]');
     await waitRt(() => !!h.content.querySelector('.arkmail-arch-download'), 'przycisk pobierania');
     click(h, '.arkmail-arch-download'); // uzbrojenie
     click(h, '.arkmail-arch-download'); // odpalenie
+    await driveIndexAll(h, {
+      odebrane: [
+        'Listy odebrane:',
+        ' 1. *R* Temat: jedyny',
+        'Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12',
+      ],
+    });
     await waitRt(
       () => notifyText(f, 'Wszystkie listy w bazie maja tresci.'),
       'toast kompletnej bazy',

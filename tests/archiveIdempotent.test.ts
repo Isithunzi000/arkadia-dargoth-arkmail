@@ -35,12 +35,28 @@ import {
   startHarness,
   stopHarness,
   loadTruncatedBox,
+  driveIndexAll,
   click,
   waitRt,
   notifyText,
   textOf,
   type Harness,
 } from './harness';
+
+/**
+ * Kompletny listing odebranych (bez suffixu uciecia) z 3 wpisami
+ * prologu - odpowiedz na indeksacje poprzedzajaca kazde pobieranie
+ * tresci (decyzja 2026-10-23).
+ */
+const LISTING3_FULL = [
+  'Listy odebrane:',
+  ' 3. *R* Temat: najstarszy',
+  'Nadawca: Foo                        N, 21 XII 2025, 01:15:04',
+  ' 2. *R* Temat: srodkowy',
+  'Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05',
+  ' 1. *R* Temat: najnowszy',
+  'Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12',
+];
 
 const ENTRY: MailboxEntry = {
   number: 1,
@@ -145,6 +161,17 @@ test('archiwum: blizniak nieprzeczytane/odebrane pobierany RAZ, tresc w obu reko
 
     downloadBtn(h).dispatchEvent(new h.window.Event('click')); // uzbrojenie
     downloadBtn(h).dispatchEvent(new h.window.Event('click')); // start
+    // Indeksacja przed pobieraniem: oba listingi kompletne i zgodne
+    // z archiwum (blizniak nieprzeczytany tez na listingu, inaczej
+    // gone-marking oznaczylby go jako znikniety).
+    await driveIndexAll(h, {
+      odebrane: LISTING3_FULL,
+      nieprzeczytane: [
+        'Listy nieprzeczytane:',
+        ' 1. Temat: najnowszy',
+        'Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12',
+      ],
+    });
     // Grupa blizniakow = JEDEN kandydat: total 3, nie 4.
     await waitRt(
       () => downloadBtn(h).textContent.includes('(0/3)') || f.sent.length > 0,
@@ -198,6 +225,8 @@ test('archiwum: list znikniety z serwera dostaje znacznik i jest pomijany przy r
     click(h, '[data-tab="archiwum"]');
     downloadBtn(h).dispatchEvent(new h.window.Event('click')); // uzbrojenie
     downloadBtn(h).dispatchEvent(new h.window.Event('click')); // start
+    // Indeksacja przed pobieraniem: kompletny listing zgodny z archiwum.
+    await driveIndexAll(h, { odebrane: LISTING3_FULL });
 
     // Listing BEZ najnowszego listu - serwer go juz nie ma (i nie
     // wraca: gdyby wrocil w kolejnym listingu, upsert zdjalby znacznik).
@@ -226,19 +255,32 @@ test('archiwum: list znikniety z serwera dostaje znacznik i jest pomijany przy r
 
     await waitRt(() => notifyText(f, 'zniknely z serwera: 1'), 'podsumowanie ze zniknietym');
 
-    // Restart petli: znikniety list jest POMIJANY (znacznik), kandydatow
-    // brak - toast o kompletnym archiwum, zadna re-kotwica nie wylatuje.
-    const sentBefore = f.sent.length;
+    // Restart operacji: znowu najpierw indeksacja (kazde pobranie
+    // tresci zaczyna sie od kontroli indeksu). Listing nadal bez
+    // najnowszego - znacznik zostaje, kandydatow brak: toast o
+    // kompletnej bazie, zadna re-kotwica nie wylatuje.
     downloadBtn(h).dispatchEvent(new h.window.Event('click')); // uzbrojenie
     downloadBtn(h).dispatchEvent(new h.window.Event('click')); // start
-    // Fala 18c (swiadoma zmiana pinu): jasny toast o kompletnej bazie.
+    await driveIndexAll(h, {
+      odebrane: [
+        'Listy odebrane:',
+        ' 2. *R* Temat: najstarszy',
+        'Nadawca: Foo                        N, 21 XII 2025, 01:15:04',
+        ' 1. *R* Temat: srodkowy',
+        'Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05',
+      ],
+    });
     await waitRt(() => notifyText(f, 'Wszystkie listy w bazie maja tresci.'), 'brak kandydatow po znaczniku');
     assert.equal(
       f.sent.filter((s) => s === 'listy odebrane przed 24 XII 2025').length,
       1,
       'znikniety list nie jest mielony ponownie',
     );
-    assert.equal(f.sent.length, sentBefore, 'restart bez komend');
+    assert.equal(
+      f.sent.filter((s) => / przed \d+ [IVX]+ \d{4}$/.test(s)).length,
+      3,
+      'restart bez nowych re-kotwic pobierania',
+    );
   } finally {
     await stopHarness();
   }
