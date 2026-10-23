@@ -280,9 +280,10 @@ Serwer pokazuje max 50 najnowszych (`prezentowane jest pierwsze 50`).
 Starsze: `listy <skrzynka> przed <d> <miesiac rzymski> <yyyy>`
 (zweryfikowane w logach: `listy wyslane przed 9 iii 2026`) — ArkMail
 paginuje wstecz i buduje lokalne archiwum poza limitem.
-Trwalosc: localStorage per postac (`arkmail.<postac>.<klucz>`) — listy
-to krotkie teksty, limit ~5 MB wystarcza na tysiace; IndexedDB
-swiadomie odlozone (prostszy kontrakt, w pelni testowalny).
+Trwalosc: IndexedDB per postac (`arkmail.<postac>.<klucz>`). Dane sa
+odczytywane przed utworzeniem UI, a zmiany zapisuje kolejka transakcji.
+Przy niedostepnej IndexedDB wtyczka uzywa RAM i zglasza brak trwalego
+zapisu. Dawne klucze localStorage sa usuwane bez migracji danych.
 
 ## Reguły dla portów (WWW / Mudlet)
 

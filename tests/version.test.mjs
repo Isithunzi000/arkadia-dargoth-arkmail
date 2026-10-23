@@ -73,3 +73,10 @@ test('opis: meta.ts PLUGIN_DESCRIPTION == plugin.json metadata.description', () 
   const pj = JSON.parse(fs.readFileSync(PLUGIN_JSON, 'utf8'));
   assert.equal(pj.metadata.description, m[1], 'plugin.json metadata.description != meta.ts PLUGIN_DESCRIPTION');
 });
+
+test('dokumentacja: docelowy magazyn archiwum jest opisany jako IndexedDB', () => {
+  const protocol = fs.readFileSync(path.join(REPO, 'docs/PROTOCOL.md'), 'utf8');
+  assert.match(protocol, /Trwalosc: IndexedDB per postac/);
+  assert.doesNotMatch(protocol, /Trwalosc: localStorage per postac/);
+  assert.doesNotMatch(protocol, /IndexedDB\s+swiadomie odlozone/);
+});
