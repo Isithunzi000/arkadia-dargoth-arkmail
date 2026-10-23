@@ -11,6 +11,7 @@ import type { MailboxEntry, MailboxResult } from '../core/session/mailbox.js';
 import type { LetterContent } from '../core/session/pager.js';
 import type { Contact } from '../core/contacts.js';
 import type { ArchiveLetter } from '../core/archive.js';
+import { letterId } from '../core/archive.js';
 import type { LetterTemplate } from '../core/letterRender.js';
 
 export type UiTab = 'listy' | 'list' | 'napisz' | 'kontakty' | 'archiwum';
@@ -287,6 +288,26 @@ export class MailUiStore {
     const b = computeBadges(boxes);
     this.update({ boxes, badge: b.unread, badgeUnsent: b.unsent });
     return { updated, added, removed };
+  }
+
+  /**
+   * Usuwa z widoku skrzynki wpisy, ktorych rekord archiwum oznaczono
+   * jako znikniety z serwera (Fala 30c). Gone-marking dotyka archiwum;
+   * bez tego widoku martwy wpis zostawal klikalny ("Nie ma tego listu
+   * na liscie"). Lokalne, zero komend; zwraca liczbe usunietych.
+   */
+  pruneMailboxEntries(box: MailBox, goneIds: Set<string>): number {
+    const view = this.current.boxes[box];
+    if (!view || view.empty !== null || goneIds.size === 0) return 0;
+    const id = (e: MailboxEntry): string =>
+      letterId(box, e.party, e.subject, e.forwarded, e.date?.raw ?? null);
+    const kept = view.entries.filter((e) => !goneIds.has(id(e)));
+    const removed = view.entries.length - kept.length;
+    if (removed === 0) return 0;
+    const boxes = { ...this.current.boxes, [box]: { ...view, entries: kept } };
+    const b = computeBadges(boxes);
+    this.update({ boxes, badge: b.unread, badgeUnsent: b.unsent });
+    return removed;
   }
 
   setBusy(label: string | null): void {

@@ -366,7 +366,22 @@ export async function init(api: PluginApi) {
     if (changed) {
       ui.setArchive(marked);
       persistArchive();
+      pruneGoneFromView(box);
     }
+  };
+
+  /**
+   * Fala 30c: widok skrzynki wyrzuca wpisy, ktorych rekord archiwum
+   * jest oznaczony jako znikniety z serwera. Wywolywane po kazdym
+   * gone-markingu (pelnym albo zakresowym) - operacja lokalna.
+   */
+  const pruneGoneFromView = (box: MailBox): void => {
+    const gone = new Set(
+      ui.state.archive
+        .filter((l) => l.box === box && l.missingOnServer === true)
+        .map((l) => l.id),
+    );
+    ui.pruneMailboxEntries(box, gone);
   };
 
   /**
@@ -394,6 +409,7 @@ export async function init(api: PluginApi) {
     if (changed) {
       ui.setArchive(marked);
       persistArchive();
+      pruneGoneFromView(box);
     }
   };
 
