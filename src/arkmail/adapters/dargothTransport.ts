@@ -1,7 +1,7 @@
 /**
  * DargothTransport: Transport (core) nad zywym PluginApi klienta Dargoth.
  *
- * - send: api.command.send(linia, false) - bez echa naszych komend.
+ * - send: api.command.send z zachowaniem wielkosci liter i bez echa.
  * - subscribe: jeden zbiorczy trigger /^/ (tag 'arkmail') rozdziela linie
  *   do subskrybentow; linia zwracana BEZ zmian (niczego nie modyfikujemy).
  *   cls = typ linii z klienta (trzeci argument callbacka, np. 'prompt').
@@ -45,7 +45,7 @@ export class DargothTransport implements Transport {
     if (this.modalActive) this.bypass.add(line);
     // Fala 28h: echo=true dla composera i "wyslij zwierze" - gracz
     // widzi w oknie, co plugin wyslal (jak przy recznym wpisaniu).
-    void this.api.command.send(line, echo);
+    void this.api.command.send(line, echo, { preserveCase: true });
   }
 
   subscribe(cb: (line: ProtoLine) => void): () => void {
@@ -80,7 +80,9 @@ export class DargothTransport implements Transport {
     }
     this.bypass.clear();
     const pending = this.queue.splice(0);
-    for (const command of pending) void this.api.command.send(command);
+    for (const command of pending) {
+      void this.api.command.send(command, undefined, { preserveCase: true });
+    }
   }
 
   /** Zdejmuje trigger i modal-guard; do wywolania w destroy() pluginu. */

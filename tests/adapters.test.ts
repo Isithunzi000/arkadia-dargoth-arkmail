@@ -17,7 +17,7 @@ type TriggerCb = (line: { text: string }, matches: unknown, type: string) => unk
 type HookCb = (command: string) => string | null | undefined;
 
 class FakeApi {
-  sent: { command: string; echo?: boolean }[] = [];
+  sent: { command: string; echo?: boolean; options?: { preserveCase?: boolean } }[] = [];
   triggerCb: TriggerCb | null = null;
   triggerTag: string | null = null;
   hookCb: HookCb | null = null;
@@ -26,8 +26,8 @@ class FakeApi {
 
   readonly api = {
     command: {
-      send: async (command: string, echo?: boolean) => {
-        this.sent.push({ command, echo });
+      send: async (command: string, echo?: boolean, options?: { preserveCase?: boolean }) => {
+        this.sent.push(options === undefined ? { command, echo } : { command, echo, options });
       },
       addSuggestions: () => {},
       removeSuggestions: () => {},
@@ -76,7 +76,24 @@ test('adapter: send idzie przez command.send z wyciszonym echem', async () => {
   const t = new DargothTransport(f.api);
   t.send('listy odebrane');
   await new Promise((r) => setImmediate(r));
-  assert.deepEqual(f.sent, [{ command: 'listy odebrane', echo: false }]);
+  assert.deepEqual(f.sent, [
+    { command: 'listy odebrane', echo: false, options: { preserveCase: true } },
+  ]);
+});
+
+test('adapter: komenda z data zachowuje wielkie litery miesiaca', async () => {
+  const f = new FakeApi();
+  const t = new DargothTransport(f.api);
+  const command = 'listy odebrane przed 18 X 2026';
+  t.send(command);
+  await new Promise((r) => setImmediate(r));
+
+  const sent = f.sent[0];
+  assert.equal(sent?.options?.preserveCase, true);
+  const delivered = sent?.options?.preserveCase
+    ? sent.command
+    : sent?.command.replace(/[IVX]+/g, (month) => month.toLowerCase());
+  assert.equal(delivered, command, 'serwer nie moze dostac miesiaca malymi literami');
 });
 
 test('adapter: subscribe dostaje {text, cls=typ}, linia zwracana bez zmian', () => {
@@ -122,13 +139,19 @@ test('adapter: modal-guard tlumi komendy gracza, przepuszcza wlasne', async () =
   assert.equal(f.hookCb!('q'), undefined);
   assert.equal(t.modalQueueLength, 1);
   await new Promise((r) => setImmediate(r));
-  assert.deepEqual(f.sent, [{ command: 'q', echo: false }]);
+  assert.deepEqual(f.sent, [
+    { command: 'q', echo: false, options: { preserveCase: true } },
+  ]);
 
   // koniec modalu: kolejka gracza odtworzona do gry, hook zdjety
   t.endModal();
   assert.equal(f.hookCb, null, 'hook wyrejestrowany po endModal');
   await new Promise((r) => setImmediate(r));
-  assert.deepEqual(f.sent[1], { command: 'atakuj goblina', echo: undefined });
+  assert.deepEqual(f.sent[1], {
+    command: 'atakuj goblina',
+    echo: undefined,
+    options: { preserveCase: true },
+  });
   assert.equal(t.modalQueueLength, 0);
 });
 
