@@ -10,18 +10,23 @@ export interface ProtoLine {
 }
 
 export interface Transport {
-  /** Wysyla jedna linie do gry. */
-  send(line: string): void;
+  /** Wysyla jedna linie do gry. echo=true: linia pokazuje sie w oknie
+   *  gry jak wpisana recznie (Fala 28h: compose i "wyslij zwierze" sa
+   *  widoczne dla gracza); domyslnie bez echa (operacje pluginowe). */
+  send(line: string, echo?: boolean): void;
   /** Subskrypcja linii przychodzacych; zwraca unsubscribe. */
   subscribe(cb: (line: ProtoLine) => void): () => void;
 }
 
 export class MockTransport implements Transport {
   readonly sent: string[] = [];
+  /** Flagi echa rownolegle do sent (Fala 28h). */
+  readonly sentEcho: boolean[] = [];
   private subs = new Set<(line: ProtoLine) => void>();
 
-  send(line: string): void {
+  send(line: string, echo = false): void {
     this.sent.push(line);
+    this.sentEcho.push(echo);
   }
 
   subscribe(cb: (line: ProtoLine) => void): () => void {

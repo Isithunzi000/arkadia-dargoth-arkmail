@@ -24,11 +24,15 @@ export class FakeApi {
   footerStates: Array<{ state: string; highlighted: boolean }> = [];
   /** Linie stlumione przez trigger pluginu (zwrot null = gag, Fala 16j). */
   gagged: string[] = [];
+  /** Flagi echa wysylek, rownolegle do sent (Fala 28h: compose/zwierze
+   *  wysylaja z echem, reszta bez). */
+  sentEcho: boolean[] = [];
 
   readonly api = {
     command: {
-      send: async (command: string) => {
+      send: async (command: string, echo?: boolean) => {
         this.sent.push(command);
+        this.sentEcho.push(echo ?? false);
       },
       addSuggestions: () => {},
       removeSuggestions: () => {},

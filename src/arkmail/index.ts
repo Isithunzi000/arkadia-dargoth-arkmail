@@ -229,7 +229,12 @@ export async function init(api: PluginApi) {
   // to odpowiedzi na komendy pluginu - tlumione w glownym oknie gry.
   // Reczne "listy" gracza i powiadomienia POCZTA przychodza poza
   // blokada i zostaja widoczne.
-  transport.setGagPredicate(() => lock.locked);
+  // Fala 28h: WYJATEK compose - krotki dialog (prompty Adresat:/Temat:/
+  // DW:, numeracja, wynik ok/blad), nie spam. Pod compose linie mail
+  // przechodza do okna, zeby gracz widzial, co pisze i co odpowiedzial
+  // serwer. Listingi/tresci (spam) gagowane jak dotychczas.
+  let composeVisible = false;
+  transport.setGagPredicate(() => lock.locked && !composeVisible);
   const composePrefs = storage.getJSON<{ template?: LetterTemplate; width?: number }>(COMPOSE_KEY);
   store = new MailUiStore({
     notifyEnabled: storage.getJSON<boolean>(NOTIFY_KEY) ?? false,
@@ -1372,7 +1377,10 @@ export async function init(api: PluginApi) {
         return;
       }
       startAnimalFlight();
-      transport!.send("wyslij zwierze");
+      // Fala 28h: z echem - gracz widzi komende jak przy recznym
+      // wpisaniu. Linie lotu (wyslanie/powrot/dostawa) i tak nie sa
+      // gagowane - lot zwierzecia nie bierze blokady sesji.
+      transport!.send("wyslij zwierze", true);
       armSluchamWindow();
     },
     onOpenLetter: (box, entry) => {
@@ -1500,6 +1508,10 @@ export async function init(api: PluginApi) {
       void lock
         .runExclusive(async () => {
           transport!.beginModal();
+          // Fala 28h: compose odgagowany na czas dialogu (patrz
+          // setGagPredicate wyzej); finally przywraca gag nawet przy
+          // bledzie/timeoutcie.
+          composeVisible = true;
           try {
             const out = await editor.send({
               adresat: input.adresat.trim(),
@@ -1523,6 +1535,7 @@ export async function init(api: PluginApi) {
               notify(api, "Blad wysylki - sprawdz adresata.");
             }
           } finally {
+            composeVisible = false;
             transport!.endModal();
           }
         })

@@ -4,6 +4,8 @@
  * dopiero po potwierdzeniu poprzedniego echem promptu (pipelining serwera
  * skleja echo: "Adresat: Temat: DW: " potwierdza wszystkie naraz).
  * Blad adresata na starcie przerywa compose - tresc NIE wycieka do gry.
+ * Fala 28h: wszystkie wysylki composera z echem - gracz widzi w oknie
+ * gry dokladnie to, co przy recznym pisaniu listu.
  */
 
 import {
@@ -67,15 +69,15 @@ export class EditorSession {
           if (c === 'adresat') {
             // adresat juz wyslany wraz z "napisz list"
           } else if (c === 'temat') {
-            this.transport.send(input.temat);
+            this.transport.send(input.temat, true);
           } else if (c === 'dw') {
-            this.transport.send(dw);
+            this.transport.send(dw, true);
           }
           stage = order[idx + 1] ?? 'tresc';
         }
         if (stage === 'tresc') {
-          for (const linia of input.linie) this.transport.send(linia);
-          this.transport.send('**');
+          for (const linia of input.linie) this.transport.send(linia, true);
+          this.transport.send('**', true);
           stage = 'tresc-wyslana'; // tresc wysylamy dokladnie raz
         }
       };
@@ -113,8 +115,8 @@ export class EditorSession {
         }
       });
 
-      this.transport.send('napisz list');
-      this.transport.send(input.adresat);
+      this.transport.send('napisz list', true);
+      this.transport.send(input.adresat, true);
     });
   }
 }

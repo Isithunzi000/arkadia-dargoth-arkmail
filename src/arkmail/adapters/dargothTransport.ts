@@ -41,9 +41,11 @@ export class DargothTransport implements Transport {
     this.gagWhen = pred;
   }
 
-  send(line: string): void {
+  send(line: string, echo = false): void {
     if (this.modalActive) this.bypass.add(line);
-    void this.api.command.send(line, false);
+    // Fala 28h: echo=true dla composera i "wyslij zwierze" - gracz
+    // widzi w oknie, co plugin wyslal (jak przy recznym wpisaniu).
+    void this.api.command.send(line, echo);
   }
 
   subscribe(cb: (line: ProtoLine) => void): () => void {
