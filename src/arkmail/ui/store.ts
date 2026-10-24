@@ -117,7 +117,7 @@ const DEFAULT_STATE: MailUiState = {
   letter: null,
   contacts: [],
   archive: [],
-  notifyEnabled: false,
+  notifyEnabled: true,
   animalFlying: false,
   unsentFlash: false,
   composeTemplate: 'plain',

@@ -76,20 +76,39 @@ test('style: szukajka uklada sie stosowo, Szukaj na calej szerokosci', () => {
   assert.match(go!, /grid-column:\s*1\s*\/\s*-1/, 'Szukaj rozpiety na caly wiersz');
 });
 
-// Fala 16k: etykiety w waskim popupie nie moga sie lamiac - przyciski
-// maja nowrap w catch-all, a dlugi opis w pasku operacji ucina ellipsis.
 test('style: przyciski nie lamia etykiet (nowrap w catch-all)', () => {
   const body = ruleBody(/\.arkmail-root\s+button\b/);
   assert.ok(body, 'regula catch-all button istnieje');
   assert.match(body!, /white-space:\s*nowrap/, 'przyciski maja white-space: nowrap');
 });
 
-test('style: pasek operacji - 12px, bez lamania, ellipsis', () => {
+test('style: pasek operacji zawija caly tekst bez ucinania', () => {
   const body = ruleBody(/\.arkmail-busy\b/);
   assert.ok(body, 'regula .arkmail-busy istnieje');
   assert.match(body!, /font-size:\s*12px/, 'czcionka 12px');
-  assert.match(body!, /white-space:\s*nowrap/, 'bez lamania');
-  assert.match(body!, /text-overflow:\s*ellipsis/, 'dlugi opis ucina ellipsis');
+  assert.match(body!, /white-space:\s*normal/, 'tekst moze przejsc do kolejnej linii');
+  assert.match(body!, /overflow-wrap:\s*anywhere/, 'dlugi fragment nie wyjdzie poza pasek');
+  assert.doesNotMatch(body!, /text-overflow:\s*ellipsis/, 'status nie jest ucinany');
+});
+
+test('style: operacje skrzynki i listu zawijaja sie, pole przekazania jest elastyczne', () => {
+  for (const selector of [/\.arkmail-box-ops\s*/, /\.arkmail-letter-ops\s*/]) {
+    const body = ruleBody(selector);
+    assert.ok(body, 'regula operacji istnieje');
+    assert.match(body!, /flex-wrap:\s*wrap/, 'operacje przechodza do kolejnego rzedu');
+  }
+  const forward = ruleBody(/\.arkmail-root\s+\.arkmail-letter-ops\s+\.arkmail-ghost-wrap\s*/);
+  assert.ok(forward, 'regula pola przekazania istnieje');
+  assert.match(forward!, /flex:\s*1\s+1\s+\d+px/, 'pole ma elastyczna podstawe szerokosci');
+  assert.match(forward!, /min-width:\s*0/, 'pole moze zmniejszyc sie bez przepelnienia');
+});
+
+test('style: placeholdery sa czytelne i mniejsze od wpisywanego tekstu', () => {
+  const body = ruleBody(/\.arkmail-root\s+input::placeholder\s*,\s*\.arkmail-root\s+textarea::placeholder\s*/);
+  assert.ok(body, 'wspolna regula placeholderow istnieje');
+  assert.match(body!, /font-size:\s*12px/);
+  assert.match(body!, /opacity:\s*1/);
+  assert.match(body!, new RegExp(`color:\\s*${HEX}`));
 });
 
 // Fala 17e (zgloszenie 2026-10-19/20 pkt 1): przycisk "Wczytaj

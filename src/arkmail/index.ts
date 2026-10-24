@@ -266,7 +266,7 @@ export async function init(api: PluginApi) {
   }
   const composePrefs = storage.getJSON<{ template?: LetterTemplate; width?: number }>(COMPOSE_KEY);
   store = new MailUiStore({
-    notifyEnabled: storage.getJSON<boolean>(NOTIFY_KEY) ?? false,
+    notifyEnabled: storage.getJSON<boolean>(NOTIFY_KEY) ?? true,
     archive,
     composeTemplate: composePrefs?.template ?? "plain",
     composeWidth: composePrefs?.width ?? 60,

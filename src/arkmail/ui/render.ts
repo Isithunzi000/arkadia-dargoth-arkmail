@@ -135,6 +135,23 @@ export function mountMailUi(
    *  wpisanego zapytania. */
   const searchDraft: Record<string, string> = { osoba: '', temat: '', tresc: '', odDaty: '', doDaty: '' };
 
+  const setButtonLabel = (
+    button: HTMLButtonElement,
+    label: string,
+    title = label,
+  ): void => {
+    button.textContent = label;
+    button.setAttribute('title', title);
+  };
+  const fillButtonTitles = (scope: ParentNode): void => {
+    scope.querySelectorAll('button').forEach((element) => {
+      const button = element as HTMLButtonElement;
+      if ((button.getAttribute('title') ?? '').trim()) return;
+      const label = (button.textContent ?? '').trim();
+      if (label) button.setAttribute('title', label);
+    });
+  };
+
   // Fala 11c: migawka widoku na czas pelnego rerenderu. Bez niej kazda
   // zmiana store (strona loadAll co ~400 ms, merge notyfikacji) niszczyla
   // DOM i gubila focus/karet/scroll - litera po literze wywalalo z pola.
@@ -268,6 +285,7 @@ export function mountMailUi(
       nodes.push(renderPane(state));
     }
     root.replaceChildren(...nodes);
+    fillButtonTitles(root);
     restoreView(snap);
   };
 
@@ -416,22 +434,23 @@ export function mountMailUi(
     // Fala 24h (zgloszenie 2026-10-21): zakres czyszczenia w tooltipie
     // przycisku zamiast stalego napisu pod paskiem operacji (napis
     // wisualnie zasmiecal kazda skrzynke).
-    clearBtn.setAttribute('title', 'Kasuje listy i kontakty. Ustawienia zostaja.');
+    const clearTitle = 'Kasuje listy i kontakty. Ustawienia zostaja.';
+    clearBtn.setAttribute('title', clearTitle);
     let clearArmed = false;
     let clearTimer: ReturnType<typeof setTimeout> | null = null;
     clearBtn.addEventListener('click', () => {
       if (!clearArmed) {
         clearArmed = true;
-        clearBtn.textContent = 'Na pewno? Kliknij ponownie';
+        setButtonLabel(clearBtn, 'Na pewno? Kliknij ponownie');
         clearTimer = setTimeout(() => {
           clearArmed = false;
-          clearBtn.textContent = 'Wyczysc zapisane dane';
+          setButtonLabel(clearBtn, 'Wyczysc zapisane dane', clearTitle);
         }, 3000);
         return;
       }
       if (clearTimer) clearTimeout(clearTimer);
       clearArmed = false;
-      clearBtn.textContent = 'Wyczysc zapisane dane';
+      setButtonLabel(clearBtn, 'Wyczysc zapisane dane', clearTitle);
       handlers.onClearCache?.();
     });
     ops.appendChild(clearBtn);
@@ -496,9 +515,9 @@ export function mountMailUi(
       const isoOd = (sOd as HTMLInputElement).value;
       const isoDo = (sDo as HTMLInputElement).value;
       if (isoOd !== '' && isoDo !== '' && isoOd > isoDo) {
-        go.textContent = 'Od dnia pozniej niz Do dnia.';
+        setButtonLabel(go, 'Od dnia pozniej niz Do dnia.');
         setTimeout(() => {
-          go.textContent = 'Szukaj';
+          setButtonLabel(go, 'Szukaj');
         }, 3000);
         return;
       }
@@ -733,16 +752,16 @@ export function mountMailUi(
       del.addEventListener('click', () => {
         if (!delArmed) {
           delArmed = true;
-          del.textContent = 'Na pewno? Kliknij ponownie';
+          setButtonLabel(del, 'Na pewno? Kliknij ponownie');
           delTimer = setTimeout(() => {
             delArmed = false;
-            del.textContent = 'Usun';
+            setButtonLabel(del, 'Usun');
           }, 3000);
           return;
         }
         if (delTimer) clearTimeout(delTimer);
         delArmed = false;
-        del.textContent = 'Usun';
+        setButtonLabel(del, 'Usun');
         handlers.onDeleteLetter(l.box, source);
       });
     } else {
@@ -990,7 +1009,7 @@ export function mountMailUi(
     const SEND_LABEL = 'Zapisz w niewyslanych';
     let sendTimer: ReturnType<typeof setTimeout> | null = null;
     const disarmSend = (): void => {
-      send.textContent = SEND_LABEL;
+      setButtonLabel(send, SEND_LABEL);
     };
     send.addEventListener('click', () => {
       const st = store.state;
@@ -1000,7 +1019,7 @@ export function mountMailUi(
         // przycisku, jak adresat (zgloszenie pkt 4). Cichy return z 15b
         // zostawial gracza bez informacji, czemu klikniecie nic nie daje.
         if (sendTimer) clearTimeout(sendTimer);
-        send.textContent = 'Brak tresci listu.';
+        setButtonLabel(send, 'Brak tresci listu.');
         sendTimer = setTimeout(disarmSend, 3000);
         return;
       }
@@ -1008,13 +1027,13 @@ export function mountMailUi(
         (pane.querySelector(`[data-field="${f}"]`) as HTMLInputElement | HTMLTextAreaElement).value;
       if (!val('adresat').trim()) {
         if (sendTimer) clearTimeout(sendTimer);
-        send.textContent = 'Podaj adresata.';
+        setButtonLabel(send, 'Podaj adresata.');
         sendTimer = setTimeout(disarmSend, 3000);
         return;
       }
       if (!val('temat').trim()) {
         if (sendTimer) clearTimeout(sendTimer);
-        send.textContent = 'Podaj temat.';
+        setButtonLabel(send, 'Podaj temat.');
         sendTimer = setTimeout(disarmSend, 3000);
         return;
       }
@@ -1042,16 +1061,16 @@ export function mountMailUi(
     clearCompose.addEventListener('click', () => {
       if (!clearArmed) {
         clearArmed = true;
-        clearCompose.textContent = 'Na pewno? Kliknij ponownie';
+        setButtonLabel(clearCompose, 'Na pewno? Kliknij ponownie');
         clearTimer = setTimeout(() => {
           clearArmed = false;
-          clearCompose.textContent = 'Wyczysc';
+          setButtonLabel(clearCompose, 'Wyczysc');
         }, 3000);
         return;
       }
       if (clearTimer) clearTimeout(clearTimer);
       clearArmed = false;
-      clearCompose.textContent = 'Wyczysc';
+      setButtonLabel(clearCompose, 'Wyczysc');
       composeDraft.adresat = '';
       composeDraft.temat = '';
       composeDraft.dw = '';
@@ -1210,6 +1229,7 @@ export function mountMailUi(
           ),
         );
       }
+      fillButtonTitles(list);
     };
     input.addEventListener('input', () => {
       contactView.filter = input.value;
@@ -1346,16 +1366,16 @@ export function mountMailUi(
       }
       if (!dlArmed) {
         dlArmed = true;
-        dlBtn.textContent = 'Pobieranie potrwa dlugo - kliknij ponownie';
+        setButtonLabel(dlBtn, 'Pobieranie potrwa dlugo - kliknij ponownie');
         dlTimer = setTimeout(() => {
           dlArmed = false;
-          dlBtn.textContent = 'Pobierz tresci do archiwum';
+          setButtonLabel(dlBtn, 'Pobierz tresci do archiwum');
         }, 3000);
         return;
       }
       if (dlTimer) clearTimeout(dlTimer);
       dlArmed = false;
-      dlBtn.textContent = 'Pobierz tresci do archiwum';
+      setButtonLabel(dlBtn, 'Pobierz tresci do archiwum');
       handlers.onDownloadArchiveBodies?.();
     });
     controls.appendChild(dlBtn);

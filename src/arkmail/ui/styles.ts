@@ -78,6 +78,11 @@ export const STYLES = `
   border-color: ${ACCENT};
 }
 .arkmail-root input[type='checkbox'] { accent-color: ${ACCENT}; }
+.arkmail-root input::placeholder, .arkmail-root textarea::placeholder {
+  color: ${FG_DIM};
+  font-size: 12px;
+  opacity: 1;
+}
 
 /* --- zakladki: segmentowana belka --- */
 .arkmail-tabs {
@@ -113,12 +118,9 @@ export const STYLES = `
   border-radius: 6px;
   background: ${BG_PANEL};
   color: ${FG_DIM};
-  /* Fala 16k: pasek operacji nie rosnie w pionie - mniejsza czcionka,
-     zero lamania, dlugi opis ucina ellipsis. */
   font-size: 12px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 /* Fala 18d (zgloszenie pkt 2): pasek postepu pod tekstem busy przy
    masowym pobieraniu tresci (jedyna petla ze znanym total). */
@@ -174,8 +176,8 @@ export const STYLES = `
 }
 
 /* Fala 11e: zbiorcze operacje na aktywnej skrzynce (zamiast ↻ per box). */
-.arkmail-box-ops { display: flex; gap: 6px; margin-bottom: 8px; }
-.arkmail-box-ops button { flex: 1; }
+.arkmail-box-ops { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.arkmail-box-ops button { flex: 1 1 140px; }
 .arkmail-root button:disabled { opacity: 0.45; cursor: default; }
 .arkmail-root button:disabled:hover { background: ${BG_RAISED}; }
 
@@ -290,7 +292,7 @@ export const STYLES = `
   padding: 10px 12px;
   color: ${FG};
 }
-.arkmail-letter-ops { display: flex; gap: 6px; margin-top: 8px; align-items: center; }
+.arkmail-letter-ops { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
 .arkmail-letter-ops input { flex: 1; }
 .arkmail-root .arkmail-del {
   background: ${DANGER};
@@ -389,8 +391,8 @@ export const STYLES = `
 /* --- ghost-podpowiedzi (Fala 9g): wyszarzona sugestia za kursorem --- */
 .arkmail-root .arkmail-ghost-wrap { position: relative; display: block; min-width: 0; }
 .arkmail-root .arkmail-ghost-wrap > input { width: 100%; box-sizing: border-box; }
-/* wrap przejmuje rozciaganie inputa w wierszu operacji listu (flex) */
-.arkmail-root .arkmail-letter-ops .arkmail-ghost-wrap { flex: 1; }
+/* Pole przekazania moze zmniejszyc szerokosc albo przejsc do nowego rzedu. */
+.arkmail-root .arkmail-letter-ops .arkmail-ghost-wrap { flex: 1 1 180px; min-width: 0; }
 .arkmail-root .arkmail-ghost {
   position: absolute;
   inset: 0;

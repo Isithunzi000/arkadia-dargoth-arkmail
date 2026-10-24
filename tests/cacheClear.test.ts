@@ -159,7 +159,7 @@ test('ui: uzbrojenie wygasa po 3 s bez drugiego kliku', async () => {
 });
 
 test('harness: czyszczenie kasuje widok i archiwum, ustawienia zostaja', async () => {
-  const h = await startHarness();
+  const h = await startHarness({ notifyEnabled: false });
   const { f, content } = h;
   try {
     await loadTruncatedBox(h);

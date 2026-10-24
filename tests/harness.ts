@@ -125,14 +125,21 @@ export interface Harness {
 
 let previousIndexedDB: IDBFactory | undefined;
 
-export async function startHarness(options: { archive?: ArchiveLetter[] } = {}): Promise<Harness> {
+export async function startHarness(
+  options: { archive?: ArchiveLetter[]; notifyEnabled?: boolean } = {},
+): Promise<Harness> {
   const window = new Window();
   (globalThis as { document?: unknown }).document = window.document;
   previousIndexedDB = globalThis.indexedDB;
   globalThis.indexedDB = new IDBFactory();
-  if (options.archive) {
+  if (options.archive || options.notifyEnabled !== undefined) {
     const seed = new IndexedDbStorageDriver(globalThis.indexedDB);
-    await seed.put('arkmail.foo.archiwum', JSON.stringify(options.archive));
+    if (options.archive) {
+      await seed.put('arkmail.foo.archiwum', JSON.stringify(options.archive));
+    }
+    if (options.notifyEnabled !== undefined) {
+      await seed.put('arkmail.foo.powiadomienia', JSON.stringify(options.notifyEnabled));
+    }
     await seed.close();
   }
   const f = new FakeApi();

@@ -418,11 +418,11 @@ test('render: przelacznik powiadomien w panelu Listy', () => {
   const { container, off } = mount(s);
   const toggle = container.querySelector('.arkmail-notify-toggle') as unknown as HTMLInputElement;
   assert.ok(toggle, 'przelacznik istnieje');
-  assert.equal(toggle.checked, false);
+  assert.equal(toggle.checked, true, 'powiadomienia sa domyslnie wlaczone');
   click(toggle);
-  assert.equal(s.state.notifyEnabled, true);
+  assert.equal(s.state.notifyEnabled, false);
   const toggle2 = container.querySelector('.arkmail-notify-toggle') as unknown as HTMLInputElement;
-  assert.equal(toggle2.checked, true, 'stan odzwierciedlony po rerenderze');
+  assert.equal(toggle2.checked, false, 'stan odzwierciedlony po rerenderze');
   off();
 });
 
