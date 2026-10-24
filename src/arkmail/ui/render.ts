@@ -487,7 +487,8 @@ export function mountMailUi(
       });
       return input;
     };
-    const sOsoba = mkSearch('osoba', 'Osoba (w dopelniaczu)');
+    const sOsoba = mkSearch('osoba', 'Osoba (kogo? czego?)');
+    sOsoba.setAttribute('title', 'Wpisz imie w dopelniaczu.');
     const sTemat = mkSearch('temat', 'Temat');
     // Fala 28a: szukanie po tresci - serwer wspiera "o tresci"
     // (?listy, help w grze), builder komendy obslugiwal od zawsze,

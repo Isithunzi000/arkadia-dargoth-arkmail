@@ -169,7 +169,8 @@ test('szukajka: pole osoby wymaga dopelniacza, nie ma ghosta i zachowuje draft',
   });
   const c = mount(s);
   const el = input(c, '[data-search="osoba"]');
-  assert.equal(el.placeholder, 'Osoba (w dopelniaczu)');
+  assert.equal(el.placeholder, 'Osoba (kogo? czego?)');
+  assert.equal(el.getAttribute('title'), 'Wpisz imie w dopelniaczu.');
   type(el, 'cor');
   assert.equal(ghostRest(c, '[data-search="osoba"]'), '');
   key(el, 'ArrowRight');
