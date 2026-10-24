@@ -22,6 +22,10 @@ function metaVersion() {
   return m[1];
 }
 
+test('wydanie: przygotowany numer wersji to 1.14.0', () => {
+  assert.equal(metaVersion(), '1.14.0');
+});
+
 function latestZip() {
   const zips = fs.readdirSync(RELEASES).filter((f) => /^arkmail_\d+(?:_\d+)*\.zip$/.test(f));
   assert.ok(zips.length > 0, 'brak zipa arkmail w releases/');
