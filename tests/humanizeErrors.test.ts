@@ -108,7 +108,7 @@ test('integracja: blad szukania pokazuje ludzki komunikat, nie debug-string', as
     await loadTruncatedBox(h);
     setInput(h, '[data-search="osoba"]', 'Corge');
     click(h, '.arkmail-search-go');
-    await waitRt(() => f.sent.includes('listy odebrane od Corge'), 'komenda szukania');
+    await waitRt(() => f.sent.includes('listy odebrane od corge'), 'komenda szukania');
     // Jednoznaczny mismatch (straznik Fali 14d) - serwer odpowiada
     // za inna skrzynke.
     f.fire('Nie masz zadnych wyslanych listow.', 'mail');

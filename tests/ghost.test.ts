@@ -157,11 +157,7 @@ test('ghost: pole tematu szukajki podpowiada tematy z archiwum', () => {
   assert.equal(el.value, 'Perly z morza');
 });
 
-test('ghost: akceptacja strzalka synchronizuje draft szukajki (Fala 26a)', () => {
-  // Zgloszenie 2026-10-22: wpisane 'cor' + strzalka w prawo wpisywala
-  // kanoniczne 'Corge' do POLA, ale bez dispatchu 'input' draft zostawal
-  // przy prefiksie - pierwszy rerender przywracal 'cor' do pola, a
-  // banner wynikow mowil 'Corge'.
+test('szukajka: pole osoby wymaga dopelniacza, nie ma ghosta i zachowuje draft', () => {
   const s = new MailUiStore();
   s.setContacts([contact('Corge', 200)]);
   s.applyMailbox('odebrane', {
@@ -173,14 +169,14 @@ test('ghost: akceptacja strzalka synchronizuje draft szukajki (Fala 26a)', () =>
   });
   const c = mount(s);
   const el = input(c, '[data-search="osoba"]');
+  assert.equal(el.placeholder, 'Osoba (w dopelniaczu)');
   type(el, 'cor');
-  assert.equal(ghostRest(c, '[data-search="osoba"]'), 'ge');
+  assert.equal(ghostRest(c, '[data-search="osoba"]'), '');
   key(el, 'ArrowRight');
-  assert.equal(el.value, 'Corge', 'akceptacja wpisuje kanoniczna forme');
-  // Dowolna zmiana store = pelny rerender (draft odtwarza pola).
+  assert.equal(el.value, 'cor', 'brak podpowiedzi nie zmienia wpisanej formy');
   s.setNotifyEnabled(!s.state.notifyEnabled);
   const el2 = input(c, '[data-search="osoba"]');
-  assert.equal(el2.value, 'Corge', 'po rerenderze pole zachowuje zaakceptowana fraze');
+  assert.equal(el2.value, 'cor', 'po rerenderze pole zachowuje wpisana fraze');
 });
 
 test('szukajka: Enter w polu osoby = Szukaj (Fala 26a)', () => {
@@ -210,7 +206,7 @@ test('szukajka: Enter w polu osoby = Szukaj (Fala 26a)', () => {
   assert.deepEqual(searches[1], ['odebrane', { osoba: 'cor', temat: 'paczka' }], 'Enter z pola tematu');
 });
 
-test('ghost: pole osoby w szukajce i Przekaz w widoku listu', () => {
+test('ghost: szukajka osoby nie ma podpowiedzi, a Przekaz ja zachowuje', () => {
   const s = new MailUiStore();
   s.setContacts([contact('Corge', 200)]);
   s.applyMailbox('odebrane', {
@@ -222,7 +218,7 @@ test('ghost: pole osoby w szukajce i Przekaz w widoku listu', () => {
   });
   const c = mount(s);
   type(input(c, '[data-search="osoba"]'), 'cor');
-  assert.equal(ghostRest(c, '[data-search="osoba"]'), 'ge');
+  assert.equal(ghostRest(c, '[data-search="osoba"]'), '');
 
   const s2 = new MailUiStore({ tab: 'list' });
   s2.setContacts([contact('Corge', 200)]);

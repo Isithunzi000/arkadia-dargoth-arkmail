@@ -34,11 +34,11 @@ import {
 test('szukaj: komenda listy z filtrami serwera (skladnia ?listy)', () => {
   assert.equal(
     searchListingCommand('odebrane', { osoba: 'Bar' }),
-    'listy odebrane od Bar',
+    'listy odebrane od bar',
   );
   assert.equal(
     searchListingCommand('wyslane', { osoba: 'Bar' }),
-    'listy wyslane do Bar',
+    'listy wyslane do bar',
     'kierunek po skrzynce: wyslane/niewyslane szukaja po adresacie (do)',
   );
   assert.equal(
@@ -77,7 +77,7 @@ test('szukaj: komenda listy z filtrami serwera (skladnia ?listy)', () => {
       doDaty: { day: 7, month: 3, year: 2002 },
       temat: 'pomoc',
     }),
-    'listy wyslane do Alvin przed 8 III 2002 o temacie pomoc',
+    'listy wyslane do alvin przed 8 III 2002 o temacie pomoc',
     'temat zawsze ostatni (wzorzec z helpu: listy wyslane do alvina przed 7 III 2002 o temacie pomoc)',
   );
   // Fala 30d (potwierdzone w grze 2026-10-23): "o temacie" jest
@@ -93,6 +93,24 @@ test('szukaj: komenda listy z filtrami serwera (skladnia ?listy)', () => {
     searchListingCommand('nieprzeczytane', {}),
     'listy nieprzeczytane',
     'puste zapytanie = zwykly listing',
+  );
+});
+
+test('szukaj: tylko osoba jest mala litera, daty i pozostale filtry bez zmian', () => {
+  const query = {
+    osoba: 'BaR',
+    odDaty: { day: 2, month: 3, year: 2026 },
+    tresc: 'Zachowaj TEKST',
+    temat: 'WaZny Temat',
+  };
+  assert.equal(
+    searchListingCommand('odebrane', query),
+    'listy odebrane od bar po 1 III 2026 o tresci Zachowaj TEKST o temacie WaZny Temat',
+  );
+  assert.equal(
+    searchDescription('odebrane', query),
+    'odebrane, nadawca: BaR, od dnia: 2026-03-02, temat: "WaZny Temat", tresc: "Zachowaj TEKST"',
+    'opis dla gracza zachowuje wpisana forme',
   );
 });
 
@@ -143,7 +161,7 @@ test('szukaj integracja: komenda z UI, wyniki w widoku, Wyczysc bez refetchu', a
     setInput(h, '[data-search="osoba"]', 'Corge');
     click(h, '.arkmail-search-go');
     await waitFor(
-      () => f.sent.includes('listy odebrane od Corge'),
+      () => f.sent.includes('listy odebrane od corge'),
       'komenda szukania po nadawcy',
     );
 
@@ -228,7 +246,7 @@ test('szukaj integracja: pole Tresc buduje komende "o tresci" (Fala 28a)', async
     setInput(h, '[data-search="tresc"]', 'morze');
     click(h, '.arkmail-search-go');
     await waitFor(
-      () => f.sent.includes('listy odebrane od Corge o tresci morze o temacie perly'),
+      () => f.sent.includes('listy odebrane od corge o tresci morze o temacie perly'),
       'komenda laczona: osoba -> tresc -> temat (temat ostatni)',
     );
   } finally {

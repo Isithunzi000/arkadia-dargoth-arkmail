@@ -76,7 +76,7 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
   const t = new MockTransport();
   const mb = new MailboxSession(t, OPTS);
   const cmd = searchListingCommand('wyslane', { osoba: 'Foo' });
-  ok('S3a komenda szukania', cmd === 'listy wyslane do Foo', cmd);
+  ok('S3a komenda szukania', cmd === 'listy wyslane do foo', cmd);
   const p = mb.fetch('wyslane', cmd);
   await t.replay([
     { cls: 'mail', text: 'Nie znaleziono zadnych takich wyslanych listow.' },
@@ -141,8 +141,8 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 {
   ok('S7a osoba+daty+temat',
     searchListingCommand('odebrane', { osoba: 'Foo', odDaty: { day: 1, month: 3, year: 2026 }, doDaty: { day: 10, month: 3, year: 2026 }, temat: 'karteczka' })
-      === 'listy odebrane od Foo po 28 II 2026 przed 11 III 2026 o temacie karteczka');
-  ok('S7b wyslane=do', searchListingCommand('wyslane', { osoba: 'Bar' }) === 'listy wyslane do Bar');
+      === 'listy odebrane od foo po 28 II 2026 przed 11 III 2026 o temacie karteczka');
+  ok('S7b wyslane=do', searchListingCommand('wyslane', { osoba: 'Bar' }) === 'listy wyslane do bar');
   ok('S7c temat ostatni', searchListingCommand('niewyslane', { temat: 'a b c' }) === 'listy niewyslane o temacie a b c');
   ok('S7d miesiac WIELKA rzymska', searchListingCommand('odebrane', { odDaty: { day: 7, month: 12, year: 2025 } }) === 'listy odebrane po 6 XII 2025');
 }

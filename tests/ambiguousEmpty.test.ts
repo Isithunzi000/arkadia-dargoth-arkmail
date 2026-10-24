@@ -111,7 +111,7 @@ test('szukaj integracja: pusty wynik "otrzymanych" na odebranych - brak bledu, b
     setInput(h, '[data-search="osoba"]', 'Corge');
     click(h, '.arkmail-search-go');
     await waitFor(
-      () => f.sent.includes('listy odebrane od Corge'),
+      () => f.sent.includes('listy odebrane od corge'),
       'komenda szukania po nadawcy',
     );
     // Serwer odpowiada dwuznacznym genitywem - stary kod odrzucal

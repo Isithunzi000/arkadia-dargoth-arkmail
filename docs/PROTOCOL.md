@@ -45,7 +45,8 @@ Odbiorcy: Xyzzy                N, 21 XII 2025, 00:31:18   <- wyslane/niewyslane
 - Numery malejąco (najnowszy najpierw), zakres 1..50.
 - `*R*` występuje tylko przy przeczytanych (na `nieprzeczytane` brak).
 - Strona `Nadawca:` (odebrane/nieprzeczytane) lub `Odbiorcy:`/`Odbiorca:`
-  (wysłane/niewysłane); data oddzielona 2+ spacjami, może jej nie być.
+  (wysłane/niewysłane); date od osoby oddziela co najmniej jedna spacja.
+  Dluga lista osob bywa skrocona wielokropkiem, a daty moze nie byc.
 - Data: `<DzienTygodnia>, <d> <MiesiacRzymski> <rrrr>, <gg:mm:ss>`
   (np. `Wt, 23 XII 2025, 00:11:12`).
 
@@ -93,9 +94,10 @@ listy [nieprzeczytane/otrzymane/wyslane/niewyslane]
 - Przyklady z pomocy (kanoniczne):
   `listy wyslane do alvina przed 7 III 2002 o temacie pomoc`,
   `listy otrzymane od alvina po 28 V 2005`.
-- `od/do [kogo]` to DOKLADNIE jedna osoba (serwer akceptuje mianownik,
-  np. `listy odebrane od foo` — zweryfikowane w logach); listow
-  wieloodbiorczych (`Odbiorcy: Foo, Bar i Corge`) filtr osoby NIE
+- `od/do [kogo]` to DOKLADNIE jedna osoba i serwer wymaga dopelniacza.
+  ArkMail zamienia na male litery wylacznie dla osoby; temat i tresc
+  przenosi bez zmian, a rzymskie miesiace zapisuje wielkimi literami.
+  Listow wieloodbiorczych (`Odbiorcy: Foo, Bar i Corge`) filtr osoby NIE
   lapie. Dlatego skok z kontaktu (ArkMail) filtruje lokalne archiwum
   podciagiem po stronie listu, a reczna szukajka zostaje serwerowa
   (zawsze aktualne dane).
@@ -188,6 +190,9 @@ n [<num>]   zapisz tresc jako notatke
 ?           ta pomoc
 ```
 
+- Pagerowe `h` zwraca maksymalnie 50 pozycji i przelacza na liste odebranych,
+  takze po otwarciu listu wyslanego. Nie jest metoda
+  stronicowania skrzynki wyslanych ani obejscia limitu serwera.
 - Prompt zawiera litere **`s`, ktorej pomoc nie dokumentuje** —
   nieudokumentowane, nie uzywac.
 - Po potwierdzeniach akcji (`d`, ...) serwer WRACA do promptu pagera —
@@ -280,6 +285,10 @@ Serwer pokazuje max 50 najnowszych (`prezentowane jest pierwsze 50`).
 Starsze: `listy <skrzynka> przed <d> <miesiac rzymski> <yyyy>`
 (zweryfikowane w logach: `listy wyslane przed 9 iii 2026`) — ArkMail
 paginuje wstecz i buduje lokalne archiwum poza limitem.
+Granice `przed` i `po` sa wylaczne i dzienne, wiec wiecej niz 50 listow z jednego dnia
+tworzy niedostepna czesc listingu. Nie ma potwierdzonej
+komendy, ktora ja zwraca. ArkMail zapisuje taki dzien jako trwala luka,
+pokazuje ja w Kontaktach i nie oznacza skrzynki jako kompletnej.
 Trwalosc: IndexedDB per postac (`arkmail.<postac>.<klucz>`). Dane sa
 odczytywane przed utworzeniem UI, a zmiany zapisuje kolejka transakcji.
 Przy niedostepnej IndexedDB wtyczka uzywa RAM i zglasza brak trwalego

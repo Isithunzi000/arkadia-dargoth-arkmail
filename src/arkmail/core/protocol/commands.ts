@@ -98,7 +98,10 @@ const datePart = (d: DateYMD): string => `${d.day} ${ROMAN_MONTHS[d.month - 1]} 
  */
 export function searchListingCommand(box: MailBox, q: ListingSearch): string {
   const parts = [`listy ${box}`];
-  if (q.osoba) parts.push(SENDER_BOXES.has(box) ? `od ${q.osoba}` : `do ${q.osoba}`);
+  if (q.osoba) {
+    const osoba = q.osoba.toLowerCase();
+    parts.push(SENDER_BOXES.has(box) ? `od ${osoba}` : `do ${osoba}`);
+  }
   if (q.odDaty) parts.push(`po ${datePart(prevDay(q.odDaty))}`);
   if (q.doDaty) parts.push(`przed ${datePart(nextDay(q.doDaty))}`);
   if (q.tresc) parts.push(`o tresci ${q.tresc}`);

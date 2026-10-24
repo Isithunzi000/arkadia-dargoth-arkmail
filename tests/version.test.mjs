@@ -74,6 +74,18 @@ test('opis: meta.ts PLUGIN_DESCRIPTION == plugin.json metadata.description', () 
   assert.equal(pj.metadata.description, m[1], 'plugin.json metadata.description != meta.ts PLUGIN_DESCRIPTION');
 });
 
+test('dokumentacja: filtr osoby, daty i limit serwera maja pelny opis', () => {
+  const protocol = fs.readFileSync(path.join(REPO, 'docs/PROTOCOL.md'), 'utf8');
+  assert.match(protocol, /co najmniej jedna spacja/);
+  assert.match(protocol, /wymaga dopelniacza/);
+  assert.match(protocol, /male litery wylacznie dla osoby/);
+  assert.match(protocol, /miesiace zapisuje wielkimi literami/);
+  assert.match(protocol, /`h` zwraca maksymalnie 50/);
+  assert.match(protocol, /przelacza na liste odebranych/);
+  assert.match(protocol, /wiecej niz 50 listow z jednego dnia/);
+  assert.match(protocol, /trwala luka/);
+});
+
 test('dokumentacja: docelowy magazyn archiwum jest opisany jako IndexedDB', () => {
   const protocol = fs.readFileSync(path.join(REPO, 'docs/PROTOCOL.md'), 'utf8');
   assert.match(protocol, /Trwalosc: IndexedDB per postac/);

@@ -123,7 +123,7 @@ test('odczyt w trybie wynikow szukania NIE odswieza (wyniki zostaja)', async () 
     };
     setInput('[data-search="osoba"]', 'Corge');
     click(h, '.arkmail-search-go');
-    await waitFor(() => f.sent.includes('listy odebrane od Corge'), 'komenda szukania');
+    await waitFor(() => f.sent.includes('listy odebrane od corge'), 'komenda szukania');
     f.fire('Wybrane listy odebrane:', 'mail');
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
     f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');

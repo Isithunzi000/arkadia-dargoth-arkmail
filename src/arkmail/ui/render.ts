@@ -468,7 +468,7 @@ export function mountMailUi(
       });
       return input;
     };
-    const sOsoba = mkSearch('osoba', 'Osoba');
+    const sOsoba = mkSearch('osoba', 'Osoba (w dopelniaczu)');
     const sTemat = mkSearch('temat', 'Temat');
     // Fala 28a: szukanie po tresci - serwer wspiera "o tresci"
     // (?listy, help w grze), builder komendy obslugiwal od zawsze,
@@ -532,8 +532,8 @@ export function mountMailUi(
     searchRow.appendChild(sDoF);
     searchRow.appendChild(go);
     pane.appendChild(searchRow);
-    // Ghost-podpowiedzi (Fala 9g) - po appendChild, wrap wymaga rodzica.
-    attachGhost(doc, sOsoba as HTMLInputElement, personSource);
+    // Temat zachowuje podpowiedzi. Pole osoby wymaga dopelniacza,
+    // dlatego nie podpowiada zapisanych form w mianowniku.
     attachGhost(doc, sTemat as HTMLInputElement, subjectSource);
 
     // Tryb wynikow: banner z opisem zapytania + Wyczysc (restore pelnego
