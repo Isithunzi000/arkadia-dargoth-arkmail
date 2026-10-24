@@ -31,6 +31,7 @@ import {
   type ArchiveLetter,
 } from '../src/arkmail/core/archive';
 import type { MailboxEntry } from '../src/arkmail/core/session/mailbox';
+import { ANCHOR_RETRY_WAITS_MS } from '../src/arkmail/core/pagination';
 import {
   startHarness,
   stopHarness,
@@ -231,7 +232,7 @@ test('archiwum: list znikniety z serwera dostaje znacznik i jest pomijany przy r
     // Listing BEZ najnowszego listu - serwer go juz nie ma (i nie
     // wraca: gdyby wrocil w kolejnym listingu, upsert zdjalby znacznik).
     const replayListingBezNajnowszego = (): void => {
-      f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
+      f.fire('Listy odebrane:', 'mail');
       f.fire(' 2. *R* Temat: najstarszy', 'mail');
       f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
       f.fire(' 1. *R* Temat: srodkowy', 'mail');
@@ -282,6 +283,72 @@ test('archiwum: list znikniety z serwera dostaje znacznik i jest pomijany przy r
       'restart bez nowych re-kotwic pobierania',
     );
   } finally {
+    await stopHarness();
+  }
+});
+
+
+test('archiwum: luka podczas re-kotwicy jest bledem, nie zniknieciem listu', async () => {
+  const retries = ANCHOR_RETRY_WAITS_MS.splice(0);
+  const h = await startHarness();
+  const { f } = h;
+  const first = 'listy odebrane przed 24 XII 2025';
+  const second = 'listy odebrane przed 23 XII 2025';
+  const count = (command: string): number => f.sent.filter((c) => c === command).length;
+  try {
+    await loadTruncatedBox(h);
+    click(h, '[data-tab="archiwum"]');
+    downloadBtn(h).dispatchEvent(new h.window.Event('click'));
+    downloadBtn(h).dispatchEvent(new h.window.Event('click'));
+    await driveIndexAll(h, { odebrane: LISTING3_FULL });
+
+    await waitRt(() => count(first) === 1, 're-kotwica przy luce');
+    f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
+    f.fire(' 4. *R* Temat: inny', 'mail');
+    f.fire('Nadawca: Foo Wt, 23 XII 2025, 01:00:00', 'mail');
+    f.fire('> ', 'prompt');
+
+    await waitRt(() => count(first) === 2 || count(second) === 1, 'powtorzenie strony albo stary brak listu');
+    if (count(first) === 2) {
+      f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
+      f.fire(' 4. *R* Temat: inny', 'mail');
+      f.fire('Nadawca: Foo Wt, 23 XII 2025, 01:00:00', 'mail');
+      f.fire('> ', 'prompt');
+      await waitRt(() => count(second) === 1, 'sonda wykluczajaca dzien');
+      f.fire('Nie znaleziono zadnych takich odebranych listow.', 'mail');
+      f.fire('> ', 'prompt');
+      await waitRt(() => count(second) === 2, 're-kotwica srodkowego po luce');
+    }
+
+    f.fire('Listy odebrane:', 'mail');
+    f.fire(' 3. *R* Temat: najstarszy', 'mail');
+    f.fire('Nadawca: Foo N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire(' 2. *R* Temat: srodkowy', 'mail');
+    f.fire('Nadawca: Foo Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire(' 1. *R* Temat: najnowszy', 'mail');
+    f.fire('Nadawca: Corge Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('> ', 'prompt');
+    await waitRt(() => f.sent.includes('przeczytaj list 2'), 'odczyt srodkowego');
+    replayLetter(h, 2, 'srodkowy', 'Tresc srodkowego.');
+
+    await waitRt(() => f.sent.includes('listy odebrane przed 22 XII 2025'), 're-kotwica najstarszego');
+    f.fire('Listy odebrane:', 'mail');
+    f.fire(' 3. *R* Temat: najstarszy', 'mail');
+    f.fire('Nadawca: Foo N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire(' 2. *R* Temat: srodkowy', 'mail');
+    f.fire('Nadawca: Foo Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire(' 1. *R* Temat: najnowszy', 'mail');
+    f.fire('Nadawca: Corge Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('> ', 'prompt');
+    await waitRt(() => f.sent.includes('przeczytaj list 3'), 'odczyt najstarszego');
+    replayLetter(h, 3, 'najstarszy', 'Tresc najstarszego.');
+
+    await waitRt(() => notifyText(f, 'Pobrano tresci (2 z 3;'), 'podsumowanie po luce');
+    assert.ok(notifyText(f, 'nieudane: 1'), 'luka jest nieudana lokalizacja');
+    assert.ok(!notifyText(f, 'zniknely z serwera'), 'luka nie jest dowodem znikniecia');
+    assert.equal(archiveRows(h, 'najnowszy').length, 1, 'list pozostaje widoczny w Archiwum');
+  } finally {
+    ANCHOR_RETRY_WAITS_MS.push(...retries);
     await stopHarness();
   }
 });

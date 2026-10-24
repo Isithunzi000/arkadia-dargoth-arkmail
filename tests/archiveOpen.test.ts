@@ -20,10 +20,12 @@ import {
   stopHarness,
   loadTruncatedBox,
   click,
+  waitRt,
   notifyText,
   textOf,
   type Harness,
 } from './harness';
+import type { ArchiveLetter } from '../src/arkmail/core/archive';
 
 /** Klik w wiersz archiwum z zadanym fragmentem tematu. */
 function clickArchiveRow(h: Harness, fragment: string): void {
@@ -125,6 +127,98 @@ test('archiwum: wpis bez tresci = re-kotwica po dacie i odczyt z serwera', async
       'list otwarty z cache po doczytaniu',
     );
     assert.equal(f.sent.length, base2, 'drugie otwarcie bez komend');
+  } finally {
+    await stopHarness();
+  }
+});
+
+test('archiwum: odzyskany rekord z dluga lista osob i jedna spacja przed data otwiera list', async () => {
+  const party = 'Foo, Bar, Corge, Waldo, Baz, Grault';
+  const raw = 'Pn, 2 III 2026, 01:02:03';
+  const damaged: ArchiveLetter = {
+    id: 'stary-identyfikator',
+    box: 'odebrane',
+    number: 8,
+    party: `${party} ${raw}`,
+    subject: 'odzyskany',
+    forwarded: false,
+    dateRaw: null,
+    sortKey: '0000-00-00 00:00:00',
+    read: true,
+    body: [],
+  };
+  const h = await startHarness({ archive: [damaged] });
+  const { f } = h;
+  try {
+    click(h, '[data-tab="archiwum"]');
+    clickArchiveRow(h, 'odzyskany');
+    await waitRt(() => f.sent.includes('listy odebrane przed 3 III 2026'), 're-kotwica odzyskanego listu');
+    f.fire('Listy odebrane:', 'mail');
+    f.fire(' 8. *R* Temat: odzyskany', 'mail');
+    f.fire(`Nadawca: ${party} ${raw}`, 'mail');
+    f.fire('> ', 'prompt');
+    await waitRt(() => f.sent.includes('przeczytaj list 8'), 'odczyt odzyskanego listu');
+    replayLetter(h, 8, 'odzyskany', 'Tresc odzyskanego listu.');
+    await waitRt(() => letterBodyShows(h, 'Tresc odzyskanego listu.'), 'widok odzyskanego listu');
+  } finally {
+    await stopHarness();
+  }
+});
+
+test('archiwum: re-kotwica znajduje list na kolejnej stronie', async () => {
+  const h = await startHarness();
+  const { f } = h;
+  const command = 'listy odebrane przed 22 XII 2025';
+  try {
+    await loadTruncatedBox(h);
+    click(h, '[data-tab="archiwum"]');
+    clickArchiveRow(h, 'najstarszy');
+    await waitRt(() => f.sent.includes(command), 'pierwsza strona re-kotwicy');
+    f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
+    f.fire(' 9. *R* Temat: inny', 'mail');
+    f.fire('Nadawca: Foo N, 21 XII 2025, 02:00:00', 'mail');
+    f.fire('> ', 'prompt');
+
+    await waitRt(() => f.sent.filter((c) => c === command).length === 2, 'druga strona re-kotwicy');
+    f.fire('Listy odebrane:', 'mail');
+    f.fire(' 7. *R* Temat: najstarszy', 'mail');
+    f.fire('Nadawca: Foo N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire('> ', 'prompt');
+    await waitRt(() => f.sent.includes('przeczytaj list 7'), 'odczyt z drugiej strony');
+    replayLetter(h, 7, 'najstarszy', 'Tresc z drugiej strony.');
+    await waitRt(() => letterBodyShows(h, 'Tresc z drugiej strony.'), 'list z drugiej strony otwarty');
+  } finally {
+    await stopHarness();
+  }
+});
+
+test('archiwum: re-kotwica nie ma dawnego limitu 40 stron', async () => {
+  const h = await startHarness();
+  const { f } = h;
+  const command = 'listy odebrane przed 22 XII 2025';
+  try {
+    await loadTruncatedBox(h);
+    click(h, '[data-tab="archiwum"]');
+    clickArchiveRow(h, 'najstarszy');
+    for (let page = 1; page <= 41; page++) {
+      await waitRt(
+        () => f.sent.filter((c) => c === command).length === page,
+        `strona ${page} re-kotwicy`,
+      );
+      f.fire(
+        page < 41 ? 'Listy odebrane (prezentowane jest pierwsze 50):' : 'Listy odebrane:',
+        'mail',
+      );
+      f.fire(` 7. *R* Temat: ${page === 41 ? 'najstarszy' : `inny ${page}`}`, 'mail');
+      f.fire(
+        `Nadawca: Foo N, 21 XII 2025, ${page === 41 ? '01:15:04' : '02:00:00'}`,
+        'mail',
+      );
+      f.fire('> ', 'prompt');
+    }
+    await waitRt(() => f.sent.includes('przeczytaj list 7'), 'odczyt po 41 stronach');
+    replayLetter(h, 7, 'najstarszy', 'Tresc poza dawnym limitem.');
+    await waitRt(() => letterBodyShows(h, 'Tresc poza dawnym limitem.'), 'list poza dawnym limitem otwarty');
   } finally {
     await stopHarness();
   }

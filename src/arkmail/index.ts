@@ -693,20 +693,41 @@ export async function init(api: PluginApi) {
       notify(api, "Nie moge znalezc tego listu - odswiez skrzynke.");
       return null;
     }
-    const res = await mailbox.fetch(box, olderListingCommand(box, nextDay(entry.date)));
-    // Fala 14f: takze pusta re-kotwica nadpisuje biezacy listing serwera.
-    if (res.kind !== "lista") bumpCtx(box);
-    if (res.kind === "lista") {
-      stampEntries(box, res.entries);
-      // Jak kazde pobranie listingu: cicho do archiwum.
-      const merged = upsertLetters(
-        ui.state.archive,
-        res.entries.map((e) => fromMailboxEntry(box, e)),
-      );
-      ui.setArchive(merged.letters);
-      persistArchive();
-      const fresh = res.entries.find((e) => entryKey(e) === entryKey(entry));
+    const generation = connectionGeneration;
+    const flag = { cancelled: false };
+    const offCancel = sessionOpts.onCancel(() => {
+      flag.cancelled = true;
+    });
+    let fresh: MailboxEntry | null = null;
+    try {
+      const scan = await scanMailboxPages({
+        box,
+        initialCommand: olderListingCommand(box, nextDay(entry.date)),
+        cancelled: () => flag.cancelled || generation !== connectionGeneration,
+        fetchPage: (command) => mailbox.fetch(box, command),
+        wait: (ms) => sleepOrCancel(ms, flag),
+        onBaseRefresh: () => bumpCtx(box),
+        onEmpty: () => bumpCtx(box),
+        onGap: (day) => recordArchiveGap(box, day),
+        onPage: (res) => {
+          stampEntries(box, res.entries);
+          const merged = upsertLetters(
+            ui.state.archive,
+            res.entries.map((item) => fromMailboxEntry(box, item)),
+          );
+          ui.setArchive(merged.letters);
+          persistArchive();
+          fresh = res.entries.find((item) => entryKey(item) === entryKey(entry)) ?? null;
+          return { stop: fresh !== null };
+        },
+      });
       if (fresh) return fresh;
+      if (scan.end === "cancelled") throw new Error("operacja anulowana");
+      if (scan.end === "incomplete") {
+        throw new Error("Nie mozna sprawdzic calej listy - sprobuj ponownie.");
+      }
+    } finally {
+      offCancel();
     }
     notify(api, "Nie ma tego listu na liscie - odswiez skrzynke.");
     return null;

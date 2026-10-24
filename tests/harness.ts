@@ -9,6 +9,8 @@ import { IDBFactory } from 'fake-indexeddb';
 
 import type PluginApi from 'plugin-api';
 import { init, destroy } from '../src/arkmail/index';
+import { IndexedDbStorageDriver } from '../src/arkmail/adapters/storageDriver';
+import type { ArchiveLetter } from '../src/arkmail/core/archive';
 
 export type TriggerCb = (line: { text: string }, matches: unknown, type: string) => unknown;
 
@@ -123,11 +125,16 @@ export interface Harness {
 
 let previousIndexedDB: IDBFactory | undefined;
 
-export async function startHarness(): Promise<Harness> {
+export async function startHarness(options: { archive?: ArchiveLetter[] } = {}): Promise<Harness> {
   const window = new Window();
   (globalThis as { document?: unknown }).document = window.document;
   previousIndexedDB = globalThis.indexedDB;
   globalThis.indexedDB = new IDBFactory();
+  if (options.archive) {
+    const seed = new IndexedDbStorageDriver(globalThis.indexedDB);
+    await seed.put('arkmail.foo.archiwum', JSON.stringify(options.archive));
+    await seed.close();
+  }
   const f = new FakeApi();
   const initializing = init(f.api);
   f.fireEvent('gmcp.char.info', { name: 'Foo' });

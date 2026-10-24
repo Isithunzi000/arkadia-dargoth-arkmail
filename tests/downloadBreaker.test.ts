@@ -103,7 +103,7 @@ async function answerError(h: Harness, n: number): Promise<void> {
 async function answerMissing(h: Harness, n: number): Promise<void> {
   await waitRt(() => anchors(h).length === n, `re-kotwica ${n}`);
   const { f } = h;
-  f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
+  f.fire('Listy odebrane:', 'mail');
   f.fire(' 1. *R* Temat: inny', 'mail');
   f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
   f.fire('> ', 'prompt');
