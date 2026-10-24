@@ -164,6 +164,92 @@ export function fromOpenedLetter(
   };
 }
 
+const ARCHIVE_DATE_SUFFIX_RE = /\s+([A-Za-z]+, \d{1,2} (?:XII|XI|IX|VIII|VII|VI|IV|V|III|II|I|X) \d{4}, \d{2}:\d{2}:\d{2})$/;
+const ARCHIVE_SORT_KEY_RE = /^(\d{4})-(\d{2})-(\d{2}) ((?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d)$/;
+const ARCHIVE_WEEKDAYS = ['N', 'Pn', 'Wt', 'Sr', 'Cz', 'Pt', 'So'];
+const ARCHIVE_MONTHS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+
+function dateFromSortKey(sortKey: string): MailDate | null {
+  const match = sortKey.match(ARCHIVE_SORT_KEY_RE);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const calendar = new Date(0);
+  calendar.setUTCFullYear(year, month - 1, day);
+  calendar.setUTCHours(0, 0, 0, 0);
+  if (
+    calendar.getUTCFullYear() !== year ||
+    calendar.getUTCMonth() !== month - 1 ||
+    calendar.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  const raw = `${ARCHIVE_WEEKDAYS[calendar.getUTCDay()]}, ${day} ${ARCHIVE_MONTHS[month - 1]} ${year}, ${match[4]}`;
+  return parseMailDate(raw);
+}
+
+function compareText(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+function mergeArchiveDuplicates(group: ArchiveLetter[]): ArchiveLetter {
+  if (group.length === 1) return group[0];
+  const ordered = [...group].sort((a, b) => compareText(JSON.stringify(a), JSON.stringify(b)));
+  const bodies = new Map<string, string[]>();
+  for (const letter of ordered) {
+    const key = JSON.stringify(letter.body);
+    if (!bodies.has(key)) bodies.set(key, letter.body);
+  }
+  const orderedBodies = [...bodies.values()].sort(
+    (a, b) => b.length - a.length || compareText(JSON.stringify(a), JSON.stringify(b)),
+  );
+  const body = [...(orderedBodies[0] ?? [])];
+  for (const candidate of orderedBodies.slice(1)) {
+    for (const line of candidate) {
+      if (!body.includes(line)) body.push(line);
+    }
+  }
+  const merged: ArchiveLetter = {
+    ...ordered[0],
+    number: Math.max(...group.map((letter) => letter.number)),
+    read: group.some((letter) => letter.read),
+    body,
+  };
+  if (group.every((letter) => letter.missingOnServer === true)) merged.missingOnServer = true;
+  else delete merged.missingOnServer;
+  return merged;
+}
+
+/**
+ * Naprawia zapisane rekordy bez kasowania danych. Data pochodzi kolejno
+ * z dateRaw, konca osoby albo poprawnego sortKey. Duplikaty po nowym
+ * identyfikatorze lacza sie deterministycznie.
+ */
+export function normalizeArchive(letters: readonly ArchiveLetter[]): ArchiveLetter[] {
+  const groups = new Map<string, ArchiveLetter[]>();
+  for (const letter of letters) {
+    const suffix = letter.party.match(ARCHIVE_DATE_SUFFIX_RE);
+    const suffixDate = suffix ? parseMailDate(suffix[1]) : null;
+    const directDate = letter.dateRaw ? parseMailDate(letter.dateRaw) : null;
+    const date = directDate ?? suffixDate ?? dateFromSortKey(letter.sortKey);
+    const party = suffixDate ? letter.party.slice(0, suffix!.index).trimEnd() : letter.party;
+    const dateRaw = date?.raw ?? letter.dateRaw;
+    const normalized: ArchiveLetter = {
+      ...letter,
+      id: letterId(letter.box, party, letter.subject, letter.forwarded === true, dateRaw),
+      party,
+      dateRaw,
+      sortKey: date ? sortKeyOf(date) : letter.sortKey,
+      body: [...letter.body],
+    };
+    const group = groups.get(normalized.id);
+    if (group) group.push(normalized);
+    else groups.set(normalized.id, [normalized]);
+  }
+  return [...groups.values()].map(mergeArchiveDuplicates).sort(byNewest);
+}
+
 function byNewest(a: ArchiveLetter, b: ArchiveLetter): number {
   if (a.sortKey !== b.sortKey) return a.sortKey < b.sortKey ? 1 : -1;
   if (a.number !== b.number) return b.number - a.number;

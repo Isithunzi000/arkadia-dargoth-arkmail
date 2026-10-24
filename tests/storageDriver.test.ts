@@ -5,6 +5,7 @@ import { IDBFactory } from 'fake-indexeddb';
 interface StorageDriver {
   loadAll(): Promise<Record<string, string>>;
   put(key: string, value: string): Promise<void>;
+  putMany(values: Readonly<Record<string, string>>): Promise<void>;
   delete(key: string): Promise<void>;
   close(): Promise<void>;
 }
@@ -68,6 +69,62 @@ test('IndexedDB: dane i przestrzenie kluczy przetrwaja ponowne otwarcie', async 
   assert.deepEqual(await second.loadAll(), {
     'arkmail.Foo.archiwum': '["Foo"]',
     'arkmail.Foo.indeks': '{"odebrane":"2026-10-24"}',
+  });
+});
+
+test('sterownik RAM: zapis wsadowy zapisuje wszystkie klucze', async () => {
+  const driver = new drivers.MemoryStorageDriver();
+  await driver.putMany({
+    'arkmail.foo.archiwum': '[]',
+    'arkmail.foo.wersja-archiwum': '1',
+  });
+
+  assert.deepEqual(await driver.loadAll(), {
+    'arkmail.foo.archiwum': '[]',
+    'arkmail.foo.wersja-archiwum': '1',
+  });
+});
+
+test('IndexedDB: zapis wsadowy uzywa jednej transakcji', async (t) => {
+  const realFactory = new IDBFactory();
+  const databaseName = `arkmail-test-${databaseSequence++}`;
+  let writeTransactions = 0;
+  const factory = {
+    open(name: string, version?: number): IDBOpenDBRequest {
+      const request = version === undefined ? realFactory.open(name) : realFactory.open(name, version);
+      request.addEventListener('success', () => {
+        const database = request.result;
+        const original = database.transaction.bind(database) as (
+          stores: string | string[],
+          mode?: IDBTransactionMode,
+        ) => IDBTransaction;
+        database.transaction = ((stores: string | string[], mode?: IDBTransactionMode) => {
+          if (mode === 'readwrite') writeTransactions++;
+          return original(stores, mode);
+        }) as IDBDatabase['transaction'];
+      });
+      return request;
+    },
+  } as IDBFactory;
+
+  const driver = new drivers.IndexedDbStorageDriver(factory, databaseName);
+  await driver.loadAll();
+  writeTransactions = 0;
+  await driver.putMany({
+    'arkmail.foo.archiwum': '[]',
+    'arkmail.foo.wersja-archiwum': '1',
+  });
+  assert.equal(writeTransactions, 1);
+  await driver.close();
+
+  const reopened = new drivers.IndexedDbStorageDriver(realFactory, databaseName);
+  t.after(async () => {
+    await reopened.close();
+    await removeDatabase(realFactory, databaseName);
+  });
+  assert.deepEqual(await reopened.loadAll(), {
+    'arkmail.foo.archiwum': '[]',
+    'arkmail.foo.wersja-archiwum': '1',
   });
 });
 

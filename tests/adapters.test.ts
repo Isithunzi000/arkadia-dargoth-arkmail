@@ -200,6 +200,22 @@ test('storage: przestrzen per postac, JSON roundtrip', async () => {
   assert.deepEqual(reopenedFoo.getJSON('ustawienia'), { powiadomienia: true });
 });
 
+test('storage: zapis wsadowy JSON zachowuje przestrzen postaci', async () => {
+  const driver = new MemoryStorageDriver();
+  const storage = await CharStorage.open('Foo', driver, () => {});
+  const batch = storage as unknown as {
+    setJSONBatch(values: Readonly<Record<string, unknown>>): void;
+  };
+
+  batch.setJSONBatch({ archiwum: [], 'wersja-archiwum': 1 });
+  await storage.flush();
+
+  assert.deepEqual(await driver.loadAll(), {
+    'arkmail.foo.archiwum': '[]',
+    'arkmail.foo.wersja-archiwum': '1',
+  });
+});
+
 test('storage: uszkodzony JSON nie wywraca odczytu', async () => {
   const driver = new MemoryStorageDriver();
   await driver.put('arkmail.foo.zepsuty', '{nie-json');

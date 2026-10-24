@@ -39,6 +39,12 @@ export class WriteThroughStorage {
     this.enqueue(() => this.driver.put(key, value));
   }
 
+  setMany(values: Readonly<Record<string, string>>): void {
+    const batch = { ...values };
+    for (const [key, value] of Object.entries(batch)) this.values.set(key, value);
+    this.enqueue(() => this.driver.putMany(batch));
+  }
+
   delete(key: string): void {
     this.values.delete(key);
     this.enqueue(() => this.driver.delete(key));

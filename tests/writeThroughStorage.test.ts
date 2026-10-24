@@ -5,6 +5,7 @@ import { IDBFactory } from 'fake-indexeddb';
 interface Driver {
   loadAll(): Promise<Record<string, string>>;
   put(key: string, value: string): Promise<void>;
+  putMany?(values: Readonly<Record<string, string>>): Promise<void>;
   delete(key: string): Promise<void>;
   close(): Promise<void>;
 }
@@ -12,6 +13,7 @@ interface Driver {
 interface Storage {
   get(key: string): string | null;
   set(key: string, value: string): void;
+  setMany(values: Readonly<Record<string, string>>): void;
   delete(key: string): void;
   flush(): Promise<void>;
   close(): Promise<void>;
@@ -44,6 +46,37 @@ test('pamiec podreczna: zapis i usuniecie sa widoczne natychmiast', async () => 
   assert.equal(storage.get('arkmail.Foo.archiwum'), null);
   await storage.flush();
   assert.deepEqual(await driver.loadAll(), {});
+});
+
+test('zapis wsadowy: cala zmiana jest w RAM, trwaly zapis wykonuje sie raz', async () => {
+  const batches: Record<string, string>[] = [];
+  const driver: Driver = {
+    async loadAll() {
+      return {};
+    },
+    async put() {},
+    async putMany(values) {
+      batches.push({ ...values });
+    },
+    async delete() {},
+    async close() {},
+  };
+  const storage = await storageModule.WriteThroughStorage.open(driver, () => {});
+  const batch = {
+    'arkmail.foo.archiwum': '[]',
+    'arkmail.foo.wersja-archiwum': '1',
+  };
+
+  storage.setMany(batch);
+  batch['arkmail.foo.archiwum'] = 'zmiana poza magazynem';
+  assert.equal(storage.get('arkmail.foo.archiwum'), '[]');
+  assert.equal(storage.get('arkmail.foo.wersja-archiwum'), '1');
+  await storage.flush();
+
+  assert.deepEqual(batches, [{
+    'arkmail.foo.archiwum': '[]',
+    'arkmail.foo.wersja-archiwum': '1',
+  }]);
 });
 
 test('flush czeka na wszystkie zapisy i zachowuje ich kolejnosc', async () => {

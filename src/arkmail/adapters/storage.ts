@@ -45,6 +45,14 @@ export class CharStorage {
     this.storage.set(this.scoped(key), JSON.stringify(value));
   }
 
+  setJSONBatch(values: Readonly<Record<string, unknown>>): void {
+    const batch: Record<string, string> = {};
+    for (const [key, value] of Object.entries(values)) {
+      batch[this.scoped(key)] = JSON.stringify(value);
+    }
+    this.storage.setMany(batch);
+  }
+
   remove(key: string): void {
     this.storage.delete(this.scoped(key));
   }

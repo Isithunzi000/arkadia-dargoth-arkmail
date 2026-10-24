@@ -2,6 +2,7 @@
 export interface StorageDriver {
   loadAll(): Promise<Record<string, string>>;
   put(key: string, value: string): Promise<void>;
+  putMany(values: Readonly<Record<string, string>>): Promise<void>;
   delete(key: string): Promise<void>;
   close(): Promise<void>;
 }
@@ -16,6 +17,10 @@ export class MemoryStorageDriver implements StorageDriver {
 
   async put(key: string, value: string): Promise<void> {
     this.values.set(key, value);
+  }
+
+  async putMany(values: Readonly<Record<string, string>>): Promise<void> {
+    for (const [key, value] of Object.entries(values)) this.values.set(key, value);
   }
 
   async delete(key: string): Promise<void> {
@@ -60,6 +65,23 @@ export class IndexedDbStorageDriver implements StorageDriver {
 
   async put(key: string, value: string): Promise<void> {
     await this.write("put", key, value);
+  }
+
+  async putMany(values: Readonly<Record<string, string>>): Promise<void> {
+    const database = await this.openDatabase();
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(STORE_NAME, "readwrite");
+      const store = transaction.objectStore(STORE_NAME);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error ?? new Error("Blad zapisu IndexedDB."));
+      transaction.onabort = () => reject(transaction.error ?? new Error("Zapis IndexedDB przerwany."));
+      try {
+        for (const [key, value] of Object.entries(values)) store.put(value, key);
+      } catch (error) {
+        transaction.abort();
+        reject(error);
+      }
+    });
   }
 
   async delete(key: string): Promise<void> {
