@@ -27,8 +27,10 @@ https://isithunzi000.github.io/arkadia-dargoth-arkmail/arkmail.js
 
 ## Dla developerów
 
+Do pracy nad wtyczką wymagany jest Node 24 lub nowszy.
+
 ```bash
-npm install
+npm ci
 npm test
 ```
 

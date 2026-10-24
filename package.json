@@ -1,6 +1,9 @@
 {
   "name": "arkadia-dargoth-arkmail",
   "private": true,
+  "engines": {
+    "node": ">=24"
+  },
   "type": "commonjs",
   "description": "ArkMail - kompleksowy system pocztowy dla klienta Dargoth (Arkadia MUD)",
   "scripts": {
@@ -11,7 +14,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.test.json"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
+    "@types/node": "^24.0.0",
     "@types/react": "^19.0.0",
     "esbuild": "^0.24.0",
     "fake-indexeddb": "^6.2.6",
