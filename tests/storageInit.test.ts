@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { IDBFactory } from 'fake-indexeddb';
+import { Window } from 'happy-dom';
 
 import { init, destroy } from '../src/arkmail/index';
 import { IndexedDbStorageDriver } from '../src/arkmail/adapters/storageDriver';
@@ -12,22 +13,28 @@ interface CleanupModule {
 
 const storageModulePath = '../src/arkmail/adapters/storage.js';
 
-test('init: UI i magazyn czekaja na nazwe postaci', async () => {
+test('init: UI powstaje od razu i uzywa aktualnej nazwy postaci', async () => {
   const previousFactory = globalThis.indexedDB;
+  const previousDocument = globalThis.document;
   globalThis.indexedDB = new IDBFactory();
+  const window = new Window();
+  globalThis.document = window.document as unknown as Document;
   const f = new FakeApi();
+  f.characterName = null;
   try {
     const initializing = init(f.api);
     await new Promise((resolve) => setImmediate(resolve));
-    assert.equal(f.popupConfig, null, 'popup nie moze powstac przed gmcp.char.info');
-
-    f.fireEvent('gmcp.char.info', { name: 'Foo' });
+    assert.ok(f.popupConfig, 'popup jest dostepny bez oczekiwania na zdarzenie postaci');
     await initializing;
-    assert.ok(f.popupConfig, 'popup powstaje po otrzymaniu nazwy postaci');
+    f.setCharacter('Foo');
+    await new Promise((resolve) => setImmediate(resolve));
+    assert.ok(f.popupConfig, 'popup pozostaje dostepny po poznaniu postaci');
   } finally {
     await destroy();
     if (previousFactory === undefined) delete (globalThis as { indexedDB?: IDBFactory }).indexedDB;
     else globalThis.indexedDB = previousFactory;
+    if (previousDocument === undefined) delete (globalThis as { document?: Document }).document;
+    else globalThis.document = previousDocument;
   }
 });
 

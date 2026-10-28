@@ -30,6 +30,13 @@ export class FakeApi {
   /** Flagi echa wysylek, rownolegle do sent (Fala 28h: compose/zwierze
    *  wysylaja z echem, reszta bez). */
   sentEcho: boolean[] = [];
+  characterName: string | null = 'Foo';
+  characterListeners = new Set<(name: string | null) => void>();
+
+  setCharacter(name: string | null): void {
+    this.characterName = name;
+    for (const listener of [...this.characterListeners]) listener(name);
+  }
 
   readonly api = {
     command: {
@@ -52,13 +59,23 @@ export class FakeApi {
       register: () => 'hook-1',
       unregister: () => true,
     },
+    character: {
+      getName: () => this.characterName,
+      onChange: (listener: (name: string | null) => void) => {
+        this.characterListeners.add(listener);
+        return () => this.characterListeners.delete(listener);
+      },
+    },
     events: {
       on: (event: string, cb: (payload: unknown) => void) => {
         const arr = this.eventListeners.get(event) ?? [];
         arr.push(cb);
         this.eventListeners.set(event, arr);
       },
-      off: () => {},
+      off: (event: string, cb: (payload: unknown) => void) => {
+        const arr = this.eventListeners.get(event) ?? [];
+        this.eventListeners.set(event, arr.filter((listener) => listener !== cb));
+      },
       emit: (event: string, ...args: unknown[]) => {
         this.emitted.push({ event, args });
       },
@@ -146,9 +163,8 @@ export async function startHarness(
     await seed.close();
   }
   const f = new FakeApi();
-  const initializing = init(f.api);
-  f.fireEvent('gmcp.char.info', { name: 'Foo' });
-  await initializing;
+  f.characterName = 'Foo';
+  await init(f.api);
   const content = (await f.popupConfig!.createContent()) as Harness['content'];
   const tick = () => new Promise((r) => setImmediate(r));
   const waitFor = async (pred: () => boolean, what: string) => {

@@ -181,6 +181,9 @@ let unsentFlashTimer: ReturnType<typeof setTimeout> | null = null;
 let delayedInboxTimers: ReturnType<typeof setTimeout>[] = [];
 const DELAYED_INBOX_RETRY_MS = [10_000, 25_000];
 let playerMailModeTimer: ReturnType<typeof setTimeout> | null = null;
+let deactivateActiveCharacter: (() => Promise<void>) | null = null;
+let unsubscribeCharacter: (() => void) | null = null;
+let lifecycleDestroyed = false;
 
 function createContent(): HTMLDivElement {
   const root = document.createElement("div");
@@ -218,22 +221,71 @@ let handlersRef: MailUiHandlers | null = null;
 
 export async function init(api: PluginApi) {
   apiRef = api;
-
-  const character = await new Promise<string>((resolve) => {
-    api.events.on(
-      "gmcp.char.info",
-      (d) => {
-        const name = typeof d?.name === "string" ? d.name.trim() : "";
-        if (name) resolve(name);
-      },
-      { once: true },
-    );
-  });
-  const storage = await openCharStorage(character, () => notify(api, STORAGE_WRITE_ERROR));
-  storageRef = storage;
+  lifecycleDestroyed = false;
   cleanupLegacyStorage();
-  transport = new DargothTransport(api);
-  const lock = new SessionLock();
+
+  popup = await api.ui.registerPersistentPopup({
+    id: POPUP_ID,
+    title: PLUGIN_NAME,
+    // Start: szeroki dwupanelowy na normalnym ekranie, waski na komorce
+    // (85vw). Rozmiar ustawiony przez gracza zawsze wygrywa z tymi
+    // wartosciami - po zmianie domyslnego pomocny jest reset rozmiaru.
+    initialWidth: "min(1400px, 85vw)",
+    initialHeight: "min(850px, 80vh)",
+    createContent,
+  });
+
+  const toggle = (): boolean => {
+    if (!popup) return true;
+    if (popup.isOpen) popup.close();
+    else void popup.open();
+    return true;
+  };
+
+  aliasId = api.aliases.register(ALIAS_REGEX, toggle);
+  menuHandle = api.ui.addPopupMenuEntry(PLUGIN_NAME, () => {
+    if (popup && !popup.isOpen) void popup.open();
+  });
+  footerHandle = api.ui.registerFooterButton(FOOTER_BUTTON_ID, {
+    label: PLUGIN_NAME,
+    command: "/arkmail",
+    state: FOOTER_STATE,
+  });
+
+  let requestedName = api.character.getName();
+  let activeName: string | null = null;
+  let switchQueue: Promise<void> = Promise.resolve();
+  const refreshPopup = (): void => {
+    if (popup?.isOpen) popup.setBody(createContent());
+  };
+  const deactivateCurrent = async (): Promise<void> => {
+    const deactivate = deactivateActiveCharacter;
+    deactivateActiveCharacter = null;
+    if (deactivate) await deactivate();
+    activeName = null;
+    refreshPopup();
+  };
+
+  const activateCharacter = async (character: string): Promise<boolean> => {
+    const storage = await openCharStorage(character, () => notify(api, STORAGE_WRITE_ERROR));
+    if (
+      lifecycleDestroyed ||
+      character.trim().toLowerCase() !== requestedName?.trim().toLowerCase()
+    ) {
+      await storage.close();
+      return false;
+    }
+    storageRef = storage;
+    transport = new DargothTransport(api);
+    const lock = new SessionLock();
+    const tasks = new Set<Promise<unknown>>();
+    const trackTask = <T,>(task: Promise<T>): Promise<T> => {
+      const tracked = task.finally(() => tasks.delete(tracked));
+      tasks.add(tracked);
+      return tracked;
+    };
+    const runExclusive = <T,>(operation: () => Promise<T>): Promise<T> =>
+      trackTask(lock.runExclusive(operation));
   let connectionGeneration = 0;
   const cancelListeners = new Set<() => void>();
   const sessionOpts = {
@@ -432,8 +484,7 @@ export async function init(api: PluginApi) {
   const refreshBoxes = (boxes: MailBox[], mode: "sync" | "replace" = "sync"): void => {
     ui.clearSearchBoxes(boxes);
     const generation = connectionGeneration;
-    void lock
-      .runExclusive(() => fetchBoxes(boxes, mode))
+    void runExclusive(() => fetchBoxes(boxes, mode))
       .catch(() => {})
       .finally(() => {
         if (generation !== connectionGeneration) return;
@@ -469,16 +520,18 @@ export async function init(api: PluginApi) {
     ui.setIndexRun(null);
     ui.setArchiveDownload(null);
   };
-  api.events.on("client.connect", () => {
+  const onClientConnect = (): void => {
     cancelConnectionOperations();
     transport!.setOnline(true);
     refreshBoxes(["odebrane", "nieprzeczytane", "wyslane", "niewyslane"]);
-  });
-  api.events.on("client.disconnect", () => {
+  };
+  const onClientDisconnect = (): void => {
     cancelConnectionOperations();
     playerMailMode = false;
     clearPlayerMailModeTimer();
-  });
+  };
+  api.events.on("client.connect", onClientConnect);
+  api.events.on("client.disconnect", onClientDisconnect);
 
   /**
    * Koalescencja odswiezen ze zdarzen zewnetrznych (Fala 13a): powiadomienie
@@ -509,8 +562,7 @@ export async function init(api: PluginApi) {
     if (drainScheduled) return;
     drainScheduled = true;
     const generation = connectionGeneration;
-    void lock
-      .runExclusive(async () => {
+    void runExclusive(async () => {
         const batch = [...pendingRefresh];
         pendingRefresh.clear();
         ui.clearSearchBoxes(batch);
@@ -579,7 +631,7 @@ export async function init(api: PluginApi) {
    * nic nie robi; ramka bez trzech booleanow jest ignorowana.
    */
   let lastMailState: { unread: boolean; unreceived: boolean; unsent: boolean } | null = null;
-  api.events.on("gmcp.mail.state", (d) => {
+  const onMailState = (d: unknown): void => {
     if (!d || typeof d !== "object") return;
     const s = d as { unread?: unknown; unreceived?: unknown; unsent?: unknown };
     if (
@@ -613,7 +665,8 @@ export async function init(api: PluginApi) {
       boxes.add("wyslane");
     }
     if (boxes.size > 0) scheduleRefresh([...boxes]);
-  });
+  };
+  api.events.on("gmcp.mail.state", onMailState);
 
   const persistArchive = (): void => {
     storage.setLetters(ui.state.archive);
@@ -729,8 +782,7 @@ export async function init(api: PluginApi) {
     const generation = connectionGeneration;
     const flag = { cancelled: false };
     ui.setBusy("Wczytuje starsze listy...");
-    void lock
-      .runExclusive(async () => {
+    void runExclusive(async () => {
         const view = ui.state.boxes[box];
         const oldest = oldestEntry(view?.entries ?? []);
         if (!oldest?.date) {
@@ -809,8 +861,7 @@ export async function init(api: PluginApi) {
     loadAllFlag = flag;
     ui.setLoadAll({ box, pages: 0 });
     const generation = connectionGeneration;
-    void lock
-      .runExclusive(async () => {
+    void runExclusive(async () => {
         try {
           const view = ui.state.boxes[box];
           const oldest = oldestEntry(view?.entries ?? []);
@@ -899,8 +950,7 @@ export async function init(api: PluginApi) {
     let runCompleted = false;
     const generation = connectionGeneration;
     const skipped: string[] = [];
-    void lock
-      .runExclusive(async () => {
+    void runExclusive(async () => {
         try {
           for (let i = 0; i < INDEX_BOXES.length; i++) {
             const box = INDEX_BOXES[i]!;
@@ -1254,8 +1304,7 @@ export async function init(api: PluginApi) {
     ui.setArchiveDownload({ done: 0, total, etaMs: null });
     ui.setBusy(`Pobieram tresci do archiwum (0/${total})...`);
     const generation = connectionGeneration;
-    void lock
-      .runExclusive(async () => {
+    void runExclusive(async () => {
         let done = 0;
         let failed = 0;
         let missing = 0;
@@ -1418,13 +1467,12 @@ export async function init(api: PluginApi) {
       }
       ui.setBusy(`Czytam list: ${entry.subject}...`);
       const generation = connectionGeneration;
-      void lock
-        .runExclusive(() => openWithResolve(box, entry))
+      void runExclusive(() => openWithResolve(box, entry))
         .catch((err: unknown) => {
           if (!isOperationCancelled(err)) notify(api, "Nie udalo sie odczytac listu.");
         })
         .finally(() => {
-          if (generation === connectionGeneration) ui.setBusy(null);
+          if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
         });
     },
     onOpenArchiveLetter: (letter) => {
@@ -1452,13 +1500,12 @@ export async function init(api: PluginApi) {
       ui.setBusy(`Czytam list: ${letter.subject}...`);
       const pseudo = archivePseudoEntry(letter);
       const generation = connectionGeneration;
-      void lock
-        .runExclusive(() => openWithResolve(letter.box, pseudo))
+      void runExclusive(() => openWithResolve(letter.box, pseudo))
         .catch((err: unknown) => {
           if (!isOperationCancelled(err)) notify(api, "Nie udalo sie odczytac listu.");
         })
         .finally(() => {
-          if (generation === connectionGeneration) ui.setBusy(null);
+          if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
         });
     },
     onDownloadArchiveBodies: () => downloadArchiveBodies(),
@@ -1515,8 +1562,7 @@ export async function init(api: PluginApi) {
       }
       ui.setBusy("Wysylam list...");
       const generation = connectionGeneration;
-      void lock
-        .runExclusive(async () => {
+      void runExclusive(async () => {
           transport!.beginModal();
           // Fala 28h: compose odgagowany na czas dialogu (patrz
           // setGagPredicate wyzej); finally przywraca gag nawet przy
@@ -1553,7 +1599,7 @@ export async function init(api: PluginApi) {
           if (!isOperationCancelled(err)) notify(api, "Blad wysylki listu.");
         })
         .finally(() => {
-          if (generation === connectionGeneration) ui.setBusy(null);
+          if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
         });
     },
     onCloseLetter: () => ui.closeLetter(),
@@ -1583,8 +1629,7 @@ export async function init(api: PluginApi) {
       }
       ui.setBusy(`Szukam w skrzynce ${box}...`);
       const generation = connectionGeneration;
-      void lock
-        .runExclusive(async () => {
+      void runExclusive(async () => {
           const res = await mailbox.fetch(box, searchListingCommand(box, query));
           // Fala 14f: puste wyniki szukania tez nadpisuja kontekst serwera.
           if (res.kind === "lista") stampEntries(box, res.entries);
@@ -1610,7 +1655,7 @@ export async function init(api: PluginApi) {
           }
         })
         .finally(() => {
-          if (generation === connectionGeneration) ui.setBusy(null);
+          if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
         });
     },
     onClearSearch: (box) => ui.clearSearch(box),
@@ -1635,8 +1680,7 @@ export async function init(api: PluginApi) {
       }
       ui.setBusy(`Usuwam list: ${entry.subject}...`);
       const generation = connectionGeneration;
-      void lock
-        .runExclusive(async () => {
+      void runExclusive(async () => {
           const fresh = await resolveEntry(box, entry);
           if (!fresh) return;
           transport!.beginModal();
@@ -1662,7 +1706,7 @@ export async function init(api: PluginApi) {
           if (!isOperationCancelled(err)) notify(api, "Blad kasowania listu.");
         })
         .finally(() => {
-          if (generation === connectionGeneration) ui.setBusy(null);
+          if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
         });
     },
     onForwardLetter: (box, entry, adresat) => {
@@ -1673,8 +1717,7 @@ export async function init(api: PluginApi) {
       }
       ui.setBusy(`Przekazuje list: ${entry.subject}...`);
       const generation = connectionGeneration;
-      void lock
-        .runExclusive(async () => {
+      void runExclusive(async () => {
           const fresh = await resolveEntry(box, entry);
           if (!fresh) return;
           transport!.beginModal();
@@ -1695,7 +1738,7 @@ export async function init(api: PluginApi) {
           if (!isOperationCancelled(err)) notify(api, "Blad przekazania listu.");
         })
         .finally(() => {
-          if (generation === connectionGeneration) ui.setBusy(null);
+          if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
         });
     },
   };
@@ -1806,33 +1849,60 @@ export async function init(api: PluginApi) {
     storage.setJSON(NOTIFY_KEY, s.notifyEnabled);
   });
 
-  popup = await api.ui.registerPersistentPopup({
-    id: POPUP_ID,
-    title: PLUGIN_NAME,
-    // Start: szeroki dwupanelowy na normalnym ekranie, waski na komorce
-    // (85vw). Rozmiar ustawiony przez gracza zawsze wygrywa z tymi
-    // wartosciami - po zmianie domyslnego pomocny jest reset rozmiaru.
-    initialWidth: "min(1400px, 85vw)",
-    initialHeight: "min(850px, 80vh)",
-    createContent,
-  });
-
-  const toggle = (): boolean => {
-    if (!popup) return true;
-    if (popup.isOpen) popup.close();
-    else void popup.open();
+    refreshPopup();
+    deactivateActiveCharacter = async (): Promise<void> => {
+      cancelConnectionOperations();
+      api.events.off("client.connect", onClientConnect);
+      api.events.off("client.disconnect", onClientDisconnect);
+      api.events.off("gmcp.mail.state", onMailState);
+      for (const timer of [animalTimer, sluchamTimer, unsentFlashTimer, playerMailModeTimer]) {
+        if (timer !== null) clearTimeout(timer);
+      }
+      animalTimer = null;
+      sluchamTimer = null;
+      unsentFlashTimer = null;
+      playerMailModeTimer = null;
+      for (const timer of delayedInboxTimers) clearTimeout(timer);
+      delayedInboxTimers = [];
+      await Promise.allSettled([...tasks]);
+      if (unsubBadge) {
+        unsubBadge();
+        unsubBadge = null;
+      }
+      if (unmount) {
+        unmount();
+        unmount = null;
+      }
+      if (wideObserver) {
+        wideObserver.disconnect();
+        wideObserver = null;
+      }
+      handlersRef = null;
+      store = null;
+      if (transport) {
+        transport.dispose();
+        transport = null;
+      }
+      if (storageRef === storage) storageRef = null;
+      await storage.close();
+    };
     return true;
   };
 
-  aliasId = api.aliases.register(ALIAS_REGEX, toggle);
-  menuHandle = api.ui.addPopupMenuEntry(PLUGIN_NAME, () => {
-    if (popup && !popup.isOpen) void popup.open();
+  const switchCharacter = async (name: string | null): Promise<void> => {
+    const normalized = name?.trim() || null;
+    const key = normalized?.toLowerCase() ?? null;
+    if (key === activeName) return;
+    await deactivateCurrent();
+    if (lifecycleDestroyed || key !== (requestedName?.trim().toLowerCase() || null)) return;
+    if (!normalized) return;
+    if (await activateCharacter(normalized)) activeName = key;
+  };
+  unsubscribeCharacter = api.character.onChange((name) => {
+    requestedName = name;
+    switchQueue = switchQueue.then(() => switchCharacter(name)).catch(() => {});
   });
-  footerHandle = api.ui.registerFooterButton(FOOTER_BUTTON_ID, {
-    label: PLUGIN_NAME,
-    command: "/arkmail",
-    state: FOOTER_STATE,
-  });
+  await switchCharacter(requestedName);
 
   return {
     name: PLUGIN_NAME,
@@ -1846,6 +1916,16 @@ export async function init(api: PluginApi) {
 }
 
 export async function destroy() {
+  lifecycleDestroyed = true;
+  if (unsubscribeCharacter) {
+    unsubscribeCharacter();
+    unsubscribeCharacter = null;
+  }
+  if (deactivateActiveCharacter) {
+    const deactivate = deactivateActiveCharacter;
+    deactivateActiveCharacter = null;
+    await deactivate();
+  }
   if (animalTimer !== null) {
     clearTimeout(animalTimer);
     animalTimer = null;

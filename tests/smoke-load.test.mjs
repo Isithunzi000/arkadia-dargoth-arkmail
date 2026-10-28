@@ -76,6 +76,13 @@ function makeMockApi(capture) {
         (capture.footerStates = capture.footerStates || []).push([name, on]);
       },
     },
+    character: {
+      getName() { return 'Foo'; },
+      onChange(listener) {
+        capture.characterListener = listener;
+        return () => { capture.characterListener = null; };
+      },
+    },
     events: {
       on(event, listener) { (capture.listeners = capture.listeners || {})[event] = listener; },
       off() {},
@@ -189,7 +196,6 @@ test('smoke: powiadomienie odswieza skrzynki i badge stopki', async () => {
 
     assert.ok(capture.trigger, 'init rejestruje zbiorczy trigger linii');
     assert.equal(capture.trigger.tag, 'arkmail');
-    assert.ok(capture.listeners?.['gmcp.char.info'], 'slucha gmcp.char.info (nazwa postaci)');
     assert.ok(!capture.peopleListener, 'kontakty tylko z listow - BEZ subskrypcji bazy people');
 
     const tick = () => new Promise((r) => setImmediate(r));
