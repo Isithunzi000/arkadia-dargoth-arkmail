@@ -22,8 +22,8 @@ function metaVersion() {
   return m[1];
 }
 
-test('wydanie: przygotowany numer wersji to 1.15.0', () => {
-  assert.equal(metaVersion(), '1.15.0');
+test('wydanie: przygotowany numer wersji to 1.16.0', () => {
+  assert.equal(metaVersion(), '1.16.0');
 });
 
 function latestZip() {
@@ -95,4 +95,12 @@ test('dokumentacja: docelowy magazyn archiwum jest opisany jako IndexedDB', () =
   assert.match(protocol, /Trwalosc: IndexedDB per postac/);
   assert.doesNotMatch(protocol, /Trwalosc: localStorage per postac/);
   assert.doesNotMatch(protocol, /IndexedDB\s+swiadomie odlozone/);
+});
+
+test('dokumentacja: README opisuje reczne i zbiorcze usuwanie listow', () => {
+  const readme = fs.readFileSync(path.join(REPO, 'README.md'), 'utf8');
+  assert.match(readme, /Usuwanie listow/);
+  assert.match(readme, /jeden wynik z wybranej skrzynki/);
+  assert.match(readme, /Wyniki nie odświeżają się automatycznie/);
+  assert.match(readme, /wyjście z zakładki\s+czyści wyniki, filtry i zaznaczenie/);
 });
