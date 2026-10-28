@@ -72,7 +72,7 @@ function mount(store: MailUiStore, handlers: Partial<MailUiHandlers> = {}) {
 const click = (el: unknown) =>
   (el as { dispatchEvent(e: unknown): void }).dispatchEvent(new window.Event('click'));
 
-test('render: cztery zakladki z polskimi etykietami, bez List', () => {
+test('render: piec zakladek z polskimi etykietami, bez List', () => {
   // Fala 11b: 'list' to wewnetrzny stan widoku (otwarty list), nie
   // zakladka - na pasku "Listy" i "List" obok siebie mylily gracza.
   const s = new MailUiStore();
@@ -80,11 +80,11 @@ test('render: cztery zakladki z polskimi etykietami, bez List', () => {
   const tabs = [...container.querySelectorAll('.arkmail-tab')];
   assert.deepEqual(
     tabs.map((t) => t.getAttribute('data-tab')),
-    ['listy', 'napisz', 'kontakty', 'archiwum'],
+    ['listy', 'napisz', 'kontakty', 'archiwum', 'usuwanie'],
   );
   assert.deepEqual(
     tabs.map((t) => t.textContent),
-    ['Listy', 'Napisz list', 'Kontakty', 'Archiwum'],
+    ['Listy', 'Napisz list', 'Kontakty', 'Archiwum', 'Usuwanie listow'],
   );
   assert.equal(container.querySelector('.arkmail-tab-active')?.getAttribute('data-tab'), 'listy');
   off();

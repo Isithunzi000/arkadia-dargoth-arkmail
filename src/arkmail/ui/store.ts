@@ -13,8 +13,32 @@ import type { Contact } from '../core/contacts.js';
 import type { ArchiveLetter } from '../core/archive.js';
 import { letterId } from '../core/archive.js';
 import type { LetterTemplate } from '../core/letterRender.js';
+import { emptyDeletionFilters } from './deletion.js';
+import type { DeletionFilters } from './deletion.js';
 
-export type UiTab = 'listy' | 'list' | 'napisz' | 'kontakty' | 'archiwum';
+export type UiTab = 'listy' | 'list' | 'napisz' | 'kontakty' | 'archiwum' | 'usuwanie';
+
+export interface DeletionState {
+  box: MailBox;
+  filters: DeletionFilters;
+  command: string | null;
+  result: MailboxResult | null;
+  selected: number[];
+  message: string | null;
+  revision: number;
+}
+
+function deletionState(revision: number): DeletionState {
+  return {
+    box: 'odebrane',
+    filters: emptyDeletionFilters(),
+    command: null,
+    result: null,
+    selected: [],
+    message: null,
+    revision,
+  };
+}
 
 export interface BoxView {
   entries: MailboxEntry[];
@@ -94,6 +118,8 @@ export interface MailUiState {
    * biezacej skrzynki (0..3 wg INDEX_BOXES) + liczba pobranych stron.
    */
   indexRun: { boxIndex: number; box: MailBox; pages: number } | null;
+  /** Tymczasowy stan zakladki usuwania; nie jest zapisywany. */
+  deletion: DeletionState;
 }
 
 /** Kolejnosc petli "Indeksuj wszystkie skrzynki" (Fala 18c). */
@@ -126,6 +152,7 @@ const DEFAULT_STATE: MailUiState = {
   indexMeta: {},
   archiveGaps: {},
   indexRun: null,
+  deletion: deletionState(0),
 };
 
 export class MailUiStore {
@@ -150,7 +177,11 @@ export class MailUiStore {
   }
 
   setTab(tab: UiTab): void {
-    this.update({ tab });
+    const patch: Partial<MailUiState> = { tab };
+    if (this.current.tab === 'usuwanie' && tab !== 'usuwanie') {
+      patch.deletion = deletionState(this.current.deletion.revision + 1);
+    }
+    this.update(patch);
   }
 
   /**
@@ -311,6 +342,95 @@ export class MailUiStore {
     const b = computeBadges(boxes);
     this.update({ boxes, badge: b.unread, badgeUnsent: b.unsent });
     return removed;
+  }
+
+  setDeletionBox(box: MailBox): void {
+    this.update({
+      deletion: {
+        ...this.current.deletion,
+        box,
+        command: null,
+        result: null,
+        selected: [],
+        message: null,
+        revision: this.current.deletion.revision + 1,
+      },
+    });
+  }
+
+  setDeletionFilters(filters: DeletionFilters): void {
+    this.update({
+      deletion: {
+        ...this.current.deletion,
+        filters: { ...filters },
+        command: null,
+        result: null,
+        selected: [],
+        message: null,
+        revision: this.current.deletion.revision + 1,
+      },
+    });
+  }
+
+  applyDeletionResult(box: MailBox, command: string, result: MailboxResult): void {
+    const limited = result.kind === 'lista'
+      ? { ...result, entries: result.entries.slice(0, 50) }
+      : result;
+    this.update({
+      deletion: {
+        ...this.current.deletion,
+        box,
+        command,
+        result: limited,
+        selected: [],
+        message: null,
+        revision: this.current.deletion.revision + 1,
+      },
+    });
+  }
+
+  toggleDeletionEntry(number: number): void {
+    const current = this.current.deletion;
+    if (current.result?.kind !== 'lista') return;
+    if (!current.result.entries.some((entry) => entry.number === number)) return;
+    const selected = current.selected.includes(number)
+      ? current.selected.filter((value) => value !== number)
+      : [...current.selected, number];
+    this.update({ deletion: { ...current, selected } });
+  }
+
+  selectAllDeletionEntries(): void {
+    const current = this.current.deletion;
+    if (current.result?.kind !== 'lista') return;
+    this.update({
+      deletion: {
+        ...current,
+        selected: current.result.entries.map((entry) => entry.number),
+      },
+    });
+  }
+
+  clearDeletionSelection(): void {
+    const current = this.current.deletion;
+    if (current.selected.length === 0) return;
+    this.update({ deletion: { ...current, selected: [] } });
+  }
+
+  clearDeletionResult(message: string | null): void {
+    const current = this.current.deletion;
+    this.update({
+      deletion: {
+        ...current,
+        result: null,
+        selected: [],
+        message,
+        revision: current.revision + 1,
+      },
+    });
+  }
+
+  resetDeletion(): void {
+    this.update({ deletion: deletionState(this.current.deletion.revision + 1) });
   }
 
   setBusy(label: string | null): void {

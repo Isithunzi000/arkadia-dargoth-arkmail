@@ -346,6 +346,44 @@ export const STYLES = `
 }
 .arkmail-root .arkmail-send:hover { background: #5a8ae6; }
 
+/* --- usuwanie listow --- */
+.arkmail-deletion-intro, .arkmail-deletion-message, .arkmail-deletion-summary,
+.arkmail-deletion-limit, .arkmail-deletion-selected { margin: 0 0 8px; }
+.arkmail-deletion-intro, .arkmail-deletion-limit { color: ${FG_DIM}; }
+.arkmail-deletion-controls, .arkmail-deletion-selection-ops {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.arkmail-root .arkmail-deletion-box { flex: 1 1 140px; min-width: 0; }
+.arkmail-deletion-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.arkmail-deletion-filter { min-width: 0; color: ${FG_DIM}; font-size: 12px; }
+.arkmail-deletion-filter span { display: block; margin-bottom: 2px; }
+.arkmail-root .arkmail-deletion-filter input { width: 100%; min-width: 0; }
+.arkmail-deletion-results { border-top: 1px solid ${BORDER}; }
+.arkmail-deletion-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px 4px;
+  border-bottom: 1px solid ${BORDER};
+  cursor: pointer;
+}
+.arkmail-deletion-entry input { flex: none; margin-top: 3px; }
+.arkmail-deletion-entry span { min-width: 0; overflow-wrap: anywhere; }
+.arkmail-root .arkmail-deletion-delete {
+  background: ${DANGER};
+  border-color: ${DANGER};
+  color: ${ACCENT_FG};
+}
+.arkmail-root .arkmail-deletion-delete:disabled { background: ${BG_RAISED}; color: ${FG_DIM}; }
+
 /* --- kontakty i archiwum --- */
 .arkmail-contact, .arkmail-arch-entry {
   display: flex;

@@ -99,6 +99,7 @@ test('podpowiedzi: kazdy przycisk ma title we wszystkich zakladkach', () => {
     new MailUiStore({ tab: 'napisz' }),
     new MailUiStore({ tab: 'kontakty' }),
     new MailUiStore({ tab: 'archiwum' }),
+    new MailUiStore({ tab: 'usuwanie' }),
   ];
   stores[3].setContacts([contact()]);
   for (const store of stores) missing.push(...missingTitles(mount(store)));

@@ -21,6 +21,8 @@ import type { MailUiState, MailUiStore, UiTab } from './store.js';
 import { allBoxesIndexed, formatBadgeSuffix, INDEX_BOXES } from './store.js';
 import { STYLES } from './styles.js';
 import { attachGhost, type GhostSource } from './ghost.js';
+import { emptyDeletionFilters, formatListCount } from './deletion.js';
+import type { DeletionFilters } from './deletion.js';
 
 export interface MailUiHandlers {
   /**
@@ -84,6 +86,12 @@ export interface MailUiHandlers {
    * Opcjonalny: starsze montaze testowe go nie podaja.
    */
   onIndexAll?(): void;
+  /** Reczne wyszukanie jednej strony w zakladce usuwania. */
+  onDeletionSearch?(box: MailBox, query: ListingSearch): void;
+  /** Powtorzenie ostatniego zapytania przed kolejnym zaznaczeniem. */
+  onDeletionRefresh?(): void;
+  /** Zbiorcze usuniecie po potwierdzeniu w interfejsie. */
+  onDeletionDelete?(): void;
 }
 
 const TEMPLATES: Array<[LetterTemplate, string]> = [
@@ -103,6 +111,7 @@ const TABS: Array<[UiTab, string]> = [
   ['napisz', 'Napisz list'],
   ['kontakty', 'Kontakty'],
   ['archiwum', 'Archiwum'],
+  ['usuwanie', 'Usuwanie listow'],
 ];
 
 const BOXES: Array<[MailBox, string]> = [
@@ -166,7 +175,7 @@ export function mountMailUi(
   const focusKeyOf = (el: Element | null): string | null => {
     if (!el || typeof (el as HTMLElement).getAttribute !== 'function') return null;
     if (!root.contains(el)) return null;
-    for (const attr of ['data-search', 'data-field', 'data-filter']) {
+    for (const attr of ['data-search', 'data-field', 'data-filter', 'data-deletion-filter']) {
       const v = (el as HTMLElement).getAttribute(attr);
       if (v !== null) return `[${attr}="${v}"]`;
     }
@@ -354,7 +363,197 @@ export function mountMailUi(
         return renderKontakty(state);
       case 'archiwum':
         return renderArchiwum(state);
+      case 'usuwanie':
+        return renderUsuwanie(state);
     }
+  };
+
+  const renderUsuwanie = (state: MailUiState): HTMLElement => {
+    const pane = doc.createElement('div');
+    pane.className = 'arkmail-pane arkmail-deletion';
+    pane.setAttribute('data-pane-key', 'usuwanie');
+
+    const intro = doc.createElement('p');
+    intro.className = 'arkmail-deletion-intro';
+    intro.textContent =
+      'Wybierz skrzynke i kliknij Szukaj. Zaznacz listy, ktore chcesz usunac, i potwierdz operacje. ' +
+      'Wyniki nie odswiezaja sie automatycznie. Wyjscie z zakladki czysci wyniki i zaznaczenie.';
+    pane.appendChild(intro);
+
+    const controls = doc.createElement('div');
+    controls.className = 'arkmail-deletion-controls';
+    const box = doc.createElement('select');
+    box.className = 'arkmail-deletion-box';
+    box.setAttribute('title', 'Wybierz skrzynke');
+    for (const [id, label] of BOXES) {
+      const option = doc.createElement('option');
+      option.value = id;
+      option.textContent = label;
+      option.selected = state.deletion.box === id;
+      box.appendChild(option);
+    }
+    box.value = state.deletion.box;
+    box.addEventListener('change', () => store.setDeletionBox(box.value as MailBox));
+    controls.appendChild(box);
+
+    const search = doc.createElement('button');
+    search.className = 'arkmail-deletion-search';
+    search.textContent = 'Szukaj';
+    search.addEventListener('click', () => {
+      const current = store.state.deletion;
+      const query: ListingSearch = {};
+      const osoba = current.filters.osoba.trim();
+      const temat = current.filters.temat.trim();
+      const tresc = current.filters.tresc.trim();
+      if (osoba) query.osoba = osoba;
+      if (temat) query.temat = temat;
+      if (tresc) query.tresc = tresc;
+      const odDaty = fromISODate(current.filters.odDaty);
+      const doDaty = fromISODate(current.filters.doDaty);
+      if (odDaty) query.odDaty = odDaty;
+      if (doDaty) query.doDaty = doDaty;
+      handlers.onDeletionSearch?.(current.box, query);
+    });
+    controls.appendChild(search);
+
+    const refresh = doc.createElement('button');
+    refresh.className = 'arkmail-deletion-refresh';
+    refresh.textContent = 'Odswiez';
+    refresh.setAttribute('title', 'Ponow ostatnie wyszukiwanie');
+    if (state.deletion.command === null) refresh.setAttribute('disabled', '');
+    refresh.addEventListener('click', () => handlers.onDeletionRefresh?.());
+    controls.appendChild(refresh);
+
+    const clearFilters = doc.createElement('button');
+    clearFilters.className = 'arkmail-deletion-clear-filters';
+    clearFilters.textContent = 'Wyczysc filtry';
+    clearFilters.addEventListener('click', () => store.setDeletionFilters(emptyDeletionFilters()));
+    controls.appendChild(clearFilters);
+    pane.appendChild(controls);
+
+    const filterRow = doc.createElement('div');
+    filterRow.className = 'arkmail-deletion-filters';
+    const fields: Array<[keyof DeletionFilters, string, string]> = [
+      ['osoba', 'Osoba (kogo? czego?)', 'Wpisz imie w dopelniaczu'],
+      ['temat', 'Temat', 'Fragment tematu'],
+      ['tresc', 'Tresc', 'Fragment tresci'],
+      ['odDaty', 'Od daty', ''],
+      ['doDaty', 'Do daty', ''],
+    ];
+    for (const [key, label, placeholder] of fields) {
+      const wrap = doc.createElement('label');
+      wrap.className = 'arkmail-deletion-filter';
+      const caption = doc.createElement('span');
+      caption.textContent = label;
+      wrap.appendChild(caption);
+      const field = doc.createElement('input');
+      field.type = key === 'odDaty' || key === 'doDaty' ? 'date' : 'text';
+      field.value = state.deletion.filters[key];
+      field.setAttribute('data-deletion-filter', key);
+      if (placeholder) field.setAttribute('placeholder', placeholder);
+      field.addEventListener('input', () => {
+        store.setDeletionFilters({ ...store.state.deletion.filters, [key]: field.value });
+      });
+      wrap.appendChild(field);
+      filterRow.appendChild(wrap);
+    }
+    pane.appendChild(filterRow);
+
+    if (state.deletion.message !== null) {
+      const message = doc.createElement('p');
+      message.className = 'arkmail-deletion-message';
+      message.textContent = state.deletion.message;
+      pane.appendChild(message);
+    }
+
+    const result = state.deletion.result;
+    const entries = result?.kind === 'lista' ? result.entries : [];
+    if (result !== null) {
+      const summary = doc.createElement('p');
+      summary.className = 'arkmail-deletion-summary';
+      summary.textContent = result.kind === 'lista'
+        ? `Wyniki: ${formatListCount(entries.length)}.`
+        : 'Brak listow dla podanych filtrow.';
+      pane.appendChild(summary);
+      if (result.kind === 'lista' && result.header.truncated) {
+        const limit = doc.createElement('p');
+        limit.className = 'arkmail-deletion-limit';
+        limit.textContent = 'Wynik jest uciety. Zawez filtry.';
+        pane.appendChild(limit);
+      }
+    }
+
+    const selectionOps = doc.createElement('div');
+    selectionOps.className = 'arkmail-deletion-selection-ops';
+    const selectAll = doc.createElement('button');
+    selectAll.className = 'arkmail-deletion-select-all';
+    selectAll.textContent = 'Zaznacz wszystkie';
+    if (entries.length === 0) selectAll.setAttribute('disabled', '');
+    selectAll.addEventListener('click', () => store.selectAllDeletionEntries());
+    selectionOps.appendChild(selectAll);
+    const clearSelection = doc.createElement('button');
+    clearSelection.className = 'arkmail-deletion-clear-selection';
+    clearSelection.textContent = 'Odznacz wszystkie';
+    if (state.deletion.selected.length === 0) clearSelection.setAttribute('disabled', '');
+    clearSelection.addEventListener('click', () => store.clearDeletionSelection());
+    selectionOps.appendChild(clearSelection);
+
+    const remove = doc.createElement('button');
+    remove.className = 'arkmail-deletion-delete';
+    setButtonLabel(remove, 'Usun zaznaczone', 'Usun zaznaczone listy. Tej operacji nie mozna cofnac.');
+    const selectedCount = state.deletion.selected.length;
+    if (selectedCount === 0) remove.setAttribute('disabled', '');
+    let armed = false;
+    let armTimer: ReturnType<typeof setTimeout> | null = null;
+    remove.addEventListener('click', () => {
+      if (!armed) {
+        armed = true;
+        setButtonLabel(
+          remove,
+          `Potwierdz usuniecie: ${formatListCount(selectedCount)}`,
+          `Usunac zaznaczone listy (liczba: ${selectedCount})? Tej operacji nie mozna cofnac. Kliknij ponownie, aby potwierdzic.`,
+        );
+        armTimer = setTimeout(() => {
+          armed = false;
+          setButtonLabel(remove, 'Usun zaznaczone', 'Usun zaznaczone listy. Tej operacji nie mozna cofnac.');
+        }, 3000);
+        return;
+      }
+      if (armTimer) clearTimeout(armTimer);
+      armed = false;
+      handlers.onDeletionDelete?.();
+    });
+    selectionOps.appendChild(remove);
+    pane.appendChild(selectionOps);
+
+    if (selectedCount > 0) {
+      const selected = doc.createElement('p');
+      selected.className = 'arkmail-deletion-selected';
+      selected.textContent = `Zaznaczono: ${formatListCount(selectedCount)}.`;
+      pane.appendChild(selected);
+    }
+
+    if (entries.length > 0) {
+      const list = doc.createElement('div');
+      list.className = 'arkmail-deletion-results';
+      for (const entry of [...entries].reverse()) {
+        const row = doc.createElement('label');
+        row.className = 'arkmail-deletion-entry';
+        const checkbox = doc.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = state.deletion.selected.includes(entry.number);
+        checkbox.setAttribute('data-deletion-number', String(entry.number));
+        checkbox.addEventListener('change', () => store.toggleDeletionEntry(entry.number));
+        row.appendChild(checkbox);
+        const text = doc.createElement('span');
+        const date = entry.date?.raw ? ` | ${entry.date.raw}` : '';
+        text.textContent = `${entry.party} | ${entry.subject}${date}`;
+        row.appendChild(text);
+        list.appendChild(row);
+      }
+      pane.appendChild(list);
+    }
+    return pane;
   };
 
   const renderListy = (state: MailUiState): HTMLElement => {
