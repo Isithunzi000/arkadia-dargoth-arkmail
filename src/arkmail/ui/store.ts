@@ -427,6 +427,8 @@ export class MailUiStore {
       contacts: [],
       badge: 0,
       badgeUnsent: 0,
+      indexMeta: {},
+      archiveGaps: {},
       search: null,
       unsentFlash: false,
     });

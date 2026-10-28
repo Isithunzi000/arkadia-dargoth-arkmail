@@ -338,13 +338,13 @@ test('wczytaj wszystkie: naturalne domkniecie skrzynki stempluje indexMeta (Fala
       'notify konca petli',
     );
 
-    // Stopka bramy Kontaktow: skrzynka 'odebrane' ma stamp indeksacji.
+    // Jedna kompletna skrzynka nie wystarcza do kompletnego indeksu.
     click(h, '[data-tab="kontakty"]');
-    await waitRt(() => !!h.content.querySelector('.arkmail-index-foot'), 'stopka indeksacji');
+    await waitRt(() => !!h.content.querySelector('.arkmail-index-foot'), 'opis indeksacji');
     assert.match(
       textOf(h, '.arkmail-index-foot'),
-      /^Ostatnia indeksacja: 20\d\d-\d\d-\d\d/,
-      'stamp indexMeta po naturalnym domknieciu loadAll',
+      /^Indeksacja niekompletna/,
+      'naturalne domkniecie loadAll zachowuje date skrzynki',
     );
   } finally {
     await stopHarness();
@@ -370,12 +370,12 @@ test('wczytaj wszystkie: przerwanie petli NIE stempluje indexMeta (Fala 24c)', a
     click(h, '.arkmail-older-all');
     await waitRt(() => notifyText(f, 'Przerwano'), 'notify przerwania');
 
-    // Petla przerwana = brak pewnosci kompletu -> bez stampa.
+    // Petla przerwana = brak pewnosci kompletu -> bez daty skrzynki.
     click(h, '[data-tab="kontakty"]');
-    await waitRt(() => !!h.content.querySelector('.arkmail-index-foot'), 'stopka indeksacji');
+    await waitRt(() => !!h.content.querySelector('.arkmail-index-foot'), 'opis indeksacji');
     assert.ok(
-      textOf(h, '.arkmail-index-foot').startsWith('Ostatnia indeksacja:  |'),
-      'brak stampa po przerwanym loadAll',
+      textOf(h, '.arkmail-index-foot').startsWith('Indeksacja niekompletna |'),
+      'brak daty po przerwanym loadAll',
     );
   } finally {
     await stopHarness();

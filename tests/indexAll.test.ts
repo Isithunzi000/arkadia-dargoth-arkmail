@@ -221,13 +221,13 @@ test('Indeksuj wszystkie: paginacja kotwicowa, flagi, gone-marking, odblokowanie
     assert.ok(names.includes('Foo'), 'kontakt z zywych listow');
     assert.ok(names.includes('Gronk'), 'kontakt z dopisanej strony');
     assert.ok(!names.includes('Corge'), 'kontakt zniknietego listu odpada');
-    // Stopka bramy: data indeksacji + rozmiar bazy (4 rekordy lacznie
-    // ze zniknieta Corge).
+    // Opis indeksacji: najwczesniejsza data + rozmiar bazy (4 rekordy
+    // lacznie ze zniknieta Corge).
     const foot = h.content.querySelector('.arkmail-index-foot') as unknown as {
       textContent?: string;
     } | null;
-    assert.ok(foot, 'stopka indeksacji');
-    assert.match(String(foot.textContent ?? ''), /^Ostatnia indeksacja: 20\d\d-\d\d-\d\d/);
+    assert.ok(foot, 'opis indeksacji');
+    assert.match(String(foot.textContent ?? ''), /^Kompletna indeksacja od: 20\d\d-\d\d-\d\d/);
     assert.ok(String(foot.textContent ?? '').includes('listow w bazie: 4'), 'rozmiar bazy');
   } finally {
     await stopHarness();

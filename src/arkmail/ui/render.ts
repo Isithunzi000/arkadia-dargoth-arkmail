@@ -1093,6 +1093,24 @@ export function mountMailUi(
     const pane = doc.createElement('div');
     pane.className = 'arkmail-pane';
     pane.setAttribute('data-pane-key', 'kontakty');
+    const foot = doc.createElement('div');
+    foot.className = 'arkmail-dim arkmail-index-foot';
+    const dates = INDEX_BOXES.map((b) => state.indexMeta[b])
+      .filter((d): d is string => d !== undefined)
+      .sort();
+    foot.textContent = allBoxesIndexed(state.indexMeta)
+      ? `Kompletna indeksacja od: ${dates[0]!.slice(0, 10)} | listow w bazie: ${state.archive.length}`
+      : `Indeksacja niekompletna | listow w bazie: ${state.archive.length}`;
+    pane.appendChild(foot);
+    const gaps = INDEX_BOXES.flatMap((box) =>
+      (state.archiveGaps[box] ?? []).map((day) => `${box}: ${day}`),
+    );
+    if (gaps.length > 0) {
+      const gapNote = doc.createElement('div');
+      gapNote.className = 'arkmail-dim arkmail-index-gaps';
+      gapNote.textContent = `Niedostepne przez limit serwera - ${gaps.join(', ')}`;
+      pane.appendChild(gapNote);
+    }
     // Fala 18c (zgloszenie 2026-10-20 pkt 1): kontakty liczone z
     // archiwum sa kompletne dopiero po pelnej indeksacji wszystkich
     // skrzynek - wczesniej (baza = pierwsze 50 wpisow) liczniki
@@ -1241,26 +1259,6 @@ export function mountMailUi(
       repaint();
     });
     repaint();
-    // Stopka bramy (Fala 18c): data najstarszej flagi (konserwatywna
-    // prawda o kompletnosci) + rozmiar bazy bedacej podstawa licznikow.
-    const foot = doc.createElement('div');
-    foot.className = 'arkmail-dim arkmail-index-foot';
-    const dates = INDEX_BOXES.map((b) => state.indexMeta[b])
-      .filter((d): d is string => d !== undefined)
-      .sort();
-    foot.textContent =
-      `Ostatnia indeksacja: ${(dates[0] ?? '').slice(0, 10)} | ` +
-      `listow w bazie: ${state.archive.length}`;
-    pane.appendChild(foot);
-    const gaps = INDEX_BOXES.flatMap((box) =>
-      (state.archiveGaps[box] ?? []).map((day) => `${box}: ${day}`),
-    );
-    if (gaps.length > 0) {
-      const gapNote = doc.createElement('div');
-      gapNote.className = 'arkmail-dim arkmail-index-gaps';
-      gapNote.textContent = `Niedostepne przez limit serwera - ${gaps.join(', ')}`;
-      pane.appendChild(gapNote);
-    }
     return pane;
   };
 

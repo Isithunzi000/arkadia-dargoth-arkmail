@@ -374,7 +374,12 @@ export const STYLES = `
   cursor: default;
 }
 .arkmail-contact-stats, .arkmail-arch-meta { color: ${FG_DIM}; font-size: 12px; }
-.arkmail-contact-controls { display: flex; gap: 6px; margin-bottom: 8px; }
+.arkmail-contact-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
 .arkmail-arch-controls {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -382,7 +387,8 @@ export const STYLES = `
   margin-bottom: 8px;
 }
 .arkmail-arch-controls input[type='date'] { color-scheme: dark; }
-.arkmail-root .arkmail-contact-filter { flex: 1; }
+.arkmail-root .arkmail-contact-filter { flex: 1 1 140px; min-width: 0; }
+.arkmail-root .arkmail-contact-sort { max-width: 100%; }
 .arkmail-contact-last { color: ${FG_DIM}; font-size: 11px; white-space: nowrap; }
 
 .arkmail-notify-toggle { margin-right: 4px; }

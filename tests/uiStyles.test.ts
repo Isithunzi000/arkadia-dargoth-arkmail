@@ -103,6 +103,21 @@ test('style: operacje skrzynki i listu zawijaja sie, pole przekazania jest elast
   assert.match(forward!, /min-width:\s*0/, 'pole moze zmniejszyc sie bez przepelnienia');
 });
 
+test('style: filtr i sortowanie kontaktow mieszcza sie w waskim panelu', () => {
+  const controls = ruleBody(/\.arkmail-contact-controls\s*/);
+  assert.ok(controls, 'regula paska kontaktow istnieje');
+  assert.match(controls!, /flex-wrap:\s*wrap/, 'kontrolki moga przejsc do kolejnego rzedu');
+
+  const filter = ruleBody(/\.arkmail-root\s+\.arkmail-contact-filter\s*/);
+  assert.ok(filter, 'regula filtra kontaktow istnieje');
+  assert.match(filter!, /flex:\s*1\s+1\s+\d+px/, 'filtr ma elastyczna podstawe szerokosci');
+  assert.match(filter!, /min-width:\s*0/, 'filtr moze zmniejszyc sie bez przepelnienia');
+
+  const sort = ruleBody(/\.arkmail-root\s+\.arkmail-contact-sort\s*/);
+  assert.ok(sort, 'regula sortowania kontaktow istnieje');
+  assert.match(sort!, /max-width:\s*100%/, 'sortowanie nie wyjdzie poza panel');
+});
+
 test('style: placeholdery sa czytelne i mniejsze od wpisywanego tekstu', () => {
   const body = ruleBody(/\.arkmail-root\s+input::placeholder\s*,\s*\.arkmail-root\s+textarea::placeholder\s*/);
   assert.ok(body, 'wspolna regula placeholderow istnieje');
