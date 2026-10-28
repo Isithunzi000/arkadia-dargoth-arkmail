@@ -1,3 +1,4 @@
+import type { ArchiveLetter } from "../core/archive";
 import type { StorageDriver } from "./storageDriver";
 import {
   openWriteThroughStorage,
@@ -29,6 +30,26 @@ export class CharStorage {
 
   get character(): string {
     return this.char;
+  }
+
+  getLetters(): ArchiveLetter[] {
+    const letters: ArchiveLetter[] = [];
+    for (const raw of Object.values(this.storage.getLetters(this.char))) {
+      try {
+        letters.push(JSON.parse(raw) as ArchiveLetter);
+      } catch {
+        // Uszkodzony rekord nie blokuje odczytu pozostalych listow.
+      }
+    }
+    return letters;
+  }
+
+  setLetters(letters: readonly ArchiveLetter[]): void {
+    this.storage.setLetters(this.char, letters);
+  }
+
+  clearLetters(): void {
+    this.storage.clearLetters(this.char);
   }
 
   getJSON<T>(key: string): T | null {

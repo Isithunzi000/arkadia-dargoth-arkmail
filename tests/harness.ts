@@ -135,7 +135,10 @@ export async function startHarness(
   if (options.archive || options.notifyEnabled !== undefined) {
     const seed = new IndexedDbStorageDriver(globalThis.indexedDB);
     if (options.archive) {
-      await seed.put('arkmail.foo.archiwum', JSON.stringify(options.archive));
+      await seed.putLetters(
+        'foo',
+        Object.fromEntries(options.archive.map((letter) => [letter.id, JSON.stringify(letter)])),
+      );
     }
     if (options.notifyEnabled !== undefined) {
       await seed.put('arkmail.foo.powiadomienia', JSON.stringify(options.notifyEnabled));

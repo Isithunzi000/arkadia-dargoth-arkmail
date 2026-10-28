@@ -1,6 +1,7 @@
 import {
   IndexedDbStorageDriver,
   MemoryStorageDriver,
+  type LettersByCharacter,
   type StorageDriver,
 } from "./storageDriver";
 
@@ -8,30 +9,53 @@ export { MemoryStorageDriver } from "./storageDriver";
 
 export const STORAGE_WRITE_ERROR = "Nie udalo sie zapisac danych archiwum";
 
+interface LetterValue {
+  id: string;
+}
+
+interface PendingLetter {
+  character: string;
+  id: string;
+  value: string;
+}
+
 /**
  * Odczyt i zmiany sa natychmiast widoczne w RAM. Trwaly zapis wykonuje
- * kolejka w tej samej kolejnosci. Blad jest zgloszony raz i nie zatrzymuje
- * pozniejszych operacji.
+ * kolejka w tej samej kolejnosci. Listy sa zapisywane jako osobne rekordy.
  */
 export class WriteThroughStorage {
   private readonly values: Map<string, string>;
+  private readonly letters = new Map<string, Map<string, string>>();
+  private readonly pendingLetters = new Map<string, PendingLetter>();
   private queue: Promise<void> = Promise.resolve();
   private errorReported = false;
 
   private constructor(
     private readonly driver: StorageDriver,
     initialValues: Record<string, string>,
+    initialLetters: LettersByCharacter,
     private readonly onError: () => void,
   ) {
     this.values = new Map(Object.entries(initialValues));
+    for (const [character, letters] of Object.entries(initialLetters)) {
+      this.letters.set(character, new Map(Object.entries(letters)));
+    }
   }
 
   static async open(driver: StorageDriver, onError: () => void): Promise<WriteThroughStorage> {
-    return new WriteThroughStorage(driver, await driver.loadAll(), onError);
+    const [values, letters] = await Promise.all([
+      driver.loadAll(),
+      driver.loadAllLetters ? driver.loadAllLetters() : Promise.resolve({}),
+    ]);
+    return new WriteThroughStorage(driver, values, letters, onError);
   }
 
   get(key: string): string | null {
     return this.values.get(key) ?? null;
+  }
+
+  getLetters(character: string): Record<string, string> {
+    return Object.fromEntries(this.letters.get(character) ?? []);
   }
 
   set(key: string, value: string): void {
@@ -45,9 +69,32 @@ export class WriteThroughStorage {
     this.enqueue(() => this.driver.putMany(batch));
   }
 
+  setLetters(character: string, letters: readonly LetterValue[]): void {
+    const current = this.letters.get(character) ?? new Map<string, string>();
+    this.letters.set(character, current);
+    let changed = false;
+    for (const letter of letters) {
+      const value = JSON.stringify(letter);
+      if (current.get(letter.id) === value) continue;
+      current.set(letter.id, value);
+      const key = JSON.stringify([character, letter.id]);
+      this.pendingLetters.set(key, { character, id: letter.id, value });
+      changed = true;
+    }
+    if (changed) this.enqueue(() => this.flushPendingLetters());
+  }
+
   delete(key: string): void {
     this.values.delete(key);
     this.enqueue(() => this.driver.delete(key));
+  }
+
+  clearLetters(character: string): void {
+    this.letters.delete(character);
+    for (const [key, letter] of this.pendingLetters) {
+      if (letter.character === character) this.pendingLetters.delete(key);
+    }
+    this.enqueue(() => this.driver.clearLetters(character));
   }
 
   async flush(): Promise<void> {
@@ -57,6 +104,24 @@ export class WriteThroughStorage {
   async close(): Promise<void> {
     await this.flush();
     await this.driver.close();
+  }
+
+  private async flushPendingLetters(): Promise<void> {
+    if (this.pendingLetters.size === 0) return;
+    const pending = [...this.pendingLetters.values()];
+    this.pendingLetters.clear();
+    const byCharacter = new Map<string, Record<string, string>>();
+    for (const letter of pending) {
+      let values = byCharacter.get(letter.character);
+      if (!values) {
+        values = {};
+        byCharacter.set(letter.character, values);
+      }
+      values[letter.id] = letter.value;
+    }
+    for (const [character, values] of byCharacter) {
+      await this.driver.putLetters(character, values);
+    }
   }
 
   private enqueue(operation: () => Promise<void>): void {

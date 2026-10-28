@@ -148,9 +148,6 @@ export const ANIMAL_TIMING = { flightTimeoutMs: 60000, sluchamWindowMs: 2000 };
  */
 let listingCtxSeq = 0;
 let listingCtx: ListingCtx | null = null;
-const ARCHIVE_KEY = "archiwum";
-const ARCHIVE_VERSION_KEY = "wersja-archiwum";
-const ARCHIVE_VERSION = 1;
 const NOTIFY_KEY = "powiadomienia";
 const COMPOSE_KEY = "compose";
 const INDEX_KEY = "indeks";
@@ -256,14 +253,8 @@ export async function init(api: PluginApi) {
   // serwer. Listingi/tresci (spam) gagowane jak dotychczas.
   let composeVisible = false;
   transport.setGagPredicate(() => lock.locked && !composeVisible);
-  let archive = storage.getJSON<ArchiveLetter[]>(ARCHIVE_KEY) ?? [];
-  if (storage.getJSON<number>(ARCHIVE_VERSION_KEY) !== ARCHIVE_VERSION) {
-    archive = normalizeArchive(archive);
-    storage.setJSONBatch({
-      [ARCHIVE_KEY]: archive,
-      [ARCHIVE_VERSION_KEY]: ARCHIVE_VERSION,
-    });
-  }
+  const archive = normalizeArchive(storage.getLetters());
+  storage.setLetters(archive);
   const composePrefs = storage.getJSON<{ template?: LetterTemplate; width?: number }>(COMPOSE_KEY);
   store = new MailUiStore({
     notifyEnabled: storage.getJSON<boolean>(NOTIFY_KEY) ?? true,
@@ -625,7 +616,7 @@ export async function init(api: PluginApi) {
   });
 
   const persistArchive = (): void => {
-    storage.setJSON(ARCHIVE_KEY, ui.state.archive);
+    storage.setLetters(ui.state.archive);
   };
 
   /** Fala 18c: flagi kompletnej indeksacji skrzynek (brama Kontaktow). */
@@ -1632,7 +1623,7 @@ export async function init(api: PluginApi) {
         notify(api, SESSION_BUSY_MSG);
         return;
       }
-      storage.remove(ARCHIVE_KEY);
+      storage.clearLetters();
       ui.clearCacheData();
       notify(api, "Zapisane dane wyczyszczone.");
     },
