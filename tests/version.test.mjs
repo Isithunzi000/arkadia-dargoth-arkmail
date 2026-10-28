@@ -53,11 +53,11 @@ test('wersja: meta.ts == plugin.json == nazwa zipa == zip w srodku == PluginInfo
   const zipVer = zip.match(/^arkmail_(\d+(?:_\d+)*)\.zip$/)[1].replace(/_/g, '.');
   assert.equal(zipVer, ver, 'nazwa najnowszego zipa != meta.ts PLUGIN_VERSION');
 
-  const zippedTs = execSync(`unzip -p "${path.join(RELEASES, zip)}" "arkmail/index.ts"`, { encoding: 'utf8' });
+  const zippedTs = execSync(`unzip -p "${path.join(RELEASES, zip)}" "index.ts"`, { encoding: 'utf8' });
   const mZip = zippedTs.match(/PLUGIN_VERSION = "([^"]+)"/);
   assert.ok(mZip, 'zip: brak PLUGIN_VERSION w index.ts');
   assert.equal(mZip[1], ver, 'zip: PLUGIN_VERSION != meta.ts');
-  const zippedPj = JSON.parse(execSync(`unzip -p "${path.join(RELEASES, zip)}" "arkmail/plugin.json"`, { encoding: 'utf8' }));
+  const zippedPj = JSON.parse(execSync(`unzip -p "${path.join(RELEASES, zip)}" "plugin.json"`, { encoding: 'utf8' }));
   assert.equal(zippedPj.metadata.version, ver, 'zip: plugin.json metadata.version != meta.ts');
 
   const entry = fs.readFileSync(ENTRY, 'utf8');

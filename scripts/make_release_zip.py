@@ -26,19 +26,14 @@ import zipfile
 
 FILES = ["index.ts", "plugin.json"]
 FIXED_DATE = (1980, 1, 1, 0, 0, 0)
-DIR_ATTR = 0o40775 << 16
 FILE_ATTR = 0o100644 << 16
 
 
-def write_entry(zf, arcname, data=None):
+def write_entry(zf, arcname, data):
     zi = zipfile.ZipInfo(arcname, date_time=FIXED_DATE)
-    if data is None:
-        zi.external_attr = DIR_ATTR
-        zf.writestr(zi, b"")
-    else:
-        zi.external_attr = FILE_ATTR
-        zi.compress_type = zipfile.ZIP_STORED
-        zf.writestr(zi, data)
+    zi.external_attr = FILE_ATTR
+    zi.compress_type = zipfile.ZIP_STORED
+    zf.writestr(zi, data)
 
 
 def build(src_root, pkg, out_path):
@@ -47,10 +42,9 @@ def build(src_root, pkg, out_path):
         if not os.path.isfile(os.path.join(pkg_dir, name)):
             raise SystemExit("BLAD: brak " + os.path.join(pkg_dir, name))
     with zipfile.ZipFile(out_path, "w") as zf:
-        write_entry(zf, pkg + "/")
         for name in sorted(FILES):
             with open(os.path.join(pkg_dir, name), "rb") as f:
-                write_entry(zf, pkg + "/" + name, f.read())
+                write_entry(zf, name, f.read())
     h = hashlib.sha256()
     with open(out_path, "rb") as f:
         for chunk in iter(lambda: f.read(65536), b""):

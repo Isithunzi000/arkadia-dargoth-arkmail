@@ -1,5 +1,5 @@
 {
-  "name": "arkmail",
+  "name": "ArkMail",
   "entryPoint": "index.ts",
   "version": "1.14.1",
   "metadata": {

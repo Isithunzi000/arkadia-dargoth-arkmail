@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * Spłaszcza wieloplikowy src/arkmail/ do jednego index.ts (kontrakt zipa
- * release'owego: katalog z index.ts + plugin.json). Import "plugin-api"
+ * Spłaszcza wieloplikowy src/arkmail/ do jednego index.ts (kontrakt ZIP-a:
+ * index.ts i plugin.json w katalogu glownym). Import "plugin-api"
  * jest type-only (import type) - esbuild go wymaze, dist nie zawiera
  * zadnych zaleznosci zewnetrznych.
  *
