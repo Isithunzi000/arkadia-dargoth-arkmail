@@ -59,6 +59,8 @@ import { STORAGE_WRITE_ERROR } from "./adapters/writeThroughStorage";
 import { notify } from "./adapters/notify";
 import { allBoxesIndexed, INDEX_BOXES, MailUiStore, formatBadgeSuffix } from "./ui/store";
 import { mountMailUi, type MailUiHandlers } from "./ui/render";
+import { applyConfirmedDeletions, matchSelectionOnFreshListing } from "./core/bulkDelete";
+import { formatListCount } from "./ui/deletion";
 
 const POPUP_ID = "arkmail";
 const FOOTER_BUTTON_ID = "arkmail";
@@ -234,6 +236,7 @@ export async function init(api: PluginApi) {
     initialHeight: "min(850px, 80vh)",
     createContent,
   });
+  popup.onClose(() => store?.resetDeletion());
 
   const toggle = (): boolean => {
     if (!popup) return true;
@@ -482,6 +485,7 @@ export async function init(api: PluginApi) {
   };
 
   const refreshBoxes = (boxes: MailBox[], mode: "sync" | "replace" = "sync"): void => {
+    if (ui.state.tab === "usuwanie") ui.resetDeletion();
     ui.clearSearchBoxes(boxes);
     const generation = connectionGeneration;
     void runExclusive(() => fetchBoxes(boxes, mode))
@@ -519,6 +523,7 @@ export async function init(api: PluginApi) {
     ui.setLoadAll(null);
     ui.setIndexRun(null);
     ui.setArchiveDownload(null);
+    ui.resetDeletion();
   };
   const onClientConnect = (): void => {
     cancelConnectionOperations();
@@ -1484,7 +1489,143 @@ export async function init(api: PluginApi) {
     );
   };
 
+  const deletionSelectionKey = (numbers: readonly number[]): string =>
+    [...numbers].sort((a, b) => a - b).join(",");
+
+  const searchForDeletion = (box: MailBox, command: string): void => {
+    if (lock.locked) {
+      notify(api, SESSION_BUSY_MSG);
+      return;
+    }
+    if (ui.state.tab !== "usuwanie") return;
+    const revision = ui.state.deletion.revision;
+    const generation = connectionGeneration;
+    ui.setBusy(`Szukam w skrzynce ${box}...`);
+    void runExclusive(async () => {
+      const result = await mailbox.fetch(box, command);
+      if (generation !== connectionGeneration) return;
+      if (
+        revision !== ui.state.deletion.revision ||
+        ui.state.tab !== "usuwanie" ||
+        ui.state.deletion.box !== box
+      ) {
+        bumpCtx(box);
+        return;
+      }
+      if (result.kind === "lista") stampEntries(box, result.entries);
+      else bumpCtx(box);
+      ui.applyDeletionResult(box, command, result);
+    })
+      .catch((err: unknown) => {
+        if (isOperationCancelled(err) || generation !== connectionGeneration) return;
+        if (revision === ui.state.deletion.revision && ui.state.tab === "usuwanie") {
+          ui.clearDeletionResult("Blad wyszukiwania. Sprobuj ponownie.");
+        }
+      })
+      .finally(() => {
+        if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
+      });
+  };
+
+  const deleteSelectedLetters = (): void => {
+    if (lock.locked) {
+      notify(api, SESSION_BUSY_MSG);
+      return;
+    }
+    const current = ui.state.deletion;
+    if (ui.state.tab !== "usuwanie" || current.result?.kind !== "lista" || current.command === null) {
+      return;
+    }
+    const selected = current.result.entries.filter((entry) => current.selected.includes(entry.number));
+    if (selected.length === 0) return;
+    const box = current.box;
+    const command = current.command;
+    const revision = current.revision;
+    const selectionKey = deletionSelectionKey(current.selected);
+    const generation = connectionGeneration;
+    let deleteStarted = false;
+    ui.setBusy("Sprawdzam zaznaczone listy...");
+    void runExclusive(async () => {
+      transport!.beginModal();
+      try {
+        const fresh = await mailbox.fetch(box, command);
+        if (generation !== connectionGeneration) return;
+        if (
+          revision !== ui.state.deletion.revision ||
+          ui.state.tab !== "usuwanie" ||
+          ui.state.deletion.command !== command ||
+          deletionSelectionKey(ui.state.deletion.selected) !== selectionKey
+        ) {
+          bumpCtx(box);
+          return;
+        }
+        if (fresh.kind === "lista") stampEntries(box, fresh.entries);
+        else bumpCtx(box);
+        if (fresh.kind !== "lista") {
+          ui.clearDeletionResult("Zaznaczone listy zmienily sie. Wyszukaj je ponownie.");
+          return;
+        }
+        const match = matchSelectionOnFreshListing(selected, fresh.entries);
+        if (!match) {
+          ui.clearDeletionResult("Zaznaczone listy zmienily sie. Wyszukaj je ponownie.");
+          return;
+        }
+        ui.setBusy("Usuwam zaznaczone listy...");
+        deleteStarted = true;
+        const result = await pager.deleteLetters(match.numbers[0], match.range);
+        const confirmed = [...new Set([...result.deletedNumbers, ...result.unexpectedNumbers])]
+          .sort((a, b) => a - b);
+        const updated = applyConfirmedDeletions(ui.state.archive, box, fresh.entries, confirmed);
+        if (updated.changedIds.size > 0) {
+          ui.setArchive(updated.letters);
+          persistArchive();
+          rebuildContacts();
+          for (const changedBox of updated.changedBoxes) pruneGoneFromView(changedBox);
+        }
+        let message: string;
+        if (result.status === "complete") {
+          message = `Usunieto: ${formatListCount(result.deletedNumbers.length)}.`;
+        } else if (confirmed.length > 0) {
+          message =
+            `Usunieto: ${formatListCount(confirmed.length)}. ` +
+            "Wynik pozostalych jest nieznany. Odswiez przed kolejna proba.";
+          if (result.unexpectedNumbers.length > 0) {
+            message += " Potwierdzono tez usuniecie listow spoza zaznaczenia.";
+          }
+        } else if (result.status === "none") {
+          message = "Nie usunieto listow.";
+        } else {
+          message = "Brak potwierdzenia usuniecia. Odswiez przed kolejna proba.";
+        }
+        if (revision === ui.state.deletion.revision && ui.state.tab === "usuwanie") {
+          ui.clearDeletionResult(message);
+        }
+      } finally {
+        transport!.endModal();
+      }
+    })
+      .catch((err: unknown) => {
+        if (isOperationCancelled(err) || generation !== connectionGeneration) return;
+        if (revision === ui.state.deletion.revision && ui.state.tab === "usuwanie") {
+          ui.clearDeletionResult(
+            deleteStarted
+              ? "Wynik usuwania jest nieznany. Odswiez przed kolejna proba."
+              : "Nie udalo sie sprawdzic listow. Sprobuj ponownie.",
+          );
+        }
+      })
+      .finally(() => {
+        if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
+      });
+  };
+
   handlersRef = {
+    onDeletionSearch: (box, query) => searchForDeletion(box, searchListingCommand(box, query)),
+    onDeletionRefresh: () => {
+      const current = ui.state.deletion;
+      if (current.command !== null) searchForDeletion(current.box, current.command);
+    },
+    onDeletionDelete: () => deleteSelectedLetters(),
     onSendAnimal: () => {
       // Jak przy innych operacjach (Fala 12a): zero cichego kolejkowania.
       if (lock.locked) {
@@ -1816,6 +1957,7 @@ export async function init(api: PluginApi) {
   let lastWatchdogQ = 0;
   transport.subscribe((line) => {
     if (line.cls === "command" || isEchoLine(line.text)) {
+      if (ui.state.tab === "usuwanie") ui.resetDeletion();
       // Komenda gracza wchodzaca w tryb poczty: jego pager jest legalny
       // (a gdyby sierota istniala, zjadlaby te komende i straznik
       // domknie ja przy promptcie - tutaj czyscimy tylko prewencyjnie).

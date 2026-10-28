@@ -11,6 +11,7 @@ import type PluginApi from 'plugin-api';
 import { init, destroy } from '../src/arkmail/index';
 import { IndexedDbStorageDriver } from '../src/arkmail/adapters/storageDriver';
 import type { ArchiveLetter } from '../src/arkmail/core/archive';
+import type { MailBox } from '../src/arkmail/core/protocol/types';
 
 export type TriggerCb = (line: { text: string }, matches: unknown, type: string) => unknown;
 
@@ -19,6 +20,11 @@ export class FakeApi {
   triggerCb: TriggerCb | null = null;
   emitted: { event: string; args: unknown[] }[] = [];
   popupConfig: { createContent: () => Promise<unknown> } | null = null;
+  popupCloseCallback: (() => void) | null = null;
+
+  closePopup(): void {
+    this.popupCloseCallback?.();
+  }
   /** Zarejestrowane nasluchy zdarzen klienta (Fala 13a: gmcp.mail.state). */
   eventListeners = new Map<string, Array<(payload: unknown) => void>>();
   /** Historia update'ow klawisza stopki (Fala 14d: badge '(u/n)'). */
@@ -99,7 +105,9 @@ export class FakeApi {
           element: null,
           open: async () => {},
           close: async () => {},
-          onClose: () => {},
+          onClose: (cb: () => void) => {
+            this.popupCloseCallback = cb;
+          },
           setTitle: () => {},
           setBody: () => {},
           setPinned: () => {},
@@ -143,13 +151,17 @@ export interface Harness {
 let previousIndexedDB: IDBFactory | undefined;
 
 export async function startHarness(
-  options: { archive?: ArchiveLetter[]; notifyEnabled?: boolean } = {},
+  options: {
+    archive?: ArchiveLetter[];
+    notifyEnabled?: boolean;
+    indexMeta?: Partial<Record<MailBox, string>>;
+  } = {},
 ): Promise<Harness> {
   const window = new Window();
   (globalThis as { document?: unknown }).document = window.document;
   previousIndexedDB = globalThis.indexedDB;
   globalThis.indexedDB = new IDBFactory();
-  if (options.archive || options.notifyEnabled !== undefined) {
+  if (options.archive || options.notifyEnabled !== undefined || options.indexMeta) {
     const seed = new IndexedDbStorageDriver(globalThis.indexedDB);
     if (options.archive) {
       await seed.putLetters(
@@ -159,6 +171,9 @@ export async function startHarness(
     }
     if (options.notifyEnabled !== undefined) {
       await seed.put('arkmail.foo.powiadomienia', JSON.stringify(options.notifyEnabled));
+    }
+    if (options.indexMeta) {
+      await seed.put('arkmail.foo.indeks', JSON.stringify(options.indexMeta));
     }
     await seed.close();
   }
