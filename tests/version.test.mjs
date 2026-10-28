@@ -22,8 +22,8 @@ function metaVersion() {
   return m[1];
 }
 
-test('wydanie: przygotowany numer wersji to 1.14.1', () => {
-  assert.equal(metaVersion(), '1.14.1');
+test('wydanie: przygotowany numer wersji to 1.15.0', () => {
+  assert.equal(metaVersion(), '1.15.0');
 });
 
 function latestZip() {
