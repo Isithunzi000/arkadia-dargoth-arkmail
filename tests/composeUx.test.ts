@@ -151,6 +151,7 @@ test('compose gotowy -> flash niewyslanych zapala sie i gasnie po ~3 s', async (
     await waitFor(() => f.sent.includes('napisz list'), 'compose start');
     // Potwierdzenie promptow edytora -> flush tematu/dw/tresci + '**'.
     f.fire('Adresat: Temat: DW: ', 'mail');
+    f.fire('Wpisz ~?, zeby uzyskac pomoc, lub **, by zakonczyc edycje.', 'mail');
     await waitFor(() => f.sent.includes('**'), 'tresc wyslana');
     // Wynik: list odlozony w niewyslanych.
     f.fire('List jest gotowy do wyslania.', 'mail');
@@ -229,6 +230,7 @@ test('compose: po zapisie w niewyslanych toast "zapisany" i pola czyszczone', as
     hClick(h, '.arkmail-send');
     await waitFor(() => f.sent.includes('napisz list'), 'compose start');
     f.fire('Adresat: Temat: DW: ', 'mail');
+    f.fire('Wpisz ~?, zeby uzyskac pomoc, lub **, by zakonczyc edycje.', 'mail');
     await waitFor(() => f.sent.includes('**'), 'tresc wyslana');
     f.fire('List jest gotowy do wyslania.', 'mail');
     await waitFor(() => f.sent.includes('listy niewyslane'), 'refresh niewyslanych');

@@ -3,12 +3,14 @@
  * Etapy: adresat -> temat -> dw -> tresc + "**". Kolejny etap wysylamy
  * dopiero po potwierdzeniu poprzedniego echem promptu (pipelining serwera
  * skleja echo: "Adresat: Temat: DW: " potwierdza wszystkie naraz).
+ * Tresc i "**" wysylamy dopiero po komunikacie gotowosci edytora.
  * Blad adresata na starcie przerywa compose - tresc NIE wycieka do gry.
  * Fala 28h: wszystkie wysylki composera z echem - gracz widzi w oknie
  * gry dokladnie to, co przy recznym pisaniu listu.
  */
 
 import {
+  isEditorReady,
   parseComposeEcho,
   parseComposeResult,
   parseEditorEcho,
@@ -42,6 +44,7 @@ export class EditorSession {
     return new Promise((resolve, reject) => {
       let stage: Stage = 'adresat';
       let done = false;
+      let editorReady = false;
       const dw = input.dw ?? '';
       let cancelUnsub: () => void = () => {};
 
@@ -77,11 +80,13 @@ export class EditorSession {
           }
           stage = order[idx + 1] ?? 'tresc';
         }
-        if (stage === 'tresc') {
-          for (const linia of input.linie) this.transport.send(linia, true);
-          this.transport.send('**', true);
-          stage = 'tresc-wyslana'; // tresc wysylamy dokladnie raz
-        }
+      };
+
+      const sendBody = (): void => {
+        if (stage !== 'tresc' || !editorReady) return;
+        for (const linia of input.linie) this.transport.send(linia, true);
+        this.transport.send('**', true);
+        stage = 'tresc-wyslana';
       };
 
       const unsub = this.transport.subscribe((line: ProtoLine) => {
@@ -110,11 +115,14 @@ export class EditorSession {
 
         if (stage === 'tresc-wyslana') return;
 
+        if (isEditorReady(line.text)) editorReady = true;
+
         // Echo promptow compose (moze byc sklejone).
         const prompts = parseComposeEcho(line.text);
         if (prompts) {
           flush(prompts as Stage[]);
         }
+        sendBody();
       });
 
       cancelUnsub = this.opts.onCancel?.(() => {

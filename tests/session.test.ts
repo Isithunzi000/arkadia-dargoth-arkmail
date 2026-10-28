@@ -209,6 +209,23 @@ test('editor: compose pipelined - wyslany w urzedzie', async () => {
   assert.ok(t.sent.length === 4 + linie.length + 1);
 });
 
+test('editor: tresc czeka na gotowosc edytora i jest wyslana raz', async () => {
+  const t = new MockTransport();
+  const s = new EditorSession(t, OPTS);
+  const linie = ['| --- |', '| tresc listu |', '| --- |'];
+  const op = s.send({ adresat: 'Foo', temat: 'Test', linie });
+  await t.replay([{ cls: 'mail', text: 'Adresat: Temat: DW: ' }]);
+  const przedGotowoscia = [...t.sent];
+  await t.replay([
+    { cls: 'editor.mail', text: 'Wpisz ~?, zeby uzyskac pomoc, lub **, by zakonczyc edycje.' },
+    { cls: 'editor.mail', text: ' 1] 2] 3] 4]List jest gotowy do wyslania.' },
+  ]);
+  const res = await op;
+  assert.equal(res.result, 'gotowy');
+  assert.deepEqual(przedGotowoscia, ['napisz list', 'Foo', 'Test', '']);
+  assert.deepEqual(t.sent, ['napisz list', 'Foo', 'Test', '', ...linie, '**']);
+});
+
 test('editor: compose poza urzedem - gotowy do wyslania (kolejka)', async () => {
   const t = new MockTransport();
   const s = new EditorSession(t, OPTS);

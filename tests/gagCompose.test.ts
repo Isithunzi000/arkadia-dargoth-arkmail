@@ -38,6 +38,7 @@ test('gag: compose widoczny w oknie gry (prompty i wynik nie gagowane)', async (
 
     // Dialog composera: NIE gagowany (gracz widzi, co sie dzieje).
     f.fire('Adresat: Temat: DW: ', 'mail');
+    f.fire('Wpisz ~?, zeby uzyskac pomoc, lub **, by zakonczyc edycje.', 'mail');
     await waitRt(() => f.sent.includes('**'), 'tresc poszla');
     f.fire('List jest gotowy do wyslania.', 'mail');
     f.fire('> ', 'prompt');
@@ -92,6 +93,7 @@ test('echo: wysylki composera i "wyslij zwierze" ida z echem, listingi bez', asy
     assert.equal(echoOf('napisz list'), true, 'napisz list z echem');
     assert.equal(echoOf('Corge'), true, 'adresat z echem');
     f.fire('Adresat: Temat: DW: ', 'mail');
+    f.fire('Wpisz ~?, zeby uzyskac pomoc, lub **, by zakonczyc edycje.', 'mail');
     await waitRt(() => f.sent.includes('**'), 'tresc poszla');
     assert.equal(echoOf('Perly'), true, 'temat z echem');
     assert.equal(echoOf('**'), true, '** z echem');

@@ -252,8 +252,14 @@ export function parseComposeEcho(text: string): ComposePrompt[] | null {
   return out.length ? out : null;
 }
 
+const EDITOR_READY_RE = /Wpisz ~\?, zeby uzyskac pomoc, lub \*\*, by zakonczyc edycje\./;
 const EDITOR_ECHO_RE = /^(\s*\d+\])+/;
 const RESULT_WYSLANY = 'List zostal pomyslnie wyslany.';
+
+/** Serwer otworzyl edytor i przyjmuje linie tresci listu. */
+export function isEditorReady(text: string): boolean {
+  return EDITOR_READY_RE.test(text);
+}
 const RESULT_GOTOWY = 'List jest gotowy do wyslania.';
 
 /** Echo numeracji linii edytora; moze konczyc sie komunikatem wyniku. */
