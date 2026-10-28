@@ -36,10 +36,47 @@ export interface ReadResult {
   pager: PagerPrompt;
 }
 
+export type DeleteStatus = 'complete' | 'partial' | 'none' | 'unknown';
+
 export interface DeleteResult {
+  status: DeleteStatus;
   deleted: boolean;
+  /** Fizyczne potwierdzenia "Kasuje: N." z zakresu zadania. */
   deletedNumbers: number[];
+  /** Numery z odpowiedzi "Zaznaczono do skasowania". */
+  selectedNumbers: number[];
+  /** Fizyczne potwierdzenia spoza zakresu zadania. */
+  unexpectedNumbers: number[];
 }
+
+const numbersInRange = (range: string): number[] => {
+  const out = new Set<number>();
+  for (const part of range.split(',')) {
+    const m = part.trim().match(/^(\d+)(?:-(\d+))?$/);
+    if (!m) continue;
+    const from = Number(m[1]);
+    const to = m[2] === undefined ? from : Number(m[2]);
+    const step = from <= to ? 1 : -1;
+    for (let n = from; step > 0 ? n <= to : n >= to; n += step) out.add(n);
+  }
+  return [...out].sort((a, b) => a - b);
+};
+
+const rangeOf = (numbers: readonly number[]): string => {
+  const sorted = [...new Set(numbers)].sort((a, b) => a - b);
+  const parts: string[] = [];
+  for (let i = 0; i < sorted.length; ) {
+    const from = sorted[i]!;
+    let to = from;
+    while (i + 1 < sorted.length && sorted[i + 1] === to + 1) to = sorted[++i]!;
+    parts.push(from === to ? String(from) : `${from}-${to}`);
+    i++;
+  }
+  return parts.join(',');
+};
+
+const sameNumbers = (a: readonly number[], b: readonly number[]): boolean =>
+  a.length === b.length && a.every((n, i) => n === b[i]);
 
 export interface ForwardResult {
   /** true = list w kolejce niewyslanych ("List jest gotowy do wyslania."). */
@@ -74,23 +111,75 @@ export class PagerSession {
     return this.run(numer, () => null, (letter, pager) => ({ letter, pager }), shouldAbort);
   }
 
-  deleteLetters(numer: number, zakres: string): Promise<DeleteResult> {
-    let deletedNumbers: number[] = [];
+  deleteLetters(numer: number, zakres: string, shouldAbort?: () => boolean): Promise<DeleteResult> {
+    const requested = numbersInRange(zakres);
+    let selectedNumbers: number[] = [];
+    let confirmed: number[] = [];
+    let deleteSent = false;
+    let selectionAccepted = false;
+    let uncertain = false;
+    const build = (): DeleteResult => {
+      const deletedNumbers = [...new Set(confirmed)]
+        .filter((n) => requested.includes(n))
+        .sort((a, b) => a - b);
+      const unexpectedNumbers = [...new Set(confirmed)]
+        .filter((n) => !requested.includes(n))
+        .sort((a, b) => a - b);
+      const complete = requested.length > 0 && unexpectedNumbers.length === 0 &&
+        requested.every((n) => deletedNumbers.includes(n));
+      const status: DeleteStatus = complete
+        ? 'complete'
+        : deletedNumbers.length > 0
+          ? 'partial'
+          : uncertain || selectionAccepted
+            ? 'unknown'
+            : 'none';
+      return { status, deleted: deletedNumbers.length > 0, deletedNumbers, selectedNumbers, unexpectedNumbers };
+    };
     return this.run(
       numer,
-      (ctx) => ({
-        onPager: () => ctx.send(`d ${zakres}`),
-        onLine: (line: ProtoLine) => {
-          const m = line.text.match(/^Zaznaczono do skasowania: ([\d, ]+)\.$/);
-          if (m) {
-            deletedNumbers = m[1].split(',').map((s) => Number(s.trim())).filter((n) => !Number.isNaN(n));
-          }
-          // Po potwierdzeniu zaznaczenia wracamy do pagera i zamykamy.
-          return m ? 'close' : undefined;
-        },
-      }),
-      () => ({ deleted: deletedNumbers.length > 0, deletedNumbers }),
-    );
+      (ctx) => {
+        const withdraw = (): void => {
+          if (deleteSent && !selectionAccepted) ctx.send(`u ${rangeOf([...requested, ...selectedNumbers])}`);
+        };
+        return {
+          onPager: () => {
+            deleteSent = true;
+            ctx.send(`d ${zakres}`);
+          },
+          onLine: (line: ProtoLine) => {
+            const m = line.text.match(/^Zaznaczono do skasowania: ([\d, ]+)\.$/);
+            if (m) {
+              selectedNumbers = numbersInRange(m[1].replace(/ /g, ''));
+              if (!sameNumbers(selectedNumbers, requested)) {
+                withdraw();
+                return 'close';
+              }
+              selectionAccepted = true;
+              return 'close';
+            }
+            return parseMailError(line.text) ? 'close' : undefined;
+          },
+          onClosingLine: (line: ProtoLine) => {
+            const m = line.text.match(/^Kasuje: (\d+)\.$/);
+            if (m) confirmed.push(Number(m[1]));
+          },
+          onAbort: withdraw,
+          onTimeout: withdraw,
+          onCancel: () => {
+            if (!deleteSent) return;
+            withdraw();
+            ctx.send('q');
+          },
+        };
+      },
+      build,
+      shouldAbort,
+    ).catch((error: unknown) => {
+      if (!deleteSent) throw error;
+      uncertain = true;
+      return build();
+    });
   }
 
   forwardLetter(numer: number, adresat: string): Promise<ForwardResult> {
@@ -139,6 +228,10 @@ export class PagerSession {
     makeActions: (ctx: { send: (l: string) => void }) => {
       onPager?: () => void;
       onLine?: (line: ProtoLine) => 'close' | undefined;
+      onClosingLine?: (line: ProtoLine) => void;
+      onAbort?: () => void;
+      onTimeout?: () => void;
+      onCancel?: () => void;
     } | null,
     build: (letter: LetterContent, pager: PagerPrompt) => T,
     shouldAbort?: () => boolean,
@@ -201,6 +294,7 @@ export class PagerSession {
       const checkAbort = (): void => {
         if (done || aborted || !shouldAbort || !shouldAbort()) return;
         aborted = true;
+        actions?.onAbort?.();
         if (state === 'pager' || pagerFired || idleOpened || headersDone) {
           if (state !== 'closing') enterClosing();
           return;
@@ -256,6 +350,7 @@ export class PagerSession {
        * Prompt gry w grace = serwer jednak odpowiedzial -> finish().
        */
       const timer = setTimeout(() => {
+        actions?.onTimeout?.();
         // Fala 24g: timeout z pagerem (byc moze) otwartym na serwerze -
         // "q" wyslane, ale bez potwierdzenia. Straznik dostaje
         // podejrzenie: przy najblizszym promptcie pagera poza sesja
@@ -302,6 +397,7 @@ export class PagerSession {
             finish();
             return;
           }
+          actions?.onClosingLine?.(line);
           armIdle();
           return;
         }
@@ -424,6 +520,7 @@ export class PagerSession {
       });
 
       cancelUnsub = this.opts.onCancel?.(() => {
+        actions?.onCancel?.();
         cleanup();
         reject(new Error('operacja anulowana'));
       }) ?? (() => {});

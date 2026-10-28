@@ -192,6 +192,8 @@ test('harness: Usun wymaga dwukliku; toast "List zostal usuniety."', async () =>
     f.fire('Zaznaczono do skasowania: 2.', 'mail');
     // Po potwierdzeniu serwer WRACA do promptu pagera - dopiero wtedy q.
     f.fire('[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 2) -- ', 'mail');
+    f.fire('Kasuje listy...', 'mail');
+    f.fire('Kasuje: 2.', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(() => notifyText(f, 'List zostal usuniety.'), 'toast po kasowaniu');
   } finally {

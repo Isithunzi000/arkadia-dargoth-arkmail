@@ -208,6 +208,8 @@ test('re-kotwiczenie: kasowanie po zmianie kontekstu uzywa swiezego numeru', asy
     f.fire('Zaznaczono do skasowania: 4.', 'mail');
     // Po potwierdzeniu serwer WRACA do promptu pagera - dopiero wtedy q.
     f.fire('[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 4) -- ', 'mail');
+    f.fire('Kasuje listy...', 'mail');
+    f.fire('Kasuje: 4.', 'mail');
     f.fire('> ', 'prompt');
     // Fala 14e: pager (d N -> q) kasuje list FAKTYCZNIE przy wyjsciu -
     // toast mowi o skutku, nie o zaznaczeniu.
