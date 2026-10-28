@@ -1713,9 +1713,22 @@ export async function init(api: PluginApi) {
         notify(api, SESSION_BUSY_MSG);
         return;
       }
-      storage.clearLetters();
-      ui.clearCacheData();
-      notify(api, "Zapisane dane wyczyszczone.");
+      const generation = connectionGeneration;
+      ui.setBusy("Czyszcze zapisane dane...");
+      void runExclusive(async () => {
+        await storage.clearMailData([INDEX_KEY, ARCHIVE_GAPS_KEY]);
+        if (generation !== connectionGeneration) return;
+        ui.clearCacheData();
+        notify(api, "Zapisane dane wyczyszczone.");
+      })
+        .catch((err: unknown) => {
+          if (!isOperationCancelled(err)) {
+            notify(api, "Nie udalo sie wyczyscic zapisanych danych.");
+          }
+        })
+        .finally(() => {
+          if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
+        });
     },
     onDeleteLetter: (box, entry) => {
       // Fala 12a: zero cichego kolejkowania sesji modalnych.

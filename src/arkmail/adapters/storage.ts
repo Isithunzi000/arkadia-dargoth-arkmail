@@ -52,6 +52,10 @@ export class CharStorage {
     this.storage.clearLetters(this.char);
   }
 
+  async clearMailData(keys: readonly string[]): Promise<void> {
+    await this.storage.clearMailData(this.char, keys.map((key) => this.scoped(key)));
+  }
+
   getJSON<T>(key: string): T | null {
     const raw = this.storage.get(this.scoped(key));
     if (raw === null) return null;

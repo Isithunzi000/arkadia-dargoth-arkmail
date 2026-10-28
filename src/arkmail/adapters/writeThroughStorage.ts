@@ -97,6 +97,23 @@ export class WriteThroughStorage {
     this.enqueue(() => this.driver.clearLetters(character));
   }
 
+  async clearMailData(character: string, keys: readonly string[]): Promise<void> {
+    const operation = this.queue.then(async () => {
+      await this.driver.clearMailData(character, keys);
+      this.letters.delete(character);
+      for (const [key, letter] of this.pendingLetters) {
+        if (letter.character === character) this.pendingLetters.delete(key);
+      }
+      for (const key of keys) this.values.delete(key);
+    });
+    this.queue = operation.catch(() => {
+      if (this.errorReported) return;
+      this.errorReported = true;
+      this.onError();
+    });
+    await operation;
+  }
+
   async flush(): Promise<void> {
     await this.queue;
   }

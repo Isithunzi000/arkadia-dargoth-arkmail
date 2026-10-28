@@ -9,6 +9,7 @@ export interface StorageDriver {
   putLetters(character: string, values: Readonly<Record<string, string>>): Promise<void>;
   delete(key: string): Promise<void>;
   clearLetters(character: string): Promise<void>;
+  clearMailData(character: string, keys: readonly string[]): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -46,7 +47,12 @@ export class MemoryStorageDriver implements StorageDriver {
   }
 
   async clearLetters(character: string): Promise<void> {
+    await this.clearMailData(character, []);
+  }
+
+  async clearMailData(character: string, keys: readonly string[]): Promise<void> {
     this.letters.delete(character);
+    for (const key of keys) this.values.delete(key);
   }
 
   async close(): Promise<void> {}
@@ -157,19 +163,33 @@ export class IndexedDbStorageDriver implements StorageDriver {
   }
 
   async clearLetters(character: string): Promise<void> {
+    await this.clearMailData(character, []);
+  }
+
+  async clearMailData(character: string, keys: readonly string[]): Promise<void> {
     const database = await this.openDatabase();
     await new Promise<void>((resolve, reject) => {
-      const transaction = database.transaction(LETTERS_STORE, "readwrite");
-      const request = transaction.objectStore(LETTERS_STORE).index("character").openCursor();
+      const transaction = database.transaction([LETTERS_STORE, STATE_STORE], "readwrite");
+      const request = transaction
+        .objectStore(LETTERS_STORE)
+        .index("character")
+        .openCursor(character);
       request.onsuccess = () => {
         const cursor = request.result;
         if (!cursor) return;
-        if ((cursor.value as StoredLetter).character === character) cursor.delete();
+        cursor.delete();
         cursor.continue();
       };
+      try {
+        const state = transaction.objectStore(STATE_STORE);
+        for (const key of keys) state.delete(key);
+      } catch (error) {
+        transaction.abort();
+        reject(error);
+      }
       transaction.oncomplete = () => resolve();
-      transaction.onerror = () => reject(transaction.error ?? new Error("Blad usuwania listow."));
-      transaction.onabort = () => reject(transaction.error ?? new Error("Usuwanie listow przerwane."));
+      transaction.onerror = () => reject(transaction.error ?? new Error("Blad usuwania danych."));
+      transaction.onabort = () => reject(transaction.error ?? new Error("Usuwanie danych przerwane."));
     });
   }
 
