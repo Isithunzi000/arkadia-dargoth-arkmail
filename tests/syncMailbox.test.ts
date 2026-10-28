@@ -13,8 +13,8 @@
  *  - nowe listy doklejane sa NA KONCU tablicy wpisow (koniec najnowszy;
  *    UI renderuje odwrotnie, wiec ląduja na gorze ekranu) - naprawia tez
  *    stary blad trybu "merge" z Fali 9b, ktory doklejal je na zly koniec;
- *  - znacznik uciecia zdejmowany dopiero, gdy mamy komplet
- *    (truncated = stary && nowy);
+ *  - znacznik uciecia odpowiada najswiezszemu listingowi: komplet go
+ *    zdejmuje, a pozniejszy limit ustawia go ponownie;
  *  - usuwanie wpisow TYLKO gdy swiezy listing jest kompletny (bez
  *    uciecia) - wtedy serwer raportuje pelna prawde (np. lista
  *    przeczytana znika z 'nieprzeczytane'); przy ucietych listingach
@@ -163,6 +163,20 @@ test('sync: znacznik uciecia zdejmowany dopiero, gdy listing kompletny', () => {
   assert.equal(s.state.boxes.odebrane!.truncated, true, 'true && true = true');
   sync(s, 'odebrane', [e1], false);
   assert.equal(s.state.boxes.odebrane!.truncated, false, 'true && false = false (komplet)');
+});
+
+test('sync: kompletny listing moze ponownie stac sie uciety', () => {
+  const s = new MailUiStore();
+  const e1 = entry('najstarszy', { raw: 'N, 21 XII 2025, 01:15:04' });
+  s.applyMailbox('odebrane', {
+    kind: 'lista',
+    header: { box: 'odebrane', truncated: false },
+    entries: [e1],
+  });
+  sync(s, 'odebrane', [e1], true);
+  assert.equal(s.state.boxes.odebrane!.truncated, true, 'nowy limit wraca po komplecie');
+  sync(s, 'odebrane', [e1], false);
+  assert.equal(s.state.boxes.odebrane!.truncated, false, 'komplet ponownie zdejmuje limit');
 });
 
 /** Dokleja starsza strone (jak w boxMemory.test) - 5 wierszy razem. */

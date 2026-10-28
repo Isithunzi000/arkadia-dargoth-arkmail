@@ -19,6 +19,7 @@ import assert from 'node:assert/strict';
 
 import { olderListingCommand, nextDay } from '../src/arkmail/core/protocol/commands';
 import { parseMailDate } from '../src/arkmail/core/protocol/parser';
+import { letterId, type ArchiveLetter } from '../src/arkmail/core/archive';
 import { INDEX_ANCHOR_RETRY_WAITS_MS, LOAD_ALL_PACE_MS } from '../src/arkmail/index';
 import {
   startHarness,
@@ -28,7 +29,6 @@ import {
   waitRt,
   notifyText,
   textOf,
-  driveIndexAll,
 } from './harness';
 
 test('paginacja: miesiac rzymski WIELKA litera (wymog serwera)', () => {
@@ -416,28 +416,23 @@ test('wczytaj wszystkie: przechodzi poza 40 stron i konczy dopiero na pelnej odp
 });
 
 test('wczytaj wszystkie: komunikat liczy wpisy dodane do widoku, nie tylko nowe rekordy', async () => {
-  const h = await startHarness();
+  const dateRaw = 'So, 20 XII 2025, 08:00:00';
+  const existing: ArchiveLetter = {
+    id: letterId('odebrane', 'Foo', 'juz w archiwum', false, dateRaw),
+    box: 'odebrane',
+    number: 1,
+    party: 'Foo',
+    subject: 'juz w archiwum',
+    forwarded: false,
+    dateRaw,
+    sortKey: '2025-12-20 08:00:00',
+    read: true,
+    body: [],
+  };
+  const h = await startHarness({ archive: [existing] });
   const { f } = h;
   try {
     await loadTruncatedBox(h);
-    click(h, '[data-tab="archiwum"]');
-    await waitRt(() => !!h.content.querySelector('.arkmail-index-all'), 'przycisk indeksacji');
-    click(h, '.arkmail-index-all');
-    await driveIndexAll(h, {
-      odebrane: [
-        'Listy odebrane:',
-        ' 4. *R* Temat: juz w archiwum',
-        'Nadawca: Foo                        So, 20 XII 2025, 08:00:00',
-        ' 3. *R* Temat: najstarszy',
-        'Nadawca: Foo                        N, 21 XII 2025, 01:15:04',
-        ' 2. *R* Temat: srodkowy',
-        'Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05',
-        ' 1. *R* Temat: najnowszy',
-        'Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12',
-      ],
-    });
-    await waitRt(() => notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'koniec indeksacji');
-    click(h, '[data-tab="listy"]');
     click(h, '.arkmail-older-all');
     await waitRt(
       () => f.sent.some((c) => c.startsWith('listy odebrane przed')),
@@ -445,7 +440,7 @@ test('wczytaj wszystkie: komunikat liczy wpisy dodane do widoku, nie tylko nowe 
     );
     f.fire('Wybrane listy odebrane:', 'mail');
     f.fire(' 1. *R* Temat: juz w archiwum', 'mail');
-    f.fire('Nadawca: Foo                        So, 20 XII 2025, 08:00:00', 'mail');
+    f.fire(`Nadawca: Foo                        ${dateRaw}`, 'mail');
     f.fire('> ', 'prompt');
     await waitRt(
       () => notifyText(f, 'Wczytano wszystkie (dodanych do listy: 1)'),

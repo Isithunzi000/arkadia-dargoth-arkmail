@@ -218,8 +218,8 @@ export class MailUiStore {
    *   appendMailboxPage) aktualizowane sa W MIEJSCU (np. znacznik *R*);
    * - nowe listy doklejane sa NA KONCU tablicy (koniec najnowszy; UI
    *   renderuje odwrotnie, wiec laduja na gorze ekranu);
-   * - znacznik uciecia: truncated = stary && nowy (zdjety dopiero, gdy
-   *   mamy komplet);
+   * - znacznik uciecia odpowiada najswiezszemu listingowi: komplet go
+   *   zdejmuje, a pozniejszy limit ustawia go ponownie;
    * - usuwanie wpisow TYLKO gdy swiezy listing jest kompletny (bez
    *   uciecia): wtedy serwer raportuje pelna prawde (np. przeczytany
    *   list znika z 'nieprzeczytane'). Przy ucietych listingach brak
@@ -284,7 +284,7 @@ export class MailUiStore {
     }
     const nextView: BoxView = {
       entries: next,
-      truncated: view.truncated && truncated,
+      truncated,
       empty: null,
     };
     const boxes = { ...this.current.boxes, [box]: nextView };

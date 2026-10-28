@@ -45,7 +45,7 @@ import {
   upsertLetters,
   type ArchiveLetter,
 } from "./core/archive";
-import { MailboxSession, type ListingCtx, type MailboxEntry } from "./core/session/mailbox";
+import { MailboxSession, type ListingCtx, type MailboxEntry, type MailboxResult } from "./core/session/mailbox";
 import { humanizeMailError, isOperationCancelled } from "./core/errors";
 import { archiveExportEntries, letterTxt, txtFileName } from "./core/exportTxt";
 import { buildZip } from "./core/zipStore";
@@ -959,19 +959,61 @@ export async function init(api: PluginApi) {
             ui.setBusy(`Indeksuje skrzynke ${box} (${i + 1}/${INDEX_BOXES.length})...`);
             const seen = new Set<string>();
             const sweepMode = indexSweepMode(ui.state.indexMeta, box, Date.now());
+            const mergeIndexPage = (res: Extract<MailboxResult, { kind: "lista" }>) => {
+              const entries = res.entries.map((entry) => fromMailboxEntry(box, entry));
+              for (const entry of entries) seen.add(entry.id);
+              const merged = upsertLetters(ui.state.archive, entries);
+              ui.setArchive(merged.letters);
+              persistArchive();
+              return merged;
+            };
+            const applyFirstIndexPage = (res: Extract<MailboxResult, { kind: "lista" }>): void => {
+              stampEntries(box, res.entries);
+              const oldest = oldestEntry(res.entries);
+              const boundaryDay = oldest?.date
+                ? `${oldest.date.year}-${String(oldest.date.month).padStart(2, "0")}-${String(oldest.date.day).padStart(2, "0")}`
+                : undefined;
+              const synced = ui.syncMailboxPage(
+                box,
+                res.entries,
+                res.header.truncated,
+                boundaryDay,
+              );
+              if (!synced) ui.applyMailbox(box, res);
+            };
             const scan = await scanMailboxPages({
               box,
               cancelled: () => flag.cancelled || generation !== connectionGeneration,
               fetchPage: (command) => mailbox.fetch(box, command),
               wait: (ms) => sleepOrCancel(ms, flag),
               onGap: (day) => recordArchiveGap(box, day),
+              onBaseRefresh: (res) => {
+                if (res.kind === "lista") {
+                  applyFirstIndexPage(res);
+                  mergeIndexPage(res);
+                } else {
+                  bumpCtx(box);
+                  ui.applyMailbox(box, res);
+                }
+                rebuildContacts();
+              },
+              onEmpty: (res) => {
+                bumpCtx(box);
+                if (seen.size === 0) {
+                  ui.applyMailbox(box, res);
+                  rebuildContacts();
+                }
+              },
               onPage: (res, pages) => {
                 ui.setIndexRun({ boxIndex: i, box, pages });
-                const entries = res.entries.map((entry) => fromMailboxEntry(box, entry));
-                for (const entry of entries) seen.add(entry.id);
-                const merged = upsertLetters(ui.state.archive, entries);
-                ui.setArchive(merged.letters);
-                persistArchive();
+                if (pages === 1) {
+                  applyFirstIndexPage(res);
+                } else {
+                  stampEntries(box, res.entries);
+                  ui.appendMailboxPage(box, res.entries, res.header.truncated);
+                }
+                const merged = mergeIndexPage(res);
+                rebuildContacts();
                 return {
                   archiveAdded: merged.added,
                   stop: sweepMode === "incremental" && merged.added === 0,
@@ -979,6 +1021,9 @@ export async function init(api: PluginApi) {
               },
             });
             if ((scan.end === "complete" || scan.end === "clamped") && !flag.cancelled) {
+              if (scan.end === "complete" && seen.size > 0) {
+                ui.appendMailboxPage(box, [], false);
+              }
               if (scan.end === "clamped") {
                 markGoneFromServerNewerThan(box, seen, scan.oldestSeenDay ?? "");
               } else {
