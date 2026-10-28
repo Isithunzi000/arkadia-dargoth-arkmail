@@ -48,6 +48,15 @@ test('naglowek listing: wszystkie 4 skrzynki, z suffiksem i bez', () => {
   assert.equal(parseListingHeader('Listy odebranee:'), null);
 });
 
+test('naglowek listing: mniej niz 50 wynikow nie jest ucietych', () => {
+  for (const count of [1, 4, 49]) {
+    assert.deepEqual(
+      parseListingHeader(`Wybrane listy wyslane (prezentowane jest pierwsze ${count}):`),
+      { box: 'wyslane', truncated: false },
+    );
+  }
+});
+
 test('wpis listing: numer, *R*, temat, nadawca/odbiorcy z data', () => {
   const e1 = parseListingEntry(' 3. *R* Temat: Elementy rozbitego szkielka');
   assert.deepEqual(e1, { number: 3, isRead: true, subject: 'Elementy rozbitego szkielka', forwarded: false });

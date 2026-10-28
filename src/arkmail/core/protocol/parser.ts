@@ -61,13 +61,16 @@ export function parseMailDate(raw: string): MailDate | null {
 // dowod: log 2026-10-18. Suffix "(prezentowane jest ...)" deklinuje sie
 // z liczba (komentarz w poczta.ts klienta), stad luzne "pierwsz".
 const LISTING_HEADER_RE = /^(?:Wybrane )?[Ll]isty (nieprzeczytane|odebrane|wyslane|niewyslane)(?: \(([^)]*)\))?:$/;
+const LISTING_LIMIT_RE = /\bpierwsz\w*\s+(\d+)\b/;
+const SERVER_LISTING_LIMIT = 50;
 
 export function parseListingHeader(text: string): ListingHeader | null {
   const m = text.match(LISTING_HEADER_RE);
   if (!m) return null;
+  const limit = m[2]?.match(LISTING_LIMIT_RE);
   return {
     box: m[1] as MailBox,
-    truncated: m[2] !== undefined && m[2].includes('pierwsz'),
+    truncated: limit != null && Number(limit[1]) >= SERVER_LISTING_LIMIT,
   };
 }
 
