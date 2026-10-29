@@ -626,15 +626,9 @@ export function mountMailUi(
     }
     pane.appendChild(boxes);
 
-    // Fala 11e: zbiorcze operacje na AKTYWNEJ skrzynce (zamiast
-    // per-skrzynka): Odswiez + Wczytaj wszystkie/Przerwij.
+    // Operacje na aktywnej skrzynce.
     const ops = doc.createElement('div');
     ops.className = 'arkmail-box-ops';
-    const refreshAll = doc.createElement('button');
-    refreshAll.className = 'arkmail-refresh-global';
-    refreshAll.textContent = 'Odswiez';
-    refreshAll.addEventListener('click', () => handlers.onRefreshBox(state.activeBox));
-    ops.appendChild(refreshAll);
     // Fala 13b: wyslanie zwierzecia pocztowego (send/receive w jednym) -
     // komenda "wyslij zwierze". Nieaktywny w trakcie lotu (roundtrip
     // 20-50 s wg logow); koniec lotu: linia ladowania albo timeout.
@@ -710,8 +704,8 @@ export function mountMailUi(
     pane.appendChild(notifyRow);
 
     // Pasek szukania serwerowego (komenda "listy" z filtrami, skladnia
-    // ?listy). Pola niekontrolowane (bez rerendera przy pisaniu);
-    // puste zapytanie nie strzela.
+    // ?listy). Pola niekontrolowane (bez rerendera przy pisaniu).
+    // Puste pola odswiezaja aktywna skrzynke.
     const searchRow = doc.createElement('div');
     searchRow.className = 'arkmail-search-row';
     const mkSearch = (key: string, placeholder: string, type = 'text') => {
@@ -780,7 +774,10 @@ export function mountMailUi(
         ...(temat !== '' ? { temat } : {}),
         ...(tresc !== '' ? { tresc } : {}),
       };
-      if (Object.keys(query).length === 0) return;
+      if (Object.keys(query).length === 0) {
+        handlers.onRefreshBox(state.activeBox);
+        return;
+      }
       handlers.onSearch(state.activeBox, query);
     };
     go.addEventListener('click', fireSearch);

@@ -25,7 +25,7 @@ import {
   notifyText,
 } from './harness';
 
-test('Odswiez / Szukaj podczas petli = odmowa, zero komend', async () => {
+test('puste i wypelnione Szukaj podczas petli = odmowa, zero komend', async () => {
   const h = await startHarness();
   const { f } = h;
   try {
@@ -36,12 +36,12 @@ test('Odswiez / Szukaj podczas petli = odmowa, zero komend', async () => {
     await waitRt(() => f.sent.includes('listy odebrane przed 22 XII 2025'), 'kotwica petli');
     const sentBefore = f.sent.length;
 
-    // Odswiez: odmowa z toastem, bez kolejkowania komendy.
-    click(h, '.arkmail-refresh-global');
-    assert.ok(notifyText(f, 'Poczekaj, az skoncze biezaca operacje'), 'toast odmowy: Odswiez');
-    assert.equal(f.sent.length, sentBefore, 'Odswiez nie wysyla komendy przy blokadzie');
+    // Puste Szukaj odswieza skrzynke, wiec korzysta z tej samej blokady.
+    click(h, '.arkmail-search-go');
+    assert.ok(notifyText(f, 'Poczekaj, az skoncze biezaca operacje'), 'toast odmowy: puste Szukaj');
+    assert.equal(f.sent.length, sentBefore, 'puste Szukaj nie wysyla komendy przy blokadzie');
 
-    // Szukaj (z niepustym zapytaniem): jw.
+    // Szukaj z niepustym zapytaniem: jw.
     const osoba = h.content.querySelector('.arkmail-search-row input') as { value: string };
     osoba.value = 'Bar';
     click(h, '.arkmail-search-go');

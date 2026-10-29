@@ -173,6 +173,20 @@ test('eksport: pobrana tresc listu zniknietego nie jest prezentowana jako dostep
   }
 });
 
+test('eksport: brak tresci ma poprawny komunikat', async () => {
+  const h = await startHarness({ archive: [archived('Bez tresci')] });
+  try {
+    await openArchive(h);
+    click(h, '.arkmail-arch-export');
+    await waitRt(() => notifyText(h.f, 'Brak listow'), 'komunikat o braku tresci');
+    assert.ok(notifyText(h.f, 'Brak listow z trescia w archiwum - najpierw pobierz tresci.'));
+    assert.ok(!notifyText(h.f, 'Brak listow z tresci w archiwum'));
+    assert.deepEqual(h.f.sent, []);
+  } finally {
+    await stopHarness();
+  }
+});
+
 test('zapis pliku: wyjatek implementacji jest zwyklym niepowodzeniem', () => {
   setDownloadImpl(() => {
     throw new Error('Zapis odrzucony.');

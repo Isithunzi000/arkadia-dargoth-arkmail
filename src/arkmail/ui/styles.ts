@@ -452,23 +452,13 @@ export const STYLES = `
 .arkmail-step-active { border-left-color: ${ACCENT}; }
 .arkmail-step-done { border-left-color: #55aa77; }
 .arkmail-step-warning, .arkmail-step-incomplete { border-left-color: #cc9944; }
-@media (min-width: 700px) {
-  .arkmail-archive-step:not(:last-child)::after {
-    content: '›';
-    position: absolute;
-    right: -15px;
-    top: 38%;
-    color: ${FG_DIM};
-    font-size: 20px;
-    font-weight: 700;
-  }
-}
 .arkmail-arch-controls {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
   margin-bottom: 8px;
 }
+.arkmail-arch-controls .arkmail-arch-clear { grid-column: 1 / -1; }
 .arkmail-arch-controls input[type='date'] { color-scheme: dark; }
 .arkmail-root .arkmail-contact-filter { flex: 1 1 140px; min-width: 0; }
 .arkmail-root .arkmail-contact-sort { max-width: 100%; }

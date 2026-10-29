@@ -1437,7 +1437,7 @@ export async function init(api: PluginApi) {
           ? "Skrzynki sa puste - nie ma czego zapisywac."
           : ui.state.archive.every((letter) => letter.missingOnServer === true)
             ? "Brak dostepnych listow do zapisu - zniknely z serwera."
-            : "Brak listow z tresci w archiwum - najpierw pobierz tresci.",
+            : "Brak listow z trescia w archiwum - najpierw pobierz tresci.",
       );
       return;
     }

@@ -191,16 +191,15 @@ test('render: kolejnosc wierszy najnowszy -> najstarszy (serwer podaje odwrotnie
   off();
 });
 
-test('render: zbiorczy Odswiez odswieza aktywna skrzynke; bez per-skrzynka', () => {
+test('render: puste Szukaj odswieza aktywna skrzynke bez osobnego Odswiez', () => {
   const s = new MailUiStore();
   const { container, calls, off } = mount(s);
   assert.ok(!container.querySelector('.arkmail-refresh'), 'bez przyciskow odswiez per skrzynka');
-  const btn = container.querySelector('.arkmail-refresh-global');
-  assert.ok(btn, 'zbiorczy Odswiez');
-  click(btn!);
+  assert.ok(!container.querySelector('.arkmail-refresh-global'), 'bez osobnego Odswiez');
+  click(container.querySelector('.arkmail-search-go')!);
   assert.deepEqual(calls, [{ name: 'refresh', args: ['odebrane'] }]);
   s.setActiveBox('wyslane');
-  click(container.querySelector('.arkmail-refresh-global')!);
+  click(container.querySelector('.arkmail-search-go')!);
   assert.deepEqual(calls[1], { name: 'refresh', args: ['wyslane'] }, 'odswieza AKTYWNA skrzynke');
   off();
 });
@@ -652,7 +651,7 @@ test('render: pasek szukania komponuje zapytanie z pol (daty ISO -> DateYMD)', (
   off();
 });
 
-test('render: puste zapytanie nie strzela (Szukaj bez pol = brak akcji)', () => {
+test('render: Enter przy pustych polach tez odswieza aktywna skrzynke', () => {
   const s = new MailUiStore();
   s.applyMailbox('odebrane', {
     kind: 'lista',
@@ -660,8 +659,9 @@ test('render: puste zapytanie nie strzela (Szukaj bez pol = brak akcji)', () => 
     entries: [entry()],
   });
   const { container, calls, off } = mount(s);
-  click(container.querySelector('.arkmail-search-go')!);
-  assert.deepEqual(calls, [], 'puste pola = brak onSearch');
+  const input = container.querySelector('[data-search="temat"]')!;
+  input.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'Enter' }));
+  assert.deepEqual(calls, [{ name: 'refresh', args: ['odebrane'] }]);
   off();
 });
 

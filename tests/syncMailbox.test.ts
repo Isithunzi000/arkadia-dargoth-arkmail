@@ -372,7 +372,7 @@ test('sync: bez granicy dnia (3 argumenty) uciety listing nic nie usuwa - jak do
   assert.equal(s.state.boxes.odebrane!.entries.length, 2);
 });
 
-test('integracja: Odswiez pelnej skrzynki usuwa skasowany nowszy list, starsze zostaja', async () => {
+test('integracja: puste Szukaj odswieza pelna skrzynke i usuwa skasowany nowszy list', async () => {
   const h = await startHarness();
   const { f, waitFor, content } = h;
   try {
@@ -380,7 +380,7 @@ test('integracja: Odswiez pelnej skrzynki usuwa skasowany nowszy list, starsze z
     const count = () => content.querySelectorAll('.arkmail-entry').length;
     assert.equal(count(), 3, '3 wpisy po prologu');
 
-    click(h, '.arkmail-refresh-global');
+    click(h, '.arkmail-search-go');
     await waitFor(
       () => f.sent.filter((c) => c === 'listy odebrane').length === 2,
       'refresh poslal listing',

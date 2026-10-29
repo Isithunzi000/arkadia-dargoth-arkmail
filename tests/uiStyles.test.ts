@@ -161,3 +161,14 @@ test('style: audyt etykiet - krotkie, bez starego formatu Przerwij', () => {
   assert.ok(!src.includes('Przerwij (strona'), 'stary dlugi format "Przerwij (strona N)" usuniety');
   assert.ok(src.includes('Przerwij · '), 'krotki format "Przerwij · N" w uzyciu');
 });
+
+test('style: Wyczysc filtry w Archiwum zajmuje caly wiersz', () => {
+  const clear = ruleBody(/\.arkmail-arch-controls\s+\.arkmail-arch-clear\b/);
+  assert.ok(clear, 'regula przycisku Wyczysc filtry istnieje');
+  assert.match(clear!, /grid-column:\s*1\s*\/\s*-1/, 'przycisk rozpiety na caly wiersz');
+});
+
+test('style: karty Archiwum nie maja ozdobnych strzalek', () => {
+  assert.doesNotMatch(STYLES, /\.arkmail-archive-step[^{]*::after/);
+  assert.ok(!STYLES.includes("content: '›'"));
+});
