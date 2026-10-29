@@ -16,10 +16,35 @@ const ROMAN_MONTHS = [
   'VII', 'VIII', 'IX', 'X', 'XI', 'XII',
 ];
 
+export const SEARCH_DATE_ERROR = 'Podaj prawidlowa date w formacie RRRR-MM-DD.';
+const SEARCH_RANGE_ERROR = 'Od dnia pozniej niz Do dnia.';
+
+function isValidDateYMD(date: DateYMD): boolean {
+  if (!Number.isInteger(date.day) || !Number.isInteger(date.month) || !Number.isInteger(date.year)) {
+    return false;
+  }
+  if (date.year < 1 || date.month < 1 || date.month > 12 || date.day < 1) return false;
+  const leap = date.year % 4 === 0 && (date.year % 100 !== 0 || date.year % 400 === 0);
+  const monthDays = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  return date.day <= monthDays[date.month - 1];
+}
+
+function assertValidDateYMD(date: DateYMD): void {
+  if (!isValidDateYMD(date)) throw new RangeError(SEARCH_DATE_ERROR);
+}
+
+function compareDates(a: DateYMD, b: DateYMD): number {
+  return a.year - b.year || a.month - b.month || a.day - b.day;
+}
+
+function hasPreviousDay(date: DateYMD): boolean {
+  return date.year > 1 || date.month > 1 || date.day > 1;
+}
+
 /** Komenda listing starszych listow: "listy <skrzynka> przed <d> <M> <y>". */
 export function olderListingCommand(box: MailBox, date: DateYMD): string {
+  assertValidDateYMD(date);
   const roman = ROMAN_MONTHS[date.month - 1];
-  if (!roman) throw new RangeError(`nieprawidlowy miesiac: ${date.month}`);
   return `listy ${box} przed ${date.day} ${roman} ${date.year}`;
 }
 
@@ -32,13 +57,11 @@ export function olderListingCommand(box: MailBox, date: DateYMD): string {
  * musi byc prawdziwa.
  */
 export function nextDay(date: DateYMD): DateYMD {
+  assertValidDateYMD(date);
   const leap =
     date.year % 4 === 0 && (date.year % 100 !== 0 || date.year % 400 === 0);
   const monthDays = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
   const max = monthDays[date.month - 1];
-  if (!max || date.day < 1 || date.day > max) {
-    throw new RangeError(`nieprawidlowa data: ${date.day}.${date.month}.${date.year}`);
-  }
   if (date.day < max) return { day: date.day + 1, month: date.month, year: date.year };
   if (date.month < 12) return { day: 1, month: date.month + 1, year: date.year };
   return { day: 1, month: 1, year: date.year + 1 };
@@ -51,13 +74,11 @@ export function nextDay(date: DateYMD): DateYMD {
  * poczatkowej w UI wysylamy dzien PRZED nia. Walidacja jak w nextDay.
  */
 export function prevDay(date: DateYMD): DateYMD {
+  assertValidDateYMD(date);
+  if (!hasPreviousDay(date)) throw new RangeError(SEARCH_DATE_ERROR);
   const leap =
     date.year % 4 === 0 && (date.year % 100 !== 0 || date.year % 400 === 0);
   const monthDays = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-  const max = monthDays[date.month - 1];
-  if (!max || date.day < 1 || date.day > max) {
-    throw new RangeError(`nieprawidlowa data: ${date.day}.${date.month}.${date.year}`);
-  }
   if (date.day > 1) return { day: date.day - 1, month: date.month, year: date.year };
   if (date.month > 1) {
     return { day: monthDays[date.month - 2], month: date.month - 1, year: date.year };
@@ -81,6 +102,58 @@ export interface ListingSearch {
   tresc?: string;
 }
 
+/** Surowe pola formularza przed zamiana dat ISO na DateYMD. */
+export interface ListingSearchDraft {
+  osoba: string;
+  temat: string;
+  tresc: string;
+  odDaty: string;
+  doDaty: string;
+}
+
+type SearchTextFields = Pick<ListingSearch, 'osoba' | 'temat' | 'tresc'>;
+
+function validateSearchText(query: SearchTextFields): string | null {
+  if (query.osoba && !/^[a-zA-Z]+$/.test(query.osoba)) {
+    return 'Osoba: tylko litery a-zA-Z.';
+  }
+  if (query.temat && /[;#]/.test(query.temat)) {
+    return 'Temat nie moze zawierac znakow ; ani #.';
+  }
+  if (query.tresc && /[;#]/.test(query.tresc)) {
+    return 'Tresc nie moze zawierac znakow ; ani #.';
+  }
+  return null;
+}
+
+/** Wspolna walidacja handlera i ostatniej bramki przed komenda. */
+export function validateListingSearch(query: ListingSearch): string | null {
+  const textError = validateSearchText(query);
+  if (textError) return textError;
+  if (query.odDaty && (!isValidDateYMD(query.odDaty) || !hasPreviousDay(query.odDaty))) {
+    return SEARCH_DATE_ERROR;
+  }
+  if (query.doDaty && !isValidDateYMD(query.doDaty)) return SEARCH_DATE_ERROR;
+  if (query.odDaty && query.doDaty && compareDates(query.odDaty, query.doDaty) > 0) {
+    return SEARCH_RANGE_ERROR;
+  }
+  return null;
+}
+
+/** Walidacja formularza bez cichego pomijania blednych dat ISO. */
+export function validateSearchDraft(draft: ListingSearchDraft): string | null {
+  const textError = validateSearchText(draft);
+  if (textError) return textError;
+  const odDaty = draft.odDaty === '' ? null : fromISODate(draft.odDaty);
+  const doDaty = draft.doDaty === '' ? null : fromISODate(draft.doDaty);
+  if ((draft.odDaty !== '' && !odDaty) || (draft.doDaty !== '' && !doDaty)) {
+    return SEARCH_DATE_ERROR;
+  }
+  if (odDaty && !hasPreviousDay(odDaty)) return SEARCH_DATE_ERROR;
+  if (odDaty && doDaty && compareDates(odDaty, doDaty) > 0) return SEARCH_RANGE_ERROR;
+  return null;
+}
+
 const SENDER_BOXES: ReadonlySet<MailBox> = new Set(['odebrane', 'nieprzeczytane']);
 
 const datePart = (d: DateYMD): string => `${d.day} ${ROMAN_MONTHS[d.month - 1]} ${d.year}`;
@@ -97,6 +170,8 @@ const datePart = (d: DateYMD): string => `${d.day} ${ROMAN_MONTHS[d.month - 1]} 
  * pozniej" (patrz docs/PROTOCOL.md).
  */
 export function searchListingCommand(box: MailBox, q: ListingSearch): string {
+  const validationError = validateListingSearch(q);
+  if (validationError) throw new RangeError(validationError);
   const parts = [`listy ${box}`];
   if (q.osoba) {
     const osoba = q.osoba.toLowerCase();

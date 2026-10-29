@@ -11,6 +11,7 @@
 import type { MailBox } from './protocol/types.js';
 import type { MailDate } from './protocol/types.js';
 import { parseMailDate } from './protocol/parser.js';
+import { fromISODate } from './protocol/commands.js';
 import type { MailboxEntry } from './session/mailbox.js';
 import type { LetterContent } from './session/pager.js';
 
@@ -317,10 +318,15 @@ function representativeOf(group: ArchiveLetter[]): ArchiveLetter {
  * blizniaka). Filtr skrzynki i tresci dziala po CA LEJ grupie (reszta
  * filtrow po reprezentancie - party/temat/daty sa w grupie identyczne).
  */
+const validArchiveDate = (value: string | undefined): string | undefined =>
+  value !== undefined && fromISODate(value) !== null ? value : undefined;
+
 export function filterVisibleArchive(
   letters: readonly ArchiveLetter[],
   filter: ArchiveFilter,
 ): ArchiveLetter[] {
+  const odDaty = validArchiveDate(filter.odDaty);
+  const doDaty = validArchiveDate(filter.doDaty);
   const groups = new Map<string, ArchiveLetter[]>();
   for (const l of letters) {
     if (l.missingOnServer === true) continue;
@@ -348,8 +354,8 @@ export function filterVisibleArchive(
     }
     if (filter.osoba !== undefined && !norm(rep.party).includes(norm(filter.osoba))) continue;
     if (filter.temat !== undefined && !norm(rep.subject).includes(norm(filter.temat))) continue;
-    if (filter.odDaty !== undefined && rep.sortKey.slice(0, 10) < filter.odDaty) continue;
-    if (filter.doDaty !== undefined && rep.sortKey.slice(0, 10) > filter.doDaty) continue;
+    if (odDaty !== undefined && rep.sortKey.slice(0, 10) < odDaty) continue;
+    if (doDaty !== undefined && rep.sortKey.slice(0, 10) > doDaty) continue;
     out.push(rep);
   }
   return out.sort(byNewest);
@@ -362,6 +368,8 @@ export function filterLetters(
   letters: readonly ArchiveLetter[],
   filter: ArchiveFilter,
 ): ArchiveLetter[] {
+  const odDaty = validArchiveDate(filter.odDaty);
+  const doDaty = validArchiveDate(filter.doDaty);
   return letters.filter((l) => {
     if (filter.od !== undefined) {
       if (!SENDER_BOXES.has(l.box)) return false;
@@ -375,8 +383,8 @@ export function filterLetters(
     if (filter.skrzynka !== undefined && l.box !== filter.skrzynka) return false;
     if (filter.temat !== undefined && !norm(l.subject).includes(norm(filter.temat))) return false;
     if (filter.tresc !== undefined && !norm(l.body.join('\n')).includes(norm(filter.tresc))) return false;
-    if (filter.odDaty !== undefined && l.sortKey.slice(0, 10) < filter.odDaty) return false;
-    if (filter.doDaty !== undefined && l.sortKey.slice(0, 10) > filter.doDaty) return false;
+    if (odDaty !== undefined && l.sortKey.slice(0, 10) < odDaty) return false;
+    if (doDaty !== undefined && l.sortKey.slice(0, 10) > doDaty) return false;
     return true;
   });
 }

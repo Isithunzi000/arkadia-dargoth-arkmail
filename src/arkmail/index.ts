@@ -27,6 +27,7 @@ import {
   nextDay,
   searchListingCommand,
   searchDescription,
+  validateListingSearch,
 } from "./core/protocol/commands";
 import type { LetterTemplate } from "./core/letterRender";
 import { validateCompose } from "./core/composeValidation";
@@ -1584,7 +1585,14 @@ export async function init(api: PluginApi) {
   };
 
   handlersRef = {
-    onDeletionSearch: (box, query) => searchForDeletion(box, searchListingCommand(box, query)),
+    onDeletionSearch: (box, query) => {
+      const validationError = validateListingSearch(query);
+      if (validationError) {
+        notify(api, validationError);
+        return;
+      }
+      searchForDeletion(box, searchListingCommand(box, query));
+    },
     onDeletionRefresh: () => {
       const current = ui.state.deletion;
       if (current.command !== null) searchForDeletion(current.box, current.command);
@@ -1764,6 +1772,11 @@ export async function init(api: PluginApi) {
     },
     onLoadAll: (box) => loadAll(box),
     onSearch: (box, query) => {
+      const validationError = validateListingSearch(query);
+      if (validationError) {
+        notify(api, validationError);
+        return;
+      }
       if (lock.locked) {
         notify(api, SESSION_BUSY_MSG);
         return;

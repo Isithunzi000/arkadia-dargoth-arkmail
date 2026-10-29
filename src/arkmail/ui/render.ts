@@ -9,7 +9,11 @@
 
 import type { MailBox } from '../core/protocol/types.js';
 import type { MailboxEntry } from '../core/session/mailbox.js';
-import { fromISODate, type ListingSearch } from '../core/protocol/commands.js';
+import {
+  fromISODate,
+  validateSearchDraft,
+  type ListingSearch,
+} from '../core/protocol/commands.js';
 import { filterVisibleArchive, type ArchiveFilter, type ArchiveLetter } from '../core/archive.js';
 import { archiveExportEntries } from '../core/exportTxt.js';
 import { viewContacts, type ContactSort } from '../core/contacts.js';
@@ -410,12 +414,31 @@ export function mountMailUi(
     const search = doc.createElement('button');
     search.className = 'arkmail-deletion-search';
     search.textContent = 'Szukaj';
+    let searchErrorTimer: ReturnType<typeof setTimeout> | null = null;
+    const showSearchError = (message: string): void => {
+      if (searchErrorTimer) clearTimeout(searchErrorTimer);
+      setButtonLabel(search, message);
+      searchErrorTimer = setTimeout(() => setButtonLabel(search, 'Szukaj'), 3000);
+    };
     search.addEventListener('click', () => {
       const current = store.state.deletion;
-      const query: ListingSearch = {};
       const osoba = current.filters.osoba.trim();
       const temat = current.filters.temat.trim();
       const tresc = current.filters.tresc.trim();
+      const validationError = validateSearchDraft({
+        osoba,
+        temat,
+        tresc,
+        odDaty: current.filters.odDaty,
+        doDaty: current.filters.doDaty,
+      });
+      if (validationError) {
+        showSearchError(validationError);
+        return;
+      }
+      if (searchErrorTimer) clearTimeout(searchErrorTimer);
+      setButtonLabel(search, 'Szukaj');
+      const query: ListingSearch = {};
       if (osoba) query.osoba = osoba;
       if (temat) query.temat = temat;
       if (tresc) query.tresc = tresc;
@@ -717,21 +740,31 @@ export function mountMailUi(
     const go = doc.createElement('button');
     go.className = 'arkmail-search-go';
     go.textContent = 'Szukaj';
+    let searchErrorTimer: ReturnType<typeof setTimeout> | null = null;
+    const showSearchError = (message: string): void => {
+      if (searchErrorTimer) clearTimeout(searchErrorTimer);
+      setButtonLabel(go, message);
+      searchErrorTimer = setTimeout(() => setButtonLabel(go, 'Szukaj'), 3000);
+    };
     const fireSearch = () => {
       const osoba = (sOsoba as HTMLInputElement).value.trim();
       const temat = (sTemat as HTMLInputElement).value.trim();
       const tresc = (sTresc as HTMLInputElement).value.trim();
-      // Fala 30a: sprzeczny zakres dat = twardy guard z komunikatem na
-      // przycisku (3 s, jak blokady compose), bez strzalu do serwera.
       const isoOd = (sOd as HTMLInputElement).value;
       const isoDo = (sDo as HTMLInputElement).value;
-      if (isoOd !== '' && isoDo !== '' && isoOd > isoDo) {
-        setButtonLabel(go, 'Od dnia pozniej niz Do dnia.');
-        setTimeout(() => {
-          setButtonLabel(go, 'Szukaj');
-        }, 3000);
+      const validationError = validateSearchDraft({
+        osoba,
+        temat,
+        tresc,
+        odDaty: isoOd,
+        doDaty: isoDo,
+      });
+      if (validationError) {
+        showSearchError(validationError);
         return;
       }
+      if (searchErrorTimer) clearTimeout(searchErrorTimer);
+      setButtonLabel(go, 'Szukaj');
       const odDaty = fromISODate(isoOd) ?? undefined;
       const doDaty = fromISODate(isoDo) ?? undefined;
       const query: ListingSearch = {
@@ -1651,19 +1684,25 @@ export function mountMailUi(
       // Fala 30a: sprzeczny zakres dat (Od pozniej niz Do) = komunikat
       // i POMINIECIE filtrow dat, zamiast milczaco pustej listy
       // (filtr lokalny, nie ma przycisku Szukaj - sygnalizacja inline).
+      const datesInvalid =
+        (archFilter.odDaty !== undefined && fromISODate(archFilter.odDaty) === null) ||
+        (archFilter.doDaty !== undefined && fromISODate(archFilter.doDaty) === null);
       const datesClash =
+        !datesInvalid &&
         archFilter.odDaty !== undefined &&
         archFilter.doDaty !== undefined &&
         archFilter.odDaty > archFilter.doDaty;
-      const effFilter = datesClash
+      const effFilter = datesInvalid || datesClash
         ? { ...archFilter, odDaty: undefined, doDaty: undefined }
         : archFilter;
       const oldErr = pane.querySelector('.arkmail-dates-error');
       if (oldErr) oldErr.remove();
-      if (datesClash) {
+      if (datesInvalid || datesClash) {
         const err = doc.createElement('div');
         err.className = 'arkmail-dates-error';
-        err.textContent = 'Od dnia pozniej niz Do dnia - daty pomijane.';
+        err.textContent = datesInvalid
+          ? 'Nieprawidlowa data - filtry dat pomijane.'
+          : 'Od dnia pozniej niz Do dnia - daty pomijane.';
         pane.insertBefore(err, list);
       }
       // Fala 18a: blizniaki jednym wierszem, znikniete ukryte (core).
