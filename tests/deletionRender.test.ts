@@ -41,7 +41,6 @@ function mount(store: MailUiStore) {
     onDeleteLetter: rec('delete'),
     onForwardLetter: rec('forward'),
     onDeletionSearch: rec('deletion-search'),
-    onDeletionRefresh: rec('deletion-refresh'),
     onDeletionDelete: rec('deletion-delete'),
   } as unknown as MailUiHandlers;
   const off = mountMailUi(container as unknown as HTMLElement, store, handlers);
@@ -123,8 +122,11 @@ test('usuwanie: filtry i skrzynka trafiaja do recznego wyszukiwania', () => {
     header: { box: 'wyslane', truncated: false },
     entries: [entry(4)],
   });
-  click(container.querySelector('.arkmail-deletion-refresh'));
-  assert.equal(calls[1].name, 'deletion-refresh');
+  // Po unifikacji jeden klawisz: ponowny klik = ponowienie zapytania
+  // (rola dawnego osobnego "Odswiez").
+  click(container.querySelector('.arkmail-deletion-search'));
+  assert.equal(calls[1].name, 'deletion-search');
+  assert.equal(calls[1].args[0] as MailBox, 'wyslane');
   click(container.querySelector('.arkmail-deletion-clear-filters'));
   assert.equal(store.state.deletion.filters.temat, '');
   assert.equal(store.state.deletion.result, null);

@@ -1599,10 +1599,6 @@ export async function init(api: PluginApi) {
       }
       searchForDeletion(box, searchListingCommand(box, query));
     },
-    onDeletionRefresh: () => {
-      const current = ui.state.deletion;
-      if (current.command !== null) searchForDeletion(current.box, current.command);
-    },
     onDeletionDelete: () => deleteSelectedLetters(),
     onSendAnimal: () => {
       // Jak przy innych operacjach (Fala 12a): zero cichego kolejkowania.

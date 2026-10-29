@@ -101,7 +101,7 @@ test('szukajka: Od pozniej niz Do blokuje szukanie z komunikatem (3 s)', async (
   assert.equal(go.textContent, 'Od dnia pozniej niz Do dnia.', 'komunikat na przycisku');
   go.click();
   assert.equal(calls.length, 0, 'drugi klik tez zablokowany');
-  await waitRt(() => go.textContent === 'Szukaj', 'etykieta wrocila po 3 s');
+  await waitRt(() => go.textContent === 'Szukaj / Odswiez', 'etykieta wrocila po 3 s');
   setVal(container.querySelector('[data-search="doDaty"]'), '2026-10-25');
   go.click();
   assert.equal(calls.length, 1, 'po korekcie dat szukanie dziala');

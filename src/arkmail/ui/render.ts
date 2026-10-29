@@ -101,8 +101,6 @@ export interface MailUiHandlers {
   onIndexAll?(): void;
   /** Reczne wyszukanie jednej strony w zakladce usuwania. */
   onDeletionSearch?(box: MailBox, query: ListingSearch): void;
-  /** Powtorzenie ostatniego zapytania przed kolejnym zaznaczeniem. */
-  onDeletionRefresh?(): void;
   /** Zbiorcze usuniecie po potwierdzeniu w interfejsie. */
   onDeletionDelete?(): void;
 }
@@ -165,6 +163,12 @@ export function mountMailUi(
     button.textContent = label;
     button.setAttribute('title', title);
   };
+  // Wspolny klawisz szukania/odswiezania (zgloszenie 2026-10-30): jedna
+  // rola w obu zakladkach - puste filtry odswiezaja skrzynke, wypelnione
+  // szukaja. Zakladka Listy juz tak dzialala; usuwanie dojrzewalo do
+  // tej samej semantyki (osobny "Odswiez" byl redundantny).
+  const SEARCH_GO_LABEL = 'Szukaj / Odswiez';
+  const SEARCH_GO_TITLE = 'Szuka po wpisanych filtrach; przy pustych filtrach odswieza skrzynke';
   const fillButtonTitles = (scope: ParentNode): void => {
     scope.querySelectorAll('button').forEach((element) => {
       const button = element as HTMLButtonElement;
@@ -397,7 +401,7 @@ export function mountMailUi(
     const intro = doc.createElement('p');
     intro.className = 'arkmail-deletion-intro';
     intro.textContent =
-      'Wybierz skrzynke i kliknij Szukaj. Zaznacz listy, ktore chcesz usunac, i potwierdz operacje. ' +
+      'Wybierz skrzynke i kliknij Szukaj / Odswiez. Zaznacz listy, ktore chcesz usunac, i potwierdz operacje. ' +
       'Wyniki nie odswiezaja sie automatycznie. Wyjscie z zakladki czysci wyniki i zaznaczenie.';
     pane.appendChild(intro);
 
@@ -419,12 +423,15 @@ export function mountMailUi(
 
     const search = doc.createElement('button');
     search.className = 'arkmail-deletion-search';
-    search.textContent = 'Szukaj';
+    setButtonLabel(search, SEARCH_GO_LABEL, SEARCH_GO_TITLE);
     let searchErrorTimer: ReturnType<typeof setTimeout> | null = null;
     const showSearchError = (message: string): void => {
       if (searchErrorTimer) clearTimeout(searchErrorTimer);
       setButtonLabel(search, message);
-      searchErrorTimer = setTimeout(() => setButtonLabel(search, 'Szukaj'), 3000);
+      searchErrorTimer = setTimeout(
+        () => setButtonLabel(search, SEARCH_GO_LABEL, SEARCH_GO_TITLE),
+        3000,
+      );
     };
     search.addEventListener('click', () => {
       const current = store.state.deletion;
@@ -443,7 +450,7 @@ export function mountMailUi(
         return;
       }
       if (searchErrorTimer) clearTimeout(searchErrorTimer);
-      setButtonLabel(search, 'Szukaj');
+      setButtonLabel(search, SEARCH_GO_LABEL, SEARCH_GO_TITLE);
       const query: ListingSearch = {};
       if (osoba) query.osoba = osoba;
       if (temat) query.temat = temat;
@@ -455,14 +462,6 @@ export function mountMailUi(
       handlers.onDeletionSearch?.(current.box, query);
     });
     controls.appendChild(search);
-
-    const refresh = doc.createElement('button');
-    refresh.className = 'arkmail-deletion-refresh';
-    refresh.textContent = 'Odswiez';
-    refresh.setAttribute('title', 'Ponow ostatnie wyszukiwanie');
-    if (state.deletion.command === null) refresh.setAttribute('disabled', '');
-    refresh.addEventListener('click', () => handlers.onDeletionRefresh?.());
-    controls.appendChild(refresh);
 
     const clearFilters = doc.createElement('button');
     clearFilters.className = 'arkmail-deletion-clear-filters';
@@ -746,12 +745,12 @@ export function mountMailUi(
     const sDoF = mkDateField(doc, sDo, 'Do dnia (wlacznie)', 'Szukanie zwroci listy wyslane do tego dnia WLACZNIE.');
     const go = doc.createElement('button');
     go.className = 'arkmail-search-go';
-    go.textContent = 'Szukaj';
+    setButtonLabel(go, SEARCH_GO_LABEL, SEARCH_GO_TITLE);
     let searchErrorTimer: ReturnType<typeof setTimeout> | null = null;
     const showSearchError = (message: string): void => {
       if (searchErrorTimer) clearTimeout(searchErrorTimer);
       setButtonLabel(go, message);
-      searchErrorTimer = setTimeout(() => setButtonLabel(go, 'Szukaj'), 3000);
+      searchErrorTimer = setTimeout(() => setButtonLabel(go, SEARCH_GO_LABEL, SEARCH_GO_TITLE), 3000);
     };
     const fireSearch = () => {
       const osoba = (sOsoba as HTMLInputElement).value.trim();
@@ -771,7 +770,7 @@ export function mountMailUi(
         return;
       }
       if (searchErrorTimer) clearTimeout(searchErrorTimer);
-      setButtonLabel(go, 'Szukaj');
+      setButtonLabel(go, SEARCH_GO_LABEL, SEARCH_GO_TITLE);
       const odDaty = fromISODate(isoOd) ?? undefined;
       const doDaty = fromISODate(isoDo) ?? undefined;
       const query: ListingSearch = {

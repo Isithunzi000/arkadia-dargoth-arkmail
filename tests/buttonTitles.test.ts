@@ -135,6 +135,7 @@ test('podpowiedzi: potwierdzenia zmieniaja title i przywracaja go po czasie', as
 
 test('podpowiedzi: bledy walidacji zmieniaja title razem z etykieta', async () => {
   const listy = mount(withBox(new MailUiStore()));
+  const initialSearchTitle = title(listy, '.arkmail-search-go');
   for (const [selector, value] of [['[data-search="odDaty"]', '2026-05-02'], ['[data-search="doDaty"]', '2026-05-01']]) {
     const input = (listy as { querySelector(s: string): unknown }).querySelector(selector) as { value: string };
     input.value = value;
@@ -147,7 +148,7 @@ test('podpowiedzi: bledy walidacji zmieniaja title razem z etykieta', async () =
   assert.ok(title(compose, '.arkmail-send').includes('Brak tresci'));
 
   await new Promise((resolve) => setTimeout(resolve, 3100));
-  assert.equal(title(listy, '.arkmail-search-go'), 'Szukaj');
+  assert.equal(title(listy, '.arkmail-search-go'), initialSearchTitle);
   assert.equal(title(compose, '.arkmail-send'), 'Zapisz w niewyslanych');
 });
 
