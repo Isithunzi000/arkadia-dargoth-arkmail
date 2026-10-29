@@ -225,13 +225,13 @@ test('storage: uszkodzony JSON nie wywraca odczytu', async () => {
 
 // --- notify -------------------------------------------------------------------
 
-test('notify: tost przez events.emit, opcjonalny czas wyswietlania', () => {
+test('notify: kazdy tost trwa 8000 ms, chyba ze czas jest podany', () => {
   const f = new FakeApi();
   notify(f.api, 'Nowy list od Foo');
-  notify(f.api, 'Pilne', { time: 8000 });
+  notify(f.api, 'Pilne', { time: 12000 });
   assert.deepEqual(f.emitted, [
-    { event: 'notify', args: [{ text: 'Nowy list od Foo' }] },
-    { event: 'notify', args: [{ text: 'Pilne', time: 8000 }] },
+    { event: 'notify', args: [{ text: 'Nowy list od Foo', time: 8000 }] },
+    { event: 'notify', args: [{ text: 'Pilne', time: 12000 }] },
   ]);
 });
 
