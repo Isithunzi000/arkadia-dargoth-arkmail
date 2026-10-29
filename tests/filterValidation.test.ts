@@ -11,6 +11,7 @@ import {
   nextDay,
   prevDay,
   searchListingCommand,
+  validateSearchDraft,
   type ListingSearch,
 } from '../src/arkmail/core/protocol/commands';
 import { filterVisibleArchive, type ArchiveLetter } from '../src/arkmail/core/archive';
@@ -166,25 +167,34 @@ test('ui Usuwanie: wspolne guardy obejmuja tez surowe daty i ich zakres', () => 
   assert.equal(callsNamed(calls, 'deletion-search').length, 0);
   assert.equal(label(container, '.arkmail-deletion-search'), PERSON_ERROR);
 
-  store.setDeletionFilters({ ...store.state.deletion.filters, osoba: '', odDaty: '2026-02-30' });
-  click(container, '.arkmail-deletion-search');
-  assert.equal(callsNamed(calls, 'deletion-search').length, 0, 'bledna data nie jest pomijana');
-  assert.equal(label(container, '.arkmail-deletion-search'), DATE_ERROR);
-
-  store.setDeletionFilters({ ...store.state.deletion.filters, odDaty: '0001-01-01' });
-  click(container, '.arkmail-deletion-search');
-  assert.equal(callsNamed(calls, 'deletion-search').length, 0, 'dolna granica nie tworzy roku zero');
-  assert.equal(label(container, '.arkmail-deletion-search'), DATE_ERROR);
-
-  store.setDeletionFilters({
-    ...store.state.deletion.filters,
-    odDaty: '2026-10-20',
-    doDaty: '2026-10-10',
-  });
+  // Pola od C3 pisza do lokalnego draftu (commit dopiero klik 'Szukaj /
+  // Odswiez'), wiec scenariusz walidacji prowadzimy przez pola.
+  setInput(container, '[data-deletion-filter="osoba"]', '');
+  setInput(container, '[data-deletion-filter="odDaty"]', '2026-10-20');
+  setInput(container, '[data-deletion-filter="doDaty"]', '2026-10-10');
   click(container, '.arkmail-deletion-search');
   assert.equal(callsNamed(calls, 'deletion-search').length, 0, 'odwrocony zakres jest zablokowany');
   assert.equal(label(container, '.arkmail-deletion-search'), RANGE_ERROR);
   off();
+});
+
+// Surowe, niedopuszczalne daty ('2026-02-30', '0001-01-01') nie da sie
+// wpisac do pola type=date (przegladarka czysci wartosc), wiec guard
+// draftu testujemy wprost - fireSearch przepuszcza przez validateSearchDraft
+// dokladnie takie surowe stringi z deletionDraft.
+test('usuwanie: surowe bledne daty odrzuca walidacja draftu', () => {
+  for (const odDaty of ['2026-02-30', '0001-01-01', '2026-13-01', 'nie-data']) {
+    assert.equal(
+      validateSearchDraft({ osoba: '', temat: '', tresc: '', odDaty, doDaty: '' }),
+      DATE_ERROR,
+      `odrzucono: "${odDaty}"`,
+    );
+  }
+  assert.equal(
+    validateSearchDraft({ osoba: '', temat: '', tresc: '', odDaty: '2026-10-20', doDaty: '2026-10-10' }),
+    RANGE_ERROR,
+    'odwrocony zakres odrzucony na poziomie draftu',
+  );
 });
 
 test('handler: bezposrednie Listy i Usuwanie nie omijaja walidacji', async () => {

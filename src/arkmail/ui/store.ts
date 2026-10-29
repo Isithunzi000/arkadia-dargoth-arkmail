@@ -369,15 +369,17 @@ export class MailUiStore {
     });
   }
 
+  // Commit filtrow z ekranu (przycisk 'Szukaj / Odswiez'). Celowo NIE kasuje
+  // wyniku / zaznaczenia / polecenia: wpisanie litery w pole nie jest
+  // 'szukaj', a repaint po kazdym znaku skasowalby liste pod palcem.
+  // Stare wyniki nadal wisza az do skonczonego wyszukiwania
+  // (applyDeletionResult / clearDeletionResult z osobna garda rewizji).
+  // armedAt: 0 - nowy draft = nowa intencja, zamknieta potwierdzanie.
   setDeletionFilters(filters: DeletionFilters): void {
     this.update({
       deletion: {
         ...this.current.deletion,
         filters: { ...filters },
-        command: null,
-        result: null,
-        selected: [],
-        message: null,
         revision: this.current.deletion.revision + 1,
         armedAt: 0,
       },

@@ -98,18 +98,25 @@ test('usuwanie: filtry i skrzynka trafiaja do recznego wyszukiwania', () => {
   assert.ok(select);
   select.value = 'wyslane';
   select.dispatchEvent(new window.Event('change'));
+  // D1 (parzystosc z Listy): zmiana skrzynki od razu pobiera jej listing;
+  // puste filtry daja zwykle 'listy <skrzynka>' (query = {}).
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].name, 'deletion-search');
+  assert.equal(calls[0].args[0] as MailBox, 'wyslane');
+  assert.deepEqual(calls[0].args[1] as ListingSearch, {});
+
   input(container, '[data-deletion-filter="osoba"]', 'Bar');
   input(container, '[data-deletion-filter="temat"]', 'Raport');
   input(container, '[data-deletion-filter="tresc"]', 'złoto');
   input(container, '[data-deletion-filter="odDaty"]', '2026-10-01');
   input(container, '[data-deletion-filter="doDaty"]', '2026-10-03');
-  assert.equal(calls.length, 0, 'edycja pol nie wysyla zapytania');
+  assert.equal(calls.length, 1, 'edycja pol nie wysyla zapytania');
 
   click(container.querySelector('.arkmail-deletion-search'));
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].name, 'deletion-search');
-  assert.equal(calls[0].args[0] as MailBox, 'wyslane');
-  assert.deepEqual(calls[0].args[1] as ListingSearch, {
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1].name, 'deletion-search');
+  assert.equal(calls[1].args[0] as MailBox, 'wyslane');
+  assert.deepEqual(calls[1].args[1] as ListingSearch, {
     osoba: 'Bar',
     temat: 'Raport',
     tresc: 'złoto',
@@ -125,11 +132,13 @@ test('usuwanie: filtry i skrzynka trafiaja do recznego wyszukiwania', () => {
   // Po unifikacji jeden klawisz: ponowny klik = ponowienie zapytania
   // (rola dawnego osobnego "Odswiez").
   click(container.querySelector('.arkmail-deletion-search'));
-  assert.equal(calls[1].name, 'deletion-search');
-  assert.equal(calls[1].args[0] as MailBox, 'wyslane');
+  assert.equal(calls[2].name, 'deletion-search');
+  assert.equal(calls[2].args[0] as MailBox, 'wyslane');
   click(container.querySelector('.arkmail-deletion-clear-filters'));
   assert.equal(store.state.deletion.filters.temat, '');
-  assert.equal(store.state.deletion.result, null);
+  // C3: czyszczenie filtrow NIE kasuje wyniku ani zaznaczenia - tylko
+  // nowe zakonczone wyszukiwanie (apply/clearDeletionResult) je podmienia.
+  assert.equal(store.state.deletion.result !== null, true);
   off();
 });
 

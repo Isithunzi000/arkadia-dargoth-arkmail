@@ -154,6 +154,10 @@ export function mountMailUi(
   /** Draft pol szukajki: lokalny (jak filtr archiwum) - rerender nie kasuje
    *  wpisanego zapytania. */
   const searchDraft: Record<string, string> = { osoba: '', temat: '', tresc: '', odDaty: '', doDaty: '' };
+  /** Draft filtrow zakladki usuwanie - lokalny (jak searchDraft): kazda
+   *  litera nie kasowala wynikow i zaznaczenia (zgloszenie 2026-10-30),
+   *  commit do store dopiero na klik "Szukaj / Odswiez". */
+  const deletionDraft = emptyDeletionFilters();
 
   const setButtonLabel = (
     button: HTMLButtonElement,
@@ -418,7 +422,6 @@ export function mountMailUi(
       box.appendChild(option);
     }
     box.value = state.deletion.box;
-    box.addEventListener('change', () => store.setDeletionBox(box.value as MailBox));
     controls.appendChild(box);
 
     const search = doc.createElement('button');
@@ -433,17 +436,20 @@ export function mountMailUi(
         3000,
       );
     };
-    search.addEventListener('click', () => {
+    // Jedna akcja dla klawisza i zmiany skrzynki (parzystosc z Listy:
+    // klik w skrzynke od razu pokazuje jej listing). Draft lokalny -
+    // commit do store dopiero tu.
+    const fireSearch = () => {
       const current = store.state.deletion;
-      const osoba = current.filters.osoba.trim();
-      const temat = current.filters.temat.trim();
-      const tresc = current.filters.tresc.trim();
+      const osoba = deletionDraft.osoba.trim();
+      const temat = deletionDraft.temat.trim();
+      const tresc = deletionDraft.tresc.trim();
       const validationError = validateSearchDraft({
         osoba,
         temat,
         tresc,
-        odDaty: current.filters.odDaty,
-        doDaty: current.filters.doDaty,
+        odDaty: deletionDraft.odDaty,
+        doDaty: deletionDraft.doDaty,
       });
       if (validationError) {
         showSearchError(validationError);
@@ -451,22 +457,36 @@ export function mountMailUi(
       }
       if (searchErrorTimer) clearTimeout(searchErrorTimer);
       setButtonLabel(search, SEARCH_GO_LABEL, SEARCH_GO_TITLE);
+      store.setDeletionFilters({ ...deletionDraft });
       const query: ListingSearch = {};
       if (osoba) query.osoba = osoba;
       if (temat) query.temat = temat;
       if (tresc) query.tresc = tresc;
-      const odDaty = fromISODate(current.filters.odDaty);
-      const doDaty = fromISODate(current.filters.doDaty);
+      const odDaty = fromISODate(deletionDraft.odDaty);
+      const doDaty = fromISODate(deletionDraft.doDaty);
       if (odDaty) query.odDaty = odDaty;
       if (doDaty) query.doDaty = doDaty;
       handlers.onDeletionSearch?.(current.box, query);
+    };
+    search.addEventListener('click', fireSearch);
+    box.addEventListener('change', () => {
+      store.setDeletionBox(box.value as MailBox);
+      fireSearch();
     });
     controls.appendChild(search);
 
     const clearFilters = doc.createElement('button');
     clearFilters.className = 'arkmail-deletion-clear-filters';
     clearFilters.textContent = 'Wyczysc filtry';
-    clearFilters.addEventListener('click', () => store.setDeletionFilters(emptyDeletionFilters()));
+    clearFilters.addEventListener('click', () => {
+      for (const key of ['osoba', 'temat', 'tresc', 'odDaty', 'doDaty'] as const) {
+        deletionDraft[key] = '';
+      }
+      filterRow.querySelectorAll('[data-deletion-filter]').forEach((el) => {
+        (el as HTMLInputElement).value = '';
+      });
+      store.setDeletionFilters(emptyDeletionFilters());
+    });
     controls.appendChild(clearFilters);
     pane.appendChild(controls);
 
@@ -487,11 +507,14 @@ export function mountMailUi(
       wrap.appendChild(caption);
       const field = doc.createElement('input');
       field.type = key === 'odDaty' || key === 'doDaty' ? 'date' : 'text';
-      field.value = state.deletion.filters[key];
+      field.value = deletionDraft[key];
       field.setAttribute('data-deletion-filter', key);
       if (placeholder) field.setAttribute('placeholder', placeholder);
+      // Pola pisza tylko do lokalnego szkicu. Gasic repaint przy kazdym
+      // znaku psuloby fokus i skakaloby czapeczka; commit dopiero na klik
+      // 'Szukaj / Odswiez' (fireSearch), a clearFilters czysci oba konce.
       field.addEventListener('input', () => {
-        store.setDeletionFilters({ ...store.state.deletion.filters, [key]: field.value });
+        deletionDraft[key] = field.value;
       });
       wrap.appendChild(field);
       filterRow.appendChild(wrap);
@@ -504,7 +527,6 @@ export function mountMailUi(
       message.textContent = state.deletion.message;
       pane.appendChild(message);
     }
-
     const result = state.deletion.result;
     const entries = result?.kind === 'lista' ? result.entries : [];
     if (result !== null) {
@@ -516,8 +538,8 @@ export function mountMailUi(
       pane.appendChild(summary);
       if (result.kind === 'lista' && result.header.truncated) {
         const limit = doc.createElement('p');
-        limit.className = 'arkmail-deletion-limit';
-        limit.textContent = 'Wynik jest uciety. Zawez filtry.';
+        limit.className = 'arkmail-dim arkmail-deletion-limit';
+        limit.textContent = 'Serwer pokazuje maksymalnie 50 wynikow.';
         pane.appendChild(limit);
       }
     }
@@ -582,7 +604,7 @@ export function mountMailUi(
     if (entries.length > 0) {
       const list = doc.createElement('div');
       list.className = 'arkmail-deletion-results';
-      for (const entry of [...entries].reverse()) {
+      for (const entry of entries) {
         const row = doc.createElement('label');
         row.className = 'arkmail-deletion-entry';
         const checkbox = doc.createElement('input');
