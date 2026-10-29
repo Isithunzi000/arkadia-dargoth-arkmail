@@ -26,6 +26,15 @@ export interface DeletionState {
   selected: number[];
   message: string | null;
   revision: number;
+  /**
+   * Uzbrojenie dwuklikowego potwierdzenia usuwania (timestamp, 0 = nie).
+   * Zyje w store, nie w DOM: na zywym kliencie popup przemalowuje sie
+   * przy kazdym badge/busy/GMCP, a stan trzymany w zamknieciu renderu
+   * ginie razem z przyciskiem (zgloszenie 2026-10-30: drugi klik
+   * uzbrajal od nowa zamiast kasowac). Bez podbicia revision - uzbrojenie
+   * nie wolno uniewazniac guardow w toku sesji usuwania.
+   */
+  armedAt: number;
 }
 
 function deletionState(revision: number): DeletionState {
@@ -37,6 +46,7 @@ function deletionState(revision: number): DeletionState {
     selected: [],
     message: null,
     revision,
+    armedAt: 0,
   };
 }
 
@@ -354,6 +364,7 @@ export class MailUiStore {
         selected: [],
         message: null,
         revision: this.current.deletion.revision + 1,
+        armedAt: 0,
       },
     });
   }
@@ -368,6 +379,7 @@ export class MailUiStore {
         selected: [],
         message: null,
         revision: this.current.deletion.revision + 1,
+        armedAt: 0,
       },
     });
   }
@@ -385,8 +397,21 @@ export class MailUiStore {
         selected: [],
         message: null,
         revision: this.current.deletion.revision + 1,
+        armedAt: 0,
       },
     });
+  }
+
+  /** Uzbrojenie potwierdzenia usuwania (zgloszenie 2026-10-30). Bez
+   *  podbicia revision: to stan czysto UI, nie sygnal nieaktualnosci
+   *  wynikow - guardy sesji usuwania maja zostac nietknięte. */
+  armDeletionConfirm(): void {
+    this.update({ deletion: { ...this.current.deletion, armedAt: Date.now() } });
+  }
+
+  disarmDeletionConfirm(): void {
+    if (this.current.deletion.armedAt === 0) return;
+    this.update({ deletion: { ...this.current.deletion, armedAt: 0 } });
   }
 
   toggleDeletionEntry(number: number): void {
@@ -425,6 +450,7 @@ export class MailUiStore {
         selected: [],
         message,
         revision: current.revision + 1,
+        armedAt: 0,
       },
     });
   }

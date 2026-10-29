@@ -540,27 +540,34 @@ export function mountMailUi(
 
     const remove = doc.createElement('button');
     remove.className = 'arkmail-deletion-delete';
-    setButtonLabel(remove, 'Usun zaznaczone', 'Usun zaznaczone listy. Tej operacji nie mozna cofnac.');
+    // Uzbrojenie dwukliku zyje w store (deletion.armedAt), nie w tym
+    // zamknieciu: kazdy repaint odtwarza drzewo i zjadal stan lokalny
+    // (zgloszenie 2026-10-30: drugi klik uzbrajal od nowa zamiast kasowac).
     const selectedCount = state.deletion.selected.length;
+    const armedAt = state.deletion.armedAt;
+    const armed = armedAt !== 0 && Date.now() - armedAt < 3000;
+    if (armed) {
+      setButtonLabel(
+        remove,
+        `Potwierdz usuniecie: ${formatListCount(selectedCount)}`,
+        `Usunac zaznaczone listy (liczba: ${selectedCount})? Tej operacji nie mozna cofnac. Kliknij ponownie, aby potwierdzic.`,
+      );
+    } else {
+      setButtonLabel(remove, 'Usun zaznaczone', 'Usun zaznaczone listy. Tej operacji nie mozna cofnac.');
+    }
     if (selectedCount === 0) remove.setAttribute('disabled', '');
-    let armed = false;
-    let armTimer: ReturnType<typeof setTimeout> | null = null;
     remove.addEventListener('click', () => {
       if (!armed) {
-        armed = true;
-        setButtonLabel(
-          remove,
-          `Potwierdz usuniecie: ${formatListCount(selectedCount)}`,
-          `Usunac zaznaczone listy (liczba: ${selectedCount})? Tej operacji nie mozna cofnac. Kliknij ponownie, aby potwierdzic.`,
-        );
-        armTimer = setTimeout(() => {
-          armed = false;
-          setButtonLabel(remove, 'Usun zaznaczone', 'Usun zaznaczone listy. Tej operacji nie mozna cofnac.');
+        store.armDeletionConfirm();
+        const armedStamp = store.state.deletion.armedAt;
+        // Po 3 s rozbrojenie - tylko gdy nikt w miedzyczasie nie
+        // uzbroil ponownie (np. klik na swiezym przycisku po repaint).
+        setTimeout(() => {
+          if (store.state.deletion.armedAt === armedStamp) store.disarmDeletionConfirm();
         }, 3000);
         return;
       }
-      if (armTimer) clearTimeout(armTimer);
-      armed = false;
+      store.disarmDeletionConfirm();
       handlers.onDeletionDelete?.();
     });
     selectionOps.appendChild(remove);

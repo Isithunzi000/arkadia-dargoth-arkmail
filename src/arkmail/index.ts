@@ -1931,7 +1931,12 @@ export async function init(api: PluginApi) {
   let lastWatchdogQ = 0;
   transport.subscribe((line) => {
     if (line.cls === "command" || isEchoLine(line.text)) {
-      if (ui.state.tab === "usuwanie") ui.resetDeletion();
+      // Uwaga: stan zakladki usuwanie NIE jest tu kasowany. Gracz z
+      // otwartym popupem pisze komendy do gry - resetowanie wynikow na
+      // kazda komende zabijalo usuwanie na zywym kliencie, a zakladka
+      // Listy tego nie robi (parzystosc, zgloszenie 2026-10-30).
+      // Bezpieczenstwo dubla nadal stoi: deleteSelectedLetters bierze
+      // swiezy listing i dopasowuje po kluczach tresci, nie numerach.
       // Komenda gracza wchodzaca w tryb poczty: jego pager jest legalny
       // (a gdyby sierota istniala, zjadlaby te komende i straznik
       // domknie ja przy promptcie - tutaj czyscimy tylko prewencyjnie).
