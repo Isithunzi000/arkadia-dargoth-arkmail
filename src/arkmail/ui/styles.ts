@@ -418,6 +418,44 @@ export const STYLES = `
   gap: 6px;
   margin-bottom: 8px;
 }
+.arkmail-archive-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+  margin: 10px 0 12px;
+}
+.arkmail-archive-step {
+  position: relative;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid ${BORDER};
+  border-left: 4px solid ${FG_DIM};
+  border-radius: 6px;
+  background: ${BG_RAISED};
+}
+.arkmail-archive-step-title { font-weight: 700; margin-bottom: 5px; }
+.arkmail-archive-step-status {
+  min-height: 34px;
+  margin-bottom: 9px;
+  color: ${FG_DIM};
+  font-size: 12px;
+  line-height: 1.4;
+}
+.arkmail-archive-step button { width: 100%; margin: 0; }
+.arkmail-step-active { border-left-color: ${ACCENT}; }
+.arkmail-step-done { border-left-color: #55aa77; }
+.arkmail-step-warning, .arkmail-step-incomplete { border-left-color: #cc9944; }
+@media (min-width: 700px) {
+  .arkmail-archive-step:not(:last-child)::after {
+    content: '›';
+    position: absolute;
+    right: -15px;
+    top: 38%;
+    color: ${FG_DIM};
+    font-size: 20px;
+    font-weight: 700;
+  }
+}
 .arkmail-arch-controls {
   display: grid;
   grid-template-columns: 1fr 1fr;

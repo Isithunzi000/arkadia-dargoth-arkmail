@@ -26,7 +26,6 @@ import {
   startHarness,
   stopHarness,
   loadTruncatedBox,
-  driveIndexAll,
   click,
   waitRt,
   notifyText,
@@ -69,27 +68,6 @@ async function startDownload(h: Harness): Promise<void> {
   click(h, '[data-tab="archiwum"]');
   downloadBtn(h).dispatchEvent(new h.window.Event('click')); // uzbrojenie
   downloadBtn(h).dispatchEvent(new h.window.Event('click')); // start
-  // Pobieranie zaczyna sie od pelnej indeksacji skrzynek (decyzja
-  // 2026-10-23). Listingi kompletne i zgodne z archiwum, zeby
-  // gone-marking niczego nie oznaczyl jako znikniete.
-  await driveIndexAll(h, {
-    odebrane: [
-      'Listy odebrane:',
-      ' 3. *R* Temat: najstarszy',
-      'Nadawca: Foo                        N, 21 XII 2025, 01:15:04',
-      ' 2. *R* Temat: srodkowy',
-      'Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05',
-      ' 1. *R* Temat: najnowszy',
-      'Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12',
-    ],
-    wyslane: [
-      'Listy wyslane:',
-      ' 2. Temat: paczka',
-      'Odbiorcy: Bar                           Sr, 24 XII 2025, 10:00:00',
-      ' 1. Temat: wyjsciowy',
-      'Odbiorcy: Bar                           Cz, 25 XII 2025, 11:00:00',
-    ],
-  });
   await waitRt(() => anchors(h).length === 1, 'pierwsza re-kotwica petli');
 }
 

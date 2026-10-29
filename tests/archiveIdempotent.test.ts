@@ -36,7 +36,6 @@ import {
   startHarness,
   stopHarness,
   loadTruncatedBox,
-  driveIndexAll,
   click,
   waitRt,
   notifyText,
@@ -162,17 +161,6 @@ test('archiwum: blizniak nieprzeczytane/odebrane pobierany RAZ, tresc w obu reko
 
     downloadBtn(h).dispatchEvent(new h.window.Event('click')); // uzbrojenie
     downloadBtn(h).dispatchEvent(new h.window.Event('click')); // start
-    // Indeksacja przed pobieraniem: oba listingi kompletne i zgodne
-    // z archiwum (blizniak nieprzeczytany tez na listingu, inaczej
-    // gone-marking oznaczylby go jako znikniety).
-    await driveIndexAll(h, {
-      odebrane: LISTING3_FULL,
-      nieprzeczytane: [
-        'Listy nieprzeczytane:',
-        ' 1. Temat: najnowszy',
-        'Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12',
-      ],
-    });
     // Grupa blizniakow = JEDEN kandydat: total 3, nie 4.
     await waitRt(
       () => downloadBtn(h).textContent.includes('(0/3)') || f.sent.length > 0,
@@ -226,8 +214,6 @@ test('archiwum: list znikniety z serwera dostaje znacznik i jest pomijany przy r
     click(h, '[data-tab="archiwum"]');
     downloadBtn(h).dispatchEvent(new h.window.Event('click')); // uzbrojenie
     downloadBtn(h).dispatchEvent(new h.window.Event('click')); // start
-    // Indeksacja przed pobieraniem: kompletny listing zgodny z archiwum.
-    await driveIndexAll(h, { odebrane: LISTING3_FULL });
 
     // Listing BEZ najnowszego listu - serwer go juz nie ma (i nie
     // wraca: gdyby wrocil w kolejnym listingu, upsert zdjalby znacznik).
@@ -256,21 +242,10 @@ test('archiwum: list znikniety z serwera dostaje znacznik i jest pomijany przy r
 
     await waitRt(() => notifyText(f, 'zniknely z serwera: 1'), 'podsumowanie ze zniknietym');
 
-    // Restart operacji: znowu najpierw indeksacja (kazde pobranie
-    // tresci zaczyna sie od kontroli indeksu). Listing nadal bez
-    // najnowszego - znacznik zostaje, kandydatow brak: toast o
-    // kompletnej bazie, zadna re-kotwica nie wylatuje.
+    // Restart: znacznik zostaje, kandydatow brak, zadna nowa
+    // re-kotwica nie wylatuje.
     downloadBtn(h).dispatchEvent(new h.window.Event('click')); // uzbrojenie
     downloadBtn(h).dispatchEvent(new h.window.Event('click')); // start
-    await driveIndexAll(h, {
-      odebrane: [
-        'Listy odebrane:',
-        ' 2. *R* Temat: najstarszy',
-        'Nadawca: Foo                        N, 21 XII 2025, 01:15:04',
-        ' 1. *R* Temat: srodkowy',
-        'Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05',
-      ],
-    });
     await waitRt(() => notifyText(f, 'Wszystkie listy w bazie maja tresci.'), 'brak kandydatow po znaczniku');
     assert.equal(
       f.sent.filter((s) => s === 'listy odebrane przed 24 XII 2025').length,
@@ -300,7 +275,6 @@ test('archiwum: luka podczas re-kotwicy jest bledem, nie zniknieciem listu', asy
     click(h, '[data-tab="archiwum"]');
     downloadBtn(h).dispatchEvent(new h.window.Event('click'));
     downloadBtn(h).dispatchEvent(new h.window.Event('click'));
-    await driveIndexAll(h, { odebrane: LISTING3_FULL });
 
     await waitRt(() => count(first) === 1, 're-kotwica przy luce');
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');

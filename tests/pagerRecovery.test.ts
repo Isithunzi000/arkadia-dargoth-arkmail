@@ -27,7 +27,6 @@ import {
   startHarness,
   stopHarness,
   loadTruncatedBox,
-  driveIndexAll,
   click,
   waitRt,
   notifyText,
@@ -166,19 +165,7 @@ test('archiwum: wyjatek z re-kotwicy nie zabija petli pobierania tresci', async 
     };
     downloadBtn().dispatchEvent(new h.window.Event('click')); // uzbrojenie
     downloadBtn().dispatchEvent(new h.window.Event('click')); // start
-    // Indeksacja przed pobieraniem (decyzja 2026-10-23): kompletny
-    // listing odebranych zgodny z archiwum, reszta skrzynek pusta.
-    await driveIndexAll(h, {
-      odebrane: [
-        'Listy odebrane:',
-        ' 3. *R* Temat: najstarszy',
-        'Nadawca: Foo                        N, 21 XII 2025, 01:15:04',
-        ' 2. *R* Temat: srodkowy',
-        'Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05',
-        ' 1. *R* Temat: najnowszy',
-        'Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12',
-      ],
-    });
+    // Petla uzyje wpisow z aktualnej bazy.
 
     await waitRt(
       () => f.sent.includes('listy odebrane przed 24 XII 2025'),

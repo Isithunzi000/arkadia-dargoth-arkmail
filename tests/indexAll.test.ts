@@ -8,9 +8,8 @@
  * - indeksacja: kompletny listing kazdej skrzynki (z paginacja
  *   kotwiczaca jak "Wczytaj wszystkie") dokleja wszystko do archiwum,
  *   oznacza znikniete z serwera i stawia flage per skrzynka.
- * - pobieranie tresci ZAWSZE zaczyna sie od indeksacji (decyzja
- *   2026-10-23); eksport (ZIP) przy pustej niezindeksowanej bazie
- *   najpierw indeksuje (zamiast martwego toastu "brak listow").
+ * - pobieranie tresci i eksport ZIP uzywaja aktualnej bazy bez
+ *   automatycznego powtarzania indeksacji.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,7 +19,6 @@ import {
   startHarness,
   stopHarness,
   loadTruncatedBox,
-  driveIndexAll,
   waitRt,
   click,
   notifyText,
@@ -131,19 +129,6 @@ test('brama Kontaktow: lista kontaktow widoczna mimo braku indeksu, wskazowka na
   }
 });
 
-/** Replay pustego listingu dla kolejnych skrzynek indeksacji. */
-async function replayEmptyBoxes(h: Harness): Promise<void> {
-  const { f } = h;
-  await waitRt(() => f.sent.includes('listy odebrane'), 'indeksacja: odebrane');
-  f.fire('Nie masz zadnych odebranych listow.', 'mail');
-  await waitRt(() => f.sent.includes('listy nieprzeczytane'), 'indeksacja: nieprzeczytane');
-  f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
-  await waitRt(() => f.sent.includes('listy wyslane'), 'indeksacja: wyslane');
-  f.fire('Nie masz zadnych wyslanych listow.', 'mail');
-  await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksacja: niewyslane');
-  f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
-}
-
 test('Indeksuj wszystkie: paginacja kotwicowa, flagi, gone-marking, odblokowanie Kontaktow', async () => {
   const h = await startHarness();
   const { f } = h;
@@ -234,7 +219,7 @@ test('Indeksuj wszystkie: paginacja kotwicowa, flagi, gone-marking, odblokowanie
   }
 });
 
-test('pobieranie tresci przy pustej bazie: indeksacja sama wykrywa puste skrzynki', async () => {
+test('pobieranie tresci przy pustej bazie: jasny toast bez indeksacji', async () => {
   const h = await startHarness();
   const { f } = h;
   try {
@@ -242,41 +227,23 @@ test('pobieranie tresci przy pustej bazie: indeksacja sama wykrywa puste skrzynk
     await waitRt(() => !!h.content.querySelector('.arkmail-arch-download'), 'przycisk pobierania');
     click(h, '.arkmail-arch-download'); // uzbrojenie (dwuklik)
     click(h, '.arkmail-arch-download'); // odpalenie
-    // Kazde pobranie tresci zaczyna sie od indeksacji (decyzja
-    // 2026-10-23) - bez komunikatu "najpierw kliknij Indeksuj".
-    await waitRt(
-      () => notifyText(f, 'najpierw indeksuje wszystkie skrzynki'),
-      'komunikat o indeksacji przed pobieraniem',
-    );
-    assert.ok(!notifyText(f, 'najpierw kliknij Indeksuj'), 'stary guard zniknal');
-    await replayEmptyBoxes(h);
-    // Kontynuacja po indeksacji: pobieranie na pustej bazie = jasny
-    // toast zamiast martwego "brak listow".
     await waitRt(() => notifyText(f, 'Skrzynki sa puste'), 'toast pustych skrzynek');
+    assert.equal(f.sent.length, 0, 'pobieranie pustej bazy bez komend');
   } finally {
     await stopHarness();
   }
 });
 
-test('eksport ZIP: najpierw indeksacja, potem automatyczny zapis albo jasny toast', async () => {
+test('eksport ZIP: pusta baza daje jasny toast bez indeksacji', async () => {
   const h = await startHarness();
   const { f } = h;
   try {
     click(h, '[data-tab="archiwum"]');
     await waitRt(() => !!h.content.querySelector('.arkmail-arch-export'), 'przycisk eksportu');
     click(h, '.arkmail-arch-export');
-    // Eksport zaczyna sie od indeksacji (jak pobieranie tresci) -
-    // bez komunikatow "najpierw kliknij" / "kliknij ponownie".
-    await waitRt(
-      () => notifyText(f, 'najpierw indeksuje wszystkie skrzynki'),
-      'komunikat o indeksacji przed eksportem',
-    );
-    assert.ok(!notifyText(f, 'najpierw kliknij Indeksuj'), 'stary guard zniknal');
-    await replayEmptyBoxes(h);
-    // Automatyczna kontynuacja: pusta baza po kompletnym indeksie =
-    // jasny toast, BEZ prosby o ponowny klik.
     await waitRt(() => notifyText(f, 'Skrzynki sa puste'), 'toast pustych skrzynek');
     assert.ok(!notifyText(f, 'kliknij ponownie'), 'brak prosby o ponowny klik');
+    assert.equal(f.sent.length, 0, 'eksport pustej bazy bez komend');
   } finally {
     await stopHarness();
   }
@@ -330,20 +297,12 @@ test('pobieranie tresci przy kompletnej bazie: jasny toast zamiast martwego', as
     f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec odczytu');
-    // Archiwum ma 1 list i ma juz tresc -> po indeksacji (kazde
-    // pobranie tresci zaczyna sie od niej, decyzja 2026-10-23)
-    // pobieranie konczy sie jasnym toastem.
+    // Archiwum ma 1 list i ma juz tresc -> pobieranie konczy sie
+    // jasnym toastem bez ponownej indeksacji.
     click(h, '[data-tab="archiwum"]');
     await waitRt(() => !!h.content.querySelector('.arkmail-arch-download'), 'przycisk pobierania');
     click(h, '.arkmail-arch-download'); // uzbrojenie
     click(h, '.arkmail-arch-download'); // odpalenie
-    await driveIndexAll(h, {
-      odebrane: [
-        'Listy odebrane:',
-        ' 1. *R* Temat: jedyny',
-        'Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12',
-      ],
-    });
     await waitRt(
       () => notifyText(f, 'Wszystkie listy w bazie maja tresci.'),
       'toast kompletnej bazy',

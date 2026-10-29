@@ -57,7 +57,7 @@ import { DargothTransport } from "./adapters/dargothTransport";
 import { cleanupLegacyStorage, openCharStorage, type CharStorage } from "./adapters/storage";
 import { STORAGE_WRITE_ERROR } from "./adapters/writeThroughStorage";
 import { notify } from "./adapters/notify";
-import { allBoxesIndexed, INDEX_BOXES, MailUiStore, formatBadgeSuffix } from "./ui/store";
+import { INDEX_BOXES, MailUiStore, formatBadgeSuffix } from "./ui/store";
 import { mountMailUi, type MailUiHandlers } from "./ui/render";
 import { applyConfirmedDeletions, matchSelectionOnFreshListing } from "./core/bulkDelete";
 import { formatListCount } from "./ui/deletion";
@@ -516,7 +516,6 @@ export async function init(api: PluginApi) {
     loadAllFlag = null;
     indexFlag = null;
     archiveDownloadFlag = null;
-    indexContinuation = null;
     pendingRefresh.clear();
     drainScheduled = false;
     ui.setBusy(null);
@@ -937,8 +936,6 @@ export async function init(api: PluginApi) {
 
   /** Flaga biezacej petli "Indeksuj wszystkie skrzynki" (null = brak). */
   let indexFlag: { cancelled: boolean } | null = null;
-  /** Akcja wykonywana dopiero po kompletnej biezacej indeksacji. */
-  let indexContinuation: null | "download" | "export" = null;
 
   const indexAllBoxes = (): void => {
     if (indexFlag) {
@@ -952,7 +949,6 @@ export async function init(api: PluginApi) {
     const flag = { cancelled: false };
     indexFlag = flag;
     let done = 0;
-    let runCompleted = false;
     const generation = connectionGeneration;
     const skipped: string[] = [];
     void runExclusive(async () => {
@@ -1044,7 +1040,6 @@ export async function init(api: PluginApi) {
               skipped.push(`${box} (${scan.skipWhy ?? "niekompletne"})`);
             }
           }
-          runCompleted = !flag.cancelled && skipped.length === 0;
           if (flag.cancelled) {
             notify(
               api,
@@ -1075,14 +1070,6 @@ export async function init(api: PluginApi) {
         if (!isOperationCancelled(err)) {
           notify(api, `Blad indeksowania: ${humanizeMailError(err instanceof Error ? err.message : String(err))}`);
         }
-      })
-      .finally(() => {
-        if (generation !== connectionGeneration) return;
-        const cont = indexContinuation;
-        indexContinuation = null;
-        if (!runCompleted || !allBoxesIndexed(ui.state.indexMeta)) return;
-        if (cont === "download") runArchiveDownload();
-        else if (cont === "export") runExportArchive();
       });
   };
 
@@ -1271,28 +1258,6 @@ export async function init(api: PluginApi) {
   const DOWNLOAD_BREAKER_LIMIT = 3;
 
   /**
-   * Klik "Pobierz tresci do archiwum" (po uzbrojeniu). KAZDE pobranie
-   * tresci zaczyna sie od pelnej kontroli indeksu wszystkich skrzynek
-   * (decyzja 2026-10-23) - dopiero swiezy indeks gwarantuje, ze lista
-   * kandydatow jest kompletna i aktualna. Sama petla pobierania odpala
-   * sie jako kontynuacja po kompletnej indeksacji (runArchiveDownload);
-   * przerwana albo niekompletna indeksacja jej nie odpala.
-   */
-  const downloadArchiveBodies = (): void => {
-    if (archiveDownloadFlag) {
-      archiveDownloadFlag.cancelled = true;
-      return;
-    }
-    if (lock.locked) {
-      notify(api, SESSION_BUSY_MSG);
-      return;
-    }
-    notify(api, "Pobieranie tresci: najpierw indeksuje wszystkie skrzynki.");
-    indexContinuation = "download";
-    indexAllBoxes();
-  };
-
-  /**
    * Petla "Pobierz tresci do archiwum" (Fala 16i, zgloszenie pkt 10):
    * kolejne listy bez tresci pod JEDNA blokada sesji, tempo jak loadAll.
    * Drugi klik przycisku = Przerwij. Blad pojedynczego listu nie zabija
@@ -1303,8 +1268,7 @@ export async function init(api: PluginApi) {
    * Fala 31a: circuit breaker - 3 bledy z rzedu (siec/serwer lezy)
    * zatrzymuja petle z jasnym komunikatem, zamiast mielic reszte
    * kandydatow do konca. Sukces i 'missing' licznik resetuja.
-   * WOLANA WYLACZNIE jako kontynuacja kompletnej indeksacji
-   * (downloadArchiveBodies) - nigdy bezposrednio z UI.
+   * Uzywa aktualnej bazy; nie uruchamia indeksacji automatycznie.
    */
   const runArchiveDownload = (): void => {
     if (archiveDownloadFlag) {
@@ -1455,9 +1419,8 @@ export async function init(api: PluginApi) {
   };
 
   /**
-   * Zapis calego archiwum do ZIP po kompletnej indeksacji. Operacja
-   * czysto lokalna: uzywa tylko danych z cache, nie wysyla komend.
-   * Wolana jako kontynuacja onExportArchive - nigdy bezposrednio z UI.
+   * Zapis dostepnych tresci do ZIP. Operacja czysto lokalna: uzywa
+   * tylko danych z cache, nie wysyla komend i nie wymaga pelnego indeksu.
    */
   const runExportArchive = (): void => {
     const { entries, skipped } = archiveExportEntries(ui.state.archive);
@@ -1694,9 +1657,8 @@ export async function init(api: PluginApi) {
           if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
         });
     },
-    onDownloadArchiveBodies: () => downloadArchiveBodies(),
-    // Fala 18c: indeksacja wszystkich skrzynek (brama Kontaktow,
-    // guardy pobierania/eksportu).
+    onDownloadArchiveBodies: () => runArchiveDownload(),
+    // Indeksacja wszystkich skrzynek jako osobna operacja.
     onIndexAll: () => indexAllBoxes(),
     // Fala 17g: eksporty TXT/ZIP - operacje czysto lokalne (dane
     // z cache), bez locka i bez komend do serwera.
@@ -1724,17 +1686,8 @@ export async function init(api: PluginApi) {
       );
     },
     onExportArchive: () => {
-      // Eksport, jak pobieranie tresci, zaczyna sie od pelnej kontroli
-      // indeksu wszystkich skrzynek (decyzja 2026-10-23) - ZIP powstaje
-      // z aktualnej, kompletnej bazy. Sam zapis odpala sie jako
-      // kontynuacja po kompletnej indeksacji (runExportArchive).
-      if (lock.locked) {
-        notify(api, SESSION_BUSY_MSG);
-        return;
-      }
-      notify(api, "Zapis do ZIP: najpierw indeksuje wszystkie skrzynki.");
-      indexContinuation = "export";
-      indexAllBoxes();
+      // Zapis uzywa wylacznie danych juz dostepnych w archiwum.
+      runExportArchive();
     },
     onSendCompose: (input) => {
       if (!input.adresat.trim() || !input.temat.trim()) {

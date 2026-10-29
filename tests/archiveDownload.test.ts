@@ -24,7 +24,6 @@ import {
   startHarness,
   stopHarness,
   loadTruncatedBox,
-  driveIndexAll,
   click,
   waitRt,
   notifyText,
@@ -122,11 +121,8 @@ test('archiwum: pobieranie tresci - uzbrojenie, petla, podsumowanie, cache', asy
     );
     assert.equal(f.sent.length, base, 'uzbrojenie nie wysyla komend');
 
-    // Drugi klik startuje operacje: najpierw pelna indeksacja skrzynek
-    // (swiezy indeks = pewnosc kompletnej listy kandydatow), dopiero
-    // potem petla pobierania - kazdy list przez re-kotwice po dacie.
+    // Drugi klik startuje pobieranie kandydatow z aktualnej bazy.
     clickDownload(h);
-    await driveIndexAll(h, { odebrane: LISTING3_FULL });
     await waitRt(() => f.sent.includes('listy odebrane przed 24 XII 2025'), 're-kotwica najnowszego');
     replayListing3(h);
     await waitRt(() => f.sent.includes('przeczytaj list 1'), 'odczyt najnowszego');
@@ -155,14 +151,12 @@ test('archiwum: pobieranie tresci - uzbrojenie, petla, podsumowanie, cache', asy
     await wf(() => letterBodyShows(h, 'Tresc drugiego.'), 'list z cache po pobraniu');
     assert.equal(f.sent.length, base2, 'podglad z cache bez komend');
 
-    // Brak kandydatow: kolejny start = znowu najpierw indeksacja
-    // (kazde pobranie tresci zaczyna sie od kontroli indeksu), potem
-    // toast o kompletnej bazie. Re-kotwice pobierania NIE wylatuja.
+    // Brak kandydatow: kolejny start daje toast o kompletnej bazie.
+    // Re-kotwice pobierania NIE wylatuja.
     click(h, '[data-tab="archiwum"]');
     const anchorsBefore = f.sent.filter((c) => / przed \d+ [IVX]+ \d{4}$/.test(c)).length;
     clickDownload(h); // uzbrojenie
     clickDownload(h); // start
-    await driveIndexAll(h, { odebrane: LISTING3_FULL });
     await wf(() => notifyText(f, 'Wszystkie listy w bazie maja tresci.'), 'toast o kompletnym archiwum');
     assert.equal(
       f.sent.filter((c) => / przed \d+ [IVX]+ \d{4}$/.test(c)).length,
@@ -182,8 +176,6 @@ test('archiwum: pobieranie tresci - Przerwij konczy petle po biezacym liscie', a
     click(h, '[data-tab="archiwum"]');
     clickDownload(h); // uzbrojenie
     clickDownload(h); // start
-    // Indeksacja przed pobieraniem (jak w pierwszym tescie).
-    await driveIndexAll(h, { odebrane: LISTING3_FULL });
     await waitRt(() => f.sent.includes('listy odebrane przed 24 XII 2025'), 're-kotwica');
     replayListing3(h);
     await waitRt(() => f.sent.includes('przeczytaj list 1'), 'odczyt pierwszego');

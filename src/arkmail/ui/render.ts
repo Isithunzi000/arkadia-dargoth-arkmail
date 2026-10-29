@@ -11,6 +11,7 @@ import type { MailBox } from '../core/protocol/types.js';
 import type { MailboxEntry } from '../core/session/mailbox.js';
 import { fromISODate, type ListingSearch } from '../core/protocol/commands.js';
 import { filterVisibleArchive, type ArchiveFilter, type ArchiveLetter } from '../core/archive.js';
+import { archiveExportEntries } from '../core/exportTxt.js';
 import { viewContacts, type ContactSort } from '../core/contacts.js';
 import {
   clampLineWidth,
@@ -1535,6 +1536,62 @@ export function mountMailUi(
       repaint();
     });
     controls.appendChild(clearFilters);
+
+    const steps = doc.createElement('div');
+    steps.className = 'arkmail-archive-steps';
+    steps.setAttribute('aria-label', 'Kolejne kroki pracy z archiwum');
+    const makeStep = (title: string, status: string, tone: string): HTMLElement => {
+      const step = doc.createElement('section');
+      step.className = `arkmail-archive-step arkmail-step-${tone}`;
+      const heading = doc.createElement('div');
+      heading.className = 'arkmail-archive-step-title';
+      heading.textContent = title;
+      const description = doc.createElement('div');
+      description.className = 'arkmail-archive-step-status';
+      description.textContent = status;
+      step.appendChild(heading);
+      step.appendChild(description);
+      steps.appendChild(step);
+      return step;
+    };
+    const indexedCount = INDEX_BOXES.filter((box) => state.indexMeta[box] !== undefined).length;
+    const gapCount = Object.values(state.archiveGaps).reduce((sum, days) => sum + days.length, 0);
+    const indexStatus = state.indexRun
+      ? `W toku: ${state.indexRun.box}, stron: ${state.indexRun.pages}.`
+      : allBoxesIndexed(state.indexMeta)
+        ? gapCount > 0
+          ? `Gotowe z ostrzezeniem: dni z brakami: ${gapCount}.`
+          : 'Gotowe: wszystkie skrzynki zindeksowane.'
+        : indexedCount > 0 || gapCount > 0
+          ? `Niekompletne: ${indexedCount} z ${INDEX_BOXES.length} skrzynek${gapCount > 0 ? `; dni z brakami: ${gapCount}` : ''}.`
+          : 'Nie rozpoczeto.';
+    const withBody = state.archive.filter((letter) => letter.body.length > 0).length;
+    const pendingBody = state.archive.filter(
+      (letter) => letter.body.length === 0 && letter.missingOnServer !== true,
+    ).length;
+    const unavailableBody = state.archive.filter(
+      (letter) => letter.body.length === 0 && letter.missingOnServer === true,
+    ).length;
+    const downloadStatus = state.archiveDownload
+      ? `W toku: ${state.archiveDownload.done} z ${state.archiveDownload.total}.`
+      : state.archive.length === 0
+        ? 'Nie rozpoczeto.'
+        : pendingBody > 0
+          ? `Niekompletne: ${formatListCount(withBody)} z trescia; bez tresci: ${pendingBody + unavailableBody}.`
+          : unavailableBody > 0
+            ? `Gotowe z ostrzezeniem: ${formatListCount(withBody)} z trescia; niedostepne: ${unavailableBody}.`
+            : `Gotowe: ${formatListCount(withBody)} z trescia.`;
+    const exportable = archiveExportEntries(state.archive);
+    const exportStatus =
+      exportable.entries.length === 0
+        ? 'Nie rozpoczeto: brak listow z trescia.'
+        : exportable.skipped > 0
+          ? `Gotowe z ostrzezeniem: ${formatListCount(exportable.entries.length)} do zapisu; bez tresci: ${exportable.skipped}.`
+          : `Gotowe: ${formatListCount(exportable.entries.length)} do zapisu.`;
+    const indexStep = makeStep('1. Indeksacja', indexStatus, state.indexRun ? 'active' : allBoxesIndexed(state.indexMeta) ? (gapCount > 0 ? 'warning' : 'done') : indexedCount > 0 || gapCount > 0 ? 'incomplete' : 'idle');
+    const downloadStep = makeStep('2. Pobranie tresci', downloadStatus, state.archiveDownload ? 'active' : pendingBody > 0 ? 'incomplete' : withBody > 0 ? (unavailableBody > 0 ? 'warning' : 'done') : 'idle');
+    const exportStep = makeStep('3. Zapis ZIP', exportStatus, exportable.entries.length > 0 ? (exportable.skipped > 0 ? 'warning' : 'done') : 'idle');
+
     // Fala 18c (zgloszenie 2026-10-20 pkt 1): indeksacja wszystkich
     // skrzynek - pelny listing kazdej (z paginacja kotwicowa) = kompletna
     // baza dla kontaktow i eksportow. Operacja tylko czyta (jak Wczytaj
@@ -1545,7 +1602,7 @@ export function mountMailUi(
       ? `Przerwij indeksowanie (${state.indexRun.boxIndex + 1}/${INDEX_BOXES.length})`
       : 'Indeksuj wszystkie skrzynki';
     idxBtn.addEventListener('click', () => handlers.onIndexAll?.());
-    controls.appendChild(idxBtn);
+    indexStep.appendChild(idxBtn);
     // Fala 16i: masowe pobieranie tresci do archiwum (zgloszenie
     // pkt 10). Dwuklikowe uzbrojenie z ostrzezeniem o dlugim czasie
     // (precedens: Wyczysc zapisane dane); w trakcie petli przycisk
@@ -1576,7 +1633,7 @@ export function mountMailUi(
       setButtonLabel(dlBtn, 'Pobierz tresci do archiwum');
       handlers.onDownloadArchiveBodies?.();
     });
-    controls.appendChild(dlBtn);
+    downloadStep.appendChild(dlBtn);
     // Fala 17g: eksport calego archiwum do ZIP z TXT per list.
     // Operacja lokalna (tylko listy z trescia w cache) - bez dwukliku.
     const expBtn = doc.createElement('button');
@@ -1585,7 +1642,8 @@ export function mountMailUi(
     // list - etykieta mowi o formacie archiwum, nie o pojedynczym TXT.
     expBtn.textContent = 'Zapisz wszystkie (ZIP)';
     expBtn.addEventListener('click', () => handlers.onExportArchive?.());
-    controls.appendChild(expBtn);
+    exportStep.appendChild(expBtn);
+    pane.appendChild(steps);
     pane.appendChild(controls);
     const list = doc.createElement('div');
     pane.appendChild(list);
