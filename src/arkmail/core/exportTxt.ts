@@ -96,19 +96,23 @@ export function archiveExportEntries(letters: readonly ArchiveLetter[]): {
   entries: ExportEntry[];
   skipped: number;
 } {
-  const byKey = new Map<string, ArchiveLetter>();
-  let skipped = 0;
+  const byKey = new Map<string, ArchiveLetter[]>();
   for (const l of letters) {
-    if (l.missingOnServer === true) continue; // Fala 18a: znikniete nie eksportujemy
-    if (l.body.length === 0) {
-      skipped++;
-      continue;
-    }
+    if (l.missingOnServer === true) continue;
     const key = contentKeyOf(l);
-    const prev = byKey.get(key);
-    if (!prev || BOX_RANK[l.box] < BOX_RANK[prev.box]) byKey.set(key, l);
+    const group = byKey.get(key);
+    if (group) group.push(l);
+    else byKey.set(key, [l]);
   }
-  const sorted = [...byKey.values()].sort((a, b) => {
+  const byCanonicalBox = (a: ArchiveLetter, b: ArchiveLetter): number =>
+    BOX_RANK[a.box] - BOX_RANK[b.box] || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  const representatives = [...byKey.values()].map((group) => {
+    const canonical = [...group].sort(byCanonicalBox)[0]!;
+    const withBody = group.filter((letter) => letter.body.length > 0).sort(byCanonicalBox)[0];
+    return withBody ? { ...canonical, body: withBody.body } : canonical;
+  });
+  const skipped = representatives.filter((letter) => letter.body.length === 0).length;
+  const sorted = representatives.filter((letter) => letter.body.length > 0).sort((a, b) => {
     if (a.sortKey !== b.sortKey) return a.sortKey < b.sortKey ? 1 : -1;
     return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
   });

@@ -1281,30 +1281,34 @@ export async function init(api: PluginApi) {
       notify(api, SESSION_BUSY_MSG);
       return;
     }
-    // Bez daty nie ma re-kotwicy (Fala 16h) - takie listy zostaja.
-    // Fala 17c: pomijamy tez rekordy oznaczone jako znikniete z serwera
-    // (bez znacznika kazdy restart mielil zombie-wpisy do timeoutu).
-    // Grupowanie po kluczu TRESCI (bez skrzynki): list nieprzeczytany
-    // ma w archiwum blizniaka (nieprzeczytane + odebrane) - pobieramy
-    // go RAZ, przez skrzynke kanoniczna.
+    // Najpierw grupujemy wszystkie dostepne rekordy. Tresc w jednym
+    // rekordzie blizniaka wystarcza dla calej grupy. Kandydat musi miec
+    // prawidlowa date, bo bez niej nie mozna odnalezc listu na serwerze.
     const groups = new Map<string, ArchiveLetter[]>();
     for (const l of ui.state.archive) {
-      if (l.body.length > 0 || l.dateRaw === null || l.missingOnServer === true) continue;
+      if (l.missingOnServer === true) continue;
       const key = contentKeyOf(l);
       const arr = groups.get(key);
       if (arr) arr.push(l);
       else groups.set(key, [l]);
     }
-    const candidates = [...groups.values()];
+    const pending = [...groups.values()].filter((group) =>
+      group.every((l) => l.body.length === 0),
+    );
+    const candidates = pending.filter((group) => {
+      const dateRaw = group[0]!.dateRaw;
+      return dateRaw !== null && parseMailDate(dateRaw) !== null;
+    });
     if (candidates.length === 0) {
-      // Fala 18c: rozroznienie stanu "nic do pobrania" - kompletna baza
-      // z tresciami vs faktycznie puste skrzynki (po pelnej indeksacji).
-      // Pusta baza bez indeksu odfiltrowana wyzej przez guard.
       notify(
         api,
-        ui.state.archive.length > 0
-          ? "Wszystkie listy w bazie maja tresci."
-          : "Skrzynki sa puste - nie ma czego pobierac.",
+        ui.state.archive.length === 0
+          ? "Skrzynki sa puste - nie ma czego pobierac."
+          : pending.length > 0
+            ? `Nie mozna pobrac tresci - listy bez prawidlowej daty: ${pending.length}.`
+            : groups.size === 0
+              ? "Brak dostepnych listow do pobrania - zniknely z serwera."
+              : "Wszystkie listy w bazie maja tresci.",
       );
       return;
     }
@@ -1431,7 +1435,9 @@ export async function init(api: PluginApi) {
         api,
         ui.state.archive.length === 0
           ? "Skrzynki sa puste - nie ma czego zapisywac."
-          : "Brak listow z tresci w archiwum - najpierw pobierz tresci.",
+          : ui.state.archive.every((letter) => letter.missingOnServer === true)
+            ? "Brak dostepnych listow do zapisu - zniknely z serwera."
+            : "Brak listow z tresci w archiwum - najpierw pobierz tresci.",
       );
       return;
     }

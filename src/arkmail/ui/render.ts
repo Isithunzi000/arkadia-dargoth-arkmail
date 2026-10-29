@@ -14,7 +14,13 @@ import {
   validateSearchDraft,
   type ListingSearch,
 } from '../core/protocol/commands.js';
-import { filterVisibleArchive, type ArchiveFilter, type ArchiveLetter } from '../core/archive.js';
+import {
+  contentKeyOf,
+  filterVisibleArchive,
+  type ArchiveFilter,
+  type ArchiveLetter,
+} from '../core/archive.js';
+import { parseMailDate } from '../core/protocol/parser.js';
 import { archiveExportEntries } from '../core/exportTxt.js';
 import { viewContacts, type ContactSort } from '../core/contacts.js';
 import {
@@ -1598,21 +1604,44 @@ export function mountMailUi(
         : indexedCount > 0 || gapCount > 0
           ? `Niekompletne: ${indexedCount} z ${INDEX_BOXES.length} skrzynek${gapCount > 0 ? `; dni z brakami: ${gapCount}` : ''}.`
           : 'Nie rozpoczeto.';
-    const withBody = state.archive.filter((letter) => letter.body.length > 0).length;
-    const pendingBody = state.archive.filter(
-      (letter) => letter.body.length === 0 && letter.missingOnServer !== true,
-    ).length;
-    const unavailableBody = state.archive.filter(
-      (letter) => letter.body.length === 0 && letter.missingOnServer === true,
-    ).length;
+    const archiveGroups = new Map<string, ArchiveLetter[]>();
+    for (const letter of state.archive) {
+      const key = contentKeyOf(letter);
+      const group = archiveGroups.get(key);
+      if (group) group.push(letter);
+      else archiveGroups.set(key, [letter]);
+    }
+    let withBody = 0;
+    let pendingBody = 0;
+    let undatedBody = 0;
+    let unavailableBody = 0;
+    for (const group of archiveGroups.values()) {
+      const live = group.filter((letter) => letter.missingOnServer !== true);
+      if (live.length === 0) {
+        unavailableBody += 1;
+        continue;
+      }
+      if (live.some((letter) => letter.body.length > 0)) {
+        withBody += 1;
+        continue;
+      }
+      const dateRaw = live[0]!.dateRaw;
+      if (dateRaw !== null && parseMailDate(dateRaw) !== null) pendingBody += 1;
+      else undatedBody += 1;
+    }
+    const bodyWarnings = [
+      undatedBody > 0 ? `bez prawidlowej daty: ${undatedBody}` : '',
+      unavailableBody > 0 ? `niedostepne: ${unavailableBody}` : '',
+    ].filter((text) => text !== '');
+    const warningSuffix = bodyWarnings.length > 0 ? `; ${bodyWarnings.join('; ')}` : '';
     const downloadStatus = state.archiveDownload
       ? `W toku: ${state.archiveDownload.done} z ${state.archiveDownload.total}.`
       : state.archive.length === 0
         ? 'Nie rozpoczeto.'
         : pendingBody > 0
-          ? `Niekompletne: ${formatListCount(withBody)} z trescia; bez tresci: ${pendingBody + unavailableBody}.`
-          : unavailableBody > 0
-            ? `Gotowe z ostrzezeniem: ${formatListCount(withBody)} z trescia; niedostepne: ${unavailableBody}.`
+          ? `Niekompletne: ${formatListCount(withBody)} z trescia; do pobrania: ${pendingBody}${warningSuffix}.`
+          : bodyWarnings.length > 0
+            ? `Gotowe z ostrzezeniem: ${formatListCount(withBody)} z trescia${warningSuffix}.`
             : `Gotowe: ${formatListCount(withBody)} z trescia.`;
     const exportable = archiveExportEntries(state.archive);
     const exportStatus =
@@ -1622,7 +1651,7 @@ export function mountMailUi(
           ? `Gotowe z ostrzezeniem: ${formatListCount(exportable.entries.length)} do zapisu; bez tresci: ${exportable.skipped}.`
           : `Gotowe: ${formatListCount(exportable.entries.length)} do zapisu.`;
     const indexStep = makeStep('1. Indeksacja', indexStatus, state.indexRun ? 'active' : allBoxesIndexed(state.indexMeta) ? (gapCount > 0 ? 'warning' : 'done') : indexedCount > 0 || gapCount > 0 ? 'incomplete' : 'idle');
-    const downloadStep = makeStep('2. Pobranie tresci', downloadStatus, state.archiveDownload ? 'active' : pendingBody > 0 ? 'incomplete' : withBody > 0 ? (unavailableBody > 0 ? 'warning' : 'done') : 'idle');
+    const downloadStep = makeStep('2. Pobranie tresci', downloadStatus, state.archiveDownload ? 'active' : pendingBody > 0 ? 'incomplete' : bodyWarnings.length > 0 ? 'warning' : withBody > 0 ? 'done' : 'idle');
     const exportStep = makeStep('3. Zapis ZIP', exportStatus, exportable.entries.length > 0 ? (exportable.skipped > 0 ? 'warning' : 'done') : 'idle');
 
     // Fala 18c (zgloszenie 2026-10-20 pkt 1): indeksacja wszystkich

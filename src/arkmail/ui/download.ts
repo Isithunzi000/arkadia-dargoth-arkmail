@@ -15,11 +15,11 @@ export function setDownloadImpl(fn: DownloadFn | null): void {
 
 /** Zapisuje blob pod zadana nazwa. false = klient nie umie pobierac. */
 export function downloadBlob(name: string, data: Blob): boolean {
-  if (impl) {
-    impl(name, data);
-    return true;
-  }
   try {
+    if (impl) {
+      impl(name, data);
+      return true;
+    }
     const g = globalThis as {
       document?: {
         createElement(tag: string): unknown;
