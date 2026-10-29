@@ -24,6 +24,7 @@ import { STYLES } from './styles.js';
 import { attachGhost, type GhostSource } from './ghost.js';
 import { emptyDeletionFilters, formatListCount } from './deletion.js';
 import type { DeletionFilters } from './deletion.js';
+import { PLUGIN_BUILD_DATE, PLUGIN_VERSION } from '../meta.js';
 
 export interface MailUiHandlers {
   /**
@@ -263,6 +264,13 @@ export function mountMailUi(
     return out;
   };
 
+  const renderVersionFooter = (): HTMLElement => {
+    const footer = doc.createElement('footer');
+    footer.className = 'arkmail-version-footer';
+    footer.textContent = `v${PLUGIN_VERSION} | ${PLUGIN_BUILD_DATE}`;
+    return footer;
+  };
+
   const render = (state: MailUiState) => {
     const snap = snapshotView();
     root.className = 'arkmail-root' + (state.wide ? ' arkmail-wide' : '');
@@ -294,6 +302,7 @@ export function mountMailUi(
     } else {
       nodes.push(renderPane(state));
     }
+    nodes.push(renderVersionFooter());
     root.replaceChildren(...nodes);
     fillButtonTitles(root);
     restoreView(snap);

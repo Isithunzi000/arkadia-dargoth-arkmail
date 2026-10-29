@@ -42,6 +42,13 @@ export const STYLES = `
   font-size: 13px;
   line-height: 1.45;
 }
+.arkmail-version-footer {
+  flex: 0 0 auto;
+  color: ${FG_DIM};
+  font-size: 11px;
+  line-height: 1.3;
+  text-align: right;
+}
 .arkmail-root *, .arkmail-root *::before, .arkmail-root *::after {
   box-sizing: border-box;
 }

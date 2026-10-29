@@ -11,6 +11,7 @@ import { Window } from 'happy-dom';
 import { mountMailUi } from '../src/arkmail/ui/render';
 import { MailUiStore } from '../src/arkmail/ui/store';
 import type { LetterContent } from '../src/arkmail/core/session/pager';
+import { PLUGIN_BUILD_DATE, PLUGIN_VERSION } from '../src/arkmail/meta';
 
 const window = new Window();
 const document = window.document;
@@ -59,6 +60,21 @@ const click = (c: unknown, sel: string): void =>
   (q(c, sel) as { dispatchEvent(e: unknown): void }).dispatchEvent(
     new window.Event('click') as unknown as Event,
   );
+
+test('stopka: wersja i data sa ostatnim elementem kazdej zakladki', () => {
+  const s = new MailUiStore();
+  const c = mount(s);
+  for (const tab of ['listy', 'napisz', 'kontakty', 'archiwum', 'usuwanie'] as const) {
+    s.setTab(tab);
+    const footer = q(c, '.arkmail-version-footer') as {
+      textContent?: string;
+      parentElement?: { lastElementChild?: unknown };
+    } | null;
+    assert.ok(footer, `stopka na zakladce ${tab}`);
+    assert.equal(footer.textContent, `v${PLUGIN_VERSION} | ${PLUGIN_BUILD_DATE}`);
+    assert.equal(footer.parentElement?.lastElementChild, footer, 'stopka jest na koncu normalnego ukladu');
+  }
+});
 
 test('layout: wide bez otwartego listu - split z listingiem i placeholderem', () => {
   const s = withBox(new MailUiStore({ wide: true }));
