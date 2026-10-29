@@ -102,6 +102,13 @@ listy [nieprzeczytane/otrzymane/wyslane/niewyslane]
   podciagiem po stronie listu, a reczna szukajka zostaje serwerowa
   (zawsze aktualne dane).
 
+Przed wysłaniem filtra ArkMail sprawdza wszystkie pola. Osoba może zawierać
+wyłącznie litery A-Z i a-z. Temat i treść filtra nie mogą zawierać znaków `;`
+ani `#`. Wszystkie daty muszą istnieć w kalendarzu, a początek zakresu nie może
+być późniejszy niż jego koniec. Dolna granica `Od dnia` nie może wymagać
+przejścia przed rok 1. Te same reguły obowiązują w Listach i Usuwaniu, także
+przy wywołaniu handlera bez formularza.
+
 ### Semantyka granic dat (zweryfikowane w logach)
 
 - `przed <data>` jest **dzienno-granularne i WYLACZNE**: list z dnia
@@ -233,6 +240,17 @@ pustego tematu — pusty temat jest niemozliwy (serwer go nie przyjmuje;
 ArkMail dodatkowo blokuje go twardo w formularzu, Fala 28g). Przy
 odpowiedzi z cytowaniem (Fala 28c) temat przenoszony doslownie:
 `Odp: --`.
+
+### Walidacja przed wysyłką
+
+Pola adresat i DW przyjmują wyłącznie litery A-Z i a-z, przecinki i spacje.
+Każde z nich może zawierać kilka nazw lub aliasów rozdzielonych przecinkami.
+Adresat jest wymagany, a DW może pozostać puste.
+
+Temat i treść nie mogą zawierać znaków `;` ani `#`. Oba pola są wymagane.
+Sam szablon lub ramka bez wpisanej treści jest pustym listem i nie może zostać
+wysłany. Błędny tekst nie jest poprawiany automatycznie. Te same reguły
+obowiązują w formularzu i bezpośrednio w handlerze wysyłki.
 
 ### Widocznosc w oknie gry (plugin)
 

@@ -22,8 +22,8 @@ function metaVersion() {
   return m[1];
 }
 
-test('wydanie: przygotowany numer wersji to 1.17.0', () => {
-  assert.equal(metaVersion(), '1.17.0');
+test('wydanie: przygotowany numer wersji to 1.18.0', () => {
+  assert.equal(metaVersion(), '1.18.0');
 });
 
 function latestZip() {
@@ -108,8 +108,26 @@ test('dokumentacja: README opisuje trzy niezalezne kroki Archiwum', () => {
 
 test('dokumentacja: README opisuje reczne i zbiorcze usuwanie listow', () => {
   const readme = fs.readFileSync(path.join(REPO, 'README.md'), 'utf8');
-  assert.match(readme, /Usuwanie listow/);
+  assert.match(readme, /Usuwanie listów/);
   assert.match(readme, /jeden wynik z wybranej skrzynki/);
   assert.match(readme, /Wyniki nie odświeżają się automatycznie/);
   assert.match(readme, /wyjście z zakładki\s+czyści wyniki, filtry i zaznaczenie/);
+});
+
+test('dokumentacja: README opisuje odswiezanie i grupowanie listow', () => {
+  const readme = fs.readFileSync(path.join(REPO, 'README.md'), 'utf8').replace(/\s+/g, ' ');
+  assert.match(readme, /osobie, temacie, treści i dacie/);
+  assert.match(readme, /Puste pola i przycisk Szukaj odświeżają aktywną skrzynkę/);
+  assert.match(readme, /W Usuwaniu przycisk Odswiez ponawia ostatnie wyszukiwanie/);
+  assert.match(readme, /powtórzone wpisy tego samego listu/);
+  assert.match(readme, /pusta lub błędna data nie oznacza zniknięcia listu/);
+});
+
+test('dokumentacja: walidacja listu i filtrow jest opisana', () => {
+  const protocol = fs.readFileSync(path.join(REPO, 'docs/PROTOCOL.md'), 'utf8');
+  assert.match(protocol, /adresat i DW przyjmują wyłącznie litery A-Z i a-z/);
+  assert.match(protocol, /kilka nazw lub aliasów rozdzielonych przecinkami/);
+  assert.match(protocol, /Temat i treść nie mogą zawierać znaków `;` ani `#`/);
+  assert.match(protocol, /Sam szablon lub ramka bez wpisanej treści jest pustym listem/);
+  assert.match(protocol, /daty muszą istnieć w kalendarzu/);
 });
