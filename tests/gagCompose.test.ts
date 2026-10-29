@@ -90,6 +90,7 @@ test('echo: wysylki composera i "wyslij zwierze" ida z echem, listingi bez', asy
     setField('tresc', 'czesc');
     click(h, '.arkmail-send');
     await waitFor(() => f.sent.includes('napisz list'), 'compose wystartowal');
+    await waitFor(() => f.sent.includes('Corge'), 'adresat zostal wyslany');
     assert.equal(echoOf('napisz list'), true, 'napisz list z echem');
     assert.equal(echoOf('Corge'), true, 'adresat z echem');
     f.fire('Adresat: Temat: DW: ', 'mail');
@@ -109,6 +110,7 @@ test('echo: wysylki composera i "wyslij zwierze" ida z echem, listingi bez', asy
     await waitRt(() => content.querySelector('.arkmail-animal-send') !== null, 'przycisk zwierzecia');
     const idx = f.sent.length;
     click(h, '.arkmail-animal-send');
+    await waitRt(() => f.sent.length > idx, 'komenda zwierzecia zostala wyslana');
     assert.equal(f.sent[idx], 'wyslij zwierze', 'komenda zwierzecia');
     assert.equal(f.sentEcho[idx], true, 'wyslij zwierze z echem');
     const gagCount = f.gagged.length;

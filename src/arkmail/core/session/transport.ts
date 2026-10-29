@@ -13,7 +13,7 @@ export interface Transport {
   /** Wysyla jedna linie do gry. echo=true: linia pokazuje sie w oknie
    *  gry jak wpisana recznie (Fala 28h: compose i "wyslij zwierze" sa
    *  widoczne dla gracza); domyslnie bez echa (operacje pluginowe). */
-  send(line: string, echo?: boolean): void;
+  send(line: string, echo?: boolean): void | Promise<void>;
   /** Subskrypcja linii przychodzacych; zwraca unsubscribe. */
   subscribe(cb: (line: ProtoLine) => void): () => void;
 }

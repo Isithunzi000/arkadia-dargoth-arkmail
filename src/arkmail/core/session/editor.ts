@@ -45,8 +45,10 @@ export class EditorSession {
       let stage: Stage = 'adresat';
       let done = false;
       let editorReady = false;
+      let bodyStarted = false;
       const dw = input.dw ?? '';
       let cancelUnsub: () => void = () => {};
+      let transition: Promise<void> = Promise.resolve();
 
       const cleanup = () => {
         done = true;
@@ -58,6 +60,18 @@ export class EditorSession {
         cleanup();
         resolve(r);
       };
+      const fail = (error: unknown) => {
+        if (done) return;
+        cleanup();
+        reject(error);
+      };
+      const enqueue = (job: () => Promise<void>) => {
+        transition = transition.then(job);
+        transition.catch(fail);
+      };
+      const sendLine = async (line: string): Promise<void> => {
+        if (!done) await this.transport.send(line, true);
+      };
 
       const timer = setTimeout(() => {
         cleanup();
@@ -65,28 +79,28 @@ export class EditorSession {
       }, this.opts.timeoutMs);
 
       /** Wysyla odpowiedzi na wszystkie potwierdzone prompty. */
-      const flush = (confirmed: Stage[]) => {
+      const flush = async (confirmed: Stage[]): Promise<void> => {
         const order: Stage[] = ['adresat', 'temat', 'dw'];
         for (const c of confirmed) {
+          if (done) return;
           const idx = order.indexOf(c);
           const cur = order.indexOf(stage);
-          if (idx < cur) continue; // juz potwierdzone wczesniej
-          if (c === 'adresat') {
-            // adresat juz wyslany wraz z "napisz list"
-          } else if (c === 'temat') {
-            this.transport.send(input.temat, true);
-          } else if (c === 'dw') {
-            this.transport.send(dw, true);
-          }
+          if (idx < cur) continue;
           stage = order[idx + 1] ?? 'tresc';
+          if (c === 'temat') await sendLine(input.temat);
+          else if (c === 'dw') await sendLine(dw);
         }
       };
 
-      const sendBody = (): void => {
-        if (stage !== 'tresc' || !editorReady) return;
-        for (const linia of input.linie) this.transport.send(linia, true);
-        this.transport.send('**', true);
+      const sendBody = async (): Promise<void> => {
+        if (done || bodyStarted || stage !== 'tresc' || !editorReady) return;
+        bodyStarted = true;
         stage = 'tresc-wyslana';
+        for (const linia of input.linie) {
+          if (done) return;
+          await sendLine(linia);
+        }
+        if (!done) await sendLine('**');
       };
 
       const unsub = this.transport.subscribe((line: ProtoLine) => {
@@ -117,12 +131,17 @@ export class EditorSession {
 
         if (isEditorReady(line.text)) editorReady = true;
 
-        // Echo promptow compose (moze byc sklejone).
+        // Prompt i gotowosc moga przyjsc w tej samej linii. Obie czynnosci
+        // wykonuje jedna kolejka, wiec tresc nie wyprzedzi tematu ani DW.
         const prompts = parseComposeEcho(line.text);
         if (prompts) {
-          flush(prompts as Stage[]);
+          enqueue(async () => {
+            await flush(prompts as Stage[]);
+            await sendBody();
+          });
+        } else if (editorReady) {
+          enqueue(sendBody);
         }
-        sendBody();
       });
 
       cancelUnsub = this.opts.onCancel?.(() => {
@@ -130,8 +149,12 @@ export class EditorSession {
         reject(new Error('operacja anulowana'));
       }) ?? (() => {});
       if (!done) {
-        this.transport.send('napisz list', true);
-        this.transport.send(input.adresat, true);
+        // Adapter zachowuje kolejnosc tych dwoch komend. Testowy transport
+        // nadal moze zapisac je synchronicznie, jak dotychczas.
+        const first = this.transport.send('napisz list', true);
+        const second = this.transport.send(input.adresat, true);
+        transition = Promise.all([first, second]).then(() => {});
+        transition.catch(fail);
       }
     });
   }

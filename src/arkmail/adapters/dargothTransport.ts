@@ -1,15 +1,15 @@
 /**
  * DargothTransport: Transport (core) nad zywym PluginApi klienta Dargoth.
  *
- * - send: api.command.send z zachowaniem wielkosci liter i bez echa.
+ * - send: api.command.send z zachowaniem wielkosci liter.
  * - subscribe: jeden zbiorczy trigger /^/ (tag 'arkmail') rozdziela linie
  *   do subskrybentow; linia zwracana BEZ zmian (niczego nie modyfikujemy).
  *   cls = typ linii z klienta (trzeci argument callbacka, np. 'prompt').
  * - modal-guard: na czas sesji pager/edytor (ktore konsumuja caly strumien
  *   wejscia gry) hook commandHooks tlumi komendy gracza do kolejki;
  *   endModal() odtwarza je do gry w oryginalnej kolejnosci.
- *   Wlasne wysylki sesji omijaja hook (zbior bypass) - api.command.send
- *   przechodzi przez commandHooks, co zweryfikowano w PluginApi.ts.
+ *   Wlasne wysylki sesji omijaja hook tylko podczas wywolania api.command.send.
+ *   Komendy sa wykonywane pojedynczo, w kolejnosci przekazania do transportu.
  */
 
 import type PluginApi from 'plugin-api';
@@ -25,7 +25,9 @@ export class DargothTransport implements Transport {
   private modalActive = false;
   private hookId: string | null = null;
   private queue: string[] = [];
-  private bypass = new Set<string>();
+  private commandQueue: Promise<void> = Promise.resolve();
+  private connectionGeneration = 0;
+  private sendingOwn = false;
   private online = true;
   /** Fala 16j: kiedy tlumic linie pocztowe (index.ts: blokada sesji). */
   private gagWhen: (() => boolean) | null = null;
@@ -42,12 +44,29 @@ export class DargothTransport implements Transport {
     this.gagWhen = pred;
   }
 
-  send(line: string, echo = false): void {
-    if (!this.online) return;
-    if (this.modalActive) this.bypass.add(line);
-    // Fala 28h: echo=true dla composera i "wyslij zwierze" - gracz
-    // widzi w oknie, co plugin wyslal (jak przy recznym wpisaniu).
-    void this.api.command.send(line, echo, { preserveCase: true });
+  send(line: string, echo = false): Promise<void> {
+    return this.enqueue(line, echo);
+  }
+
+  /** Jedna komenda czeka na zakonczenie przetwarzania poprzedniej. */
+  private enqueue(line: string, echo: boolean | undefined): Promise<void> {
+    if (!this.online) return Promise.resolve();
+    const generation = this.connectionGeneration;
+    const task = this.commandQueue.then(async () => {
+      if (!this.online || generation !== this.connectionGeneration) return;
+      let pending: Promise<void>;
+      // Hook jest wywolywany synchronicznie przez api.command.send. Flaga
+      // rozroznia wysylke pluginu od komendy gracza takze przy tym samym tekscie.
+      this.sendingOwn = true;
+      try {
+        pending = this.api.command.send(line, echo, { preserveCase: true });
+      } finally {
+        this.sendingOwn = false;
+      }
+      await pending;
+    });
+    this.commandQueue = task.catch(() => {});
+    return task;
   }
 
   subscribe(cb: (line: ProtoLine) => void): () => void {
@@ -67,7 +86,7 @@ export class DargothTransport implements Transport {
     if (this.modalActive) return;
     this.modalActive = true;
     this.hookId = this.api.commandHooks.register((command: string) => {
-      if (this.bypass.delete(command)) return undefined; // nasza wysylka
+      if (this.sendingOwn) return undefined;
       this.queue.push(command);
       return null; // stlumienie: pager/edytor konsumuje wejscie
     }, MODAL_HOOK_PRIORITY);
@@ -80,11 +99,10 @@ export class DargothTransport implements Transport {
       this.api.commandHooks.unregister(this.hookId);
       this.hookId = null;
     }
-    this.bypass.clear();
     const pending = this.queue.splice(0);
     if (!this.online) return;
     for (const command of pending) {
-      void this.api.command.send(command, undefined, { preserveCase: true });
+      void this.enqueue(command, undefined).catch(() => {});
     }
   }
 
@@ -92,13 +110,14 @@ export class DargothTransport implements Transport {
   setOnline(online: boolean): void {
     this.online = online;
     if (online) return;
+    this.connectionGeneration++;
+    this.commandQueue = Promise.resolve();
     if (this.hookId !== null) {
       this.api.commandHooks.unregister(this.hookId);
       this.hookId = null;
     }
     this.modalActive = false;
     this.queue = [];
-    this.bypass.clear();
   }
 
   /** Zdejmuje trigger i modal-guard; do wywolania w destroy() pluginu. */
@@ -110,7 +129,8 @@ export class DargothTransport implements Transport {
     }
     this.subscribers.clear();
     this.queue = [];
-    this.bypass.clear();
+    this.connectionGeneration++;
+    this.commandQueue = Promise.resolve();
   }
 
   private armTrigger(): void {

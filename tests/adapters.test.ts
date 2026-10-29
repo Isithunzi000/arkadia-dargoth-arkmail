@@ -134,9 +134,8 @@ test('adapter: modal-guard tlumi komendy gracza, przepuszcza wlasne', async () =
   assert.equal(f.hookCb!('atakuj goblina'), null);
   assert.equal(t.modalQueueLength, 1);
 
-  // wlasna wysylka sesji: przechodzi (undefined), nie laduje w kolejce
+  // wlasna wysylka sesji: przechodzi przez API, nie laduje w kolejce
   t.send('q');
-  assert.equal(f.hookCb!('q'), undefined);
   assert.equal(t.modalQueueLength, 1);
   await new Promise((r) => setImmediate(r));
   assert.deepEqual(f.sent, [
