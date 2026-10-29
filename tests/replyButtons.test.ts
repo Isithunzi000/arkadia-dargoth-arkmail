@@ -66,6 +66,9 @@ const clickEl = (el: unknown) =>
     new window.Event('click') as unknown as Event,
   );
 
+const sends = (calls: { name: string; args: unknown[] }[]) =>
+  calls.filter((c) => c.name === 'send');
+
 function openLetter(
   s: MailUiStore,
   box: MailBox,
@@ -277,6 +280,28 @@ test('ui: Odpowiedz z cytowaniem nieaktywne przy liscie bez tresci', () => {
     | null;
   assert.ok(btn, 'przycisk istnieje');
   assert.ok(btn.hasAttribute('disabled'), 'bez tresci nie ma czego cytowac');
+  off();
+});
+
+test('ui: cytat z separatorami zostaje nietkniety i wymaga recznej poprawy', () => {
+  const s = new MailUiStore();
+  const { container, calls, off } = mount(s);
+  openLetterFull(s, 'odebrane', {
+    from: 'Foo',
+    to: '',
+    cc: null,
+    subject: 'Perly',
+    body: ['cytat; z separatorem #'],
+  });
+  clickEl(container.querySelector('.arkmail-reply-quote'));
+  const quoted = field(container, 'tresc');
+  clickEl(container.querySelector('.arkmail-send'));
+  assert.equal(sends(calls).length, 0, 'cytat nie jest wysylany z separatorami komend');
+  assert.equal(field(container, 'tresc'), quoted, 'plugin nie usuwa ani nie zastepuje znakow');
+  assert.equal(
+    container.querySelector('.arkmail-send')?.textContent,
+    'Tresc nie moze zawierac znakow ; ani #.',
+  );
   off();
 });
 

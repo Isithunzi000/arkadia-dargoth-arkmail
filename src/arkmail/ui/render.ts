@@ -18,6 +18,7 @@ import {
   renderLetter,
   type LetterTemplate,
 } from '../core/letterRender.js';
+import { validateCompose, type ComposeSendInput } from '../core/composeValidation.js';
 import type { MailUiState, MailUiStore, UiTab } from './store.js';
 import { allBoxesIndexed, formatBadgeSuffix, INDEX_BOXES } from './store.js';
 import { STYLES } from './styles.js';
@@ -33,7 +34,7 @@ export interface MailUiHandlers {
    * kazda operacja pagerowa re-kotwiczy wpis na swiezy listing (Fala 9a).
    */
   onOpenLetter(box: MailBox, entry: MailboxEntry): void;
-  onSendCompose(input: { adresat: string; temat: string; dw: string; linie: string[] }): void;
+  onSendCompose(input: ComposeSendInput): void;
   onCloseLetter(): void;
   onRefreshBox(box: MailBox): void;
   onLoadOlder(box: MailBox): void;
@@ -1223,36 +1224,26 @@ export function mountMailUi(
     };
     send.addEventListener('click', () => {
       const st = store.state;
-      const rendered = renderLetter(tresc.value, st.composeTemplate, st.composeWidth);
-      if (!rendered.hasContent) {
-        // Fala 16d: pusta tresc = twarda blokada z komunikatem na
-        // przycisku, jak adresat (zgloszenie pkt 4). Cichy return z 15b
-        // zostawial gracza bez informacji, czemu klikniecie nic nie daje.
-        if (sendTimer) clearTimeout(sendTimer);
-        setButtonLabel(send, 'Brak tresci listu.');
-        sendTimer = setTimeout(disarmSend, 3000);
-        return;
-      }
       const val = (f: string) =>
         (pane.querySelector(`[data-field="${f}"]`) as HTMLInputElement | HTMLTextAreaElement).value;
-      if (!val('adresat').trim()) {
-        if (sendTimer) clearTimeout(sendTimer);
-        setButtonLabel(send, 'Podaj adresata.');
-        sendTimer = setTimeout(disarmSend, 3000);
-        return;
-      }
-      if (!val('temat').trim()) {
-        if (sendTimer) clearTimeout(sendTimer);
-        setButtonLabel(send, 'Podaj temat.');
-        sendTimer = setTimeout(disarmSend, 3000);
-        return;
-      }
-      if (sendTimer) clearTimeout(sendTimer);
-      disarmSend();
-      handlers.onSendCompose({
+      const input = {
         adresat: val('adresat'),
         temat: val('temat'),
         dw: val('dw'),
+        tresc: tresc.value,
+      };
+      const validationError = validateCompose(input);
+      if (validationError) {
+        if (sendTimer) clearTimeout(sendTimer);
+        setButtonLabel(send, validationError);
+        sendTimer = setTimeout(disarmSend, 3000);
+        return;
+      }
+      const rendered = renderLetter(input.tresc, st.composeTemplate, st.composeWidth);
+      if (sendTimer) clearTimeout(sendTimer);
+      disarmSend();
+      handlers.onSendCompose({
+        ...input,
         linie: rendered.lines,
       });
     });

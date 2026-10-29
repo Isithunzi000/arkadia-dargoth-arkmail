@@ -29,6 +29,7 @@ import {
   searchDescription,
 } from "./core/protocol/commands";
 import type { LetterTemplate } from "./core/letterRender";
+import { validateCompose } from "./core/composeValidation";
 import {
   ANCHOR_RETRY_WAITS_MS,
   PAGE_PACE_MS,
@@ -1690,8 +1691,9 @@ export async function init(api: PluginApi) {
       runExportArchive();
     },
     onSendCompose: (input) => {
-      if (!input.adresat.trim() || !input.temat.trim()) {
-        notify(api, "Adresat i temat sa wymagane.");
+      const validationError = validateCompose(input);
+      if (validationError) {
+        notify(api, validationError);
         return;
       }
       // Fala 12a: jak przy odczycie - zero cichego kolejkowania sesji.

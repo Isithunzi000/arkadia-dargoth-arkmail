@@ -235,6 +235,7 @@ test('render: formularz compose zbiera pola; linie przechodza przez renderer', (
           adresat: 'Garply',
           temat: 'Perly',
           dw: 'Foo',
+          tresc: 'linia1\nlinia2',
           linie: renderLetter('linia1\nlinia2', 'plain', 60).lines,
         },
       ],

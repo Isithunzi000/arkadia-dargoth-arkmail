@@ -101,3 +101,13 @@ test('renderer: pusta tresc nie ma contentu', () => {
   const r = renderLetter('   \n  ', 'plain', 30);
   assert.equal(r.hasContent, false);
 });
+
+test('renderer: surowe biale znaki i sama ramka nie sa trescia', () => {
+  const raw = renderLetter('  \t\n   ', 'raw', 30);
+  assert.equal(raw.hasContent, false, 'raw liczy tylko znaki niebedace bialymi');
+  assert.deepEqual(raw.lines, ['  \t', '   '], 'raw nadal zachowuje wpisane biale znaki');
+
+  const framed = renderLetter('  \n ', 'plain', 30);
+  assert.equal(framed.hasContent, false, 'wygenerowana ramka nie jest trescia');
+  assert.ok(framed.lines.length > 0, 'podglad ramki nadal moze istniec');
+});

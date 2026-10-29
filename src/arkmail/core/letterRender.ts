@@ -334,7 +334,7 @@ export function renderLetterLayout(
     ...formatBody(layout, bodySource, bodyWidth),
     ...layout.footer.map((line) => expandFillLine(line, bodyWidth)),
   ];
-  const hasContent = baseLines.some((line) => line.length > 0);
+  const hasContent = baseLines.some((line) => line.trim().length > 0);
   return { lines, hasContent };
 }
 
