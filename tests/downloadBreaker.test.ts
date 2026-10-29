@@ -175,7 +175,7 @@ test('breaker: znikniety list (missing) resetuje licznik bledow', async () => {
     await answerError(h, 5);
 
     await waitRt(
-      () => notifyText(f, 'Pobrano tresci (0 z 5; nieudane: 4; zniknely z serwera: 1)'),
+      () => notifyText(f, 'Pobrano tresci (0 z 5; nieudane: 4; nie ma juz w skrzynce: 1)'),
       'podsumowanie ze zniknietym i bez breakera',
     );
     assert.ok(!notifyText(f, BREAKER_MSG), 'missing nie jest bledem breakera');

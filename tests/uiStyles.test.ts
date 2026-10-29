@@ -159,7 +159,7 @@ test('style: audyt etykiet - krotkie, bez starego formatu Przerwij', () => {
   }
   // Format dynamiczny (template literal) - sprawdzany w zrodle.
   assert.ok(!src.includes('Przerwij (strona'), 'stary dlugi format "Przerwij (strona N)" usuniety');
-  assert.ok(src.includes('Przerwij · '), 'krotki format "Przerwij · N" w uzyciu');
+  assert.ok(src.includes('Przerwij ('), 'krotki format "Przerwij (N)" w uzyciu');
 });
 
 test('style: Wyczysc filtry w Archiwum zajmuje caly wiersz', () => {

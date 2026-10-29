@@ -121,7 +121,7 @@ export interface MailUiState {
    * dopiero wtedy archiwum jest pelna podstawa licznikow kontaktow.
    */
   indexMeta: Partial<Record<MailBox, string>>;
-  /** Dni, ktorych czesc jest niedostepna przez limit 50 wynikow serwera. */
+  /** Dni, ktorych czesci serwer nie pokazuje przez limit 50 wynikow. */
   archiveGaps: Partial<Record<MailBox, string[]>>;
   /**
    * Petla "Indeksuj wszystkie skrzynki" w toku (Fala 18c): indeks
@@ -270,7 +270,7 @@ export class MailUiStore {
    * Fala 30b: przy UCIETYM listingu opcjonalna granica dnia
    * (pruneNewerThan, ISO YYYY-MM-DD = najstarszy dzien swiezej strony).
    * Strona jest ciagla od najnowszego, wiec wpis SCISELE NOWSZY niz
-   * granica, nieobecny na stronie, na pewno zniknal z serwera -
+   * granica, nieobecny na stronie, na pewno nie ma go juz w skrzynce -
    * usuwamy. Dzien graniczny, starsze i wpisy bez daty zostaja
    * (strona moze byc ucieta w polowie dnia).
    *
@@ -336,7 +336,7 @@ export class MailUiStore {
 
   /**
    * Usuwa z widoku skrzynki wpisy, ktorych rekord archiwum oznaczono
-   * jako znikniety z serwera (Fala 30c). Gone-marking dotyka archiwum;
+   * jako nieobecny na serwerze (Fala 30c). Gone-marking dotyka archiwum;
    * bez tego widoku martwy wpis zostawal klikalny ("Nie ma tego listu
    * na liscie"). Lokalne, zero komend; zwraca liczbe usunietych.
    */

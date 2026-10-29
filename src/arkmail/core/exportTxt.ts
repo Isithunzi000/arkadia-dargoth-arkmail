@@ -86,7 +86,7 @@ export interface ExportEntry {
 
 /**
  * Eksport calego archiwum: tylko listy Z trescia (bez-tresciowe
- * pomijane i liczone), rekordy znikniete z serwera pomijane (Fala
+ * pomijane i liczone), rekordy nieobecne na serwerze pomijane (Fala
  * 18a), blizniaki nieprzeczytane/odebrane deduplikowane po kluczu
  * tresci (Fala 17c) - plik laduje w folderze skrzynki kanonicznej.
  * Kolizje nazw dostaja suffiks -2, -3, ...

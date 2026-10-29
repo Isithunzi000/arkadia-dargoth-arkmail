@@ -240,7 +240,7 @@ test('archiwum: list znikniety z serwera dostaje znacznik i jest pomijany przy r
     await waitRt(() => f.sent.includes('przeczytaj list 2'), 'odczyt najstarszego');
     replayLetter(h, 2, 'najstarszy', 'Tresc najstarszego.');
 
-    await waitRt(() => notifyText(f, 'zniknely z serwera: 1'), 'podsumowanie ze zniknietym');
+    await waitRt(() => notifyText(f, 'nie ma juz w skrzynce: 1'), 'podsumowanie ze zniknietym');
 
     // Restart: znacznik zostaje, kandydatow brak, zadna nowa
     // re-kotwica nie wylatuje.
@@ -319,7 +319,7 @@ test('archiwum: luka podczas re-kotwicy jest bledem, nie zniknieciem listu', asy
 
     await waitRt(() => notifyText(f, 'Pobrano tresci (2 z 3;'), 'podsumowanie po luce');
     assert.ok(notifyText(f, 'nieudane: 1'), 'luka jest nieudana lokalizacja');
-    assert.ok(!notifyText(f, 'zniknely z serwera'), 'luka nie jest dowodem znikniecia');
+    assert.ok(!notifyText(f, 'nie ma juz w skrzynce'), 'luka nie jest dowodem znikniecia');
     assert.equal(archiveRows(h, 'najnowszy').length, 1, 'list pozostaje widoczny w Archiwum');
   } finally {
     ANCHOR_RETRY_WAITS_MS.push(...retries);

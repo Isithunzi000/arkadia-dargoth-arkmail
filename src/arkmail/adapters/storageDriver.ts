@@ -211,7 +211,7 @@ export class IndexedDbStorageDriver implements StorageDriver {
     if (this.databasePromise) return this.databasePromise;
     const opening = new Promise<IDBDatabase>((resolve, reject) => {
       if (!this.factory) {
-        reject(new Error("IndexedDB jest niedostepne."));
+        reject(new Error("Baza w przegladarce nie dziala - zapis bedzie tylko w pamieci."));
         return;
       }
       let request: IDBOpenDBRequest;

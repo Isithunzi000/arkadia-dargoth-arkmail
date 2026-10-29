@@ -40,7 +40,7 @@ test('archiwum: pokazuje trzy kroki i niekompletny indeks', async () => {
     assert.match(labels[0], /1\. Indeksacja/);
     assert.match(labels[1], /2\. Pobranie tresci/);
     assert.match(labels[2], /3\. Zapis ZIP/);
-    assert.match(labels[0], /Niekompletne: 1 z 4 skrzynek/);
+    assert.match(labels[0], /Czesciowo: 1 z 4 skrzynek/);
     assert.match(labels[1], /Gotowe: 1 list z trescia/);
     assert.match(labels[2], /Gotowe: 1 list do zapisu/);
   } finally {
@@ -78,7 +78,7 @@ test('archiwum: czesciowy indeks pozwala zapisac dostepne tresci z ostrzezeniem'
     const steps = Array.from(h.content.querySelectorAll('.arkmail-archive-step')).map((step) =>
       String((step as { textContent?: string }).textContent ?? ''),
     );
-    assert.match(steps[2], /Gotowe z ostrzezeniem/);
+    assert.match(steps[2], /Gotowe: 1 list do zapisu \(1 bez tresci\)/);
   } finally {
     setDownloadImpl(null);
     await stopHarness();

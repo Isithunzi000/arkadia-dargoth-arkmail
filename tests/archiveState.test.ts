@@ -99,7 +99,7 @@ test('pobieranie: pusta i bledna data nie sa zniknieciem listu z serwera', async
       'koniec sprawdzania dat',
     );
     assert.ok(notifyText(h.f, 'Nie mozna pobrac tresci - listy bez prawidlowej daty: 2.'));
-    assert.ok(!notifyText(h.f, 'zniknely z serwera'));
+    assert.ok(!notifyText(h.f, 'nie ma juz w skrzynce'));
     assert.deepEqual(h.f.sent, [], 'bez daty nie ma komendy odnalezienia listu');
   } finally {
     await stopHarness();
@@ -114,11 +114,11 @@ test('pobieranie: same listy znikniete nie sa kompletem dostepnych tresci', asyn
     startDownload(h);
     await waitRt(
       () =>
-        notifyText(h.f, 'Brak dostepnych listow do pobrania - zniknely z serwera.') ||
+        notifyText(h.f, 'Brak dostepnych listow do pobrania - nie ma juz w skrzynce.') ||
         notifyText(h.f, 'Wszystkie listy w bazie maja tresci.'),
       'komunikat o braku kandydatow',
     );
-    assert.ok(notifyText(h.f, 'Brak dostepnych listow do pobrania - zniknely z serwera.'));
+    assert.ok(notifyText(h.f, 'Brak dostepnych listow do pobrania - nie ma juz w skrzynce.'));
     assert.ok(!notifyText(h.f, 'Wszystkie listy w bazie maja tresci.'));
     assert.deepEqual(h.f.sent, []);
   } finally {
@@ -147,9 +147,9 @@ test('statusy: liczniki pobierania i ZIP uwzgledniaja grupy oraz niedostepne dat
     const steps = stepTexts(h);
     assert.match(
       steps[1],
-      /Gotowe z ostrzezeniem: 1 list z trescia; bez prawidlowej daty: 1; niedostepne: 1\./,
+      /Gotowe: 1 list z trescia \(1 bez daty, 1 nie ma juz w skrzynce\)\./,
     );
-    assert.match(steps[2], /Gotowe z ostrzezeniem: 1 list do zapisu; bez tresci: 1\./);
+    assert.match(steps[2], /Gotowe: 1 list do zapisu \(1 bez tresci\)\./);
   } finally {
     await stopHarness();
   }
@@ -164,7 +164,7 @@ test('eksport: pobrana tresc listu zniknietego nie jest prezentowana jako dostep
     await openArchive(h);
     click(h, '.arkmail-arch-export');
     await waitRt(() => notifyText(h.f, 'Brak'), 'komunikat o braku plikow');
-    assert.ok(notifyText(h.f, 'Brak dostepnych listow do zapisu - zniknely z serwera.'));
+    assert.ok(notifyText(h.f, 'Brak dostepnych listow do zapisu - nie ma juz w skrzynce.'));
     assert.equal(captured.length, 0);
     assert.deepEqual(h.f.sent, []);
   } finally {

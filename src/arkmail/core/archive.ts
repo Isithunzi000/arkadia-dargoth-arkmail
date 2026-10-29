@@ -36,7 +36,7 @@ export interface ArchiveLetter {
   read: boolean;
   body: string[];
   /**
-   * List zniknal z serwera (Fala 17c, zgloszenie pkt 3): re-kotwica
+   * List nieobecny na serwerze (Fala 17c, zgloszenie pkt 3): re-kotwica
    * nie znalazla go na swiezym listingu podczas pobierania tresci.
    * Petla pobierania takie rekordy POMIJA (bez znacznika kazdy restart
    * mielil zombie-wpisy do timeoutu). Upsert z listingu znacznik
@@ -285,7 +285,7 @@ export function upsertLetters(
       ...prev,
       ...inc,
       body: inc.body.length > 0 ? inc.body : prev.body,
-      // Fala 17c: powrot listu do listingu czysci znacznik znikniecia
+      // Fala 17c: powrot listu do listingu czysci znacznik nieobecnosci
       // (incoming z listingu nigdy go nie niesie, wiec undefined
       // wygrywa; znacznik ustawia wylacznie petla pobierania tresci).
       missingOnServer: inc.missingOnServer === true ? true : undefined,
@@ -314,7 +314,7 @@ function representativeOf(group: ArchiveLetter[]): ArchiveLetter {
  * Widok archiwum (Fala 18a, zgloszenie 2026-10-20 pkt 1/3): ten sam
  * list widoczny w kilku skrzynkach (nieprzeczytany jest i tu, i tu)
  * pokazuje sie JEDEN raz - grupa po kluczu tresci; rekordy oznaczone
- * jako znikniete z serwera sa ukryte (grupa zyje, poki ma zywego
+ * jako nieobecne na serwerze sa ukryte (grupa zyje, poki ma zywego
  * blizniaka). Filtr skrzynki i tresci dziala po CA LEJ grupie (reszta
  * filtrow po reprezentancie - party/temat/daty sa w grupie identyczne).
  */

@@ -672,7 +672,7 @@ export function mountMailUi(
     const loadAllBtn = doc.createElement('button');
     loadAllBtn.className = 'arkmail-older-all';
     loadAllBtn.textContent = loopHere
-      ? `Przerwij · ${state.loadAll!.pages}`
+      ? `Przerwij (${state.loadAll!.pages})`
       : 'Wczytaj wszystkie';
     // Wylaczony, gdy nie ma czego doczytywac: tryb wynikow, skrzynka
     // pusta/niezaladowana lub w calosci, petla na innej skrzynce.
@@ -883,7 +883,7 @@ export function mountMailUi(
       row.appendChild(num);
       const party = doc.createElement('span');
       party.className = 'arkmail-entry-party';
-      party.textContent = e.party || '—';
+      party.textContent = e.party || '(brak)';
       row.appendChild(party);
       const subject = doc.createElement('span');
       subject.className = 'arkmail-entry-subject';
@@ -1620,15 +1620,19 @@ export function mountMailUi(
     };
     const indexedCount = INDEX_BOXES.filter((box) => state.indexMeta[box] !== undefined).length;
     const gapCount = Object.values(state.archiveGaps).reduce((sum, days) => sum + days.length, 0);
+    // Fala 31e: mowimy, czego brakuje ("brakuje danych z N dni").
+    // Liczebnik dni: 1 dnia / 2 dni / 5 dni.
+    const gapPhrase = (days: number): string =>
+      days === 1 ? 'brakuje danych z 1 dnia' : `brakuje danych z ${days} dni`;
     const indexStatus = state.indexRun
       ? `W toku: ${state.indexRun.box}, stron: ${state.indexRun.pages}.`
       : allBoxesIndexed(state.indexMeta)
         ? gapCount > 0
-          ? `Gotowe z ostrzezeniem: dni z brakami: ${gapCount}.`
-          : 'Gotowe: wszystkie skrzynki zindeksowane.'
+          ? `Gotowe, ale ${gapPhrase(gapCount)}.`
+          : 'Gotowe: wszystkie skrzynki zapisane.'
         : indexedCount > 0 || gapCount > 0
-          ? `Niekompletne: ${indexedCount} z ${INDEX_BOXES.length} skrzynek${gapCount > 0 ? `; dni z brakami: ${gapCount}` : ''}.`
-          : 'Nie rozpoczeto.';
+          ? `Czesciowo: ${indexedCount} z ${INDEX_BOXES.length} skrzynek${gapCount > 0 ? ` (${gapPhrase(gapCount)})` : ''}.`
+          : 'Jeszcze nie zaczeto.';
     const archiveGroups = new Map<string, ArchiveLetter[]>();
     for (const letter of state.archive) {
       const key = contentKeyOf(letter);
@@ -1654,26 +1658,28 @@ export function mountMailUi(
       if (dateRaw !== null && parseMailDate(dateRaw) !== null) pendingBody += 1;
       else undatedBody += 1;
     }
+    // Fala 31e: szczegoly w nawiasie, liczebnik przodem
+    // ("1 bez daty", "2 nie ma juz w skrzynce").
     const bodyWarnings = [
-      undatedBody > 0 ? `bez prawidlowej daty: ${undatedBody}` : '',
-      unavailableBody > 0 ? `niedostepne: ${unavailableBody}` : '',
+      undatedBody > 0 ? `${undatedBody} bez daty` : '',
+      unavailableBody > 0 ? `${unavailableBody} nie ma juz w skrzynce` : '',
     ].filter((text) => text !== '');
-    const warningSuffix = bodyWarnings.length > 0 ? `; ${bodyWarnings.join('; ')}` : '';
+    const warningSuffix = bodyWarnings.length > 0 ? ` (${bodyWarnings.join(', ')})` : '';
     const downloadStatus = state.archiveDownload
-      ? `W toku: ${state.archiveDownload.done} z ${state.archiveDownload.total}.`
+      ? `Pobieram tresci: ${state.archiveDownload.done} z ${state.archiveDownload.total}.`
       : state.archive.length === 0
-        ? 'Nie rozpoczeto.'
+        ? 'Jeszcze nie pobrano.'
         : pendingBody > 0
-          ? `Niekompletne: ${formatListCount(withBody)} z trescia; do pobrania: ${pendingBody}${warningSuffix}.`
+          ? `Czesciowo: ${formatListCount(withBody)} z trescia. Do pobrania: ${pendingBody}${warningSuffix}.`
           : bodyWarnings.length > 0
-            ? `Gotowe z ostrzezeniem: ${formatListCount(withBody)} z trescia${warningSuffix}.`
+            ? `Gotowe: ${formatListCount(withBody)} z trescia${warningSuffix}.`
             : `Gotowe: ${formatListCount(withBody)} z trescia.`;
     const exportable = archiveExportEntries(state.archive);
     const exportStatus =
       exportable.entries.length === 0
-        ? 'Nie rozpoczeto: brak listow z trescia.'
+        ? 'Brak listow z trescia - nie ma czego zapisywac.'
         : exportable.skipped > 0
-          ? `Gotowe z ostrzezeniem: ${formatListCount(exportable.entries.length)} do zapisu; bez tresci: ${exportable.skipped}.`
+          ? `Gotowe: ${formatListCount(exportable.entries.length)} do zapisu (${exportable.skipped} bez tresci).`
           : `Gotowe: ${formatListCount(exportable.entries.length)} do zapisu.`;
     // Fala 31d: agregat nad lista - globalny (nie zalezy od filtra),
     // po deduplikacji blizniakow (contentKeyOf) i bez listow, ktorych
@@ -1723,7 +1729,7 @@ export function mountMailUi(
     const dlBtn = doc.createElement('button');
     dlBtn.className = 'arkmail-arch-download';
     dlBtn.textContent = state.archiveDownload
-      ? `Przerwij · ${state.archiveDownload.done}/${state.archiveDownload.total}`
+      ? `Przerwij (${state.archiveDownload.done}/${state.archiveDownload.total})`
       : 'Pobierz tresci do archiwum';
     let dlArmed = false;
     let dlTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1786,7 +1792,7 @@ export function mountMailUi(
           : 'Od dnia pozniej niz Do dnia - daty pomijane.';
         pane.insertBefore(err, list);
       }
-      // Fala 18a: blizniaki jednym wierszem, znikniete ukryte (core).
+      // Fala 18a: blizniaki jednym wierszem, nieobecne ukryte (core).
       const rows = filterVisibleArchive(state.archive, effFilter);
       // Podpis filtra tresci: tresc zna tylko pobrane listy - bez
       // podpowiedzi filtr "milczaco" nic nie znajdowal (zgloszenie

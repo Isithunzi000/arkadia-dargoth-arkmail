@@ -29,7 +29,7 @@ const CLIENT_PREFIX_RE = /^\s*\[ POCZTA \]\s+/;
 
 export function stripClientPrefix(text: string): string {
   // trim() (nie trimStart): trigger klienta newMail dokleja suffix "\n\n"
-  // za linia powiadomienia - biale znaki z koncow tez musza zniknac.
+  // za linia powiadomienia - biale znaki z koncow tez odpadaja.
   return text.replace(CLIENT_PREFIX_RE, '').trim();
 }
 

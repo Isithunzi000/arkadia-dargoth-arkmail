@@ -65,7 +65,7 @@ const oneDayOf = (entries: readonly MailboxEntry[]): string | null => {
 };
 
 const gapReason = (day: string): string =>
-  `ponad 50 listow z dnia ${day} - czesc jest niedostepna`;
+  `ponad 50 listow z dnia ${day} - serwer nie pokazuje reszty`;
 
 /**
  * Wspolne pobieranie starszych stron. Powtorzenia strony najpierw sa

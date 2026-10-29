@@ -361,7 +361,7 @@ export async function init(api: PluginApi) {
    * SYNCHRONIZUJE sie z widokiem - znane wpisy aktualizowane w miejscu,
    * nowe doklejane na koncu (najnowszy), wczytane starsze strony
    * ZOSTAJA. Tryb "replace": pelna wymiana widoku (po skasowaniu listu
-   * - lista ma zniknac natychmiast, nawet z ucietych listingow).
+   * - lista ma byc ukryta natychmiast, nawet z ucietych listingow).
    * Kontrakt sync: ui/store.ts syncMailboxPage, tests/syncMailbox.test.ts.
    */
   /** Wnetrze refreshBoxes: pobranie i zastosowanie listingow (pod lockiem). */
@@ -374,9 +374,9 @@ export async function init(api: PluginApi) {
       else bumpCtx(box);
       // Fala 30b: granica dnia strony (najstarszy dzien swiezego
       // listingu) - przy UCIETYM listingu wpisy scisle nowsze, ktorych
-      // strona nie raportuje, na pewno zniknely z serwera (strona jest
-      // ciagla od najnowszego). Usuwamy je z widoku i oznaczamy w
-      // archiwum. Dzien graniczny nietkniety (strona moze byc ucieta
+      // strona nie raportuje, na pewno nie ma ich juz w skrzynce
+      // (strona jest ciagla od najnowszego). Usuwamy je z widoku
+      // i oznaczamy w archiwum. Dzien graniczny nietkniety.
       // w polowie dnia) - wzorzec zakresowy jak w Fali 24e.
       const boundaryDay = ((): string | undefined => {
         if (res.kind !== "lista") return undefined;
@@ -405,8 +405,9 @@ export async function init(api: PluginApi) {
         ui.setArchive(merged.letters);
         // Fala 18a: KOMPLTNY listing (bez uciecia) = pelna prawda o
         // skrzynce (jak syncMailboxPage dla widoku, Fala 14f). Rekordy
-        // nieobecne oznaczamy jako znikniete - znikaja z widoku
-        // archiwum i licznikow kontaktow. Tylko tutaj: to jedyna
+        // rekordow nieobecnych na swiezym listingu dotyka flaga
+        // missingOnServer - wypadaja z widoku archiwum i licznikow
+        // kontaktow. Tylko tutaj: to jedyna
         // sciezka z NIEfiltrowana komenda "listy <skrzynka>" (szukanie,
         // re-kotwice i paginacje maja wlasne komendy i call-site'y).
         if (!res.header.truncated) {
@@ -418,7 +419,7 @@ export async function init(api: PluginApi) {
         }
       } else if (res.reason === "puste") {
         // Pusta skrzynka (reason "puste", nie "filtr") = pelna prawda:
-        // wszystkie jej rekordy zniknely z serwera.
+        // wszystkie jej rekordy odpadly (skrzynka jest pusta).
         markGoneFromServer(box, new Set());
       }
     }
@@ -426,7 +427,7 @@ export async function init(api: PluginApi) {
 
   /**
    * Fala 18a: oznacza rekordy archiwum danej skrzynki nieobecne
-   * w freshIds jako znikniete z serwera (cicho, jak upsert). Wywolywane
+   * w freshIds jako nieobecne na serwerze (cicho, jak upsert). Wywolywane
    * WYLACZNIE przy pewnoscia kompletnego listingu (patrz fetchBoxes).
    */
   const markGoneFromServer = (box: MailBox, freshIds: Set<string>): void => {
@@ -445,7 +446,7 @@ export async function init(api: PluginApi) {
 
   /**
    * Fala 30c: widok skrzynki wyrzuca wpisy, ktorych rekord archiwum
-   * jest oznaczony jako znikniety z serwera. Wywolywane po kazdym
+   * jest oznaczony jako nieobecny na serwerze. Wywolywane po kazdym
    * gone-markingu (pelnym albo zakresowym) - operacja lokalna.
    */
   const pruneGoneFromView = (box: MailBox): void => {
@@ -1045,7 +1046,7 @@ export async function init(api: PluginApi) {
           if (flag.cancelled) {
             notify(
               api,
-              `Przerwano indeksowanie (zindeksowane skrzynki: ${done} z ${INDEX_BOXES.length}).`,
+              `Przerwano indeksowanie (zapisane skrzynki: ${done} z ${INDEX_BOXES.length}).`,
             );
           } else if (skipped.length === 0) {
             rebuildContacts();
@@ -1058,7 +1059,7 @@ export async function init(api: PluginApi) {
             notify(
               api,
               `Indeksowanie niekompletne - pominiete: ${skipped.join(", ")}. ` +
-                `Pozostale skrzynki zindeksowane.`,
+                `Pozostale skrzynki zapisane.`,
             );
           }
         } finally {
@@ -1125,12 +1126,12 @@ export async function init(api: PluginApi) {
   };
 
   /**
-   * Odczyt listu przez re-kotwice (Fala 9a) z druga szansa po zniknieciu
-   * listingu (Fala 16c). Wspolna sciezka dla kliku w liste skrzynki
+   * Odczyt listu przez re-kotwice (Fala 9a) z druga szansa, gdy
+   * pierwsza kotwica nie trafi (Fala 16c). Wspolna sciezka dla kliku w liste skrzynki
    * i w wpis archiwum bez tresci (Fala 16h). WYMAGA locka (caller).
    */
   const openWithResolve = async (box: MailBox, entry: MailboxEntry): Promise<void> => {
-    // Fala 16c: blad "listing serwera zniknal" (re-login, cudzy
+    // Fala 16c: blad "listing serwera odpowiedzial nietypowo" (re-login, cudzy
     // listing gracza miedzy operacjami - log 2026-10-19 17:13:14)
     // dostaje JEDNA druga szanse: wymuszamy re-kotwice (bumpCtx
     // uniewaznia dopasowanie kontekstu) i ponawiamy odczyt.
@@ -1192,7 +1193,7 @@ export async function init(api: PluginApi) {
 
   /**
    * Wynik doczytu tresci (Fala 17c): 'ok' = tresc pobrana; 'missing' =
-   * listu nie ma na swiezym listingu (zniknal z serwera - caller
+   * listu nie ma na swiezym listingu (kto go usunal - caller
    * oznacza rekord i pomija go w kolejnych uruchomieniach); 'error' =
    * porazka przejsciowa (timeout, sierocy pager, przerwanie).
    */
@@ -1266,7 +1267,7 @@ export async function init(api: PluginApi) {
    * petli - liczony i podsumowany na koncu.
    * Fala 17c (zgloszenie pkt 3): petla jest IDEMPOTENTNA - kandydaci
    * grupowani po kluczu tresci (blizniak pobierany raz), rekordy
-   * znikniete z serwera oznaczane i pomijane przy restarcie.
+   * nieobecne na serwerze oznaczane i pomijane przy restarcie.
    * Fala 31a: circuit breaker - 3 bledy z rzedu (siec/serwer lezy)
    * zatrzymuja petle z jasnym komunikatem, zamiast mielic reszte
    * kandydatow do konca. Sukces i 'missing' licznik resetuja.
@@ -1307,7 +1308,7 @@ export async function init(api: PluginApi) {
           : pending.length > 0
             ? `Nie mozna pobrac tresci - listy bez prawidlowej daty: ${pending.length}.`
             : groups.size === 0
-              ? "Brak dostepnych listow do pobrania - zniknely z serwera."
+              ? "Brak dostepnych listow do pobrania - nie ma juz w skrzynce."
               : "Wszystkie listy w bazie maja tresci.",
       );
       return;
@@ -1329,7 +1330,8 @@ export async function init(api: PluginApi) {
         let failed = 0;
         let missing = 0;
         // Fala 31a (circuit breaker): serie bledow Z RZEDU zatrzymuja
-        // petle. Sukces i 'missing' (serwer odpowiedzial - list zniknal)
+        // petle. Sukces i 'missing' (serwer odpowiedzial - listu juz
+        // nie ma w skrzynce)
         // resetuja licznik, bo dowodza, ze polaczenie zyje.
         let consecutiveErrors = 0;
         let breakerTripped = false;
@@ -1409,7 +1411,7 @@ export async function init(api: PluginApi) {
           } else {
             const parts: string[] = [];
             if (failed > 0) parts.push(`nieudane: ${failed}`);
-            if (missing > 0) parts.push(`zniknely z serwera: ${missing}`);
+            if (missing > 0) parts.push(`nie ma juz w skrzynce: ${missing}`);
             notify(api, `Pobrano tresci (${done} z ${total}; ${parts.join("; ")}).`);
           }
         } finally {
@@ -1436,7 +1438,7 @@ export async function init(api: PluginApi) {
         ui.state.archive.length === 0
           ? "Skrzynki sa puste - nie ma czego zapisywac."
           : ui.state.archive.every((letter) => letter.missingOnServer === true)
-            ? "Brak dostepnych listow do zapisu - zniknely z serwera."
+            ? "Brak dostepnych listow do zapisu - nie ma juz w skrzynce."
             : "Brak listow z trescia w archiwum - najpierw pobierz tresci.",
       );
       return;
@@ -1860,7 +1862,7 @@ export async function init(api: PluginApi) {
               // przy wyjsciu ("Kasuje: N.") - toast mowi o skutku.
               notify(api, "List zostal usuniety.");
               ui.closeLetter();
-              // Replace (Fala 12b): skasowany list ma zniknac z widoku
+              // Replace (Fala 12b): skasowany list ma byc ukryty
               // natychmiast, nawet gdy listing jest uciety (sync bez
               // pelnego listingu nie usuwa wpisow).
               refreshBoxes([box], "replace");
