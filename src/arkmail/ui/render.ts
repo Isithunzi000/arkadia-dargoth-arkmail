@@ -1675,6 +1675,32 @@ export function mountMailUi(
         : exportable.skipped > 0
           ? `Gotowe z ostrzezeniem: ${formatListCount(exportable.entries.length)} do zapisu; bez tresci: ${exportable.skipped}.`
           : `Gotowe: ${formatListCount(exportable.entries.length)} do zapisu.`;
+    // Fala 31d: agregat nad lista - globalny (nie zalezy od filtra),
+    // po deduplikacji blizniakow (contentKeyOf) i bez listow, ktorych
+    // juz nie ma na serwerze; skrzynki z zerem pomijane.
+    const liveGroups = [...archiveGroups.values()].filter((group) =>
+      group.some((letter) => letter.missingOnServer !== true),
+    );
+    const perBoxCounts = new Map<MailBox, number>();
+    for (const group of liveGroups) {
+      const countedBoxes = new Set<MailBox>();
+      for (const letter of group) {
+        if (letter.missingOnServer === true || countedBoxes.has(letter.box)) continue;
+        countedBoxes.add(letter.box);
+        perBoxCounts.set(letter.box, (perBoxCounts.get(letter.box) ?? 0) + 1);
+      }
+    }
+    let countsStrip: HTMLElement | null = null;
+    if (liveGroups.length > 0) {
+      const parts: string[] = [];
+      for (const box of INDEX_BOXES) {
+        const count = perBoxCounts.get(box);
+        if (count !== undefined) parts.push(`${box}: ${formatListCount(count)}`);
+      }
+      countsStrip = doc.createElement('p');
+      countsStrip.className = 'arkmail-dim arkmail-arch-counts';
+      countsStrip.textContent = `Listow w bazie: ${formatListCount(liveGroups.length)}${parts.length > 0 ? ` (${parts.join(', ')})` : ''}.`;
+    }
     const indexStep = makeStep('1. Indeksacja', indexStatus, state.indexRun ? 'active' : allBoxesIndexed(state.indexMeta) ? (gapCount > 0 ? 'warning' : 'done') : indexedCount > 0 || gapCount > 0 ? 'incomplete' : 'idle');
     const downloadStep = makeStep('2. Pobranie tresci', downloadStatus, state.archiveDownload ? 'active' : pendingBody > 0 ? 'incomplete' : bodyWarnings.length > 0 ? 'warning' : withBody > 0 ? 'done' : 'idle');
     const exportStep = makeStep('3. Zapis ZIP', exportStatus, exportable.entries.length > 0 ? (exportable.skipped > 0 ? 'warning' : 'done') : 'idle');
@@ -1732,6 +1758,7 @@ export function mountMailUi(
     exportStep.appendChild(expBtn);
     pane.appendChild(steps);
     pane.appendChild(controls);
+    if (countsStrip) pane.appendChild(countsStrip);
     const list = doc.createElement('div');
     pane.appendChild(list);
     const repaint = () => {
