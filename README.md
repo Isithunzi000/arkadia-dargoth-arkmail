@@ -26,6 +26,12 @@ https://isithunzi000.github.io/arkadia-dargoth-arkmail/arkmail.js
 
 `/arkmail` — otwiera i zamyka okno. Reszta to przyciski w oknie.
 
+Zakładka **Archiwum** pokazuje kolejno: **1. Indeksacja**, **2. Pobranie treści**
+i **3. Zapis ZIP**. Każdy przycisk wykonuje tylko własną operację: pobieranie
+treści i zapis ZIP nie uruchamia indeksacji. Gdy serwer nie udostępni części
+listów, można pobrać dostępne treści i zapisać częściowy ZIP. Komunikat podaje
+liczbę zapisanych i pominiętych listów.
+
 Zakładka **Usuwanie listow** pobiera jeden wynik z wybranej skrzynki.
 Można zawęzić go filtrami, zaznaczyć wiele listów i usunąć je po
 potwierdzeniu. Wyniki nie odświeżają się automatycznie; wyjście z zakładki
