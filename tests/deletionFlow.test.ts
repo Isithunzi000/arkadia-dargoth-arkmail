@@ -123,12 +123,11 @@ test('usuwanie: swiezy listing zmienia numery, a potwierdzenia aktualizuja dane'
     await h.waitFor(() => f.sent.includes('przeczytaj list 2'), 'pierwszy swiezy numer');
     replayPager(h, 2);
     await h.waitFor(() => f.sent.includes('d 2,5'), 'zakres po renumeracji');
-    f.fire('Zaznaczono do skasowania: 2, 5.', 'mail');
+    f.fire('Zaznaczono do skasowania: 2 i 5.', 'mail');
     f.fire('[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 2) -- ', 'mail');
     await h.waitFor(() => f.sent.includes('q'), 'zamkniecie pagera');
     f.fire('Kasuje listy...', 'mail');
-    f.fire('Kasuje: 2.', 'mail');
-    f.fire('Kasuje: 5.', 'mail');
+    f.fire('Kasuje: 2 i 5.', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(() => textOf(h, '.arkmail-deletion-message') === 'Usunieto: 2 listy.', 'komunikat');
     assert.equal(h.content.querySelectorAll('.arkmail-deletion-entry').length, 0);

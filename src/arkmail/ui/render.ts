@@ -132,6 +132,14 @@ const BOXES: Array<[MailBox, string]> = [
   ['niewyslane', 'Niewyslane'],
 ];
 
+/**
+ * Okno dwuklikowego potwierdzenia zbiorczego usuwania (zgloszenie
+ * 2026-10-30): drugi klik w tym czasie kasuje, ESC w tym czasie
+ * anuluje uzbrojenie. Wyeksportowane na potrzeby testow (jeden
+ * punkt prawdy dla renderu i asercji).
+ */
+export const DELETION_ARM_MS = 5000;
+
 export function mountMailUi(
   container: HTMLElement,
   store: MailUiStore,
@@ -566,12 +574,12 @@ export function mountMailUi(
     // (zgloszenie 2026-10-30: drugi klik uzbrajal od nowa zamiast kasowac).
     const selectedCount = state.deletion.selected.length;
     const armedAt = state.deletion.armedAt;
-    const armed = armedAt !== 0 && Date.now() - armedAt < 3000;
+    const armed = armedAt !== 0 && Date.now() - armedAt < DELETION_ARM_MS;
     if (armed) {
       setButtonLabel(
         remove,
         `Potwierdz usuniecie: ${formatListCount(selectedCount)}`,
-        `Usunac zaznaczone listy (liczba: ${selectedCount})? Tej operacji nie mozna cofnac. Kliknij ponownie, aby potwierdzic.`,
+        `Usunac zaznaczone listy (liczba: ${selectedCount})? Tej operacji nie mozna cofnac. Kliknij ponownie, aby potwierdzic. ESC anuluje.`,
       );
     } else {
       setButtonLabel(remove, 'Usun zaznaczone', 'Usun zaznaczone listy. Tej operacji nie mozna cofnac.');
@@ -581,11 +589,11 @@ export function mountMailUi(
       if (!armed) {
         store.armDeletionConfirm();
         const armedStamp = store.state.deletion.armedAt;
-        // Po 3 s rozbrojenie - tylko gdy nikt w miedzyczasie nie
-        // uzbroil ponownie (np. klik na swiezym przycisku po repaint).
+        // Po DELETION_ARM_MS rozbrojenie - tylko gdy nikt w miedzyczasie
+        // nie uzbroil ponownie (np. klik na swiezym przycisku po repaint).
         setTimeout(() => {
           if (store.state.deletion.armedAt === armedStamp) store.disarmDeletionConfirm();
-        }, 3000);
+        }, DELETION_ARM_MS);
         return;
       }
       store.disarmDeletionConfirm();
@@ -604,7 +612,9 @@ export function mountMailUi(
     if (entries.length > 0) {
       const list = doc.createElement('div');
       list.className = 'arkmail-deletion-results';
-      for (const entry of entries) {
+      // Najnowsze na gorze - identycznie jak w zakladce Listy
+      // (zgloszenie 2026-10-30).
+      for (const entry of [...entries].reverse()) {
         const row = doc.createElement('label');
         row.className = 'arkmail-deletion-entry';
         const checkbox = doc.createElement('input');
@@ -1869,8 +1879,17 @@ export function mountMailUi(
 
   const off = store.subscribe(render);
   render(store.state);
+  // ESC w oknie potwierdzania usuwania (zgloszenie 2026-10-30):
+  // anuluje uzbrojenie bez kasowania. Jeden listener na mount, nie na
+  // repaint - przycisk odtwarza sie z kazdym renderem, listener nie.
+  const onEscape = (event: Event): void => {
+    if ((event as KeyboardEvent).key !== 'Escape') return;
+    if (store.state.deletion.armedAt !== 0) store.disarmDeletionConfirm();
+  };
+  doc.addEventListener('keydown', onEscape);
   return () => {
     off();
+    doc.removeEventListener('keydown', onEscape);
     container.replaceChildren();
   };
 }

@@ -157,7 +157,7 @@ test('usuwanie: zaznaczanie i potwierdzenie uzywaja biezacej liczby listow', () 
   assert.ok(armed?.textContent?.includes('3 listy'));
   assert.equal(
     armed?.getAttribute('title'),
-    'Usunac zaznaczone listy (liczba: 3)? Tej operacji nie mozna cofnac. Kliknij ponownie, aby potwierdzic.',
+    'Usunac zaznaczone listy (liczba: 3)? Tej operacji nie mozna cofnac. Kliknij ponownie, aby potwierdzic. ESC anuluje.',
   );
   click(armed);
   assert.deepEqual(calls, [{ name: 'deletion-delete', args: [] }]);
@@ -168,5 +168,47 @@ test('usuwanie: zaznaczanie i potwierdzenie uzywaja biezacej liczby listow', () 
   click(container.querySelector('.arkmail-deletion-clear-selection'));
   assert.deepEqual(store.state.deletion.selected, []);
   assert.ok((container.querySelector('.arkmail-deletion-delete') as unknown as { disabled: boolean }).disabled);
+  off();
+});
+
+test('usuwanie: najnowsze listy na gorze, identycznie jak w zakladce Listy', () => {
+  // Kolejnosc serwerowa listingu: najstarszy (najwyzszy numer) pierwszy.
+  // Listy robi [...entries].reverse() - usuwanie ma byc identyczne
+  // (zgloszenie 2026-10-30: w Usuwaniu nowe maja byc na gorze).
+  const store = new MailUiStore({ tab: 'usuwanie' });
+  store.applyDeletionResult('odebrane', 'listy odebrane', {
+    kind: 'lista',
+    header: { box: 'odebrane', truncated: false },
+    entries: [entry(3), entry(2), entry(1)],
+  });
+  const { container, off } = mount(store);
+  const numbers = [...container.querySelectorAll('[data-deletion-number]')].map((element) =>
+    Number((element as unknown as { getAttribute(name: string): string }).getAttribute('data-deletion-number')),
+  );
+  assert.deepEqual(numbers, [1, 2, 3], 'numer 1 (najnowszy) jako pierwszy');
+  off();
+});
+
+test('usuwanie: ESC w oknie potwierdzania anuluje uzbrojenie', () => {
+  const store = deletionStore();
+  const { container, calls, off } = mount(store);
+  const remove = () =>
+    container.querySelector('.arkmail-deletion-delete') as unknown as {
+      textContent?: string;
+      dispatchEvent(event: unknown): void;
+    };
+  click(remove());
+  assert.ok((remove().textContent ?? '').includes('Potwierdz usuniecie'), 'uzbrojone');
+  (document as unknown as { dispatchEvent(event: unknown): void }).dispatchEvent(
+    new window.KeyboardEvent('keydown', { key: 'Escape' }),
+  );
+  const armed = store.state.deletion as unknown as { armedAt: number };
+  assert.equal(armed.armedAt, 0, 'ESC rozbrojilo');
+  assert.ok((remove().textContent ?? '').includes('Usun zaznaczone'), 'etykieta poczatkowa');
+  assert.deepEqual(calls, [], 'ESC nie wywoluje kasowania');
+  click(remove());
+  assert.deepEqual(calls, [], 'klik po ESC znowu tylko uzbraja');
+  click(remove());
+  assert.deepEqual(calls, [{ name: 'deletion-delete', args: [] }], 'drugi klik po ponownym uzbrojeniu kasuje');
   off();
 });

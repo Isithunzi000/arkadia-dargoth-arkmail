@@ -78,6 +78,16 @@ const rangeOf = (numbers: readonly number[]): string => {
 const sameNumbers = (a: readonly number[], b: readonly number[]): boolean =>
   a.length === b.length && a.every((n, i) => n === b[i]);
 
+/**
+ * Numery z potwierdzenia readera ("Zaznaczono do skasowania: …",
+ * "Kasuje: …"). Serwer LACZY numery spojnikiem " i " i rozwija zakresy
+ * (log 2026-10-30: "d 1,4" -> "Zaznaczono do skasowania: 1 i 4.",
+ * wyjscie -> "Kasuje: 1 i 4."), wiec bierzemy wszystkie liczby z
+ * odebranej czesci linii, bez narzucania separatora.
+ */
+const numbersOfConfirmation = (text: string): number[] =>
+  [...text.matchAll(/\d+/g)].map((m) => Number(m[0]));
+
 export interface ForwardResult {
   /** true = list w kolejce niewyslanych ("List jest gotowy do wyslania."). */
   queued: boolean;
@@ -148,9 +158,9 @@ export class PagerSession {
             ctx.send(`d ${zakres}`);
           },
           onLine: (line: ProtoLine) => {
-            const m = line.text.match(/^Zaznaczono do skasowania: ([\d, ]+)\.$/);
+            const m = line.text.match(/^Zaznaczono do skasowania: (.+)\.$/);
             if (m) {
-              selectedNumbers = numbersInRange(m[1].replace(/ /g, ''));
+              selectedNumbers = [...new Set(numbersOfConfirmation(m[1]))].sort((a, b) => a - b);
               if (!sameNumbers(selectedNumbers, requested)) {
                 withdraw();
                 return 'close';
@@ -161,8 +171,10 @@ export class PagerSession {
             return parseMailError(line.text) ? 'close' : undefined;
           },
           onClosingLine: (line: ProtoLine) => {
-            const m = line.text.match(/^Kasuje: (\d+)\.$/);
-            if (m) confirmed.push(Number(m[1]));
+            const m = line.text.match(/^Kasuje: (.+)\.$/);
+            if (m) {
+              for (const n of numbersOfConfirmation(m[1])) confirmed.push(n);
+            }
           },
           onAbort: withdraw,
           onTimeout: withdraw,

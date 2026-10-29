@@ -43,11 +43,10 @@ test('pager: zbiera tylko fizyczne potwierdzenia i zglasza wynik czesciowy', asy
   const op = pager.deleteLetters(2, '2-4,7');
   await t.replay([
     ...OPEN,
-    { cls: 'mail', text: 'Zaznaczono do skasowania: 2, 3, 4, 7.' },
+    { cls: 'mail', text: 'Zaznaczono do skasowania: 2 i 3 i 4 i 7.' },
     { cls: 'mail', text: PAGER },
     { cls: 'mail', text: 'Kasuje listy...' },
-    { cls: 'mail', text: 'Kasuje: 2.' },
-    { cls: 'mail', text: 'Kasuje: 3.' },
+    { cls: 'mail', text: 'Kasuje: 2 i 3.' },
     { cls: 'prompt', text: '> ' },
   ]);
   const res = await op as unknown as {
@@ -68,7 +67,7 @@ test('pager: niezgodne zaznaczenie wycofuje sie przez u przed q', async () => {
   const op = pager.deleteLetters(2, '2-4');
   await t.replay([
     ...OPEN,
-    { cls: 'mail', text: 'Zaznaczono do skasowania: 2, 4.' },
+    { cls: 'mail', text: 'Zaznaczono do skasowania: 2 i 4.' },
     { cls: 'mail', text: 'Odznaczono listy.' },
     { cls: 'mail', text: PAGER },
     { cls: 'prompt', text: '> ' },
