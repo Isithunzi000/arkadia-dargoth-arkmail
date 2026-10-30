@@ -180,6 +180,11 @@ export async function startHarness(
   const f = new FakeApi();
   f.characterName = 'Foo';
   await init(f.api);
+  // Fala 25 (blad 3): brama gry - transport pluginu startuje rozbrojony
+  // i uzbraja sie WYLACZNIE sygnalami obecnosci w grze. Kazdy test
+  // harnessu symuluje gracza w grze, wiec po init oddajemy ten sygnal,
+  // inaczej zadna komenda pluginu nie wyszlaby na zadna skrzynke.
+  f.fireEvent('gmcp.char.info', { name: 'Foo' });
   const content = (await f.popupConfig!.createContent()) as Harness['content'];
   const tick = () => new Promise((r) => setImmediate(r));
   const waitFor = async (pred: () => boolean, what: string) => {

@@ -71,9 +71,28 @@ class FakeApi {
 
 // --- DargothTransport -------------------------------------------------------
 
-test('adapter: send idzie przez command.send z wyciszonym echem', async () => {
+/**
+ * Fala 25 (blad 3): transport startuje ROZBROJONY - brame otwiera
+ * wylacznie sygnal obecnosci w grze (index.ts). Testy mechaniki
+ * wysylki uzbrajaja recznie; brak uzbrojenia jest osobno testowany.
+ */
+function armedTransport(f: FakeApi): DargothTransport {
+  const t = new DargothTransport(f.api);
+  t.setOnline(true);
+  return t;
+}
+
+test('adapter: transport startuje rozbrojony - send przed uzbrojeniem nic nie wysyla', async () => {
   const f = new FakeApi();
   const t = new DargothTransport(f.api);
+  t.send('listy odebrane');
+  await new Promise((r) => setImmediate(r));
+  assert.deepEqual(f.sent, [], 'rozbrojony transport milczy (brama gry, blad 3)');
+});
+
+test('adapter: send idzie przez command.send z wyciszonym echem', async () => {
+  const f = new FakeApi();
+  const t = armedTransport(f);
   t.send('listy odebrane');
   await new Promise((r) => setImmediate(r));
   assert.deepEqual(f.sent, [
@@ -83,7 +102,7 @@ test('adapter: send idzie przez command.send z wyciszonym echem', async () => {
 
 test('adapter: komenda z data zachowuje wielkie litery miesiaca', async () => {
   const f = new FakeApi();
-  const t = new DargothTransport(f.api);
+  const t = armedTransport(f);
   const command = 'listy odebrane przed 18 X 2026';
   t.send(command);
   await new Promise((r) => setImmediate(r));
@@ -125,7 +144,7 @@ test('adapter: unsubscribe odcina strumien', () => {
 
 test('adapter: modal-guard tlumi komendy gracza, przepuszcza wlasne', async () => {
   const f = new FakeApi();
-  const t = new DargothTransport(f.api);
+  const t = armedTransport(f);
   t.beginModal();
   assert.ok(f.hookCb, 'hook zarejestrowany');
   assert.equal(f.hookPriority, 100, 'wysoki priorytet - przed aliasami gry');

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import { startHarness, stopHarness } from './harness';
 
-test('reconnect anuluje stary listing i od razu rozpoczyna nowe odswiezenie', async () => {
+test('reconnect anuluje stary listing i wznawia odswiezenie po sygnale wznowienia sesji', async () => {
   const h = await startHarness();
   const { f, waitFor, content } = h;
   try {
@@ -13,6 +13,9 @@ test('reconnect anuluje stary listing i od razu rozpoczyna nowe odswiezenie', as
 
     f.fireEvent('client.disconnect', undefined);
     f.fireEvent('client.connect', undefined);
+    // Fala 25: sam connect odpala tez na ekranie logowania, wiec
+    // odswiezenie dopiero po faktycznym wznowieniu sesji w grze.
+    f.fireEvent('proxy.session', { resumed: true, upstreamClosed: false });
 
     await waitFor(
       () => f.sent.filter((c) => c === 'listy odebrane').length > before,

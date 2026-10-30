@@ -527,18 +527,55 @@ export async function init(api: PluginApi) {
     ui.setArchiveDownload(null);
     ui.resetDeletion();
   };
+  /**
+   * Fala 25 (blad 3, krytyczny): client.connect odpala na OTWARCIU
+   * WebSocketa - takze na EKRANIE LOGOWANIA, zanim gracz poda nazwe
+   * postaci. Login w kliencie jest prompt-driven: kazda linia na
+   * ekranie logowania jest traktowana jako nazwa postaci. Auto-refresh
+   * "listy ..." po connect ladowal komende na prompt nazwy i zabijal
+   * logowanie ("Nie ma takiej postaci" - potwierdzone przez dwoch
+   * graczy; dzialalo dopiero czyszczenie danych + usuniecie pluginu +
+   * ctrl+r; z arkadia.rpg.pl logowanie dzialalo, wiec winny byl
+   * plugin). Connect kasuje wylacznie operacje poprzedniej sesji;
+   * brame otwieraja WYLACZNIE sygnaly potwierdzajace obecnosc w grze
+   * (GMCP postaci / pokoju / stanu poczty) albo faktyczne wznowienie
+   * sesji przez proxy (resumed && !upstreamClosed). Rozbrojenie:
+   * client.disconnect oraz gmcp_msg.system.login (komunikat serwera
+   * o zamknieciu sesji - wylapuje tez kick, gdy disconnect nie zdazy
+   * nadejsc).
+   */
   const onClientConnect = (): void => {
     cancelConnectionOperations();
+  };
+  const armGameTransport = (): void => {
     transport!.setOnline(true);
-    refreshBoxes(["odebrane", "nieprzeczytane", "wyslane", "niewyslane"]);
+  };
+  const onGamePresence = (): void => {
+    armGameTransport();
+  };
+  const onProxySession = (session: unknown): void => {
+    const s = session as { resumed?: unknown; upstreamClosed?: unknown } | null | undefined;
+    if (s?.resumed === true && s?.upstreamClosed === false) {
+      armGameTransport();
+      refreshBoxes(["odebrane", "nieprzeczytane", "wyslane", "niewyslane"]);
+    }
   };
   const onClientDisconnect = (): void => {
     cancelConnectionOperations();
     playerMailMode = false;
     clearPlayerMailModeTimer();
   };
+  const onSystemLogin = (): void => {
+    onClientDisconnect();
+  };
   api.events.on("client.connect", onClientConnect);
   api.events.on("client.disconnect", onClientDisconnect);
+  api.events.on("gmcp.char.info", onGamePresence);
+  api.events.on("gmcp.char.name", onGamePresence);
+  api.events.on("gmcp.mail.state", onGamePresence);
+  api.events.on("gmcp_msg.room.long", onGamePresence);
+  api.events.on("proxy.session", onProxySession);
+  api.events.on("gmcp_msg.system.login", onSystemLogin);
 
   /**
    * Koalescencja odswiezen ze zdarzen zewnetrznych (Fala 13a): powiadomienie
@@ -2032,6 +2069,12 @@ export async function init(api: PluginApi) {
       api.events.off("client.connect", onClientConnect);
       api.events.off("client.disconnect", onClientDisconnect);
       api.events.off("gmcp.mail.state", onMailState);
+      api.events.off("gmcp.char.info", onGamePresence);
+      api.events.off("gmcp.char.name", onGamePresence);
+      api.events.off("gmcp_msg.room.long", onGamePresence);
+      api.events.off("proxy.session", onProxySession);
+      api.events.off("gmcp_msg.system.login", onSystemLogin);
+      api.events.off("gmcp.mail.state", onGamePresence);
       for (const timer of [animalTimer, sluchamTimer, unsentFlashTimer, playerMailModeTimer]) {
         if (timer !== null) clearTimeout(timer);
       }

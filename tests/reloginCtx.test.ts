@@ -9,8 +9,9 @@
  * "nie moge kliknac i wyswietlic zadnego listu" (zgloszenie pkt 3/13).
  *
  * Kontrakt:
- *  - client.connect / client.disconnect uniewazniaja kontekst listingu
- *    i odpalaja swiezy refresh skrzynek (widok dostaje nowe stemple);
+ *  - client.connect / client.disconnect uniewazniaja kontekst listingu;
+ *    swiezy refresh skrzynek odpala Fala 25 proxy.session (wznowienie
+ *    sesji w grze) - sam connect odpala tez na ekranie logowania;
  *  - blad pagera "listing zniknal" ("Zadne listy nie zostaly wybrane.",
  *    "Zly numer listu: N.") przy odczycie = JEDNA druga szansa:
  *    wymuszona re-kotwica po dacie i ponowny odczyt; powtorka = toast
@@ -95,7 +96,7 @@ async function openAndRefresh(h: Harness): Promise<void> {
   await waitFor(() => !content.querySelector('.arkmail-busy'), 'setup: koniec refreshu');
 }
 
-test('re-login: client.connect uniewaznia kontekst i odswieza skrzynki', async () => {
+test('re-login: wznowienie sesji uniewaznia kontekst i odswieza skrzynki', async () => {
   const h = await startHarness();
   const { f, waitFor, content } = h;
   try {
@@ -103,7 +104,11 @@ test('re-login: client.connect uniewaznia kontekst i odswieza skrzynki', async (
     await openAndRefresh(h);
     const base = f.sent.length;
 
+    // Fala 25: sam client.connect odpala tez na ekranie logowania;
+    // kontekst i tak jest uniewazniany przy connect, ale odswiezenie
+    // rusza dopiero po faktycznym wznowieniu sesji w grze.
     f.fireEvent('client.connect', undefined);
+    f.fireEvent('proxy.session', { resumed: true, upstreamClosed: false });
     await waitFor(
       () => f.sent.slice(base).includes('listy odebrane'),
       'auto-refresh odebranych po connect',

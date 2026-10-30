@@ -95,6 +95,9 @@ class ComposeClient {
 
 function start(client: ComposeClient, timeoutMs = 500, onCancel?: (cb: () => void) => () => void) {
   const transport = new DargothTransport(client.api);
+  // Fala 25: transport startuje rozbrojony; testy mechaniki uzbrajaja
+  // recznie (brama otwiera ja w kodzie produkcyjnym sygnalem z gry).
+  transport.setOnline(true);
   transport.beginModal();
   const editor = new EditorSession(transport, { timeoutMs, onCancel });
   const operation = editor.send({
@@ -170,6 +173,7 @@ test('transport: identyczne komendy pluginu i gracza nie mieszaja kolejek', asyn
   const client = new ComposeClient();
   client.delay = (command) => command === 'listy odebrane' ? 30 : 0;
   const transport = new DargothTransport(client.api);
+  transport.setOnline(true);
   transport.beginModal();
   void transport.send('listy odebrane');
   void transport.send('q');
@@ -185,6 +189,7 @@ test('transport: reconnect odrzuca komendy oczekujace z starego polaczenia', asy
   const client = new ComposeClient();
   client.delay = (command) => command === 'listy odebrane' ? 30 : 0;
   const transport = new DargothTransport(client.api);
+  transport.setOnline(true);
   void transport.send('listy odebrane');
   void transport.send('listy wyslane');
   await new Promise((resolve) => setImmediate(resolve));

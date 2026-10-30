@@ -163,6 +163,9 @@ test('destroy anuluje aktywna operacje, odpina zdarzenia i jest idempotentne', a
   controlled(f).characterName = 'Foo';
   try {
     await within(init(f.api));
+    // Fala 25: brama gry - po init transport jest rozbrojony; test
+    // sprawdza aktywna operacje, wiec najpierw sygnal obecnosci w grze.
+    f.fireEvent('gmcp.char.info', { name: 'Foo' });
     f.fire(' [ POCZTA ] Masz nowa poczte od Foo.');
     for (let i = 0; i < 200 && !f.sent.includes('listy odebrane'); i++) {
       await new Promise((resolve) => setImmediate(resolve));

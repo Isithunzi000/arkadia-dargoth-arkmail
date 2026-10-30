@@ -28,7 +28,13 @@ export class DargothTransport implements Transport {
   private commandQueue: Promise<void> = Promise.resolve();
   private connectionGeneration = 0;
   private sendingOwn = false;
-  private online = true;
+  // Fala 25 (blad 3): transport startuje ROZBROJONY. Brama otwiera
+  // wylacznie sygnal obecnosci w grze (gmcp.char.info / char.name /
+  // mail.state / room.long albo proxy.session z faktycznym wznowieniem
+  // sesji); client.connect sam w sobie NIE uzbraja, bo odpala tez na
+  // ekranie logowania - komenda "listy ..." na prompcie nazwy postaci
+  // zabijala logowanie ("Nie ma takiej postaci").
+  private online = false;
   /** Fala 16j: kiedy tlumic linie pocztowe (index.ts: blokada sesji). */
   private gagWhen: (() => boolean) | null = null;
 
