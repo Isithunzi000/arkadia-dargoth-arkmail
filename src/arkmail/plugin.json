@@ -1,10 +1,10 @@
 {
   "name": "ArkMail",
   "entryPoint": "index.ts",
-  "version": "1.19.4",
+  "version": "1.19.5",
   "metadata": {
     "name": "ArkMail",
-    "version": "1.19.4",
+    "version": "1.19.5",
     "author": "Isithunzi000",
     "description": "ArkMail to kompleksowy system pocztowy: skrzynki, kontakty, archiwum i pisanie listow (alias /arkmail)."
   },
