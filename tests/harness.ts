@@ -155,6 +155,10 @@ export async function startHarness(
     archive?: ArchiveLetter[];
     notifyEnabled?: boolean;
     indexMeta?: Partial<Record<MailBox, string>>;
+    // Fala 27: true = pominac domyslne uzbrojenie bramy po init
+    // (symulacja install/enable pluginu W GRZE - sygnaly obecnosci
+    // przeminely, zanim plugin zdazyl sie zaladowac).
+    skipArm?: boolean;
   } = {},
 ): Promise<Harness> {
   const window = new Window();
@@ -184,7 +188,7 @@ export async function startHarness(
   // i uzbraja sie WYLACZNIE sygnalami obecnosci w grze. Kazdy test
   // harnessu symuluje gracza w grze, wiec po init oddajemy ten sygnal,
   // inaczej zadna komenda pluginu nie wyszlaby na zadna skrzynke.
-  f.fireEvent('gmcp.char.info', { name: 'Foo' });
+  if (!options.skipArm) f.fireEvent('gmcp.char.info', { name: 'Foo' });
   const content = (await f.popupConfig!.createContent()) as Harness['content'];
   const tick = () => new Promise((r) => setImmediate(r));
   const waitFor = async (pred: () => boolean, what: string) => {
