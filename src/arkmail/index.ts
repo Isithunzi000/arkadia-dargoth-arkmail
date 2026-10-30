@@ -412,6 +412,15 @@ export async function init(api: PluginApi) {
         // re-kotwice i paginacje maja wlasne komendy i call-site'y).
         if (!res.header.truncated) {
           markGoneFromServer(box, freshIds);
+          // Fala 25 (blad 1, decyzja D1): nieuciety listing z komenda
+          // "listy <skrzynka>" = skrzynka zweryfikowana w calosci.
+          // Stempel dostaje KAZDA sciezka pelnej wiedzy, nie tylko
+          // pedzel indeksacji - po "Odswiez + Wczytaj wszystkie"
+          // status w Archiwum/Kontaktach klamal ("niekompletna"),
+          // mimo ze skrzynki byly zweryfikowane listingiem.
+          clearArchiveGaps(box);
+          ui.setIndexMeta({ ...ui.state.indexMeta, [box]: new Date().toISOString() });
+          persistIndexMeta();
         } else if (boundaryDay !== undefined) {
           // Fala 30b: przy ucietym listingu oznaczamy zakresowo -
           // tylko rekordy scisle nowsze niz granica dnia strony.
@@ -421,6 +430,11 @@ export async function init(api: PluginApi) {
         // Pusta skrzynka (reason "puste", nie "filtr") = pelna prawda:
         // wszystkie jej rekordy odpadly (skrzynka jest pusta).
         markGoneFromServer(box, new Set());
+        // Fala 25 (blad 1, decyzja D1): pusta skrzynka to kompletna
+        // wiedza o skrzynce - ten sam stempel co przy nieucietym listingu.
+        clearArchiveGaps(box);
+        ui.setIndexMeta({ ...ui.state.indexMeta, [box]: new Date().toISOString() });
+        persistIndexMeta();
       }
     }
   };
@@ -858,6 +872,13 @@ export async function init(api: PluginApi) {
         if (scan.end === "cancelled") return;
         if (scan.end === "complete" && scan.pages === 0) {
           ui.appendMailboxPage(box, [], false);
+          // Fala 25 (blad 1, decyzja D2): pusta odpowiedz na paginacje
+          // wstecz = doszlismy do dna skrzynki - cala zawartosc jest
+          // juz w widoku i archiwum, wiec skrzynka ma stempel pelnej
+          // wiedzy, a zapisane wczesniej luki dni znikaja.
+          clearArchiveGaps(box);
+          ui.setIndexMeta({ ...ui.state.indexMeta, [box]: new Date().toISOString() });
+          persistIndexMeta();
           notify(api, "Brak starszych listow.");
         } else if (scan.end === "incomplete") {
           notify(
