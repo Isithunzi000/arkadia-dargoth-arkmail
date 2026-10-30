@@ -558,18 +558,44 @@ export async function init(api: PluginApi) {
    * o zamknieciu sesji - wylapuje tez kick, gdy disconnect nie zdazy
    * nadejsc).
    */
+  // Fala 27 (anti-replay): true = ostatnia ramka proxy.session mowila,
+  // ze gra zamknela polaczenie. Proxy odtwarza wtedy bufor martwej
+  // sesji (w tym STARE envelope'y GMCP) i zamyka socket - takie
+  // odtworzone sygnaly obecnosci NIE MOGA uzbroic bramy na ekranie
+  // logowania (powrot buga 3). Flage kasuje wylacznie client.connect
+  // albo attach zywej sesji (resumed i brak upstreamClosed).
+  let lastUpstreamClosed = false;
   const onClientConnect = (): void => {
+    lastUpstreamClosed = false;
     cancelConnectionOperations();
   };
   const armGameTransport = (): void => {
     transport!.setOnline(true);
   };
   const onGamePresence = (): void => {
+    if (lastUpstreamClosed) return;
+    armGameTransport();
+  };
+  // Fala 27 (blad A): pluginy Dargoth laduja sie hot-load - install/
+  // enable W GRZE nastepuje PO sygnalach obecnosci (char.info itd.)
+  // i brama zostaje wiecznie rozbrojona. Generyczny event 'gmcp'
+  // (MudClient emituje go dla KAZDEGO envelope'a, PluginApi.ts) jest
+  // dowodem ZYWEGO ruchu z gry - Arkadia wysyla Char.State przy
+  // kazdym ticku, wiec uzbrojenie nastepuje w ciagu sekund. Straż
+  // anti-replay obowiazuje identycznie jak dla sygnalow gate.
+  const onAnyGmcp = (): void => {
+    if (lastUpstreamClosed) return;
     armGameTransport();
   };
   const onProxySession = (session: unknown): void => {
     const s = session as { resumed?: unknown; upstreamClosed?: unknown } | null | undefined;
-    if (s?.resumed === true && s?.upstreamClosed === false) {
+    // Fala 27 (blad B): proxy Go wysyla upstreamClosed WYLACZNIE gdy
+    // true (json:"upstreamClosed,omitempty", proxy/session.go) - sesja
+    // zywa ma klucz POMINIETY, wiec === false nigdy nie przechodzilo
+    // i uzbrajanie na wznowieniu sesji nigdy nie odpalalo. Klient
+    // sam uzywa poprawnego !upstreamClosed (PlayerIdentity.ts).
+    if (s?.resumed === true && !s?.upstreamClosed) {
+      lastUpstreamClosed = false;
       armGameTransport();
       refreshBoxes(["odebrane", "nieprzeczytane", "wyslane", "niewyslane"]);
     } else if (s?.upstreamClosed === true) {
@@ -577,7 +603,12 @@ export async function init(api: PluginApi) {
       // ramka 'ended' albo 'attached' z upstreamClosed=true - obie
       // przychodza PRZED ekranem logowania / gmcp_msg.system.login).
       // Rozbrajamy natychmiast, zamiast czekac na system.login.
+      lastUpstreamClosed = true;
       onClientDisconnect();
+    } else {
+      // Swiezy attach (brak resumed i upstreamClosed) - czysta sesja
+      // na ekranie logowania; zdejmujemy straż anti-replay.
+      lastUpstreamClosed = false;
     }
   };
   const onClientDisconnect = (): void => {
@@ -590,6 +621,7 @@ export async function init(api: PluginApi) {
   };
   api.events.on("client.connect", onClientConnect);
   api.events.on("client.disconnect", onClientDisconnect);
+  api.events.on("gmcp", onAnyGmcp);
   api.events.on("gmcp.char.info", onGamePresence);
   api.events.on("gmcp.char.name", onGamePresence);
   api.events.on("gmcp.mail.state", onGamePresence);
@@ -2096,6 +2128,7 @@ export async function init(api: PluginApi) {
       api.events.off("client.connect", onClientConnect);
       api.events.off("client.disconnect", onClientDisconnect);
       api.events.off("gmcp.mail.state", onMailState);
+      api.events.off("gmcp", onAnyGmcp);
       api.events.off("gmcp.char.info", onGamePresence);
       api.events.off("gmcp.char.name", onGamePresence);
       api.events.off("gmcp_msg.room.long", onGamePresence);
