@@ -84,7 +84,14 @@ function makeMockApi(capture) {
       },
     },
     events: {
-      on(event, listener) { (capture.listeners = capture.listeners || {})[event] = listener; },
+      // Klient dopuszcza wiele nasluchow na jedno zdarzenie (Fala 25:
+      // np. "gmcp.mail.state" ma osobno brame gry i reakcje na stan) -
+      // mock musi trzymac tablice, nie ostatni callback.
+      on(event, listener) {
+        (capture.listeners = capture.listeners || {})[event] = (
+          capture.listeners[event] || []
+        ).concat(listener);
+      },
       off() {},
       emit(event, ...args) { (capture.emitted = capture.emitted || []).push([event, ...args]); },
     },
@@ -133,8 +140,11 @@ test('smoke: init rejestruje kontrakt, destroy zdejmuje rejestracje', async () =
     const capture = { removed: [] };
     const api = makeMockApi(capture);
     const initializing = mod.init(api);
-    capture.listeners?.['gmcp.char.info']?.({ name: 'Foo' });
     const info = await initializing;
+    // Fala 25: brama gry - sygnal obecnosci DOPERO po zaladowaniu
+    // pluginu; wczesniej nasluchy jeszcze nie istnieja i sygnal
+    // przepadlby bez echa (jak na ekranie logowania przed init).
+    for (const cb of capture.listeners?.['gmcp.char.info'] ?? []) cb({ name: 'Foo' });
 
     assert.equal(info.name, 'ArkMail');
     const meta = fs.readFileSync(path.join(REPO, 'src/arkmail/meta.ts'), 'utf8');
@@ -191,8 +201,10 @@ test('smoke: powiadomienie odswieza skrzynki i badge stopki', async () => {
     const capture = { removed: [] };
     const api = makeMockApi(capture);
     const initializing = mod.init(api);
-    capture.listeners?.['gmcp.char.info']?.({ name: 'Foo' });
     await initializing;
+    // Fala 25: brama gry - sygnal obecnosci dopiero po zaladowaniu
+    // pluginu (w.cz. zarejestrowaniu nasluchow), inaczej przepada.
+    for (const cb of capture.listeners?.['gmcp.char.info'] ?? []) cb({ name: 'Foo' });
 
     assert.ok(capture.trigger, 'init rejestruje zbiorczy trigger linii');
     assert.equal(capture.trigger.tag, 'arkmail');
