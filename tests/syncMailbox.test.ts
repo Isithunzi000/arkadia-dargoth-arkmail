@@ -288,8 +288,9 @@ test('powiadomienie o nowej poczcie: nowy list ląduje na GORZE widoku, strony z
  * SCISELE NOWSZE niz granica, ktorych strona nie raportuje - strona jest
  * ciagla od najnowszego, wiec ich brak = pewne skasowanie. Dzien
  * graniczny i starsze NIETKNIETE (strona moze byc ucieta w polowie
- * dnia), wpisy bez daty rowniez. W archiwum te same rekordy dostaja
- * missingOnServer (zakresowy gone-marking, wzorzec z indeksacji 24e).
+ * dnia), wpisy bez daty rowniez. W archiwum te same rekordy sa
+ * FIZYCZNIE purgowane (Fala 28; zakresowy gone-marking, wzorzec
+ * z indeksacji 24e).
  */
 
 /** sync z granica dnia (4. argument) - rzutowanie: pada w runtime na starym kodzie. */
@@ -405,7 +406,7 @@ test('integracja: puste Szukaj odswieza pelna skrzynke i usuwa skasowany nowszy 
       'koniec sesji refreshu',
     );
 
-    // Archiwum: skasowany list oznaczony missingOnServer = ukryty.
+    // Archiwum: skasowany list FIZYCZNIE purgowany (Fala 28) = ukryty.
     (content.querySelector('[data-tab="archiwum"]') as { dispatchEvent(e: unknown): void })
       .dispatchEvent(new h.window.Event('click'));
     await waitFor(

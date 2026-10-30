@@ -133,10 +133,12 @@ test('usuwanie: swiezy listing zmienia numery, a potwierdzenia aktualizuja dane'
     assert.equal(h.content.querySelectorAll('.arkmail-deletion-entry').length, 0);
     assert.equal(f.sent.filter((command) => command === 'listy odebrane').length, 2, 'brak auto-refresh');
 
+    // Fala 28: potwierdzone usuniecia FIZYCZNIE wypadaja z archiwum
+    // (zamiast flagi missingOnServer - zombie siedzialy w bazie).
     const letters = await storedArchive();
-    assert.equal(letters.find((letter) => letter.subject === 'Temat A')?.missingOnServer, true);
-    assert.equal(letters.find((letter) => letter.subject === 'Temat C')?.missingOnServer, true);
-    assert.notEqual(letters.find((letter) => letter.subject === 'Temat B')?.missingOnServer, true);
+    assert.equal(letters.find((letter) => letter.subject === 'Temat A'), undefined, 'Temat A fizycznie usuniety');
+    assert.equal(letters.find((letter) => letter.subject === 'Temat C'), undefined, 'Temat C fizycznie usuniety');
+    assert.ok(letters.some((letter) => letter.subject === 'Temat B'), 'Temat B nietkniety');
     click(h, '[data-tab="kontakty"]');
     await h.waitFor(() => h.content.querySelectorAll('.arkmail-contact').length === 1, 'jeden kontakt');
     assert.equal(textOf(h, '.arkmail-contact-name'), 'Corge');
@@ -162,7 +164,10 @@ test('usuwanie: niezgodny swiezy wynik zatrzymuje operacje przed pagerem', async
     assert.ok(!f.sent.some((command) => command.startsWith('przeczytaj list')));
     assert.ok(!f.sent.some((command) => command.startsWith('d ')));
     assert.equal(h.content.querySelectorAll('.arkmail-deletion-entry').length, 0);
-    assert.notEqual((await storedArchive())[0].missingOnServer, true);
+    // Fala 28: operacja przerwana = archiwum nietkniety (bez flag).
+    const kept = await storedArchive();
+    assert.equal(kept.length, 1, 'archiwum nietkniety');
+    assert.notEqual(kept[0].missingOnServer, true);
   } finally {
     await stopHarness();
   }
@@ -189,7 +194,10 @@ test('usuwanie: brak fizycznego potwierdzenia nie zmienia Archiwum', async () =>
       () => textOf(h, '.arkmail-deletion-message') === 'Brak potwierdzenia usuniecia. Odswiez przed kolejna proba.',
       'nieznany wynik',
     );
-    assert.notEqual((await storedArchive())[0].missingOnServer, true);
+    // Fala 28: brak potwierdzenia = archiwum nietkniety (bez flag).
+    const kept = await storedArchive();
+    assert.equal(kept.length, 1, 'archiwum nietkniety');
+    assert.notEqual(kept[0].missingOnServer, true);
     assert.equal(h.content.querySelectorAll('.arkmail-deletion-entry').length, 0);
   } finally {
     await stopHarness();

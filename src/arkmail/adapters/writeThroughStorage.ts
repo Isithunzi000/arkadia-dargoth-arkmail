@@ -81,7 +81,22 @@ export class WriteThroughStorage {
       this.pendingLetters.set(key, { character, id: letter.id, value });
       changed = true;
     }
+    // Fala 28: fizyczny purge - rekordy, ktorych NIE ma w przekazanym
+    // stanie, wypadaja tez z magazynu (wczesniej setLetters robil
+    // wylacznie upsert i zombie zostawaly w IndexedDB na zawsze).
+    const alive = new Set(letters.map((letter) => letter.id));
+    const removed: string[] = [];
+    for (const id of current.keys()) {
+      if (alive.has(id)) continue;
+      removed.push(id);
+      this.pendingLetters.delete(JSON.stringify([character, id]));
+    }
+    for (const id of removed) current.delete(id);
     if (changed) this.enqueue(() => this.flushPendingLetters());
+    if (removed.length > 0) {
+      const batch = removed;
+      this.enqueue(() => this.driver.deleteLetters(character, batch));
+    }
   }
 
   delete(key: string): void {

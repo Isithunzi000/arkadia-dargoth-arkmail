@@ -51,8 +51,10 @@ export function matchSelectionOnFreshListing(
 
 
 /**
- * Oznacza lokalne rekordy usuniete na serwerze. Znikniecie calej tozsamosci
- * wymaga usuniecia wszystkich kopii widocznych na swiezym wyniku.
+ * Fizycznie usuwa lokalne rekordy skasowane na serwerze (Fala 28 -
+ * wczesniej: flaga missingOnServer, rekord siedzial w bazie wiecznie
+ * i totalne liczniki klamaly). Znikniecie calej tozsamosci wymaga
+ * usuniecia wszystkich kopii widocznych na swiezym wyniku.
  */
 export function applyConfirmedDeletions(
   archive: ArchiveLetter[],
@@ -81,21 +83,16 @@ export function applyConfirmedDeletions(
   if (removedContentKeys.size === 0) return { letters: archive, changedIds, changedBoxes };
 
   const incomingTwin = box === 'odebrane' || box === 'nieprzeczytane';
-  let changed = false;
-  const letters = archive.map((letter) => {
+  const letters = archive.filter((letter) => {
     const samePhysicalLetter = letter.box === box ||
       (incomingTwin && (letter.box === 'odebrane' || letter.box === 'nieprzeczytane'));
-    if (
-      !samePhysicalLetter ||
-      letter.missingOnServer === true ||
-      !removedContentKeys.has(contentKeyOf(letter))
-    ) {
-      return letter;
+    if (!samePhysicalLetter || !removedContentKeys.has(contentKeyOf(letter))) {
+      return true;
     }
-    changed = true;
     changedIds.add(letter.id);
     changedBoxes.add(letter.box);
-    return { ...letter, missingOnServer: true };
+    return false;
   });
-  return { letters: changed ? letters : archive, changedIds, changedBoxes };
+  if (changedIds.size === 0) return { letters: archive, changedIds, changedBoxes };
+  return { letters, changedIds, changedBoxes };
 }

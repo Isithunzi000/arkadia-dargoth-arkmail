@@ -3,8 +3,10 @@
  * zgloszenie 2026-10-23): gone-marking (pelny albo zakresowy) dotykal
  * tylko archiwum - skasowany list znikal z Archiwum i kontaktow, ale
  * zostawal w widoku skrzynki i klik w niego konczyl sie "Nie ma tego
- * listu na liscie". Teraz kazde oznaczenie missingOnServer usuwa tez
- * odpowiadajace wpisy z widoku skrzynki (lokalnie, zero komend).
+ * listu na liscie". Kazde oznaczenie usuwa tez odpowiadajace wpisy
+ * z widoku skrzynki (lokalnie, zero komend), a od Fali 28 samo
+ * oznaczenie = FIZYCZNY purge rekordu z archiwum (zamiast flagi
+ * missingOnServer - zombie siedzialy w bazie i klamaly liczniki).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -126,7 +128,7 @@ test('integracja: pelna indeksacja usuwa z widoku list znikniety z serwera', asy
     assert.ok(subjects.includes('najstarszy'), 'zywy list zostaje');
     assert.ok(subjects.includes('srodkowy'), 'zywy list zostaje (2)');
 
-    // Archiwum tez go nie pokazuje (missingOnServer, jak dotad).
+    // Archiwum tez go nie pokazuje (fizyczny purge, Fala 28).
     click(h, '[data-tab="archiwum"]');
     await waitRt(
       () => content.querySelectorAll('.arkmail-arch-entry').length === 2,

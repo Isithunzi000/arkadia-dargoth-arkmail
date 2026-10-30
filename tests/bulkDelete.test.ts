@@ -73,7 +73,7 @@ test('usuwanie zbiorcze: duplikaty porownywane sa jako liczba wystapien', async 
 });
 
 
-test('usuwanie zbiorcze: potwierdzony list i jego blizniak znikaja z Archiwum', async () => {
+test('usuwanie zbiorcze: potwierdzony list i jego blizniak USUWANE fizycznie z Archiwum (Fala 28)', async () => {
   const { applyConfirmedDeletions } = await loadModule();
   const removed = entry(4, 'Foo', 'A');
   const other = entry(3, 'Bar', 'B', 'Pn, 22 XII 2025, 02:20:05');
@@ -83,11 +83,13 @@ test('usuwanie zbiorcze: potwierdzony list i jego blizniak znikaja z Archiwum', 
     fromMailboxEntry('odebrane', other),
   ];
   const result = applyConfirmedDeletions(archive, 'odebrane', [removed, other], [4]);
-  assert.equal(result.letters[0]!.missingOnServer, true);
-  assert.equal(result.letters[1]!.missingOnServer, true);
-  assert.equal(result.letters[2]!.missingOnServer, undefined);
-  assert.equal(result.letters[2], archive[2], 'nietkniety rekord zachowuje referencje');
-  assert.equal(archive[0]!.missingOnServer, undefined, 'wejscie bez mutacji');
+  assert.deepEqual(
+    result.letters.map((l) => l.subject),
+    ['B'],
+    'obie kopie fizycznie usuniete (Fala 28: zadnych zombie)',
+  );
+  assert.equal(result.letters[0], archive[2], 'nietkniety rekord zachowuje referencje');
+  assert.equal(archive.length, 3, 'wejscie bez mutacji');
   assert.deepEqual([...result.changedIds].sort(), [archive[0]!.id, archive[1]!.id].sort());
   assert.deepEqual([...result.changedBoxes].sort(), ['nieprzeczytane', 'odebrane']);
 });
@@ -100,7 +102,6 @@ test('usuwanie zbiorcze: pozostaly duplikat chroni rekord Archiwum', async () =>
   const result = applyConfirmedDeletions(archive, 'odebrane', [first, duplicate], [4]);
   assert.equal(result.letters, archive, 'bez zmian zwracana jest ta sama tablica');
   assert.equal(result.changedIds.size, 0);
-  assert.equal(result.letters[0]!.missingOnServer, undefined);
 });
 
 test('usuwanie zbiorcze: brak fizycznego potwierdzenia nie zmienia Archiwum', async () => {
@@ -110,5 +111,4 @@ test('usuwanie zbiorcze: brak fizycznego potwierdzenia nie zmienia Archiwum', as
   const result = applyConfirmedDeletions(archive, 'odebrane', fresh, []);
   assert.equal(result.letters, archive);
   assert.equal(result.changedBoxes.size, 0);
-  assert.equal(result.letters[0]!.missingOnServer, undefined);
 });

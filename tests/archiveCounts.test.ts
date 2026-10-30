@@ -3,7 +3,8 @@
  * z rozbiem per skrzynka. Zasady:
  *  - deduplikacja blizniakow (ten sam list w "nieprzeczytane" i
  *    "odebrane" liczony raz - klucz: contentKeyOf);
- *  - listy, ktorych juz nie ma na serwerze (missingOnServer), wypadaja;
+ *  - Fala 28: skasowanych listow w bazie nie ma wcale (fizyczny
+ *    purge), wiec zywosc nie jest sprawdzana;
  *  - skrzynki z zerem pomijane;
  *  - agregat jest globalny (nie zalezy od filtra nad lista).
  */
@@ -56,13 +57,11 @@ function countsText(container: { querySelector(s: string): unknown }): string | 
   return strip?.textContent ?? null;
 }
 
-test('archiwum: agregat liczy listy po deduplikacji i bez usunietych', () => {
+test('archiwum: agregat liczy listy po deduplikacji (purge Fala 28 juz usunal skasowane)', () => {
   const read = archived('odebrane', 'Wspolny');
   const unread = { ...archived('nieprzeczytane', 'Wspolny'), id: 'inny-rekord' };
   const sent = archived('wyslane', 'Raport');
-  const gone = archived('odebrane', 'Stary', { missingOnServer: true });
-  const goneToo = archived('niewyslane', 'Nadany', { missingOnServer: true });
-  const { container, off } = mount([read, unread, sent, gone, goneToo]);
+  const { container, off } = mount([read, unread, sent]);
   try {
     const text = countsText(container);
     assert.equal(
@@ -70,18 +69,6 @@ test('archiwum: agregat liczy listy po deduplikacji i bez usunietych', () => {
       'Listow w bazie: 2 listy (odebrane: 1 list, nieprzeczytane: 1 list, wyslane: 1 list).',
       `agregat: ${text}`,
     );
-  } finally {
-    off();
-  }
-});
-
-test('archiwum: same listy nieobecne na serwerze = brak paska', () => {
-  const { container, off } = mount([
-    archived('odebrane', 'Stary', { missingOnServer: true }),
-    archived('wyslane', 'Nadany', { missingOnServer: true }),
-  ]);
-  try {
-    assert.equal(countsText(container), null, 'pasek znika, gdy baza nie ma zadnego zywego listu');
   } finally {
     off();
   }

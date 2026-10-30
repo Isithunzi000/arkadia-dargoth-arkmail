@@ -87,7 +87,9 @@ test('normalizacja: scala duplikaty i zachowuje wszystkie rozne linie tresci', (
   const normalized = archive.normalizeArchive([first, second]);
   assert.equal(normalized.length, 1);
   assert.equal(normalized[0].read, true);
-  assert.equal(normalized[0].missingOnServer, undefined);
+  // Fala 28: normalize NIE rusza legacy-pola - jednorazowy purge
+  // flagged rekordow dzieje sie przy ladowaniu pluginu (index.ts).
+  assert.equal(normalized[0].missingOnServer, true);
   assert.equal(normalized[0].number, 9);
   assert.deepEqual(new Set(normalized[0].body), new Set(['pierwsza', 'druga', 'wspolna']));
   assert.equal(normalized[0].body.length, 3);

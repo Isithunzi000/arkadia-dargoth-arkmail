@@ -17,9 +17,9 @@
  *    "nieprzeczytane" po przeczytaniu znika z tego listingu, wiec
  *    re-kotwica po nim bylaby falszywym chybiem;
  *  - list, ktorego re-kotwica nie znajduje na swiezym listingu,
- *    dostaje znacznik missingOnServer i jest POMIJANY w kolejnych
- *    uruchomieniach petli; powrot listu do listingu (upsert) znacznik
- *    czysci;
+ *    jest FIZYCZNIE usuwany z archiwum (Fala 28 - zamiast znacznika
+ *    missingOnServer, po ktorym zombie siedzialy w bazie wiecznie);
+ *    powrot listu do listingu (upsert) odtwarza rekord;
  *  - podsumowanie petli raportuje znikniete listy osobno.
  */
 import { test } from 'node:test';
@@ -27,6 +27,7 @@ import assert from 'node:assert/strict';
 
 import {
   fromMailboxEntry,
+  purgeGoneLetters,
   upsertLetters,
   type ArchiveLetter,
 } from '../src/arkmail/core/archive';
@@ -75,12 +76,14 @@ const ENTRY: MailboxEntry = {
   },
 };
 
-test('archiwum: powrot listu do listingu czysci znacznik missingOnServer', () => {
+test('archiwum: list purgowany wraca listingiem (upsert odtwarza rekord)', () => {
   const gone: ArchiveLetter = { ...fromMailboxEntry('odebrane', ENTRY), missingOnServer: true };
+  const purged = purgeGoneLetters([gone], 'odebrane', new Set());
+  assert.equal(purged.letters.length, 0, 'zombie fizycznie usuniety');
   const back = fromMailboxEntry('odebrane', ENTRY); // list znowu w listingu
-  const res = upsertLetters([gone], [back]);
-  assert.equal(res.updated, 1, 'aktualizacja, nie duplikat');
-  assert.ok(res.letters[0].missingOnServer !== true, 'znacznik wyczyszczony po powrocie');
+  const res = upsertLetters(purged.letters, [back]);
+  assert.equal(res.updated, 0, 'czysty insert - nie bylo czego aktualizowac');
+  assert.equal(res.letters.length, 1, 'rekord odtworzony listingiem');
 });
 
 /** Swiezy przycisk pobierania (rerender tworzy nowy DOM). */
@@ -206,7 +209,7 @@ test('archiwum: blizniak nieprzeczytane/odebrane pobierany RAZ, tresc w obu reko
   }
 });
 
-test('archiwum: list znikniety z serwera dostaje znacznik i jest pomijany przy restarcie', async () => {
+test('archiwum: list znikniety z serwera jest purgowany i pomijany przy restarcie', async () => {
   const h = await startHarness();
   const { f } = h;
   try {
@@ -216,7 +219,8 @@ test('archiwum: list znikniety z serwera dostaje znacznik i jest pomijany przy r
     downloadBtn(h).dispatchEvent(new h.window.Event('click')); // start
 
     // Listing BEZ najnowszego listu - serwer go juz nie ma (i nie
-    // wraca: gdyby wrocil w kolejnym listingu, upsert zdjalby znacznik).
+    // wraca: gdyby wrocil w kolejnym listingu, upsert odtworzylby
+    // purgowany rekord).
     const replayListingBezNajnowszego = (): void => {
       f.fire('Listy odebrane:', 'mail');
       f.fire(' 2. *R* Temat: najstarszy', 'mail');
@@ -242,8 +246,8 @@ test('archiwum: list znikniety z serwera dostaje znacznik i jest pomijany przy r
 
     await waitRt(() => notifyText(f, 'nie ma juz w skrzynce: 1'), 'podsumowanie ze zniknietym');
 
-    // Restart: znacznik zostaje, kandydatow brak, zadna nowa
-    // re-kotwica nie wylatuje.
+    // Restart: rekord purgowany nie istnieje, kandydatow brak, zadna
+    // nowa re-kotwica nie wylatuje.
     downloadBtn(h).dispatchEvent(new h.window.Event('click')); // uzbrojenie
     downloadBtn(h).dispatchEvent(new h.window.Event('click')); // start
     await waitRt(() => notifyText(f, 'Wszystkie listy w bazie maja tresci.'), 'brak kandydatow po znaczniku');

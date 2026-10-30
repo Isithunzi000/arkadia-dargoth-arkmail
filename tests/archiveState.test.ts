@@ -106,19 +106,22 @@ test('pobieranie: pusta i bledna data nie sa zniknieciem listu z serwera', async
   }
 });
 
-test('pobieranie: same listy znikniete nie sa kompletem dostepnych tresci', async () => {
+test('pobieranie: legacy-zombie (missingOnServer) purgowany przy ladowaniu', async () => {
   const gone = archived('Znikniety', { missingOnServer: true });
   const h = await startHarness({ archive: [gone] });
   try {
+    // Fala 28: rekord z flaga ze STAREJ wersji fizycznie wypada przy
+    // init - puste archiwum daje neutralny komunikat, nie "wszystkie
+    // maja tresci".
     await openArchive(h);
     startDownload(h);
     await waitRt(
       () =>
-        notifyText(h.f, 'Brak dostepnych listow do pobrania - nie ma juz w skrzynce.') ||
+        notifyText(h.f, 'Skrzynki sa puste - nie ma czego pobierac.') ||
         notifyText(h.f, 'Wszystkie listy w bazie maja tresci.'),
-      'komunikat o braku kandydatow',
+      'komunikat o pustym archiwum',
     );
-    assert.ok(notifyText(h.f, 'Brak dostepnych listow do pobrania - nie ma juz w skrzynce.'));
+    assert.ok(notifyText(h.f, 'Skrzynki sa puste - nie ma czego pobierac.'));
     assert.ok(!notifyText(h.f, 'Wszystkie listy w bazie maja tresci.'));
     assert.deepEqual(h.f.sent, []);
   } finally {
@@ -145,26 +148,29 @@ test('statusy: liczniki pobierania i ZIP uwzgledniaja grupy oraz niedostepne dat
   try {
     await openArchive(h);
     const steps = stepTexts(h);
-    assert.match(
-      steps[1],
-      /Gotowe: 1 list z trescia \(1 bez daty, 1 nie ma juz w skrzynce\)\./,
-    );
+    // Fala 28: legacy-zombie jest purgowany przy ladowaniu - nie jest
+    // liczony ani w kolumnie pobierania, ani w ZIP.
+    assert.match(steps[1], /Gotowe: 1 list z trescia \(1 bez daty\)\./);
     assert.match(steps[2], /Gotowe: 1 list do zapisu \(1 bez tresci\)\./);
   } finally {
     await stopHarness();
   }
 });
 
-test('eksport: pobrana tresc listu zniknietego nie jest prezentowana jako dostepna', async () => {
+test('eksport: legacy-zombie z trescia purgowany przy ladowaniu, nie eksportowany', async () => {
   const gone = archived('Znikniety', { body: ['Tresc listu.'], missingOnServer: true });
   const h = await startHarness({ archive: [gone] });
   const captured: Blob[] = [];
   setDownloadImpl((_name, data) => captured.push(data));
   try {
+    // Fala 28: purge przy init - eksport widzi puste archiwum.
     await openArchive(h);
     click(h, '.arkmail-arch-export');
-    await waitRt(() => notifyText(h.f, 'Brak'), 'komunikat o braku plikow');
-    assert.ok(notifyText(h.f, 'Brak dostepnych listow do zapisu - nie ma juz w skrzynce.'));
+    await waitRt(
+      () => notifyText(h.f, 'Skrzynki sa puste - nie ma czego zapisywac.'),
+      'komunikat o braku plikow',
+    );
+    assert.ok(notifyText(h.f, 'Skrzynki sa puste - nie ma czego zapisywac.'));
     assert.equal(captured.length, 0);
     assert.deepEqual(h.f.sent, []);
   } finally {

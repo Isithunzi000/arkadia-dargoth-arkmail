@@ -44,9 +44,12 @@ import {
   fromMailboxEntry,
   fromOpenedLetter,
   normalizeArchive,
+  purgeGoneLetters,
+  purgeGoneLettersNewerThan,
   upsertLetters,
   type ArchiveLetter,
 } from "./core/archive";
+import { totalLive } from "./core/archiveStats";
 import { MailboxSession, type ListingCtx, type MailboxEntry, type MailboxResult } from "./core/session/mailbox";
 import { humanizeMailError, isOperationCancelled } from "./core/errors";
 import { archiveExportEntries, letterTxt, txtFileName } from "./core/exportTxt";
@@ -310,7 +313,12 @@ export async function init(api: PluginApi) {
   // serwer. Listingi/tresci (spam) gagowane jak dotychczas.
   let composeVisible = false;
   transport.setGagPredicate(() => lock.locked && !composeVisible);
-  const archive = normalizeArchive(storage.getLetters());
+  // Fala 28: jednorazowy przeglad storage - rekordy oznaczone przez
+  // STARE wersje jako nieobecne na serwerze (missingOnServer) fizycznie
+  // wypadaja. Od tej wersji purge dzieje sie przy kazdym gone-markingu.
+  const archive = normalizeArchive(storage.getLetters()).filter(
+    (l) => l.missingOnServer !== true,
+  );
   storage.setLetters(archive);
   const composePrefs = storage.getJSON<{ template?: LetterTemplate; width?: number }>(COMPOSE_KEY);
   store = new MailUiStore({
@@ -440,65 +448,48 @@ export async function init(api: PluginApi) {
   };
 
   /**
-   * Fala 18a: oznacza rekordy archiwum danej skrzynki nieobecne
-   * w freshIds jako nieobecne na serwerze (cicho, jak upsert). Wywolywane
-   * WYLACZNIE przy pewnoscia kompletnego listingu (patrz fetchBoxes).
+   * Fala 28: FIZYCZNIE usuwa rekordy archiwum danej skrzynki nieobecne
+   * w freshIds (zamiast flagi missingOnServer - zombie siedzialy w bazie
+   * wiecznie i totalne liczniki klamaly). Wywolywane WYLACZNIE przy
+   * pewnoscia kompletnego listingu (patrz fetchBoxes). Blednie usuniety
+   * rekord odtworzy kolejny listing (upsert).
    */
   const markGoneFromServer = (box: MailBox, freshIds: Set<string>): void => {
-    let changed = false;
-    const marked = ui.state.archive.map((l) => {
-      if (l.box !== box || l.missingOnServer === true || freshIds.has(l.id)) return l;
-      changed = true;
-      return { ...l, missingOnServer: true };
-    });
-    if (changed) {
-      ui.setArchive(marked);
-      persistArchive();
-      pruneGoneFromView(box);
-    }
+    const purged = purgeGoneLetters(ui.state.archive, box, freshIds);
+    if (purged.removedIds.size === 0) return;
+    ui.setArchive(purged.letters);
+    persistArchive();
+    pruneGoneFromView(box, purged.removedIds);
   };
 
   /**
-   * Fala 30c: widok skrzynki wyrzuca wpisy, ktorych rekord archiwum
-   * jest oznaczony jako nieobecny na serwerze. Wywolywane po kazdym
-   * gone-markingu (pelnym albo zakresowym) - operacja lokalna.
+   * Fala 30c: widok skrzynki wyrzuca wpisy o usunietych id - operacja
+   * lokalna, zero komend.
    */
-  const pruneGoneFromView = (box: MailBox): void => {
-    const gone = new Set(
-      ui.state.archive
-        .filter((l) => l.box === box && l.missingOnServer === true)
-        .map((l) => l.id),
-    );
-    ui.pruneMailboxEntries(box, gone);
+  const pruneGoneFromView = (box: MailBox, removedIds: Set<string>): void => {
+    ui.pruneMailboxEntries(box, removedIds);
   };
 
   /**
-   * Fala 24e: gone-marking ZAKRESOWY po klamrze przeczesu
-   * incrementalnego. Klamra zatrzymuje przeces na przecieciu z baza,
-   * wiec pelny markGoneFromServer oznaczylby niesprawdzone rekordy.
-   * Oznaczamy tylko rekordy NOWSZE niz boundaryDay (najstarszy dzien
-   * widziany w tej petli): strony listingu sa ciagle od najnowszego,
-   * wiec wszystko nowsze musialo przejsc przez pobrane strony. Dzien
-   * graniczny (<= boundaryDay) nietkniety - klamra mogla uciac go
-   * w polowie strony.
+   * Fala 24e/28: purge ZAKRESOWY po klamrze przeczesu incrementalnego.
+   * Klamra zatrzymuje przeces na przecieciu z baza, wiec pelny
+   * markGoneFromServer usunalby niesprawdzone rekordy. Usuwamy tylko
+   * rekordy NOWSZE niz boundaryDay (najstarszy dzien widziany w tej
+   * petli): strony listingu sa ciagle od najnowszego, wiec wszystko
+   * nowsze musialo przejsc przez pobrane strony. Dzien graniczny
+   * (<= boundaryDay) nietkniety - klamra mogla uciac go w polowie
+   * strony.
    */
   const markGoneFromServerNewerThan = (
     box: MailBox,
     freshIds: Set<string>,
     boundaryDay: string,
   ): void => {
-    let changed = false;
-    const marked = ui.state.archive.map((l) => {
-      if (l.box !== box || l.missingOnServer === true || freshIds.has(l.id)) return l;
-      if (l.sortKey.slice(0, 10) <= boundaryDay) return l;
-      changed = true;
-      return { ...l, missingOnServer: true };
-    });
-    if (changed) {
-      ui.setArchive(marked);
-      persistArchive();
-      pruneGoneFromView(box);
-    }
+    const purged = purgeGoneLettersNewerThan(ui.state.archive, box, freshIds, boundaryDay);
+    if (purged.removedIds.size === 0) return;
+    ui.setArchive(purged.letters);
+    persistArchive();
+    pruneGoneFromView(box, purged.removedIds);
   };
 
   const refreshBoxes = (boxes: MailBox[], mode: "sync" | "replace" = "sync"): void => {
@@ -1148,7 +1139,7 @@ export async function init(api: PluginApi) {
             rebuildContacts();
             notify(
               api,
-              `Zindeksowano wszystkie skrzynki (listow w bazie: ${ui.state.archive.length}).`,
+              `Zindeksowano wszystkie skrzynki (listow w bazie: ${totalLive(ui.state.archive)}).`,
             );
           } else {
             rebuildContacts();
@@ -1383,7 +1374,6 @@ export async function init(api: PluginApi) {
     // prawidlowa date, bo bez niej nie mozna odnalezc listu na serwerze.
     const groups = new Map<string, ArchiveLetter[]>();
     for (const l of ui.state.archive) {
-      if (l.missingOnServer === true) continue;
       const key = contentKeyOf(l);
       const arr = groups.get(key);
       if (arr) arr.push(l);
@@ -1467,10 +1457,9 @@ export async function init(api: PluginApi) {
             } else if (result.kind === "missing" && !flag.cancelled) {
               missing += 1;
               consecutiveErrors = 0;
-              // Znacznik na calej grupie: restart petli je pomija.
-              const marked = group.map((l) => ({ ...l, missingOnServer: true }));
-              const merged = upsertLetters(ui.state.archive, marked);
-              ui.setArchive(merged.letters);
+              // Fala 28: brak na serwerze -> fizyczny purge grupy z archiwum.
+              const goneIds = new Set(group.map((l) => l.id));
+              ui.setArchive(ui.state.archive.filter((l) => !goneIds.has(l.id)));
               persistArchive();
             } else if (!flag.cancelled) {
               failed += 1;
@@ -1533,9 +1522,7 @@ export async function init(api: PluginApi) {
         api,
         ui.state.archive.length === 0
           ? "Skrzynki sa puste - nie ma czego zapisywac."
-          : ui.state.archive.every((letter) => letter.missingOnServer === true)
-            ? "Brak dostepnych listow do zapisu - nie ma juz w skrzynce."
-            : "Brak listow z trescia w archiwum - najpierw pobierz tresci.",
+          : "Brak listow z trescia w archiwum - najpierw pobierz tresci.",
       );
       return;
     }
@@ -1649,7 +1636,11 @@ export async function init(api: PluginApi) {
           ui.setArchive(updated.letters);
           persistArchive();
           rebuildContacts();
-          for (const changedBox of updated.changedBoxes) pruneGoneFromView(changedBox);
+          // Pelny zbior usunietych id per skrzynka: pruneMailboxEntries
+          // i tak ignoruje id, ktorych dana skrzynka nie zawiera.
+          for (const changedBox of updated.changedBoxes) {
+            pruneGoneFromView(changedBox, updated.changedIds);
+          }
         }
         let message: string;
         if (result.status === "complete") {
@@ -1826,7 +1817,11 @@ export async function init(api: PluginApi) {
             });
             if (out.result === "wyslany") {
               notify(api, "List zostal wyslany.");
-              refreshBoxes(["wyslane"]);
+              // Fala 28: wczesniej refreshowala sie tylko skrzynka
+              // "wyslane" - rekord szkicu w "niewyslane" zostawal zywy
+              // w bazie obok wyslanej kopii i totalne liczniki sie
+              // rozjezdzaly. Pelny listing niewyslanych usuwa szkic.
+              refreshBoxes(["wyslane", "niewyslane"]);
               // Fala 16e: po udanej wysylce formularz sie czysci
               // (zgloszenie pkt 12) - kolejny list zaczyna sie od zera.
               ui.clearCompose();

@@ -98,7 +98,6 @@ export function archiveExportEntries(letters: readonly ArchiveLetter[]): {
 } {
   const byKey = new Map<string, ArchiveLetter[]>();
   for (const l of letters) {
-    if (l.missingOnServer === true) continue;
     const key = contentKeyOf(l);
     const group = byKey.get(key);
     if (group) group.push(l);

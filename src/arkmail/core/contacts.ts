@@ -169,17 +169,17 @@ export function contactsFromBoxes(
  * kazdy pobrany listing i przetrwa refresh oraz restart (storage),
  * w przeciwienstwie do widokow skrzynek (domyslnie pierwsze 50 wpisow).
  * Rekordy sprzed Fali 14a nie maja pola forwarded - traktowane jak false.
+ * Fala 28: listow nieobecnych na serwerze w bazie nie ma wcale
+ * (fizyczny purge), wiec zywosc nie jest sprawdzana.
  */
 export function contactsFromArchive(letters: readonly ArchiveLetter[]): Contact[] {
   return mergeContacts({
     people: [],
     przedstawieni: [],
-    // Fala 18a: listy nieobecne na serwerze nie licza sie
-    // do kontaktow (kompletny listing raportuje pelna prawde).
     // Fala 18b: szkice (niewyslane) to nie wyslana korespondencja.
     korespondencja: korespondencjaFromLetters(
       letters
-        .filter((l) => l.missingOnServer !== true && l.box !== 'niewyslane')
+        .filter((l) => l.box !== 'niewyslane')
         .map(archiveToLetterLike),
     ),
     aliasy: [],

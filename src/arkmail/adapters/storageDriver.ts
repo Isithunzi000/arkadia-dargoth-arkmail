@@ -7,6 +7,7 @@ export interface StorageDriver {
   put(key: string, value: string): Promise<void>;
   putMany(values: Readonly<Record<string, string>>): Promise<void>;
   putLetters(character: string, values: Readonly<Record<string, string>>): Promise<void>;
+  deleteLetters(character: string, ids: readonly string[]): Promise<void>;
   delete(key: string): Promise<void>;
   clearLetters(character: string): Promise<void>;
   clearMailData(character: string, keys: readonly string[]): Promise<void>;
@@ -40,6 +41,12 @@ export class MemoryStorageDriver implements StorageDriver {
     const current = this.letters.get(character) ?? new Map<string, string>();
     this.letters.set(character, current);
     for (const [id, value] of Object.entries(values)) current.set(id, value);
+  }
+
+  async deleteLetters(character: string, ids: readonly string[]): Promise<void> {
+    const current = this.letters.get(character);
+    if (!current) return;
+    for (const id of ids) current.delete(id);
   }
 
   async delete(key: string): Promise<void> {
@@ -151,6 +158,24 @@ export class IndexedDbStorageDriver implements StorageDriver {
       transaction.onabort = () => reject(transaction.error ?? new Error("Zapis listow przerwany."));
       try {
         for (const [id, value] of Object.entries(values)) store.put({ character, id, value });
+      } catch (error) {
+        transaction.abort();
+        reject(error);
+      }
+    });
+  }
+
+  async deleteLetters(character: string, ids: readonly string[]): Promise<void> {
+    if (ids.length === 0) return;
+    const database = await this.openDatabase();
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(LETTERS_STORE, "readwrite");
+      const store = transaction.objectStore(LETTERS_STORE);
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error ?? new Error("Blad kasowania listow."));
+      transaction.onabort = () => reject(transaction.error ?? new Error("Kasowanie listow przerwane."));
+      try {
+        for (const id of ids) store.delete([character, id]);
       } catch (error) {
         transaction.abort();
         reject(error);

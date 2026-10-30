@@ -15,11 +15,15 @@ import {
   type ListingSearch,
 } from '../core/protocol/commands.js';
 import {
-  contentKeyOf,
   filterVisibleArchive,
   type ArchiveFilter,
   type ArchiveLetter,
 } from '../core/archive.js';
+import {
+  liveArchiveGroups,
+  perBoxCounts,
+  totalLive,
+} from '../core/archiveStats.js';
 import { parseMailDate } from '../core/protocol/parser.js';
 import { archiveExportEntries } from '../core/exportTxt.js';
 import { viewContacts, type ContactSort } from '../core/contacts.js';
@@ -1375,11 +1379,13 @@ export function mountMailUi(
     // Fala 25 (blad 2): pedzel indeksacji ma pierwszenstwo przed
     // flagowym stanem - stopka pokazuje "w toku" zgodnie z archiwum,
     // zeby oba panele nie pokazywaly roznych statusow tego samego przebiegu.
+    // Fala 28: ta sama miara co pasek archiwum (totalLive - zywe
+    // grupy po deduplikacji blizniakow), nie surowa dlugosc bazy.
     foot.textContent = state.indexRun
-      ? `Indeksowanie trwa: ${state.indexRun.box} (${state.indexRun.boxIndex + 1}/${INDEX_BOXES.length}), stron: ${state.indexRun.pages} | listow w bazie: ${state.archive.length}`
+      ? `Indeksowanie trwa: ${state.indexRun.box} (${state.indexRun.boxIndex + 1}/${INDEX_BOXES.length}), stron: ${state.indexRun.pages} | listow w bazie: ${totalLive(state.archive)}`
       : allBoxesIndexed(state.indexMeta)
-        ? `Kompletna indeksacja od: ${dates[0]!.slice(0, 10)} | listow w bazie: ${state.archive.length}`
-        : `Indeksacja niekompletna | listow w bazie: ${state.archive.length}`;
+        ? `Kompletna indeksacja od: ${dates[0]!.slice(0, 10)} | listow w bazie: ${totalLive(state.archive)}`
+        : `Indeksacja niekompletna | listow w bazie: ${totalLive(state.archive)}`;
     pane.appendChild(foot);
     const gaps = INDEX_BOXES.flatMap((box) =>
       (state.archiveGaps[box] ?? []).map((day) => `${box}: ${day}`),
@@ -1652,36 +1658,27 @@ export function mountMailUi(
         : indexedCount > 0 || gapCount > 0
           ? `Czesciowo: ${indexedCount} z ${INDEX_BOXES.length} skrzynek${gapCount > 0 ? ` (${gapPhrase(gapCount)})` : ''}.`
           : 'Jeszcze nie zaczeto.';
-    const archiveGroups = new Map<string, ArchiveLetter[]>();
-    for (const letter of state.archive) {
-      const key = contentKeyOf(letter);
-      const group = archiveGroups.get(key);
-      if (group) group.push(letter);
-      else archiveGroups.set(key, [letter]);
-    }
+    // Fala 28: grupy przez core/archiveStats - jedna miara "total"
+    // dla paska, stopki indeksacji i komunikatow. Rekordow nieobecnych
+    // na serwerze w bazie nie ma wcale (fizyczny purge), wiec zywosc
+    // nie jest sprawdzana.
+    const archiveGroups = liveArchiveGroups(state.archive);
     let withBody = 0;
     let pendingBody = 0;
     let undatedBody = 0;
-    let unavailableBody = 0;
-    for (const group of archiveGroups.values()) {
-      const live = group.filter((letter) => letter.missingOnServer !== true);
-      if (live.length === 0) {
-        unavailableBody += 1;
-        continue;
-      }
-      if (live.some((letter) => letter.body.length > 0)) {
+    for (const group of archiveGroups) {
+      if (group.some((letter) => letter.body.length > 0)) {
         withBody += 1;
         continue;
       }
-      const dateRaw = live[0]!.dateRaw;
+      const dateRaw = group[0]!.dateRaw;
       if (dateRaw !== null && parseMailDate(dateRaw) !== null) pendingBody += 1;
       else undatedBody += 1;
     }
-    // Fala 31e: szczegoly w nawiasie, liczebnik przodem
-    // ("1 bez daty", "2 nie ma juz w skrzynce").
+    // Fala 31e: szczegoly w nawiasie, liczebnik przedom
+    // ("1 bez daty").
     const bodyWarnings = [
       undatedBody > 0 ? `${undatedBody} bez daty` : '',
-      unavailableBody > 0 ? `${unavailableBody} nie ma juz w skrzynce` : '',
     ].filter((text) => text !== '');
     const warningSuffix = bodyWarnings.length > 0 ? ` (${bodyWarnings.join(', ')})` : '';
     const downloadStatus = state.archiveDownload
@@ -1700,31 +1697,21 @@ export function mountMailUi(
         : exportable.skipped > 0
           ? `Gotowe: ${formatListCount(exportable.entries.length)} do zapisu (${exportable.skipped} bez tresci).`
           : `Gotowe: ${formatListCount(exportable.entries.length)} do zapisu.`;
-    // Fala 31d: agregat nad lista - globalny (nie zalezy od filtra),
-    // po deduplikacji blizniakow (contentKeyOf) i bez listow, ktorych
-    // juz nie ma na serwerze; skrzynki z zerem pomijane.
-    const liveGroups = [...archiveGroups.values()].filter((group) =>
-      group.some((letter) => letter.missingOnServer !== true),
-    );
-    const perBoxCounts = new Map<MailBox, number>();
-    for (const group of liveGroups) {
-      const countedBoxes = new Set<MailBox>();
-      for (const letter of group) {
-        if (letter.missingOnServer === true || countedBoxes.has(letter.box)) continue;
-        countedBoxes.add(letter.box);
-        perBoxCounts.set(letter.box, (perBoxCounts.get(letter.box) ?? 0) + 1);
-      }
-    }
+    // Fala 31d/28: agregat nad lista - globalny (nie zalezy od filtra),
+    // po deduplikacji blizniakow (core/archiveStats); skrzynki z zerem
+    // pomijane. Kazdy rekord jest zywy (fizyczny purge Fala 28), wiec
+    // zywosc nie jest sprawdzana.
+    const boxCounts = perBoxCounts(state.archive);
     let countsStrip: HTMLElement | null = null;
-    if (liveGroups.length > 0) {
+    if (archiveGroups.length > 0) {
       const parts: string[] = [];
       for (const box of INDEX_BOXES) {
-        const count = perBoxCounts.get(box);
+        const count = boxCounts.get(box);
         if (count !== undefined) parts.push(`${box}: ${formatListCount(count)}`);
       }
       countsStrip = doc.createElement('p');
       countsStrip.className = 'arkmail-dim arkmail-arch-counts';
-      countsStrip.textContent = `Listow w bazie: ${formatListCount(liveGroups.length)}${parts.length > 0 ? ` (${parts.join(', ')})` : ''}.`;
+      countsStrip.textContent = `Listow w bazie: ${formatListCount(archiveGroups.length)}${parts.length > 0 ? ` (${parts.join(', ')})` : ''}.`;
     }
     const indexStep = makeStep('1. Indeksacja', indexStatus, state.indexRun ? 'active' : allBoxesIndexed(state.indexMeta) ? (gapCount > 0 ? 'warning' : 'done') : indexedCount > 0 || gapCount > 0 ? 'incomplete' : 'idle');
     const downloadStep = makeStep('2. Pobranie tresci', downloadStatus, state.archiveDownload ? 'active' : pendingBody > 0 ? 'incomplete' : bodyWarnings.length > 0 ? 'warning' : withBody > 0 ? 'done' : 'idle');

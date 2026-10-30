@@ -12,6 +12,7 @@ import assert from 'node:assert/strict';
 import {
   filterVisibleArchive,
   fromMailboxEntry,
+  purgeGoneLetters,
   upsertLetters,
   type ArchiveLetter,
 } from '../src/arkmail/core/archive';
@@ -74,14 +75,15 @@ test('filtr skrzynki dopasowuje grupe po dowolnej skrzynce blizniaka', () => {
   );
 });
 
-test('rekordy znikniete z serwera sa ukryte; grupa z zywym blizniakiem zostaje', () => {
-  const znikniety = { ...entry('nieprzeczytane', { isRead: false }), missingOnServer: true };
+test('Fala 28: purge usuwa rekord znikniety z serwera; grupa z zywym blizniakiem zostaje', () => {
+  const flagged = { ...entry('nieprzeczytane', { isRead: false }), missingOnServer: true };
   const zywy = entry('odebrane');
-  const rows = filterVisibleArchive([znikniety, zywy], {});
+  const purged = purgeGoneLetters([flagged, zywy], 'nieprzeczytane', new Set());
+  const rows = filterVisibleArchive(purged.letters, {});
   assert.equal(rows.length, 1, 'grupa zyje przez odebrane');
   assert.equal(rows[0].box, 'odebrane');
-  const samZnikniety = filterVisibleArchive([znikniety], {});
-  assert.equal(samZnikniety.length, 0, 'sam zombie ukryty');
+  const samZnikniety = purgeGoneLetters([flagged], 'nieprzeczytane', new Set());
+  assert.equal(samZnikniety.letters.length, 0, 'sam zombie fizycznie usuniety');
 });
 
 test('filtr tresci dopasowuje grupe po tresci dowolnego blizniaka', () => {
@@ -92,19 +94,21 @@ test('filtr tresci dopasowuje grupe po tresci dowolnego blizniaka', () => {
   assert.equal(filterVisibleArchive([bezTresci, zTrescia], { tresc: 'nie-ma' }).length, 0);
 });
 
-test('kontakty i eksport pomijaja rekordy znikniete z serwera', () => {
-  const znikniety = {
+test('kontakty i eksport pomijaja rekordy znikniete z serwera (po purge Fala 28)', () => {
+  const flagged = {
     ...entry('odebrane', { party: 'Corge', subject: 'Stary' }),
     body: ['tresc'],
     missingOnServer: true,
   };
   const zywy = { ...entry('odebrane', { party: 'Foo' }), body: ['tresc'] };
-  const contacts = contactsFromArchive([znikniety, zywy]);
+  // freshIds = zywe rekordy z kompletnego listingu; purge kasuje reszte.
+  const letters = purgeGoneLetters([flagged, zywy], 'odebrane', new Set([zywy.id])).letters;
+  const contacts = contactsFromArchive(letters);
   assert.ok(
     !contacts.some((c) => c.name === 'Corge'),
     'znikniety list nie liczy sie do kontaktow',
   );
-  const { entries } = archiveExportEntries([znikniety, zywy]);
+  const { entries } = archiveExportEntries(letters);
   assert.equal(entries.length, 1, 'eksport pomija znikniete');
   assert.ok(entries[0].name.startsWith('odebrane/'));
 });
@@ -126,9 +130,11 @@ test('kolejnosc wyniku: od najnowszych (deterministycznie po grupach)', () => {
   );
 });
 
-test('upsertLetters nadal czysci znacznik znikniecia po powrocie do listingu', () => {
-  const znikniety = { ...entry('odebrane'), missingOnServer: true };
-  const swiezy = entry('odebrane');
-  const merged = upsertLetters([znikniety], [swiezy]);
-  assert.equal(merged.letters[0].missingOnServer, undefined, 'powrot do listingu czysci znacznik');
+test('upsertLetters odtwarza rekord po jego powrocie na listing (po purge Fala 28)', () => {
+  const record = entry('odebrane');
+  const purged = purgeGoneLetters([record], 'odebrane', new Set());
+  assert.equal(purged.letters.length, 0, 'purge usunal rekord fizycznie');
+  const merged = upsertLetters(purged.letters, [record]);
+  assert.equal(merged.added, 1, 'rekord odtworzony z listingu');
+  assert.equal(merged.letters[0]!.subject, record.subject);
 });

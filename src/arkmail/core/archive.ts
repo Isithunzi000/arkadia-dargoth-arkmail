@@ -36,11 +36,11 @@ export interface ArchiveLetter {
   read: boolean;
   body: string[];
   /**
-   * List nieobecny na serwerze (Fala 17c, zgloszenie pkt 3): re-kotwica
-   * nie znalazla go na swiezym listingu podczas pobierania tresci.
-   * Petla pobierania takie rekordy POMIJA (bez znacznika kazdy restart
-   * mielil zombie-wpisy do timeoutu). Upsert z listingu znacznik
-   * czysci - list wrocil na serwer.
+   * LEGACY (Fala 28): wczesniej flaga "nieobecny na serwerze".
+   * Od Fali 28 rekordy nieobecne sa FIZYCZNIE usuwane (purge), wiec
+   * flagi nikt nie stawia ani nie czyta w runtime. Pole zostaje w
+   * typie wylacznie dla danych zapisanych przez stare wersje - przy
+   * ladowaniu plugin je odfiltrowuje (jednorazowy przeglad storage).
    */
   missingOnServer?: boolean;
 }
@@ -217,8 +217,6 @@ function mergeArchiveDuplicates(group: ArchiveLetter[]): ArchiveLetter {
     read: group.some((letter) => letter.read),
     body,
   };
-  if (group.every((letter) => letter.missingOnServer === true)) merged.missingOnServer = true;
-  else delete merged.missingOnServer;
   return merged;
 }
 
@@ -285,10 +283,6 @@ export function upsertLetters(
       ...prev,
       ...inc,
       body: inc.body.length > 0 ? inc.body : prev.body,
-      // Fala 17c: powrot listu do listingu czysci znacznik nieobecnosci
-      // (incoming z listingu nigdy go nie niesie, wiec undefined
-      // wygrywa; znacznik ustawia wylacznie petla pobierania tresci).
-      missingOnServer: inc.missingOnServer === true ? true : undefined,
     });
     updated++;
   }
@@ -358,10 +352,11 @@ function representativeOf(group: ArchiveLetter[]): ArchiveLetter {
 /**
  * Widok archiwum (Fala 18a, zgloszenie 2026-10-20 pkt 1/3): ten sam
  * list widoczny w kilku skrzynkach (nieprzeczytany jest i tu, i tu)
- * pokazuje sie JEDEN raz - grupa po kluczu tresci; rekordy oznaczone
- * jako nieobecne na serwerze sa ukryte (grupa zyje, poki ma zywego
- * blizniaka). Filtr skrzynki i tresci dziala po CA LEJ grupie (reszta
- * filtrow po reprezentancie - party/temat/daty sa w grupie identyczne).
+ * pokazuje sie JEDEN raz - grupa po kluczu tresci. Fala 28: rekordow
+ * nieobecnych na serwerze w bazie nie ma wcale (fizyczny purge), wiec
+ * zywosc nie jest sprawdzana. Filtr skrzynki i tresci dziala po
+ * CA LEJ grupie (reszta filtrow po reprezentancie - party/temat/daty
+ * sa w grupie identyczne).
  */
 const validArchiveDate = (value: string | undefined): string | undefined =>
   value !== undefined && fromISODate(value) !== null ? value : undefined;
@@ -374,7 +369,6 @@ export function filterVisibleArchive(
   const doDaty = validArchiveDate(filter.doDaty);
   const groups = new Map<string, ArchiveLetter[]>();
   for (const l of letters) {
-    if (l.missingOnServer === true) continue;
     const key = contentKeyOf(l);
     const arr = groups.get(key);
     if (arr) arr.push(l);
