@@ -572,6 +572,12 @@ export async function init(api: PluginApi) {
     if (s?.resumed === true && s?.upstreamClosed === false) {
       armGameTransport();
       refreshBoxes(["odebrane", "nieprzeczytane", "wyslane", "niewyslane"]);
+    } else if (s?.upstreamClosed === true) {
+      // Fala 26: proxy wprost mowi, ze gra zamknela polaczenie (kick:
+      // ramka 'ended' albo 'attached' z upstreamClosed=true - obie
+      // przychodza PRZED ekranem logowania / gmcp_msg.system.login).
+      // Rozbrajamy natychmiast, zamiast czekac na system.login.
+      onClientDisconnect();
     }
   };
   const onClientDisconnect = (): void => {
