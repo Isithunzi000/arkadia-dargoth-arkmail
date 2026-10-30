@@ -296,6 +296,51 @@ export function upsertLetters(
 }
 
 /**
+ * Fizyczne usuniecie rekordow skrzynki nieobecnych na KOMPLETNYM
+ * listingu (Fala 28 - zamiast flagi missingOnServer). Serwer nie
+ * serwuje skasowanych listow, a blednie usuniety rekord odtworzy
+ * kolejny listing (upsert) - nic wiecznie nie ginie. Zwraca baze
+ * bez rekordow + zbior usunietych id (widok skrzynki czysci sie
+ * na ich podstawie).
+ */
+export function purgeGoneLetters(
+  existing: readonly ArchiveLetter[],
+  box: MailBox,
+  freshIds: ReadonlySet<string>,
+): { letters: ArchiveLetter[]; removedIds: Set<string> } {
+  const removedIds = new Set<string>();
+  const letters = existing.filter((letter) => {
+    if (letter.box !== box || freshIds.has(letter.id)) return true;
+    removedIds.add(letter.id);
+    return false;
+  });
+  if (removedIds.size === 0) return { letters: [...existing], removedIds };
+  return { letters, removedIds };
+}
+
+/**
+ * Wariant zakresowy (Fala 24e/28): usuwa tylko rekordy scisle nowsze
+ * niz granica dnia (najstarszy dzien widzianej strony). Dzien
+ * graniczny nietkniety - klamra paginacji mogla uciac go w polowie.
+ */
+export function purgeGoneLettersNewerThan(
+  existing: readonly ArchiveLetter[],
+  box: MailBox,
+  freshIds: ReadonlySet<string>,
+  boundaryDay: string,
+): { letters: ArchiveLetter[]; removedIds: Set<string> } {
+  const removedIds = new Set<string>();
+  const letters = existing.filter((letter) => {
+    if (letter.box !== box || freshIds.has(letter.id)) return true;
+    if (letter.sortKey.slice(0, 10) <= boundaryDay) return true;
+    removedIds.add(letter.id);
+    return false;
+  });
+  if (removedIds.size === 0) return { letters: [...existing], removedIds };
+  return { letters, removedIds };
+}
+
+/**
  * Reprezentant grupy blizniakow (Fala 18a): rekord z trescia wygrywa
  * (wiersz i otwarcie z cache), potem skrzynka kanoniczna (odebrane
  * przed nieprzeczytanymi - zombie po przeczytaniu nie rzadzi widokiem),
