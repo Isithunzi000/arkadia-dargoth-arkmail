@@ -1372,9 +1372,14 @@ export function mountMailUi(
     const dates = INDEX_BOXES.map((b) => state.indexMeta[b])
       .filter((d): d is string => d !== undefined)
       .sort();
-    foot.textContent = allBoxesIndexed(state.indexMeta)
-      ? `Kompletna indeksacja od: ${dates[0]!.slice(0, 10)} | listow w bazie: ${state.archive.length}`
-      : `Indeksacja niekompletna | listow w bazie: ${state.archive.length}`;
+    // Fala 25 (blad 2): pedzel indeksacji ma pierwszenstwo przed
+    // flagowym stanem - stopka pokazuje "w toku" zgodnie z archiwum,
+    // zeby oba panele nie pokazywaly roznych statusow tego samego przebiegu.
+    foot.textContent = state.indexRun
+      ? `Indeksowanie trwa: ${state.indexRun.box} (${state.indexRun.boxIndex + 1}/${INDEX_BOXES.length}), stron: ${state.indexRun.pages} | listow w bazie: ${state.archive.length}`
+      : allBoxesIndexed(state.indexMeta)
+        ? `Kompletna indeksacja od: ${dates[0]!.slice(0, 10)} | listow w bazie: ${state.archive.length}`
+        : `Indeksacja niekompletna | listow w bazie: ${state.archive.length}`;
     pane.appendChild(foot);
     const gaps = INDEX_BOXES.flatMap((box) =>
       (state.archiveGaps[box] ?? []).map((day) => `${box}: ${day}`),
@@ -1397,7 +1402,11 @@ export function mountMailUi(
     // kontaktow, bo brama wisala na fladze indeksu, nie na danych).
     // Dopisek "(jednorazowo)" usuniety - indeksowanie nie jest
     // jednorazowe (Fala 24e: incrementalna, przeczes co 7 dni).
-    if (!allBoxesIndexed(state.indexMeta)) {
+    // Fala 25 (blad 2): brama (i przycisk "Przerwij indeksowanie")
+    // widoczne ZAWSZE, gdy pedzel dziala - takze przy kompletnym
+    // indexMeta (ponowna indeksacja), inaczej nie dalo sie jej
+    // przerwac z zakladki kontaktow.
+    if (!allBoxesIndexed(state.indexMeta) || state.indexRun) {
       pane.appendChild(
         dim('Kontakty powstaja z listow zebranych ze wszystkich skrzynek.'),
       );
