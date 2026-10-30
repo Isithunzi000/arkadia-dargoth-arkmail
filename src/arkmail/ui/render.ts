@@ -1882,14 +1882,18 @@ export function mountMailUi(
   // ESC w oknie potwierdzania usuwania (zgloszenie 2026-10-30):
   // anuluje uzbrojenie bez kasowania. Jeden listener na mount, nie na
   // repaint - przycisk odtwarza sie z kazdym renderem, listener nie.
+  // Guard na addEventListener: dymkowe srodowiska smoke daja okrojony
+  // document bez API zdarzen (smoke-load: doc.addEventListener is not
+  // a function).
   const onEscape = (event: Event): void => {
     if ((event as KeyboardEvent).key !== 'Escape') return;
     if (store.state.deletion.armedAt !== 0) store.disarmDeletionConfirm();
   };
-  doc.addEventListener('keydown', onEscape);
+  const canListen = typeof (doc as Document).addEventListener === 'function';
+  if (canListen) doc.addEventListener('keydown', onEscape);
   return () => {
     off();
-    doc.removeEventListener('keydown', onEscape);
+    if (canListen) doc.removeEventListener('keydown', onEscape);
     container.replaceChildren();
   };
 }
