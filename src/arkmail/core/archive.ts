@@ -36,6 +36,19 @@ export interface ArchiveLetter {
   read: boolean;
   body: string[];
   /**
+   * Fala 35: liczba wystapien listu na serwerze (blizniaki o
+   * identycznych metadanych wylistowane pod roznymi numerami).
+   * Brak pola = 1 (zapisy ze starych wersji). Ustawiana wylacznie
+   * z pelnego listingu indeksacji - wynik listingu, nie suma zapisow.
+   */
+  occurrences?: number;
+  /**
+   * Fala 35: tresci wystapien 2..n przeczytane kazde osobno (petla
+   * pobierania czyta kazde wystapienie; body = wystapienie 1). Bez
+   * deduplikacji bajtow - dwa identyczne wystapienia to dwie kopie.
+   */
+  extraBodies?: string[][];
+  /**
    * LEGACY (Fala 28): wczesniej flaga "nieobecny na serwerze".
    * Od Fali 28 rekordy nieobecne sa FIZYCZNIE usuwane (purge), wiec
    * flagi nikt nie stawia ani nie czyta w runtime. Pole zostaje w
@@ -100,6 +113,16 @@ export function letterId(
   // od strony/listingu. Flaga forwarded rozroznia forward oryginalu
   // wyslany w tej samej sekundzie (log 2026-10-18).
   return fnv1a([box, party, subject, forwarded ? 'f' : '', dateRaw ?? ''].join('|'));
+}
+
+/** Wystapienia rekordu (Fala 35): brak pola = 1 (zapis legacy). */
+export function occurrenceCount(letter: ArchiveLetter): number {
+  return letter.occurrences ?? 1;
+}
+
+/** Wszystkie przeczytane tresci wystapien: body + extraBodies, bez dedupu. */
+export function bodiesOf(letter: ArchiveLetter): string[][] {
+  return [letter.body, ...(letter.extraBodies ?? [])];
 }
 
 /**
@@ -216,6 +239,9 @@ function mergeArchiveDuplicates(group: ArchiveLetter[]): ArchiveLetter {
     number: Math.max(...group.map((letter) => letter.number)),
     read: group.some((letter) => letter.read),
     body,
+    // Fala 35: te same id = te same metadane = te same wystapienia;
+    // MAX chroni przed podwojnym liczeniem przy scalaniu duplikatow.
+    occurrences: Math.max(...group.map((letter) => occurrenceCount(letter))),
   };
   return merged;
 }
