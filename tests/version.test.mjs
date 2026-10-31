@@ -116,6 +116,27 @@ test('dokumentacja: README opisuje reczne i zbiorcze usuwanie listow', () => {
 
 // Fala 32: permalink stalej nazwy zipa (releases/latest/download)
 // musi byc udokumentowany - asset arkmail.zip istnieje wlasnie po to.
+// Fala 32: sekcja Licencja wspomina wylacznie licencje - wyjasnienia
+// rodla kodu (np. "port 1:1") nie wolno tam umieszczac.
+test('dokumentacja: sekcja Licencja wspomina tylko licencje', () => {
+  const readme = fs.readFileSync(path.join(REPO, 'README.md'), 'utf8');
+  const lic = readme.split('## Licencja')[1] ?? '';
+  assert.match(lic, /AGPL/);
+  assert.doesNotMatch(lic, /port 1:1/);
+});
+
+// Fala 32: kazdy URL w README ma byc klikalnym odnosnikiem markdown
+// ([tekst](url)), nie surowym tekstem w code spanie/fenced blocku.
+test('dokumentacja: README uzywa wylacznie klikalnych odnosnikow', () => {
+  const readme = fs.readFileSync(path.join(REPO, 'README.md'), 'utf8');
+  assert.doesNotMatch(readme, /`[^`\n]*https?:\/\/[^`\n]*`/);
+  const urls = readme.match(/https?:\/\/[^\s)<>"']+/g) ?? [];
+  assert.ok(urls.length > 0, 'README ma zawierac jakies odnosniki');
+  for (const u of urls) {
+    assert.ok(readme.includes(`](${u}`), `${u}: nie jest klikalnym odnosnikiem`);
+  }
+});
+
 test('dokumentacja: README podaje permalink recznego importu ZIP', () => {
   const readme = fs.readFileSync(path.join(REPO, 'README.md'), 'utf8');
   assert.match(readme, /releases\/latest\/download\/arkmail\.zip/);
