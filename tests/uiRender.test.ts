@@ -210,7 +210,7 @@ test('render: badge w etykiecie zakladki Listy', () => {
   s.applyMailbox('nieprzeczytane', {
     kind: 'lista',
     header: { box: 'nieprzeczytane', truncated: false },
-    entries: [entry(), entry({ number: 2 })],
+    entries: [entry(), entry({ number: 2, subject: 'Perly 2' })],
   });
   assert.equal(container.querySelector('[data-tab="listy"]')?.textContent, 'Listy (2)');
   off();
