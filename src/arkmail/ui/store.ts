@@ -37,6 +37,29 @@ export interface DeletionState {
   armedAt: number;
 }
 
+
+/**
+ * Fala 29: klucz TRESCI wpisu widoku (bez boxa - widok jest per
+ * skrzynka; bez numeru - numeracja stron jest wzgledna). Ten sam
+ * klucz co contentKeyOf w archiwum: blizniacze listy o identycznych
+ * metadanych skladaja sie w jeden wiersz, zgodnie z tym jak archiwum
+ * sklada je w jedna grupe.
+ */
+function contentKeyOfEntry(e: MailboxEntry): string {
+  return [e.party, e.subject, e.forwarded ? 'f' : '', e.date?.raw ?? ''].join('|');
+}
+
+/** Fala 29: dedup w obrebie listy wpisow; pierwsze wystapienie wygrywa. */
+function dedupeMailboxEntries(entries: MailboxEntry[]): MailboxEntry[] {
+  const seen = new Set<string>();
+  return entries.filter((e) => {
+    const k = contentKeyOfEntry(e);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
 function deletionState(revision: number): DeletionState {
   return {
     box: 'odebrane',
@@ -216,7 +239,10 @@ export class MailUiStore {
   applyMailbox(box: MailBox, result: MailboxResult): void {
     const view: BoxView =
       result.kind === 'lista'
-        ? { entries: result.entries, truncated: result.header.truncated, empty: null }
+        ? // Fala 29: dedup w obrebie pierwszej strony - para blizniakow
+          // o identycznych metadanych to jeden wiersz, jak jedna grupa
+          // w archiwum (zgoda licznikow widok/archiwum).
+          { entries: dedupeMailboxEntries(result.entries), truncated: result.header.truncated, empty: null }
         : { entries: [], truncated: false, empty: result.reason };
     const boxes = { ...this.current.boxes, [box]: view };
     const b = computeBadges(boxes);
@@ -237,7 +263,10 @@ export class MailUiStore {
     const key = (e: MailboxEntry): string =>
       [e.party, e.subject, e.forwarded ? 'f' : '', e.date?.raw ?? ''].join('|');
     const known = new Set(view.entries.map(key));
-    const fresh = entries.filter((e) => !known.has(key(e)));
+    // Fala 29: najpierw dedup W OBREBIE swiezej strony, potem filtrem
+    // wzgledem widoku - para blizniakow na jednej stronie doklejala
+    // sie dwa razy.
+    const fresh = dedupeMailboxEntries(entries).filter((e) => !known.has(key(e)));
     const next: BoxView = {
       entries: [...fresh, ...view.entries],
       truncated,
