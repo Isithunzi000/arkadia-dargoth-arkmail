@@ -65,6 +65,7 @@ test('ui: nieprzeczytany wiersz ma klase unread, przeczytany nie', () => {
         entries: [entry(1, false, 'Swiezy'), entry(2, true, 'Stary')],
         truncated: false,
         empty: null,
+        headCount: 2,
       },
     },
   });
@@ -81,7 +82,7 @@ test('ui: regresja 14c - w skrzynce wyslanych brak znacznika unread', () => {
     tab: 'listy',
     activeBox: 'wyslane',
     boxes: {
-      wyslane: { entries: [entry(1, false, 'Wyslany')], truncated: false, empty: null },
+      wyslane: { entries: [entry(1, false, 'Wyslany')], truncated: false, empty: null, headCount: 1 },
     },
   });
   const { container, off } = mount(s);

@@ -39,25 +39,15 @@ export interface DeletionState {
 
 
 /**
- * Fala 29: klucz TRESCI wpisu widoku (bez boxa - widok jest per
- * skrzynka; bez numeru - numeracja stron jest wzgledna). Ten sam
- * klucz co contentKeyOf w archiwum: blizniacze listy o identycznych
- * metadanych skladaja sie w jeden wiersz, zgodnie z tym jak archiwum
- * sklada je w jedna grupe.
+ * Fala 34: klucz TRESCI wpisu widoku (bez boxa - widok jest per
+ * skrzynka; bez numeru - numeracja listingu jest kontekstowa).
+ * Uzywany WYLACZNIE do parowania wielozbiorowego (sync) i zdejmowania
+ * ponownie pokazanych listow (sonda sciany paginacji) - NIGDY do
+ * sklejania wierszy: serwer wylistowal N wpisow = widok pokazuje
+ * N wierszy (blizniaki o identycznych metadanych to osobne wiersze).
  */
 function contentKeyOfEntry(e: MailboxEntry): string {
   return [e.party, e.subject, e.forwarded ? 'f' : '', e.date?.raw ?? ''].join('|');
-}
-
-/** Fala 29: dedup w obrebie listy wpisow; pierwsze wystapienie wygrywa. */
-function dedupeMailboxEntries(entries: MailboxEntry[]): MailboxEntry[] {
-  const seen = new Set<string>();
-  return entries.filter((e) => {
-    const k = contentKeyOfEntry(e);
-    if (seen.has(k)) return false;
-    seen.add(k);
-    return true;
-  });
 }
 
 function deletionState(revision: number): DeletionState {
@@ -78,6 +68,15 @@ export interface BoxView {
   truncated: boolean;
   /** znacznik wariantu pustego; null gdy listing niepusty */
   empty: 'puste' | 'filtr' | null;
+  /**
+   * Fala 34: liczba wpisow NA KONCU tablicy nalezaca do ostatniego
+   * listingu pierwszej strony (blok glowy). Starsze strony doklejone
+   * PRZODEM poza ten blok; sync paruje swieza strone tylko z blokiem
+   * glowy (numeracja stron jest wzgledna - wpis z innego listingu
+   * o tym samym numerze to INNY list). Wpisy nieparujace w obrebie
+   * bloku glowy przy kompletnym listingu wypadaja z widoku.
+   */
+  headCount: number;
 }
 
 export interface OpenLetter extends LetterContent {
@@ -239,11 +238,16 @@ export class MailUiStore {
   applyMailbox(box: MailBox, result: MailboxResult): void {
     const view: BoxView =
       result.kind === 'lista'
-        ? // Fala 29: dedup w obrebie pierwszej strony - para blizniakow
-          // o identycznych metadanych to jeden wiersz, jak jedna grupa
-          // w archiwum (zgoda licznikow widok/archiwum).
-          { entries: dedupeMailboxEntries(result.entries), truncated: result.header.truncated, empty: null }
-        : { entries: [], truncated: false, empty: result.reason };
+        ? // Fala 34: listing 1:1 - para blizniakow (identyczne
+          // metadane, rozne numery) to DWA wiersze. Cala strona =
+          // blok glowy (sync paruje z nim, nie ze starszymi stronami).
+          {
+            entries: result.entries,
+            truncated: result.header.truncated,
+            empty: null,
+            headCount: result.entries.length,
+          }
+        : { entries: [], truncated: false, empty: result.reason, headCount: 0 };
     const boxes = { ...this.current.boxes, [box]: view };
     const b = computeBadges(boxes);
     this.update({ boxes, badge: b.unread, badgeUnsent: b.unsent });
@@ -252,25 +256,23 @@ export class MailUiStore {
   /**
    * Dokleja strone starszych listow (paginacja "Wybrane listy") PRZED
    * istniejace wpisy - widok trzyma kolejnosc serwera (najstarszy
-   * pierwszy). Dedup po stronie/temacie/forwarded/dacie, bo numeracja
-   * stron jest wzgledna i kotwica (+1 dzien) daje nakladanie.
+   * pierwszy). Fala 34: w obrebie strony NIC nie deduplikujemy;
+   * filtrem klucza tresci zdejmujemy jedynie wpisy juz widoczne
+   * (sonda sciany paginacji odpytuje ponownie dzien graniczny - to
+   * te same fizyczne listy; blizniaki z innego dnia nie koliduja).
    * truncated=false oznacza koniec starszych (przycisk znika).
    */
-  /** Dokleja strone starszych wpisow; zwraca liczbe NOWYCH (po dedup). */
+  /** Dokleja strone starszych wpisow; zwraca liczbe NOWYCH wierszy. */
   appendMailboxPage(box: MailBox, entries: MailboxEntry[], truncated: boolean): number {
     const view = this.current.boxes[box];
     if (!view) return 0;
-    const key = (e: MailboxEntry): string =>
-      [e.party, e.subject, e.forwarded ? 'f' : '', e.date?.raw ?? ''].join('|');
-    const known = new Set(view.entries.map(key));
-    // Fala 29: najpierw dedup W OBREBIE swiezej strony, potem filtrem
-    // wzgledem widoku - para blizniakow na jednej stronie doklejala
-    // sie dwa razy.
-    const fresh = dedupeMailboxEntries(entries).filter((e) => !known.has(key(e)));
+    const known = new Set(view.entries.map(contentKeyOfEntry));
+    const fresh = entries.filter((e) => !known.has(contentKeyOfEntry(e)));
     const next: BoxView = {
       entries: [...fresh, ...view.entries],
       truncated,
       empty: null,
+      headCount: view.headCount,
     };
     const boxes = { ...this.current.boxes, [box]: next };
     const b = computeBadges(boxes);
@@ -284,8 +286,11 @@ export class MailUiStore {
    * ("Wczytaj starsze" / "Wczytaj wszystkie") NIE znikaja przy
    * odswiezeniu - gracz nie wraca do domyslnych 50 wpisow.
    *
-   * - wpisy znane (tozsamosc: strona|temat|forwarded|data, jak w
-   *   appendMailboxPage) aktualizowane sa W MIEJSCU (np. znacznik *R*);
+   * - Fala 34: parowanie wielozbiorowe (multiset) W OBREBIE bloku
+   *   glowy - wpisy swiezej strony parowane po kluczu tresci ze
+   *   starymi wpisami bloku glowy i aktualizowane W MIEJSCU (np.
+   *   znacznik *R*); drugi blizniak na swiezej stronie = DOKLADANY
+   *   wiersz (blizniaki nigdy nie sa sklejane);
    * - nowe listy doklejane sa NA KONCU tablicy (koniec najnowszy; UI
    *   renderuje odwrotnie, wiec laduja na gorze ekranu);
    * - znacznik uciecia odpowiada najswiezszemu listingowi: komplet go
@@ -314,48 +319,100 @@ export class MailUiStore {
   ): { updated: number; added: number; removed: number } | null {
     const view = this.current.boxes[box];
     if (!view || view.empty !== null) return null;
-    const key = (e: MailboxEntry): string =>
-      [e.party, e.subject, e.forwarded ? 'f' : '', e.date?.raw ?? ''].join('|');
+    const key = contentKeyOfEntry;
     const isoDay = (e: MailboxEntry): string | null => {
       if (!e.date) return null;
       const p = (n: number) => String(n).padStart(2, '0');
       return `${e.date.year}-${p(e.date.month)}-${p(e.date.day)}`;
     };
-    const pos = new Map(view.entries.map((e, i) => [key(e), i] as const));
-    let next = [...view.entries];
+    // Fala 34: parowanie WYLACZNIE w obrebie bloku glowy (wpisy z
+    // ostatniego listingu pierwszej strony, NA KONCU tablicy). Starsze
+    // strony doklejone PRZODEM sa z innych dni - nie biora udzialu w
+    // parowaniu (numeracja stron jest wzgledna, wpis z innego
+    // listingu o tym samym numerze to INNY list). Blizniaki paruja
+    // dowolnie (sa nierozroznialne), ale liczba wierszy zalezy od
+    // liczby wystapien na swiezej stronie.
+    const all = view.entries;
+    const headCount = Math.min(view.headCount, all.length);
+    const older = all.slice(0, all.length - headCount);
+    const head = all.slice(all.length - headCount);
+    const headSlots = new Map<string, number[]>();
+    head.forEach((e, i) => {
+      const k = key(e);
+      const list = headSlots.get(k);
+      if (list) list.push(i);
+      else headSlots.set(k, [i]);
+    });
+    const used = new Set<number>();
+    // newHead[i] = null: stary wpis nieparujacy (kandydat do usuniecia)
+    const newHead: Array<MailboxEntry | null> = head.map(() => null);
     let updated = 0;
     let added = 0;
     for (const e of entries) {
-      const i = pos.get(key(e));
-      if (i === undefined) {
-        pos.set(key(e), next.length);
-        next.push(e);
+      const free = headSlots.get(key(e))?.find((i) => !used.has(i));
+      if (free === undefined) {
+        newHead.push(e);
         added += 1;
       } else {
-        next[i] = e;
+        used.add(free);
+        newHead[free] = e;
         updated += 1;
       }
     }
+    // Nieparujace wpisy bloku glowy: kompletny listing = pelna prawda
+    // serwera (wypadaja); przy ucieciu wypadaja tylko wpisy SCISLE
+    // nowsze niz granica dnia (strona ciagla od najnowszego - brak =
+    // pewne skasowanie); dzien graniczny, starsze i wpisy bez daty
+    // zostaja (strona moze byc ucieta w polowie dnia).
     let removed = 0;
+    let keptHead: MailboxEntry[];
     if (!truncated) {
-      const freshKeys = new Set(entries.map(key));
-      const kept = next.filter((e) => freshKeys.has(key(e)));
-      removed = next.length - kept.length;
-      next = kept;
+      removed += newHead.filter((e) => e === null).length;
+      keptHead = newHead.filter((e): e is MailboxEntry => e !== null);
     } else if (pruneNewerThan !== undefined) {
-      const freshKeys = new Set(entries.map(key));
-      const kept = next.filter((e) => {
-        const day = isoDay(e);
-        if (day === null || day <= pruneNewerThan) return true;
-        return freshKeys.has(key(e));
+      keptHead = [];
+      for (let i = 0; i < newHead.length; i++) {
+        const slot = newHead[i];
+        if (slot === null) {
+          const day = isoDay(head[i]!);
+          if (day !== null && day > pruneNewerThan) {
+            removed += 1;
+            continue;
+          }
+          keptHead.push(head[i]!);
+        } else {
+          keptHead.push(slot);
+        }
+      }
+    } else {
+      keptHead = newHead.map((e, i) => e ?? head[i]!);
+    }
+    let next = [...older, ...keptHead];
+    if (!truncated) {
+      // Kompletny listing raportuje CALA skrzynke: starsze strony tez
+      // podlegaja prawdzie serwera - wypadki ponad liczbe wystapien
+      // z listingu (np. blizniak skasowany na serwerze).
+      const freshCounts = new Map<string, number>();
+      for (const e of entries) {
+        const k = key(e);
+        freshCounts.set(k, (freshCounts.get(k) ?? 0) + 1);
+      }
+      const keptOlder = older.filter((e) => {
+        const c = freshCounts.get(key(e)) ?? 0;
+        if (c > 0) {
+          freshCounts.set(key(e), c - 1);
+          return true;
+        }
+        return false;
       });
-      removed = next.length - kept.length;
-      next = kept;
+      removed += older.length - keptOlder.length;
+      next = [...keptOlder, ...keptHead];
     }
     const nextView: BoxView = {
       entries: next,
       truncated,
       empty: null,
+      headCount: keptHead.length,
     };
     const boxes = { ...this.current.boxes, [box]: nextView };
     const b = computeBadges(boxes);
@@ -377,7 +434,16 @@ export class MailUiStore {
     const kept = view.entries.filter((e) => !goneIds.has(id(e)));
     const removed = view.entries.length - kept.length;
     if (removed === 0) return 0;
-    const boxes = { ...this.current.boxes, [box]: { ...view, entries: kept } };
+    // Fala 34: wypadki moga nalezec do bloku glowy - korekta licznika,
+    // zeby sync nie traktowal pozycji ze starszych stron jak glowy.
+    const headCount = Math.min(view.headCount, view.entries.length);
+    const removedFromHead = view.entries
+      .slice(view.entries.length - headCount)
+      .filter((e) => goneIds.has(id(e))).length;
+    const boxes = {
+      ...this.current.boxes,
+      [box]: { ...view, entries: kept, headCount: Math.max(0, headCount - removedFromHead) },
+    };
     const b = computeBadges(boxes);
     this.update({ boxes, badge: b.unread, badgeUnsent: b.unsent });
     return removed;

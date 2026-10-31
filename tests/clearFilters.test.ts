@@ -82,7 +82,7 @@ test('szukajka: Wyczysc w bannerze kasuje tez pola formularza', () => {
     tab: 'listy',
     activeBox: 'odebrane',
     search: { box: 'odebrane', label: 'temat: "Perly"' },
-    boxes: { odebrane: { entries: [entry(1)], truncated: false, empty: null } },
+    boxes: { odebrane: { entries: [entry(1)], truncated: false, empty: null, headCount: 1 } },
   });
   const { container, calls, off } = mount(s);
   setInput(container, '[data-search="osoba"]', 'Foo');
