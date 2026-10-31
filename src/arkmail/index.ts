@@ -1433,9 +1433,13 @@ export async function init(api: PluginApi) {
               ["odebrane", "nieprzeczytane", "wyslane", "niewyslane"] as MailBox[]
             ).filter((b) => present.has(b));
             let result: FetchBodyResult = { kind: "error" };
+            // Fala 31: skrzynka ostatniej proby - przy 'missing' z niej
+            // wypada wiersz widoku (box z petli nie jest tu w zakresie).
+            let triedBox: MailBox | null = null;
             for (const box of order) {
               if (flag.cancelled) break;
               // Fala 17a: Przerwij domyka tez pager w toku (shouldAbort).
+              triedBox = box;
               result = await fetchArchiveBody(group[0], {
                 shouldAbort: () => flag.cancelled,
                 box,
@@ -1461,6 +1465,10 @@ export async function init(api: PluginApi) {
               const goneIds = new Set(group.map((l) => l.id));
               ui.setArchive(ui.state.archive.filter((l) => !goneIds.has(l.id)));
               persistArchive();
+              // Fala 31: domkniecie parowania - martwy wiersz znika tez
+              // z widoku skrzynki (ostatnia niesparowana sciezka;
+              // bez tego wiersz byl klikalny i liczyl sie w badge).
+              if (triedBox !== null) pruneGoneFromView(triedBox, goneIds);
             } else if (!flag.cancelled) {
               failed += 1;
               consecutiveErrors += 1;
