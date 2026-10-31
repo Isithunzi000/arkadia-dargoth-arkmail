@@ -6,18 +6,13 @@ archiwum i pisanie listów.
 ## Instalacja
 
 1. Otwórz klienta Dargoth.
-2. Dodaj wtyczkę z adresu:
-
-   ```
-   https://isithunzi000.github.io/arkadia-dargoth-arkmail/arkmail.js
-   ```
+2. Dodaj wtyczkę z adresu [arkmail.js na GitHub Pages](https://isithunzi000.github.io/arkadia-dargoth-arkmail/arkmail.js).
 
 3. W grze wpisz `/arkmail`, aby otworzyć okno poczty.
 
-Alternatywnie (import ręczny): pobierz
-`https://github.com/Isithunzi000/arkadia-dargoth-arkmail/releases/latest/download/arkmail.zip`
-i zaimportuj paczkę w kliencie. Ten adres zawsze prowadzi do najnowszej
-wersji — bez względu na numer wydania.
+Alternatywnie (import ręczny): pobierz [paczkę arkmail.zip](https://github.com/Isithunzi000/arkadia-dargoth-arkmail/releases/latest/download/arkmail.zip)
+i zaimportuj ją w kliencie. Ten adres zawsze prowadzi do najnowszej wersji —
+bez względu na numer wydania.
 
 ## Aktualizacje
 
@@ -78,8 +73,7 @@ wyszukiwanie.
 
 ## Licencja
 
-AGPL-3.0 (plik LICENSE). Renderer listów to port 1:1 z oficjalnego
-klienta WWW Arkadii (licencja MIT, https://arkadia.rpg.pl).
+AGPL-3.0 — pełny tekst licencji w pliku [LICENSE](LICENSE).
 
 ## Dla developerów
 
@@ -90,4 +84,4 @@ npm ci
 npm test
 ```
 
-Specyfikacja protokołu: `docs/PROTOCOL.md`.
+Specyfikacja protokołu: [docs/PROTOCOL.md](docs/PROTOCOL.md).
