@@ -1,14 +1,24 @@
 # ArkMail
 
-Poczta Arkadii w oknie klienta Dargoth.
+Poczta Arkadii w oknie klienta Dargoth: skrzynki, szukanie, kontakty,
+archiwum i pisanie listów.
 
 ## Instalacja
 
-W kliencie Dargoth dodaj wtyczkę z adresu:
+1. Otwórz klienta Dargoth.
+2. Dodaj wtyczkę z adresu:
 
-```
-https://isithunzi000.github.io/arkadia-dargoth-arkmail/arkmail.js
-```
+   ```
+   https://isithunzi000.github.io/arkadia-dargoth-arkmail/arkmail.js
+   ```
+
+3. W grze wpisz `/arkmail`, aby otworzyć okno poczty.
+
+## Aktualizacje
+
+Wtyczka ładowana jest z powyższego adresu przy każdym uruchomieniu
+klienta — aktualizacje przychodzą same, bez ponownej instalacji. Numer
+wersji widnieje w nagłówku okna.
 
 ## Co potrafi
 
@@ -19,35 +29,52 @@ https://isithunzi000.github.io/arkadia-dargoth-arkmail/arkmail.js
 - usuwanie i przekazywanie listów
 - zbiorcze usuwanie zaznaczonych listów z jednej skrzynki
 - kontakty z licznikami listów
-- archiwum per postać: filtry, zapis treści, eksport do TXT i ZIP
+- archiwum per postać: indeksacja, zapis treści, eksport do TXT i ZIP
 - powiadomienia o nowej poczcie (opcjonalne)
 
 ## Użycie
 
 `/arkmail` — otwiera i zamyka okno. Reszta to przyciski w oknie.
 
-Puste pola i przycisk Szukaj odświeżają aktywną skrzynkę w Listach. Kliknięcie
-wybranej skrzynki także ją odświeża. Wpisanie filtrów uruchamia wyszukiwanie.
-Pole osoby wymaga dopełniacza, a wybrane daty są uwzględniane włącznie.
+**Listy.** Puste pola i przycisk Szukaj odświeżają aktywną skrzynkę;
+kliknięcie nazwy skrzynki także. Wpisanie filtrów uruchamia wyszukiwanie.
+Pole osoby wymaga dopełniacza; wybrane daty są uwzględniane włącznie.
 
-Przy pisaniu pola adresat i DW mogą zawierać kilka nazw lub aliasów
-rozdzielonych przecinkami. Temat i treść nie mogą zawierać znaków `;` ani `#`.
-List musi mieć wpisaną treść; sam szablon ramki nie wystarczy.
+**Pisanie.** Pola adresat i DW przyjmują kilka nazw lub aliasów
+rozdzielonych przecinkami. Temat i treść nie mogą zawierać znaków `;`
+ani `#`. List musi mieć wpisaną treść; sam szablon ramki nie wystarczy.
 
-Zakładka **Archiwum** pokazuje kolejno: **1. Indeksacja**, **2. Pobranie treści**
-i **3. Zapis ZIP**. Każdy przycisk wykonuje tylko własną operację: pobieranie
-treści i zapis ZIP nie uruchamia indeksacji. Gdy serwer nie udostępni części
-listów, można pobrać dostępne treści i zapisać częściowy ZIP. Komunikat podaje
-liczbę zapisanych i pominiętych listów. Archiwum łączy powtórzone wpisy tego
-samego listu i liczy je raz. Treść w jednym z powiązanych wpisów wystarcza dla
-całej grupy. Komunikat wyjaśnia też, że pusta lub błędna data nie oznacza
-zniknięcia listu.
+**Archiwum.** Trzy osobne kroki, każdy przycisk wykonuje tylko własną
+operację:
 
-Zakładka **Usuwanie listów** pobiera jeden wynik z wybranej skrzynki.
-Można zawęzić go filtrami, zaznaczyć wiele listów i usunąć je po
-potwierdzeniu. Wyniki nie odświeżają się automatycznie; wyjście z zakładki
-czyści wyniki, filtry i zaznaczenie. W Usuwaniu przycisk Odswiez ponawia
-ostatnie wyszukiwanie.
+1. **Indeksacja** — spis wszystkich listów postaci.
+2. **Pobranie treści** — pełne listy; gdy serwer części nie udostępni,
+   można pobrać dostępne i zapisać częściowy ZIP (komunikat podaje liczby
+   zapisanych i pominiętych listów).
+3. **Zapis ZIP** — archiwum na dysku.
+
+Archiwum łączy powtórzone wpisy tego samego listu i liczy je raz; treść
+w jednym z powiązanych wpisów wystarcza dla całej grupy. Pusta lub
+błędna data w jednym wpisie nie oznacza zniknięcia listu.
+
+**Usuwanie listów.** Pobiera wyniki z jednej skrzynki; można je zawęzić
+filtrami, zaznaczyć wiele pozycji i usunąć po potwierdzeniu. Wyniki nie
+odświeżają się automatycznie; wyjście z zakładki czyści wyniki, filtry
+i zaznaczenie. Przycisk Odśwież ponawia ostatnie wyszukiwanie.
+
+## Znane ograniczenia
+
+- Dwa listy o identycznych metadanych (nadawca, temat, data) są w widoku
+  skrzynki liczone jako jeden; treść obu nadal dostępna po rozwinięciu
+  paginacji archiwum.
+- Przy ponad 50 listach dziennie paginacja "Wczytaj starsze" może
+  przeskoczyć dzień bez listów — wynik zależy od kotwicy liczonej
+  po stronie serwera.
+
+## Licencja
+
+AGPL-3.0 (plik LICENSE). Renderer listów to port 1:1 z oficjalnego
+klienta WWW Arkadii (licencja MIT, https://arkadia.rpg.pl).
 
 ## Dla developerów
 
@@ -58,5 +85,4 @@ npm ci
 npm test
 ```
 
-Specyfikacja protokołu: `docs/PROTOCOL.md`. Renderer listów to port 1:1
-z oficjalnego klienta WWW Arkadii (licencja MIT, https://arkadia.rpg.pl).
+Specyfikacja protokołu: `docs/PROTOCOL.md`.
