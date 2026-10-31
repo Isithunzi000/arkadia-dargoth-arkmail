@@ -112,8 +112,10 @@ test('brama Kontaktow: lista kontaktow widoczna mimo braku indeksu, wskazowka na
       const pane = container.querySelector('[data-pane-key="kontakty"]');
       assert.ok(pane, 'panel kontaktow');
       const children = Array.from((pane as unknown as { children: unknown[] }).children);
+      // Fala 30: klasa poziomu doklejona obok - sprawdzamy obecnosc,
+      // nie pelna rownosc className.
       const gateIdx = children.findIndex((el) =>
-        (el as { className?: string }).className === 'arkmail-index-all',
+        ((el as { className?: string }).className ?? '').split(' ').includes('arkmail-index-all'),
       );
       const controlsIdx = children.findIndex(
         (el) => (el as { className?: string }).className === 'arkmail-contact-controls',
