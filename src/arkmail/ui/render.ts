@@ -437,7 +437,7 @@ export function mountMailUi(
     controls.appendChild(box);
 
     const search = doc.createElement('button');
-    search.className = 'arkmail-deletion-search';
+    search.className = 'arkmail-deletion-search arkmail-btn-primary';
     setButtonLabel(search, SEARCH_GO_LABEL, SEARCH_GO_TITLE);
     let searchErrorTimer: ReturnType<typeof setTimeout> | null = null;
     const showSearchError = (message: string): void => {
@@ -488,7 +488,7 @@ export function mountMailUi(
     controls.appendChild(search);
 
     const clearFilters = doc.createElement('button');
-    clearFilters.className = 'arkmail-deletion-clear-filters';
+    clearFilters.className = 'arkmail-deletion-clear-filters arkmail-btn-reset';
     clearFilters.textContent = 'Wyczysc filtry';
     clearFilters.addEventListener('click', () => {
       for (const key of ['osoba', 'temat', 'tresc', 'odDaty', 'doDaty'] as const) {
@@ -572,7 +572,7 @@ export function mountMailUi(
     selectionOps.appendChild(clearSelection);
 
     const remove = doc.createElement('button');
-    remove.className = 'arkmail-deletion-delete';
+    remove.className = 'arkmail-deletion-delete arkmail-btn-danger';
     // Uzbrojenie dwukliku zyje w store (deletion.armedAt), nie w tym
     // zamknieciu: kazdy repaint odtwarza drzewo i zjadal stan lokalny
     // (zgloszenie 2026-10-30: drugi klik uzbrajal od nowa zamiast kasowac).
@@ -675,7 +675,7 @@ export function mountMailUi(
     // komenda "wyslij zwierze". Nieaktywny w trakcie lotu (roundtrip
     // 20-50 s wg logow); koniec lotu: linia ladowania albo timeout.
     const animalBtn = doc.createElement('button');
-    animalBtn.className = 'arkmail-animal-send';
+    animalBtn.className = 'arkmail-animal-send arkmail-btn-action';
     animalBtn.textContent = state.animalFlying ? 'Zwierze w drodze...' : 'Wyslij zwierze';
     if (state.animalFlying) animalBtn.setAttribute('disabled', '');
     animalBtn.addEventListener('click', () => handlers.onSendAnimal?.());
@@ -684,7 +684,7 @@ export function mountMailUi(
     const searchMode0 = state.search && state.search.box === state.activeBox ? state.search : null;
     const loopHere = state.loadAll !== null && state.loadAll.box === state.activeBox;
     const loadAllBtn = doc.createElement('button');
-    loadAllBtn.className = 'arkmail-older-all';
+    loadAllBtn.className = 'arkmail-older-all arkmail-btn-action';
     loadAllBtn.textContent = loopHere
       ? `Przerwij (${state.loadAll!.pages})`
       : 'Wczytaj wszystkie';
@@ -704,7 +704,7 @@ export function mountMailUi(
     // potwierdzeniem (uzbrojenie wygasa po 3 s). Stan uzbrojenia lokalny
     // dla przycisku - kazdy rerender wraca do stanu poczatkowego.
     const clearBtn = doc.createElement('button');
-    clearBtn.className = 'arkmail-cache-clear';
+    clearBtn.className = 'arkmail-cache-clear arkmail-btn-reset';
     clearBtn.textContent = 'Wyczysc zapisane dane';
     // Fala 24h (zgloszenie 2026-10-21): zakres czyszczenia w tooltipie
     // przycisku zamiast stalego napisu pod paskiem operacji (napis
@@ -780,7 +780,7 @@ export function mountMailUi(
     const sOdF = mkDateField(doc, sOd, 'Od dnia (wlacznie)', 'Szukanie zwroci listy wyslane od tego dnia WLACZNIE.');
     const sDoF = mkDateField(doc, sDo, 'Do dnia (wlacznie)', 'Szukanie zwroci listy wyslane do tego dnia WLACZNIE.');
     const go = doc.createElement('button');
-    go.className = 'arkmail-search-go';
+    go.className = 'arkmail-search-go arkmail-btn-primary';
     setButtonLabel(go, SEARCH_GO_LABEL, SEARCH_GO_TITLE);
     let searchErrorTimer: ReturnType<typeof setTimeout> | null = null;
     const showSearchError = (message: string): void => {
@@ -852,7 +852,7 @@ export function mountMailUi(
       banner.className = 'arkmail-search-banner';
       banner.appendChild(doc.createTextNode(`Wyniki szukania: ${searchMode.label}`));
       const clear = doc.createElement('button');
-      clear.className = 'arkmail-search-clear';
+      clear.className = 'arkmail-search-clear arkmail-btn-reset';
       clear.textContent = 'Wyczysc';
       clear.addEventListener('click', () => {
         // Fala 16g: Wyczysc kasuje tez pola szukajki (zgloszenie pkt 11)
@@ -921,7 +921,7 @@ export function mountMailUi(
       // wszystkie/Przerwij siedzi na pasku nad lista. Petla na innej
       // skrzynce chowa paginacje (blokada sesji).
       const btn = doc.createElement('button');
-      btn.className = 'arkmail-older';
+      btn.className = 'arkmail-older arkmail-btn-action';
       btn.textContent = 'Wczytaj starsze';
       btn.addEventListener('click', () => handlers.onLoadOlder(state.activeBox));
       pane.appendChild(btn);
@@ -1029,7 +1029,7 @@ export function mountMailUi(
     }
     ops.appendChild(replyQuote);
     const del = doc.createElement('button');
-    del.className = 'arkmail-del';
+    del.className = 'arkmail-del arkmail-btn-danger';
     del.textContent = 'Usun';
     if (source) {
       // Fala 14e: kasowanie z dwuklikowym potwierdzeniem (uzbrojenie
@@ -1089,7 +1089,7 @@ export function mountMailUi(
 
     if (!state.wide) {
       const back = doc.createElement('button');
-      back.className = 'arkmail-older';
+      back.className = 'arkmail-older arkmail-btn-action';
       back.textContent = 'Zamknij list';
       back.addEventListener('click', () => handlers.onCloseLetter());
       pane.appendChild(back);
@@ -1283,7 +1283,7 @@ export function mountMailUi(
     });
 
     const send = doc.createElement('button');
-    send.className = 'arkmail-send';
+    send.className = 'arkmail-send arkmail-btn-primary';
     // Fala 14b: poza poczta compose ZAWSZE laduje w kolejce niewyslanych
     // ("List jest gotowy do wyslania.") - przycisk "Wyslij" mylil gracza
     // (zgloszenie 2026-10-19). Etykieta mowi, co naprawde sie stanie.
@@ -1333,7 +1333,7 @@ export function mountMailUi(
     // to ustawienia, zostaja. Stan uzbrojenia lokalny - kazdy rerender
     // wraca do stanu poczatkowego.
     const clearCompose = doc.createElement('button');
-    clearCompose.className = 'arkmail-compose-clear';
+    clearCompose.className = 'arkmail-compose-clear arkmail-btn-reset';
     clearCompose.textContent = 'Wyczysc';
     let clearArmed = false;
     let clearTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1417,7 +1417,7 @@ export function mountMailUi(
         dim('Kontakty powstaja z listow zebranych ze wszystkich skrzynek.'),
       );
       const gate = doc.createElement('button');
-      gate.className = 'arkmail-index-all';
+      gate.className = 'arkmail-index-all arkmail-btn-action';
       gate.textContent = state.indexRun
         ? `Przerwij indeksowanie (${state.indexRun.boxIndex + 1}/${INDEX_BOXES.length})`
         : 'Indeksuj wszystkie skrzynki';
@@ -1612,7 +1612,7 @@ export function mountMailUi(
     // Fala 16g: czyszczenie wszystkich filtrow archiwum jednym klikiem
     // (zgloszenie pkt 11). Niedestrukcyjne (dane zostaja) - bez dwukliku.
     const clearFilters = doc.createElement('button');
-    clearFilters.className = 'arkmail-arch-clear';
+    clearFilters.className = 'arkmail-arch-clear arkmail-btn-reset';
     clearFilters.textContent = 'Wyczysc filtry';
     clearFilters.addEventListener('click', () => {
       for (const key of ['osoba', 'temat', 'tresc', 'odDaty', 'doDaty'] as const) {
@@ -1722,7 +1722,7 @@ export function mountMailUi(
     // baza dla kontaktow i eksportow. Operacja tylko czyta (jak Wczytaj
     // wszystkie) - bez dwukliku; w trakcie petli drugi klik = Przerwij.
     const idxBtn = doc.createElement('button');
-    idxBtn.className = 'arkmail-index-all';
+    idxBtn.className = 'arkmail-index-all arkmail-btn-action';
     idxBtn.textContent = state.indexRun
       ? `Przerwij indeksowanie (${state.indexRun.boxIndex + 1}/${INDEX_BOXES.length})`
       : 'Indeksuj wszystkie skrzynki';
@@ -1733,7 +1733,7 @@ export function mountMailUi(
     // (precedens: Wyczysc zapisane dane); w trakcie petli przycisk
     // zamienia sie w Przerwij z postepem (precedens: Wczytaj wszystkie).
     const dlBtn = doc.createElement('button');
-    dlBtn.className = 'arkmail-arch-download';
+    dlBtn.className = 'arkmail-arch-download arkmail-btn-action';
     dlBtn.textContent = state.archiveDownload
       ? `Przerwij (${state.archiveDownload.done}/${state.archiveDownload.total})`
       : 'Pobierz tresci do archiwum';
@@ -1762,7 +1762,7 @@ export function mountMailUi(
     // Fala 17g: eksport calego archiwum do ZIP z TXT per list.
     // Operacja lokalna (tylko listy z trescia w cache) - bez dwukliku.
     const expBtn = doc.createElement('button');
-    expBtn.className = 'arkmail-arch-export';
+    expBtn.className = 'arkmail-arch-export arkmail-btn-primary';
     // Fala 18e (zgloszenie 2026-10-20 pkt 5): zapisuje ZIP z TXT per
     // list - etykieta mowi o formacie archiwum, nie o pojedynczym TXT.
     expBtn.textContent = 'Zapisz wszystkie (ZIP)';

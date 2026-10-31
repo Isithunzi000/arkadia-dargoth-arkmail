@@ -59,6 +59,11 @@ function openLetter(store: MailUiStore): MailUiStore {
   return store;
 }
 
+function withSearch(store: MailUiStore): MailUiStore {
+  store.setSearch({ box: 'odebrane', label: 'temat: test' });
+  return store;
+}
+
 function contact(): Contact {
   return {
     name: 'Bar',
@@ -90,7 +95,7 @@ const TIERS: Array<{ tab: string; selector: string; tier: string }> = [
   { tab: 'listy', selector: '.arkmail-search-go', tier: 'arkmail-btn-primary' },
   { tab: 'listy', selector: '.arkmail-animal-send', tier: 'arkmail-btn-action' },
   { tab: 'listy', selector: '.arkmail-older-all', tier: 'arkmail-btn-action' },
-  { tab: 'listy', selector: '.arkmail-older', tier: 'arkmail-btn-action' },
+  { tab: 'listy-full', selector: '.arkmail-older', tier: 'arkmail-btn-action' },
   { tab: 'listy', selector: '.arkmail-cache-clear', tier: 'arkmail-btn-reset' },
   { tab: 'listy', selector: '.arkmail-search-clear', tier: 'arkmail-btn-reset' },
   { tab: 'list', selector: '.arkmail-del', tier: 'arkmail-btn-danger' },
@@ -110,7 +115,10 @@ function mountedTabs(): Record<string, { querySelector(s: string): unknown; quer
   const kontakty = new MailUiStore({ tab: 'kontakty' });
   kontakty.setContacts([contact()]);
   return {
-    listy: mount(withBox(new MailUiStore())),
+    // search-clear renderuje sie tylko w trybie wynikow szukania
+    // (banner z zapytaniem) - fixture musi ten tryb aktywowac.
+    listy: mount(withBox(withSearch(new MailUiStore()))),
+    'listy-full': mount(withBox(new MailUiStore())),
     list: mount(openLetter(withBox(new MailUiStore()))),
     napisz: mount(new MailUiStore({ tab: 'napisz' })),
     kontakty: mount(kontakty),

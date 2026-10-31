@@ -72,6 +72,32 @@ export const STYLES = `
   min-height: 26px;
 }
 .arkmail-root button:hover { background: #3b3d47; }
+
+/* --- Fala 30: cztery poziomy przyciskow (jeden jezyk calego UI) --- */
+.arkmail-root .arkmail-btn-primary {
+  background: ${ACCENT};
+  border-color: ${ACCENT};
+  color: ${ACCENT_FG};
+}
+.arkmail-root .arkmail-btn-primary:hover { background: #3a63b8; border-color: #3a63b8; }
+.arkmail-root .arkmail-btn-action {
+  background: ${BG_RAISED};
+  border: 1px solid ${ACCENT};
+  color: ${ACCENT};
+}
+.arkmail-root .arkmail-btn-action:hover { background: #31333c; border-color: #6b93ea; color: #6b93ea; }
+.arkmail-root .arkmail-btn-danger {
+  background: ${DANGER};
+  border-color: ${DANGER};
+  color: ${ACCENT_FG};
+}
+.arkmail-root .arkmail-btn-danger:hover { background: #c2564d; border-color: #c2564d; }
+.arkmail-root .arkmail-btn-reset {
+  background: ${BG_PANEL};
+  border-color: ${BORDER};
+  color: ${FG_DIM};
+}
+.arkmail-root .arkmail-btn-reset:hover { background: #2b2d34; }
 .arkmail-root input, .arkmail-root textarea, .arkmail-root select {
   background: ${BG_INPUT};
   color: ${FG};
