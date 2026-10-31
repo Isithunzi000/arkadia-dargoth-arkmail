@@ -114,6 +114,13 @@ test('dokumentacja: README opisuje reczne i zbiorcze usuwanie listow', () => {
   assert.match(readme, /wyjście z zakładki\s+czyści wyniki, filtry i zaznaczenie/);
 });
 
+// Fala 32: permalink stalej nazwy zipa (releases/latest/download)
+// musi byc udokumentowany - asset arkmail.zip istnieje wlasnie po to.
+test('dokumentacja: README podaje permalink recznego importu ZIP', () => {
+  const readme = fs.readFileSync(path.join(REPO, 'README.md'), 'utf8');
+  assert.match(readme, /releases\/latest\/download\/arkmail\.zip/);
+});
+
 test('dokumentacja: README opisuje odswiezanie i grupowanie listow', () => {
   const readme = fs.readFileSync(path.join(REPO, 'README.md'), 'utf8').replace(/\s+/g, ' ');
   assert.match(readme, /osobie, temacie, treści i dacie/);
