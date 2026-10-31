@@ -44,23 +44,23 @@ Pole osoby wymaga dopełniacza; wybrane daty są uwzględniane włącznie.
 rozdzielonych przecinkami. Temat i treść nie mogą zawierać znaków `;`
 ani `#`. List musi mieć wpisaną treść; sam szablon ramki nie wystarczy.
 
-**Archiwum.** Trzy osobne kroki, każdy przycisk wykonuje tylko własną
-operację:
+**Archiwum.** Trzy niezależne kroki, każdy przycisk wykonuje tylko własną
+operację — pobieranie treści i zapis ZIP nie uruchamia indeksacji:
 
-1. **Indeksacja** — spis wszystkich listów postaci.
-2. **Pobranie treści** — pełne listy; gdy serwer części nie udostępni,
+1. Indeksacja — spis wszystkich listów postaci.
+2. Pobranie treści — pełne listy; gdy serwer części nie udostępni,
    można pobrać dostępne i zapisać częściowy ZIP (komunikat podaje liczby
    zapisanych i pominiętych listów).
-3. **Zapis ZIP** — archiwum na dysku.
+3. Zapis ZIP — archiwum na dysku.
 
 Archiwum łączy powtórzone wpisy tego samego listu i liczy je raz; treść
-w jednym z powiązanych wpisów wystarcza dla całej grupy. Pusta lub
-błędna data w jednym wpisie nie oznacza zniknięcia listu.
+w jednym z powiązanych wpisów wystarcza dla całej grupy. Komunikat
+wyjaśnia też, że pusta lub błędna data nie oznacza zniknięcia listu.
 
-**Usuwanie listów.** Pobiera wyniki z jednej skrzynki; można je zawęzić
-filtrami, zaznaczyć wiele pozycji i usunąć po potwierdzeniu. Wyniki nie
-odświeżają się automatycznie; wyjście z zakładki czyści wyniki, filtry
-i zaznaczenie. Przycisk Odśwież ponawia ostatnie wyszukiwanie.
+**Usuwanie listów.** Pobiera jeden wynik z wybranej skrzynki; można go
+zawęzić filtrami, zaznaczyć wiele pozycji i usunąć po potwierdzeniu.
+Wyniki nie odświeżają się automatycznie; wyjście z zakładki czyści wyniki, filtry i zaznaczenie. W Usuwaniu przycisk Odswiez ponawia ostatnie
+wyszukiwanie.
 
 ## Znane ograniczenia
 

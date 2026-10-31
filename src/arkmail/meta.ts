@@ -11,4 +11,4 @@ export const PLUGIN_BUILD_DATE = "30-10-2026";
 export const PLUGIN_NAME = "ArkMail";
 export const PLUGIN_AUTHOR = "Isithunzi000";
 export const PLUGIN_DESCRIPTION =
-  "ArkMail to kompleksowy system pocztowy: skrzynki, kontakty, archiwum i pisanie listow (alias /arkmail).";
+  "ArkMail to kompleksowy system pocztowy: skrzynki, kontakty, archiwum i pisanie listów (alias /arkmail).";
