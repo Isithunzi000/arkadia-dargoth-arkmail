@@ -114,8 +114,6 @@ test('dokumentacja: README opisuje reczne i zbiorcze usuwanie listow', () => {
   assert.match(readme, /wyjście z zakładki\s+czyści wyniki, filtry i zaznaczenie/);
 });
 
-// Fala 32: permalink stalej nazwy zipa (releases/latest/download)
-// musi byc udokumentowany - asset arkmail.zip istnieje wlasnie po to.
 // Fala 32: sekcja Licencja wspomina wylacznie licencje - wyjasnienia
 // rodla kodu (np. "port 1:1") nie wolno tam umieszczac.
 test('dokumentacja: sekcja Licencja wspomina tylko licencje', () => {
@@ -137,9 +135,13 @@ test('dokumentacja: README uzywa wylacznie klikalnych odnosnikow', () => {
   }
 });
 
-test('dokumentacja: README podaje permalink recznego importu ZIP', () => {
+// Konwencja release'ow arkmaila to WYlACZNIE wersjonowany zip
+// (arkmail_X_Y_Z.zip); asset o stalej nazwie arkmail.zip byl jednorazowym
+// odchyleniem i zostal usuniety z wydania - README nie moze do niego
+// odsylac (martwy link).
+test('dokumentacja: README nie odwoluje sie do assetu arkmail.zip', () => {
   const readme = fs.readFileSync(path.join(REPO, 'README.md'), 'utf8');
-  assert.match(readme, /releases\/latest\/download\/arkmail\.zip/);
+  assert.doesNotMatch(readme, /arkmail\.zip/);
 });
 
 test('dokumentacja: README opisuje odswiezanie i grupowanie listow', () => {
