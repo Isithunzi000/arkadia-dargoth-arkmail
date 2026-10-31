@@ -10,9 +10,6 @@ archiwum i pisanie listów.
 
 3. W grze wpisz `/arkmail`, aby otworzyć okno poczty.
 
-Alternatywnie (import ręczny): pobierz [paczkę arkmail.zip](https://github.com/Isithunzi000/arkadia-dargoth-arkmail/releases/latest/download/arkmail.zip)
-i zaimportuj ją w kliencie. Ten adres zawsze prowadzi do najnowszej wersji —
-bez względu na numer wydania.
 
 ## Aktualizacje
 
