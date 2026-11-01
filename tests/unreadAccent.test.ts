@@ -137,6 +137,12 @@ test('style: nieprzeczytany wiersz ma jasniejsze tlo (hex)', () => {
   assert.match(m[1], /background:\s*#[0-9a-fA-F]{3,8}\b/, 'jawne jasniejsze tlo wiersza');
 });
 
+test('style: nieprzeczytany wiersz ma pasek akcentowy z lewej', () => {
+  const m = STYLES.match(/\.arkmail-unread\s*\{([^}]*)\}/);
+  assert.ok(m, 'regula .arkmail-unread istnieje');
+  assert.match(m[1], /inset 3px 0 0 #4a7de0/, 'pasek ACCENT z lewej (3.75 vs panel, WCAG 1.4.11)');
+});
+
 test('style: akcent skrzynki to obwodka w kolorze #4a7de0', () => {
   const m = STYLES.match(/\.arkmail-box-attention\s*\{([^}]*)\}/);
   assert.ok(m, 'regula .arkmail-box-attention istnieje');

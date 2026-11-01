@@ -19,10 +19,15 @@ const BG_RAISED = '#31333c'; // przyciski, hover
 const BG_INPUT = '#141519'; // pola tekstowe
 const FG = '#e6e6ea'; // tekst glowny
 const FG_DIM = '#9a9da8'; // tekst przytlumiony
-const BORDER = '#3a3c46'; // obramowania
-const ACCENT = '#4a7de0'; // akcent (aktywne, wysylka)
+const BORDER = '#787e8f'; // obramowania (AA non-text vs wszystkie panele)
+const ACCENT = '#4a7de0'; // akcent (aktywne, wysylka, kropki, obwodki)
+const ACCENT_SOFT = '#7ea2ee'; // tekst akcentowy na BG_RAISED (4.97)
+const ACCENT_DEEP = '#3a63b8'; // tlo btn-primary (bialy 5.74)
+const ACCENT_DEEPER = '#2f4f94'; // hover btn-primary (bialy 7.87)
 const ACCENT_FG = '#ffffff';
-const DANGER = '#b04a42'; // kasowanie
+const DANGER = '#b04a42'; // tlo btn-danger (bialy 5.38)
+const DANGER_TEXT = '#d4736c'; // tekst bledow na panelu (4.58)
+const BG_UNREAD = '#2f3542'; // tlo wiersza nieprzeczytanego
 
 export const STYLES = `
 .arkmail-root {
@@ -75,15 +80,15 @@ export const STYLES = `
 
 /* --- Fala 30: cztery poziomy przyciskow (jeden jezyk calego UI) --- */
 .arkmail-root .arkmail-btn-primary {
-  background: ${ACCENT};
-  border-color: ${ACCENT};
+  background: ${ACCENT_DEEP};
+  border-color: ${ACCENT_DEEP};
   color: ${ACCENT_FG};
 }
-.arkmail-root .arkmail-btn-primary:hover { background: #3a63b8; border-color: #3a63b8; }
+.arkmail-root .arkmail-btn-primary:hover { background: ${ACCENT_DEEPER}; border-color: ${ACCENT_DEEPER}; }
 .arkmail-root .arkmail-btn-action {
   background: ${BG_RAISED};
   border: 1px solid ${ACCENT};
-  color: ${ACCENT};
+  color: ${ACCENT_SOFT};
 }
 .arkmail-root .arkmail-btn-action:hover { background: #31333c; border-color: #6b93ea; color: #6b93ea; }
 .arkmail-root .arkmail-btn-danger {
@@ -245,7 +250,7 @@ export const STYLES = `
 /* Fala 16f: nieprzeczytany wiersz dodatkowo JAŚNIEJSZY (pkt 8: kropka +
    pogrubienie + rozjasnienie; po odczyciu listing daje *R* i wiersz
    wraca do normalnego). */
-.arkmail-unread { background: ${BG_PANEL}; }
+.arkmail-unread { background: ${BG_UNREAD}; box-shadow: inset 3px 0 0 ${ACCENT}; }
 .arkmail-unread .arkmail-entry-party, .arkmail-unread .arkmail-entry-subject {
   color: ${FG};
   font-weight: 700;
@@ -280,7 +285,7 @@ export const STYLES = `
 .arkmail-date-field { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .arkmail-date-field input { width: 100%; box-sizing: border-box; }
 .arkmail-date-label { color: ${FG_DIM}; font-size: 11px; }
-.arkmail-dates-error { color: ${DANGER}; font-size: 12px; margin-bottom: 6px; }
+.arkmail-dates-error { color: ${DANGER_TEXT}; font-size: 12px; margin-bottom: 6px; }
 .arkmail-search-banner {
   display: flex;
   align-items: center;
