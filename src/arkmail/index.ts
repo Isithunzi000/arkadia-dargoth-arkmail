@@ -700,7 +700,7 @@ export async function init(api: PluginApi) {
    * Serwer wysyla je po zalogowaniu oraz przy otrzymywaniu i czytaniu
    * poczty; klient emituje jako "gmcp.mail.state" (path lowercasowany
    * w gmcp.ts). Po co, skoro sa linie tekstowe: one potrafia sie rozjechac
-   * ze stanem (log 1999-09-05 01:03 - "Masz nowa poczte od Bar.", a 15 s
+   * ze stanem (log 1999-09-05 01:03 - "Masz nowa poczte od X.", a 15 s
    * pozniej przy ladowaniu zwierzecia "Nie masz zadnych nieprzeczytanych
    * listow.", choć list byl w skrzynce). GMCP jest WYZWALACZEM odswiezenia;
    * badge nadal liczy sie z listingow (computeBadge).
@@ -937,10 +937,10 @@ export async function init(api: PluginApi) {
         } else if (scan.end === "incomplete") {
           notify(
             api,
-            `Wczytano dostepne listy (dodanych do listy: ${scan.addedToView}). ${scan.skipWhy ?? "Sprobuj ponownie za chwile"}.`,
+            `Wczytano dostepne listy: ${ui.state.boxes[box]?.entries.length ?? 0} w widoku (dodano do widoku: ${scan.addedToView}). ${scan.skipWhy ?? "Sprobuj ponownie za chwile"}.`,
           );
         } else {
-          notify(api, `Wczytano starsze listy (dodanych do listy: ${scan.addedToView}).`);
+          notify(api, `Wczytano starsze listy: ${ui.state.boxes[box]?.entries.length ?? 0} w widoku (dodano do widoku: ${scan.addedToView}).`);
         }
       })
       .catch((err: unknown) => {
@@ -1007,7 +1007,7 @@ export async function init(api: PluginApi) {
             },
           });
           if (scan.end === "cancelled") {
-            notify(api, `Przerwano (dodanych do listy: ${scan.addedToView}).`);
+            notify(api, `Przerwano (dodano do widoku: ${scan.addedToView}).`);
             return;
           }
           if (scan.end === "complete") {
@@ -1023,11 +1023,11 @@ export async function init(api: PluginApi) {
               ui.setIndexMeta({ ...ui.state.indexMeta, [box]: new Date().toISOString() });
               persistIndexMeta();
             }
-            notify(api, `Wczytano wszystkie (dodanych do listy: ${scan.addedToView}).`);
+            notify(api, `Wczytano wszystkie: ${ui.state.boxes[box]?.entries.length ?? 0} list (dodano do widoku: ${scan.addedToView}).`);
           } else {
             notify(
               api,
-              `Wczytano dostepne listy (dodanych do listy: ${scan.addedToView}). ${scan.skipWhy ?? "Sprobuj ponownie za chwile"}.`,
+              `Wczytano dostepne listy: ${ui.state.boxes[box]?.entries.length ?? 0} w widoku (dodano do widoku: ${scan.addedToView}). ${scan.skipWhy ?? "Sprobuj ponownie za chwile"}.`,
             );
           }
         } finally {
@@ -2273,9 +2273,6 @@ export async function init(api: PluginApi) {
     if (!n) return;
     if (n.kind === "nowa-poczte") {
       if (ui.state.notifyEnabled) notify(api, `Masz nowa poczte od ${n.nadawca}.`);
-      scheduleRefresh(["odebrane", "nieprzeczytane"]);
-      scheduleDelayedInboxRefresh();
-    } else if (n.kind === "goniec") {
       scheduleRefresh(["odebrane", "nieprzeczytane"]);
       scheduleDelayedInboxRefresh();
     } else if (n.kind === "wysylasz") {

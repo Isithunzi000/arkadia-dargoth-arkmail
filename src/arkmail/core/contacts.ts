@@ -3,7 +3,6 @@
  *
  * Zrodla (w kolejnosci wiarygodnosci nazwy kanonicznej):
  * - people: baza znanych osob klienta (mianownik + opis + guild),
- * - przedstawieni: scraping komendy "przedstawieni" (mianownik),
  * - korespondencja: nadawcy/odbiorcy z listingow i listow (mianownik),
  * - aliasy: aliasy pocztowe zdefiniowane w grze (cel = mianownik).
  *
@@ -19,10 +18,10 @@ import type { MailboxEntry } from './session/mailbox.js';
 import type { ArchiveLetter } from './archive.js';
 import { occurrenceCount } from './archive.js';
 
-export type ContactSource = 'people' | 'przedstawieni' | 'korespondencja' | 'alias';
+export type ContactSource = 'people' | 'korespondencja' | 'alias';
 
 export interface Contact {
-  /** Kanoniczne imie (z people/przedstawieni/korespondencji - pierwsze wygrywa). */
+  /** Kanoniczne imie (z people/korespondencji - pierwsze wygrywa). */
   name: string;
   sources: ContactSource[];
   description?: string;
@@ -188,7 +187,6 @@ export function contactsFromBoxes(
   }
   return mergeContacts({
     people,
-    przedstawieni: [],
     korespondencja: korespondencjaFromLetters(letters),
     aliasy: [],
   });
@@ -205,7 +203,6 @@ export function contactsFromBoxes(
 export function contactsFromArchive(letters: readonly ArchiveLetter[]): Contact[] {
   return mergeContacts({
     people: [],
-    przedstawieni: [],
     // Fala 18b: szkice (niewyslane) to nie wyslana korespondencja.
     korespondencja: korespondencjaFromLetters(
       letters
@@ -219,7 +216,6 @@ export function contactsFromArchive(letters: readonly ArchiveLetter[]): Contact[
 
 export interface ContactInput {
   people: Array<{ name: string; description?: string; guild?: string }>;
-  przedstawieni: string[];
   korespondencja: Array<{
     name: string;
     direction: 'in' | 'out';
@@ -231,7 +227,7 @@ export interface ContactInput {
   aliasy: Array<{ name: string; targets: string[] }>;
 }
 
-const SOURCE_ORDER: ContactSource[] = ['people', 'przedstawieni', 'korespondencja', 'alias'];
+const SOURCE_ORDER: ContactSource[] = ['people', 'korespondencja', 'alias'];
 
 export function mergeContacts(input: ContactInput): Contact[] {
   const byKey = new Map<string, Contact>();
@@ -255,10 +251,6 @@ export function mergeContacts(input: ContactInput): Contact[] {
     addSource(c, 'people');
     if (p.description) c.description = p.description;
     if (p.guild) c.guild = p.guild;
-  }
-  for (const name of input.przedstawieni) {
-    const c = get(name);
-    addSource(c, 'przedstawieni');
   }
   for (const k of input.korespondencja) {
     const c = get(k.name);
