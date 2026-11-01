@@ -429,8 +429,11 @@ export class MailUiStore {
   pruneMailboxEntries(box: MailBox, goneIds: Set<string>): number {
     const view = this.current.boxes[box];
     if (!view || view.empty !== null || goneIds.size === 0) return 0;
+    // Fala 41: dopasowanie po archiveId wpisu (tozsamosc z przebiegu
+    // skanu). Fallback metadanych tylko dla wpisow bez archiveId
+    // (konstrukcje testowe / widok zlozony przed stemplem).
     const id = (e: MailboxEntry): string =>
-      letterId(box, e.party, e.subject, e.forwarded, e.date?.raw ?? null);
+      e.archiveId ?? letterId(box, e.party, e.subject, e.forwarded, e.date?.raw ?? null);
     const kept = view.entries.filter((e) => !goneIds.has(id(e)));
     const removed = view.entries.length - kept.length;
     if (removed === 0) return 0;

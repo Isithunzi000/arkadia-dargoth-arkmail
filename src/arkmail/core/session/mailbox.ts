@@ -61,6 +61,15 @@ export interface MailboxEntry extends ListingEntry {
    * resolveEntry). Nie trafia do archiwum ani storage.
    */
   ctx?: ListingCtx;
+  /**
+   * Fala 41: id rekordu archiwum powstalego z tego wpisu (recordId =
+   * box|scanKey strony|pozycja). Wpis i rekord to 1:1 - otwarcie listu
+   * przez wpis dopelnia tresc DOKLADNIE tego rekordu (blizniaki o
+   * identycznych metadanych maja rozne archiveId i zostaja nietkniete).
+   * Nadawane przez warstwe skanu (index.ts) przy kazdym ingescie;
+   * nie trafia do storage.
+   */
+  archiveId?: string;
 }
 
 export type MailboxResult =

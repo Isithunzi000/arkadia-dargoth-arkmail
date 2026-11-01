@@ -3,6 +3,7 @@
  *
  * Zrodla (w kolejnosci wiarygodnosci nazwy kanonicznej):
  * - people: baza znanych osob klienta (mianownik + opis + guild),
+ * - przedstawieni: scraping komendy "przedstawieni" (mianownik),
  * - korespondencja: nadawcy/odbiorcy z listingow i listow (mianownik),
  * - aliasy: aliasy pocztowe zdefiniowane w grze (cel = mianownik).
  *
@@ -18,10 +19,10 @@ import type { MailboxEntry } from './session/mailbox.js';
 import type { ArchiveLetter } from './archive.js';
 import { occurrenceCount } from './archive.js';
 
-export type ContactSource = 'people' | 'korespondencja' | 'alias';
+export type ContactSource = 'people' | 'przedstawieni' | 'korespondencja' | 'alias';
 
 export interface Contact {
-  /** Kanoniczne imie (z people/korespondencji - pierwsze wygrywa). */
+  /** Kanoniczne imie (z people/przedstawieni/korespondencji - pierwsze wygrywa). */
   name: string;
   sources: ContactSource[];
   description?: string;
@@ -75,7 +76,9 @@ interface LetterLike {
   forwarded: boolean;
   dateRaw?: string | null;
   dateKey?: number;
-  /** Fala 35: liczba wystapien (archiwum); brak = 1. */
+  /** Fala 41: skrzynka pochodzenia - granica dedupu licznika. */
+  box: MailBox;
+  /** Fala 35: liczba wystapien (archiwum legacy); brak = 1. */
   count?: number;
 }
 
@@ -90,8 +93,11 @@ interface LetterLike {
 function korespondencjaFromLetters(
   letters: readonly LetterLike[],
 ): ContactInput['korespondencja'] {
-  const korespondencja: ContactInput['korespondencja'] = [];
-  const byDedupKey = new Map<string, ContactInput['korespondencja'][number]>();
+  // Fala 41: kazdy listingowany list to osobna korespondencja. Dedup
+  // licznika: w obrebie TEJ SAMEJ skrzynki identyczne wpisy sumuja sie
+  // (blizniaki = dwa listy), a replika miedzy skrzynkami (nieprzeczytany
+  // w "nieprzeczytane" i "odebrane") liczy MAX - jeden fizyczny list.
+  const byDedupKey = new Map<string, { name: string; direction: 'in' | 'out'; dateRaw?: string; dateKey?: number; perBox: Map<MailBox, number> }>();
   for (const l of letters) {
     if (!l.party) continue;
     for (const name of splitParty(l.party)) {
@@ -102,22 +108,32 @@ function korespondencjaFromLetters(
         l.forwarded ? 'f' : '',
         l.dateRaw ?? '',
       ].join('|');
-      // Fala 35: identyczne wpisy (blizniaki) sklejaja sie w JEDEN
-      // wpis z sumaryczna liczba wystapien - kontakty licza wystapienia.
-      const existing = byDedupKey.get(dedupKey);
-      if (existing) {
-        // MAX, nie suma: identyczny wpis z drugiej skrzynki to ten
-        // sam fizyczny list (jak totalLive w archiveStats).
-        existing.count = Math.max(existing.count ?? 1, l.count ?? 1);
-        continue;
+      const n = l.count ?? 1;
+      let entry = byDedupKey.get(dedupKey);
+      if (!entry) {
+        entry = {
+          name,
+          direction: l.direction,
+          dateRaw: l.dateRaw ?? undefined,
+          dateKey: l.dateKey,
+          perBox: new Map(),
+        };
+        byDedupKey.set(dedupKey, entry);
       }
-      byDedupKey.set(dedupKey, {
-        name, direction: l.direction, dateRaw: l.dateRaw ?? undefined,
-        dateKey: l.dateKey, count: l.count ?? 1,
-      });
+      // W obrebie skrzynki: suma wystapien (rekordy osobne licza
+      // kazde z osobna); legacy pole occurrences wnosi swoja liczbe.
+      entry.perBox.set(l.box, (entry.perBox.get(l.box) ?? 0) + n);
+      if (entry.dateKey === undefined && l.dateKey !== undefined) entry.dateKey = l.dateKey;
     }
   }
-  return [...byDedupKey.values()];
+  return [...byDedupKey.values()].map((entry) => ({
+    name: entry.name,
+    direction: entry.direction,
+    dateRaw: entry.dateRaw,
+    dateKey: entry.dateKey,
+    // Miedzy skrzynkami MAX - replika to ten sam fizyczny list.
+    count: Math.max(...entry.perBox.values()),
+  }));
 }
 
 /** Listings wpis -> znormalizowany LetterLike (dateKey z MailDate). */
@@ -135,6 +151,7 @@ function entryToLetterLike(box: MailBox, e: MailboxEntry): LetterLike {
     forwarded: e.forwarded,
     dateRaw: e.date?.raw,
     dateKey,
+    box,
   };
 }
 
@@ -149,6 +166,7 @@ function archiveToLetterLike(l: ArchiveLetter): LetterLike {
     forwarded: l.forwarded === true,
     dateRaw: l.dateRaw,
     dateKey: digits > 0 ? digits : undefined,
+    box: l.box,
   };
 }
 
@@ -170,6 +188,7 @@ export function contactsFromBoxes(
   }
   return mergeContacts({
     people,
+    przedstawieni: [],
     korespondencja: korespondencjaFromLetters(letters),
     aliasy: [],
   });
@@ -186,6 +205,7 @@ export function contactsFromBoxes(
 export function contactsFromArchive(letters: readonly ArchiveLetter[]): Contact[] {
   return mergeContacts({
     people: [],
+    przedstawieni: [],
     // Fala 18b: szkice (niewyslane) to nie wyslana korespondencja.
     korespondencja: korespondencjaFromLetters(
       letters
@@ -199,6 +219,7 @@ export function contactsFromArchive(letters: readonly ArchiveLetter[]): Contact[
 
 export interface ContactInput {
   people: Array<{ name: string; description?: string; guild?: string }>;
+  przedstawieni: string[];
   korespondencja: Array<{
     name: string;
     direction: 'in' | 'out';
@@ -210,7 +231,7 @@ export interface ContactInput {
   aliasy: Array<{ name: string; targets: string[] }>;
 }
 
-const SOURCE_ORDER: ContactSource[] = ['people', 'korespondencja', 'alias'];
+const SOURCE_ORDER: ContactSource[] = ['people', 'przedstawieni', 'korespondencja', 'alias'];
 
 export function mergeContacts(input: ContactInput): Contact[] {
   const byKey = new Map<string, Contact>();
@@ -234,6 +255,10 @@ export function mergeContacts(input: ContactInput): Contact[] {
     addSource(c, 'people');
     if (p.description) c.description = p.description;
     if (p.guild) c.guild = p.guild;
+  }
+  for (const name of input.przedstawieni) {
+    const c = get(name);
+    addSource(c, 'przedstawieni');
   }
   for (const k of input.korespondencja) {
     const c = get(k.name);

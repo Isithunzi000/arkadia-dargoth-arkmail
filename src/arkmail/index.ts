@@ -44,11 +44,12 @@ import {
   contentKeyOf,
   fromMailboxEntry,
   fromOpenedLetter,
+  mergeListingPage,
   normalizeArchive,
   occurrenceCount,
-  purgeGoneLetters,
   purgeGoneLettersNewerThan,
-  setOccurrences,
+  replaceBoxLetters,
+  scanKeyOfEntries,
   upsertLetters,
   withOccurrenceBodies,
   type ArchiveLetter,
@@ -381,9 +382,6 @@ export async function init(api: PluginApi) {
     for (const box of boxes) {
       ui.setBusy(`Pobieram skrzynke ${box}...`);
       const res = await mailbox.fetch(box);
-      // Fala 14f: pusty listing TEZ nadpisuje biezacy kontekst serwera.
-      if (res.kind === "lista") stampEntries(box, res.entries);
-      else bumpCtx(box);
       // Fala 30b: granica dnia strony (najstarszy dzien swiezego
       // listingu) - przy UCIETYM listingu wpisy scisle nowsze, ktorych
       // strona nie raportuje, na pewno nie ma ich juz w skrzynce
@@ -397,33 +395,21 @@ export async function init(api: PluginApi) {
         const p = (n: number): string => String(n).padStart(2, "0");
         return `${oldest.date.year}-${p(oldest.date.month)}-${p(oldest.date.day)}`;
       })();
-      if (res.kind === "lista" && mode === "sync") {
-        // null = brak widoku / widok pusty -> pelne zastosowanie.
-        const synced = ui.syncMailboxPage(box, res.entries, res.header.truncated, boundaryDay);
-        if (!synced) ui.applyMailbox(box, res);
-      } else {
-        ui.applyMailbox(box, res);
-      }
+      // Fala 41: archiwum pierwsze, widok po nim. KAZDE pobranie
+      // listingu wkleja wynik ze STALA TOZSAMOSCIA tresci (nowy wpis
+      // = nowy rekord; znana tresc = dopasowanie bez duplikatu).
+      // Wpis dostaje archiveId ROZWIAZANEGO rekordu (istniejacego albo
+      // dopisanego). Tylko nieucieta komenda "listy <skrzynka>" jest
+      // pelna prawda o skrzynce (szukanie, re-kotwice i paginacje maja
+      // wlasne komendy i call-site'y).
+      let resolvedIds: string[] | undefined;
       if (res.kind === "lista") {
-        // Cache (Fala 8f): KAZDE pobranie listingu dokleja wpisy do
-        // archiwum (cicho, bez notify). Widok skrzynki NIE jest
-        // hydratowany z cache - numery zyja w kontekscie ostatniego
-        // listingu serwera.
-        const freshIds = new Set(res.entries.map((e) => fromMailboxEntry(box, e).id));
-        const merged = upsertLetters(
-          ui.state.archive,
-          res.entries.map((e) => fromMailboxEntry(box, e)),
-        );
-        ui.setArchive(merged.letters);
-        // Fala 18a: KOMPLTNY listing (bez uciecia) = pelna prawda o
-        // skrzynce (jak syncMailboxPage dla widoku, Fala 14f). Rekordy
-        // rekordow nieobecnych na swiezym listingu dotyka flaga
-        // missingOnServer - wypadaja z widoku archiwum i licznikow
-        // kontaktow. Tylko tutaj: to jedyna
-        // sciezka z NIEfiltrowana komenda "listy <skrzynka>" (szukanie,
-        // re-kotwice i paginacje maja wlasne komendy i call-site'y).
+        const listingRecords = recordsOfListing(box, res.entries);
         if (!res.header.truncated) {
-          markGoneFromServer(box, freshIds);
+          const replaced = replaceBoxLetters(ui.state.archive, box, listingRecords);
+          ui.setArchive(replaced.letters);
+          resolvedIds = replaced.resolvedIds;
+          if (replaced.removedIds.size > 0) pruneGoneFromView(box, replaced.removedIds);
           // Fala 25 (blad 1, decyzja D1): nieuciety listing z komenda
           // "listy <skrzynka>" = skrzynka zweryfikowana w calosci.
           // Stempel dostaje KAZDA sciezka pelnej wiedzy, nie tylko
@@ -433,37 +419,40 @@ export async function init(api: PluginApi) {
           clearArchiveGaps(box);
           ui.setIndexMeta({ ...ui.state.indexMeta, [box]: new Date().toISOString() });
           persistIndexMeta();
-        } else if (boundaryDay !== undefined) {
-          // Fala 30b: przy ucietym listingu oznaczamy zakresowo -
-          // tylko rekordy scisle nowsze niz granica dnia strony.
-          markGoneFromServerNewerThan(box, freshIds, boundaryDay);
+        } else {
+          // Uciety listing = wklejanie bez kasowania (starsze strony
+          // zyja pod swoimi scanKey); przyciecie zakresowe nowszych
+          // niz granica dnia (Fala 30b).
+          const merged = mergeListingPage(ui.state.archive, box, listingRecords);
+          ui.setArchive(merged.letters);
+          resolvedIds = merged.resolvedIds;
+          if (boundaryDay !== undefined) {
+            markGoneFromServerNewerThan(box, merged.freshIds, boundaryDay);
+          }
         }
-      } else if (res.reason === "puste") {
+      } else if (res.kind === "pusta" && res.reason === "puste") {
         // Pusta skrzynka (reason "puste", nie "filtr") = pelna prawda:
         // wszystkie jej rekordy odpadly (skrzynka jest pusta).
-        markGoneFromServer(box, new Set());
+        const replaced = replaceBoxLetters(ui.state.archive, box, []);
+        ui.setArchive(replaced.letters);
+        if (replaced.removedIds.size > 0) pruneGoneFromView(box, replaced.removedIds);
         // Fala 25 (blad 1, decyzja D1): pusta skrzynka to kompletna
         // wiedza o skrzynce - ten sam stempel co przy nieucietym listingu.
         clearArchiveGaps(box);
         ui.setIndexMeta({ ...ui.state.indexMeta, [box]: new Date().toISOString() });
         persistIndexMeta();
       }
+      // Fala 14f: pusty listing TEZ nadpisuje biezacy kontekst serwera.
+      if (res.kind === "lista") stampEntries(box, res.entries, resolvedIds);
+      else bumpCtx(box);
+      if (res.kind === "lista" && mode === "sync") {
+        // null = brak widoku / widok pusty -> pelne zastosowanie.
+        const synced = ui.syncMailboxPage(box, res.entries, res.header.truncated, boundaryDay);
+        if (!synced) ui.applyMailbox(box, res);
+      } else {
+        ui.applyMailbox(box, res);
+      }
     }
-  };
-
-  /**
-   * Fala 28: FIZYCZNIE usuwa rekordy archiwum danej skrzynki nieobecne
-   * w freshIds (zamiast flagi missingOnServer - zombie siedzialy w bazie
-   * wiecznie i totalne liczniki klamaly). Wywolywane WYLACZNIE przy
-   * pewnoscia kompletnego listingu (patrz fetchBoxes). Blednie usuniety
-   * rekord odtworzy kolejny listing (upsert).
-   */
-  const markGoneFromServer = (box: MailBox, freshIds: Set<string>): void => {
-    const purged = purgeGoneLetters(ui.state.archive, box, freshIds);
-    if (purged.removedIds.size === 0) return;
-    ui.setArchive(purged.letters);
-    persistArchive();
-    pruneGoneFromView(box, purged.removedIds);
   };
 
   /**
@@ -711,7 +700,7 @@ export async function init(api: PluginApi) {
    * Serwer wysyla je po zalogowaniu oraz przy otrzymywaniu i czytaniu
    * poczty; klient emituje jako "gmcp.mail.state" (path lowercasowany
    * w gmcp.ts). Po co, skoro sa linie tekstowe: one potrafia sie rozjechac
-   * ze stanem (log 1999-09-05 01:03 - "Masz nowa poczte od X.", a 15 s
+   * ze stanem (log 1999-09-05 01:03 - "Masz nowa poczte od Bar.", a 15 s
    * pozniej przy ladowaniu zwierzecia "Nie masz zadnych nieprzeczytanych
    * listow.", choć list byl w skrzynce). GMCP jest WYZWALACZEM odswiezenia;
    * badge nadal liczy sie z listingow (computeBadge).
@@ -801,10 +790,44 @@ export async function init(api: PluginApi) {
     listingCtx = { box, stamp: listingCtxSeq };
   };
 
-  /** Nadaje wpisom kontekst biezacego listingu serwera (Fala 9a). */
-  const stampEntries = (box: MailBox, entries: MailboxEntry[]): void => {
+  /**
+   * Nadaje wpisom kontekst biezacego listingu serwera (Fala 9a) oraz
+   * archiveId rekordu archiwum przypisanego do wpisu (Fala 41). Ids
+   * przekazywane rownolegle (resolvedIds z mergeListingPage - dla
+   * wpisu dopasowanego po tresci to ID ISTNIEJACEGO rekordu).
+   */
+  const stampEntries = (box: MailBox, entries: MailboxEntry[], ids?: string[]): void => {
     bumpCtx(box);
-    for (const e of entries) e.ctx = { box, stamp: listingCtxSeq };
+    for (let i = 0; i < entries.length; i++) {
+      entries[i]!.ctx = { box, stamp: listingCtxSeq };
+      const id = ids?.[i];
+      if (id !== undefined) entries[i]!.archiveId = id;
+    }
+  };
+
+  /**
+   * Fala 41: rekordy archiwum dla jednej strony listingu - tozsamosc
+   * (box, scanKey strony, pozycja wpisu). KAZDY wpis = osobny rekord,
+   * zero mergowania po metadanych.
+   */
+  const recordsOfListing = (box: MailBox, entries: MailboxEntry[]): ArchiveLetter[] => {
+    const scanKey = scanKeyOfEntries(entries);
+    return entries.map((e, i) => fromMailboxEntry(box, e, scanKey, i));
+  };
+
+  /**
+   * Fala 41: pelny zrzut skrzynki z widoku - rekordy archiwum wskazywane
+   * przez archiveId wpisow widoku (glowa + doklejone strony). Uzywane,
+   * gdy wiadomo, ze widok pokrywa cala skrzynke (loadAll do dna).
+   */
+  const snapshotRecords = (box: MailBox): ArchiveLetter[] => {
+    const byId = new Map(ui.state.archive.map((l) => [l.id, l]));
+    const out: ArchiveLetter[] = [];
+    for (const e of ui.state.boxes[box]?.entries ?? []) {
+      const rec = e.archiveId !== undefined ? byId.get(e.archiveId) : undefined;
+      if (rec) out.push(rec);
+    }
+    return out;
   };
 
   /**
@@ -845,13 +868,13 @@ export async function init(api: PluginApi) {
         onEmpty: () => bumpCtx(box),
         onGap: (day) => recordArchiveGap(box, day),
         onPage: (res) => {
-          stampEntries(box, res.entries);
-          const merged = upsertLetters(
-            ui.state.archive,
-            res.entries.map((item) => fromMailboxEntry(box, item)),
-          );
+          // Fala 41: wklejanie strony ze stala tozsamoscia tresci;
+          // wpisy dostaja archiveId rozwiazanych rekordow.
+          const records = recordsOfListing(box, res.entries);
+          const merged = mergeListingPage(ui.state.archive, box, records);
           ui.setArchive(merged.letters);
           persistArchive();
+          stampEntries(box, res.entries, merged.resolvedIds);
           fresh = res.entries.find((item) => entryKey(item) === entryKey(entry)) ?? null;
           return { stop: fresh !== null };
         },
@@ -891,14 +914,12 @@ export async function init(api: PluginApi) {
           onGap: (day) => recordArchiveGap(box, day),
           onEmpty: () => bumpCtx(box),
           onPage: (res) => {
-            stampEntries(box, res.entries);
-            const addedToView = ui.appendMailboxPage(box, res.entries, res.header.truncated);
-            const merged = upsertLetters(
-              ui.state.archive,
-              res.entries.map((entry) => fromMailboxEntry(box, entry)),
-            );
+            const records = recordsOfListing(box, res.entries);
+            const merged = mergeListingPage(ui.state.archive, box, records);
             ui.setArchive(merged.letters);
             persistArchive();
+            stampEntries(box, res.entries, merged.resolvedIds);
+            const addedToView = ui.appendMailboxPage(box, res.entries, res.header.truncated);
             return { addedToView, archiveAdded: merged.added };
           },
         });
@@ -916,10 +937,10 @@ export async function init(api: PluginApi) {
         } else if (scan.end === "incomplete") {
           notify(
             api,
-            `Wczytano dostepne listy: ${ui.state.boxes[box]?.entries.length ?? 0} w widoku (dodano do widoku: ${scan.addedToView}). ${scan.skipWhy ?? "Sprobuj ponownie za chwile"}.`,
+            `Wczytano dostepne listy (dodanych do listy: ${scan.addedToView}). ${scan.skipWhy ?? "Sprobuj ponownie za chwile"}.`,
           );
         } else {
-          notify(api, `Wczytano starsze listy: ${ui.state.boxes[box]?.entries.length ?? 0} w widoku (dodano do widoku: ${scan.addedToView}).`);
+          notify(api, `Wczytano starsze listy (dodanych do listy: ${scan.addedToView}).`);
         }
       })
       .catch((err: unknown) => {
@@ -974,21 +995,19 @@ export async function init(api: PluginApi) {
             onGap: (day) => recordArchiveGap(box, day),
             onEmpty: () => bumpCtx(box),
             onPage: (res, pages) => {
-              stampEntries(box, res.entries);
-              const addedToView = ui.appendMailboxPage(box, res.entries, res.header.truncated);
-              const merged = upsertLetters(
-                ui.state.archive,
-                res.entries.map((entry) => fromMailboxEntry(box, entry)),
-              );
+              const records = recordsOfListing(box, res.entries);
+              const merged = mergeListingPage(ui.state.archive, box, records);
               ui.setArchive(merged.letters);
               persistArchive();
+              stampEntries(box, res.entries, merged.resolvedIds);
+              const addedToView = ui.appendMailboxPage(box, res.entries, res.header.truncated);
               ui.setLoadAll({ box, pages });
               ui.setBusy(`Wczytuje wszystkie (${box}): strona ${pages}...`);
               return { addedToView, archiveAdded: merged.added };
             },
           });
           if (scan.end === "cancelled") {
-            notify(api, `Przerwano (dodano do widoku: ${scan.addedToView}).`);
+            notify(api, `Przerwano (dodanych do listy: ${scan.addedToView}).`);
             return;
           }
           if (scan.end === "complete") {
@@ -996,18 +1015,19 @@ export async function init(api: PluginApi) {
             clearArchiveGaps(box);
             const done = ui.state.boxes[box];
             if (done && !done.truncated) {
-              markGoneFromServer(
-                box,
-                new Set(done.entries.map((entry) => fromMailboxEntry(box, entry).id)),
-              );
+              // Fala 41: widok = glowa + doklejone strony = pelny zrzut
+              // skrzynki; zastepuje archiwum tej skrzynki wynikiem.
+              const replaced = replaceBoxLetters(ui.state.archive, box, snapshotRecords(box));
+              ui.setArchive(replaced.letters);
+              if (replaced.removedIds.size > 0) pruneGoneFromView(box, replaced.removedIds);
               ui.setIndexMeta({ ...ui.state.indexMeta, [box]: new Date().toISOString() });
               persistIndexMeta();
             }
-            notify(api, `Wczytano wszystkie: ${ui.state.boxes[box]?.entries.length ?? 0} list (dodano do widoku: ${scan.addedToView}).`);
+            notify(api, `Wczytano wszystkie (dodanych do listy: ${scan.addedToView}).`);
           } else {
             notify(
               api,
-              `Wczytano dostepne listy: ${ui.state.boxes[box]?.entries.length ?? 0} w widoku (dodano do widoku: ${scan.addedToView}). ${scan.skipWhy ?? "Sprobuj ponownie za chwile"}.`,
+              `Wczytano dostepne listy (dodanych do listy: ${scan.addedToView}). ${scan.skipWhy ?? "Sprobuj ponownie za chwile"}.`,
             );
           }
         } finally {
@@ -1052,35 +1072,25 @@ export async function init(api: PluginApi) {
             if (flag.cancelled || generation !== connectionGeneration) break;
             ui.setIndexRun({ boxIndex: i, box, pages: 0 });
             ui.setBusy(`Indeksuje skrzynke ${box} (${i + 1}/${INDEX_BOXES.length})...`);
-            const seen = new Set<string>();
+            // Fala 41: kazda strona indeksu wklejana ze stala tozsamoscia
+            // tresci; pelny przebieg ZASTEPUJE zawartosc skrzynki w
+            // archiwum wynikiem. Klamra = strona w calosci dopasowana
+            // po tresci (added 0) - przeglad inkrementalny staje.
+            const collectedFreshIds = new Set<string>();
             const sweepMode = indexSweepMode(ui.state.indexMeta, box, Date.now());
-            // Fala 35: wynik listingu nadpisuje occurrences (najswiezsza
-            // strona pokazujaca klucz), nigdy nie sumuje.
-            const mergeIndexPage = (
-              res: Extract<MailboxResult, { kind: "lista" }>,
-              fresh: ReadonlyMap<string, number>,
-            ) => {
-              const entries = res.entries.map((entry) => fromMailboxEntry(box, entry));
-              for (const entry of entries) seen.add(entry.id);
-              const merged = upsertLetters(ui.state.archive, entries);
-              // Po upsert: wystapienia dopiero teraz, gdy rekordy klucza
-              // istnieja (nowe wchodza z occurrences = 1, wynik listingu
-              // nadpisuje).
-              let letters = merged.letters;
-              let occurrenceChanged = false;
-              for (const [key, count] of fresh) {
-                const applied = setOccurrences(letters, box, key, count);
-                if (applied.changed > 0) {
-                  letters = applied.letters;
-                  occurrenceChanged = true;
-                }
-              }
-              ui.setArchive(letters);
+            const mergeIndexPage = (res: Extract<MailboxResult, { kind: "lista" }>) => {
+              const records = recordsOfListing(box, res.entries);
+              const merged = mergeListingPage(ui.state.archive, box, records);
+              ui.setArchive(merged.letters);
               persistArchive();
-              return { ...merged, occurrenceChanged };
+              for (const id of merged.freshIds) collectedFreshIds.add(id);
+              return merged;
             };
-            const applyFirstIndexPage = (res: Extract<MailboxResult, { kind: "lista" }>): void => {
-              stampEntries(box, res.entries);
+            const applyFirstIndexPage = (
+              res: Extract<MailboxResult, { kind: "lista" }>,
+              resolvedIds: string[],
+            ): void => {
+              stampEntries(box, res.entries, resolvedIds);
               const oldest = oldestEntry(res.entries);
               const boundaryDay = oldest?.date
                 ? `${oldest.date.year}-${String(oldest.date.month).padStart(2, "0")}-${String(oldest.date.day).padStart(2, "0")}`
@@ -1101,10 +1111,10 @@ export async function init(api: PluginApi) {
               onGap: (day) => recordArchiveGap(box, day),
               onBaseRefresh: (res) => {
                 if (res.kind === "lista") {
-                  applyFirstIndexPage(res);
-                  // Baza = swieza strona pierwsza: klucze juz policzone
-                  // przy pierwszym przejsciu - bez rekontowania.
-                  mergeIndexPage(res, NO_FRESH);
+                  // Baza = swieza strona pierwsza; wklejamy ja (tresci
+                  // juz znane = czyste dopasowanie, zero smiecia).
+                  const merged = mergeIndexPage(res);
+                  applyFirstIndexPage(res, merged.resolvedIds);
                 } else {
                   bumpCtx(box);
                   ui.applyMailbox(box, res);
@@ -1113,40 +1123,48 @@ export async function init(api: PluginApi) {
               },
               onEmpty: (res) => {
                 bumpCtx(box);
-                if (seen.size === 0) {
+                if (collectedFreshIds.size === 0) {
                   ui.applyMailbox(box, res);
                   rebuildContacts();
                 }
               },
-              onPage: (res, pages, fresh) => {
+              onPage: (res, pages) => {
                 ui.setIndexRun({ boxIndex: i, box, pages });
+                const merged = mergeIndexPage(res);
                 if (pages === 1) {
-                  applyFirstIndexPage(res);
+                  applyFirstIndexPage(res, merged.resolvedIds);
                 } else {
-                  stampEntries(box, res.entries);
+                  stampEntries(box, res.entries, merged.resolvedIds);
                   ui.appendMailboxPage(box, res.entries, res.header.truncated);
                 }
-                const merged = mergeIndexPage(res, fresh);
                 rebuildContacts();
                 return {
                   archiveAdded: merged.added,
-                  // Fala 35: nowy blizniak przy istniejacym kluczu to
-                  // zmiana occurrences - przeglad leci dalej.
-                  stop:
-                    sweepMode === "incremental" &&
-                    merged.added === 0 &&
-                    !merged.occurrenceChanged,
+                  // Fala 41: strona bez ani jednego nowego rekordu =
+                  // klamra doszla do znanego materiału - przeglad
+                  // inkrementalny moze stac.
+                  stop: sweepMode === "incremental" && merged.added === 0,
                 };
               },
             });
             if ((scan.end === "complete" || scan.end === "clamped") && !flag.cancelled) {
-              if (scan.end === "complete" && seen.size > 0) {
+              if (scan.end === "complete" && collectedFreshIds.size > 0) {
                 ui.appendMailboxPage(box, [], false);
               }
               if (scan.end === "clamped") {
-                markGoneFromServerNewerThan(box, seen, scan.oldestSeenDay ?? "");
+                markGoneFromServerNewerThan(
+                  box,
+                  collectedFreshIds,
+                  scan.oldestSeenDay ?? "",
+                );
               } else {
-                markGoneFromServer(box, seen);
+                // Fala 41: kompletny przebieg = pelna prawda o skrzynce;
+                // archiwum skrzynki ZASTEPUJEMY zrzutem z widoku (glowa
+                // + wszystkie strony przebiegu = cala skrzynka).
+                const replaced = replaceBoxLetters(ui.state.archive, box, snapshotRecords(box));
+                ui.setArchive(replaced.letters);
+                persistArchive();
+                if (replaced.removedIds.size > 0) pruneGoneFromView(box, replaced.removedIds);
                 clearArchiveGaps(box);
                 ui.setIndexMeta({ ...ui.state.indexMeta, [box]: new Date().toISOString() });
                 persistIndexMeta();
@@ -1365,9 +1383,6 @@ export async function init(api: PluginApi) {
   };
 
   /** Flaga biezacej petli pobierania tresci (jedna na raz; null = brak). */
-  /** Fala 35: pusty wynik liczenia dla sciezek bez danych per strona. */
-  const NO_FRESH: ReadonlyMap<string, number> = new Map();
-
   let archiveDownloadFlag: { cancelled: boolean } | null = null;
 
   /**
@@ -1559,12 +1574,13 @@ export async function init(api: PluginApi) {
                 wait: (ms) => sleepOrCancel(ms, flag),
                 onPage: (res) => {
                   if (res.kind === "lista") {
-                    for (const entry of res.entries) {
-                      const k = contentKeyOf(fromMailboxEntry(box, entry));
+                    const scanKey = scanKeyOfEntries(res.entries);
+                    res.entries.forEach((entry, i) => {
+                      const k = contentKeyOf(fromMailboxEntry(box, entry, scanKey, i));
                       const arr = rowsByKey.get(k);
                       if (arr) arr.push(entry);
                       else rowsByKey.set(k, [entry]);
-                    }
+                    });
                   }
                   return {};
                 },
@@ -2071,18 +2087,20 @@ export async function init(api: PluginApi) {
       const generation = connectionGeneration;
       void runExclusive(async () => {
           const res = await mailbox.fetch(box, searchListingCommand(box, query));
+          // Fala 41: wyniki szukania tez wklejane pod tozsamoscia
+          // przebiegu (numeracja selekcji nie koliduje z pelnymi
+          // listinguami - inny scanKey).
+          const searchRecords = res.kind === "lista" ? recordsOfListing(box, res.entries) : undefined;
           // Fala 14f: puste wyniki szukania tez nadpisuja kontekst serwera.
-          if (res.kind === "lista") stampEntries(box, res.entries);
-          else bumpCtx(box);
+          if (res.kind !== "lista") bumpCtx(box);
           ui.setSearch({ box, label: searchDescription(box, query) });
           ui.applySearchResults(box, res);
-          if (res.kind === "lista") {
-            // Cache (jak przy kazdym listingu): wyniki tez do archiwum.
-            const merged = upsertLetters(
-              ui.state.archive,
-              res.entries.map((e) => fromMailboxEntry(box, e)),
-            );
+          if (res.kind === "lista" && searchRecords !== undefined) {
+            // Cache (jak przy kazdym listingu): wyniki tez do archiwum,
+            // wpisy dostaja archiveId rozwiazanych rekordow.
+            const merged = mergeListingPage(ui.state.archive, box, searchRecords);
             ui.setArchive(merged.letters);
+            stampEntries(box, res.entries, merged.resolvedIds);
             persistArchive();
             notify(api, `Wyniki szukania (${formatListCount(res.entries.length)}).`);
           } else {
@@ -2255,6 +2273,9 @@ export async function init(api: PluginApi) {
     if (!n) return;
     if (n.kind === "nowa-poczte") {
       if (ui.state.notifyEnabled) notify(api, `Masz nowa poczte od ${n.nadawca}.`);
+      scheduleRefresh(["odebrane", "nieprzeczytane"]);
+      scheduleDelayedInboxRefresh();
+    } else if (n.kind === "goniec") {
       scheduleRefresh(["odebrane", "nieprzeczytane"]);
       scheduleDelayedInboxRefresh();
     } else if (n.kind === "wysylasz") {

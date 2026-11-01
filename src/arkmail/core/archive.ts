@@ -16,7 +16,14 @@ import type { MailboxEntry } from './session/mailbox.js';
 import type { LetterContent } from './session/pager.js';
 
 export interface ArchiveLetter {
-  /** Stabilny identyfikator: FNV-1a(box|number|party|subject|dateRaw). */
+  /**
+   * Stabilny identyfikator rekordu. Fala 41: FNV-1a(box|scanKey|pozycja) -
+   * tozsamosc pochodzi z PRZEBIEGU SKANU (skrot tresci calej strony
+   * listingu) i pozycji wpisu w nim, NIE z metadanych. Dwa wpisy o
+   * identycznych osobie/tematcie/dacie to zawsze DWA rekordy (kazdy
+   * listingowany list = osobny list). Zapis 'stary-identyfikator'
+   * ponizej = legacy (rekordy sprzed Fali 41, klucz z metadanych).
+   */
   id: string;
   box: MailBox;
   number: number;
@@ -101,6 +108,12 @@ function sortKeyOf(date: MailDate | null): string {
   return `${date.year}-${p(date.month)}-${p(date.day)} ${date.time}`;
 }
 
+/**
+ * LEGACY (przed Fala 41): klucz z metadanych. Zostaje wylacznie jako
+ * fallback dla rekordow bez tozsamosci skanowej (otwarcie listu z
+ * wynikow szukania, wpisy widoku bez archiveId). Runtime NIE uzywa go
+ * do tozsamosci archiwum - patrz recordId/scanKeyOfEntries.
+ */
 export function letterId(
   box: MailBox,
   party: string,
@@ -108,11 +121,42 @@ export function letterId(
   forwarded: boolean,
   dateRaw: string | null,
 ): string {
-  // Numer NIE wchodzi w ID: serwer renumeruje wpisy na stronach "Wybrane
-  // listy" (1..N selekcji), wiec ten sam list ma rozne numery zaleznie
-  // od strony/listingu. Flaga forwarded rozroznia forward oryginalu
-  // wyslany w tej samej sekundzie (log 2026-10-18).
   return fnv1a([box, party, subject, forwarded ? 'f' : '', dateRaw ?? ''].join('|'));
+}
+
+/**
+ * Fala 41: klucz PRZEBIEGU SKANU - skrot serializacji wszystkich wpisow
+ * jednej strony listingu (w kolejnosci serwera). Deterministyczny i
+ * idempotentny: ten sam listing zawsze daje ten sam klucz, wiec powtorka
+ * pobrania tej samej strony nie tworzy duplikatow. Zmiana TRESCI strony
+ * (nowy list na gorze) = inny klucz = nowe tozsamosci pozycji.
+ */
+export function scanKeyOfEntries(entries: readonly MailboxEntry[]): string {
+  return fnv1a(
+    entries
+      .map((e) =>
+        [
+          e.number,
+          e.isRead ? 'R' : 'N',
+          e.forwarded ? 'F' : '',
+          e.party,
+          e.subject,
+          e.date?.raw ?? '',
+        ].join('|'),
+      )
+      .join('\n'),
+  );
+}
+
+/**
+ * Fala 41: identyfikator rekordu = FNV-1a(box|scanKey|pozycja). Numer
+ * listu NIE wchodzi w sklad: serwer renumeruje wpisy na stronach
+ * "Wybrane listy" (1..N selekcji). Pozycja w przebiegu skanu rozroznia
+ * blizniakow o identycznych metadanych - kazdy z nich dostaje wlasny,
+ * niezalezny rekord.
+ */
+export function recordId(box: MailBox, scanKey: string, position: number): string {
+  return fnv1a([box, scanKey, String(position)].join('|'));
 }
 
 /** Wystapienia rekordu (Fala 35): brak pola = 1 (zapis legacy). */
@@ -184,11 +228,25 @@ export function contentKeyOf(letter: ArchiveLetter): string {
   );
 }
 
-/** List z listingu -> rekord archiwum (tresc pusta, dokleja ja pager). */
-export function fromMailboxEntry(box: MailBox, entry: MailboxEntry): ArchiveLetter {
+/**
+ * List z listingu -> rekord archiwum (tresc pusta, dokleja ja pager).
+ * Fala 41: tozsamosc rekordu = (box, scanKey strony, pozycja wpisu).
+ * Parametry scanKey/position sa wymagane na kazdej sciezce runtime;
+ * fallback metadanych istnieje tylko dla zapisow/testow legacy (commit
+ * sprzatajacy Fali 41 go usuwa).
+ */
+export function fromMailboxEntry(
+  box: MailBox,
+  entry: MailboxEntry,
+  scanKey?: string,
+  position?: number,
+): ArchiveLetter {
   const dateRaw = entry.date?.raw ?? null;
   return {
-    id: letterId(box, entry.party, entry.subject, entry.forwarded, dateRaw),
+    id:
+      scanKey !== undefined && position !== undefined
+        ? recordId(box, scanKey, position)
+        : letterId(box, entry.party, entry.subject, entry.forwarded, dateRaw),
     box,
     number: entry.number,
     party: entry.party,
@@ -214,7 +272,16 @@ export function fromOpenedLetter(
   entry?: MailboxEntry,
 ): ArchiveLetter {
   if (entry) {
-    return { ...fromMailboxEntry(box, entry), read: true, body: letter.body };
+    // Fala 41: swiezy wpis niesie archiveId rekordu z listingu - tresc
+    // trafia do DOKLADNIE tego rekordu (blizniak o tych samych
+    // metadanych ma wlasne ID i zostaje nietkniety).
+    const base = entry.archiveId
+      ? {
+          ...fromMailboxEntry(box, entry),
+          id: entry.archiveId,
+        }
+      : fromMailboxEntry(box, entry);
+    return { ...base, read: true, body: letter.body };
   }
   const party = SENDER_BOXES.has(box) ? letter.from : letter.to;
   const dateRaw = letter.date;
@@ -293,8 +360,11 @@ function mergeArchiveDuplicates(group: ArchiveLetter[]): ArchiveLetter {
 
 /**
  * Naprawia zapisane rekordy bez kasowania danych. Data pochodzi kolejno
- * z dateRaw, konca osoby albo poprawnego sortKey. Duplikaty po nowym
- * identyfikatorze lacza sie deterministycznie.
+ * z dateRaw, konca osoby albo poprawnego sortKey. Fala 41: identyfikator
+ * NIE jest przebudowywany (tozsamosc = przebieg skanu, ktorego storage
+ * nie zna) i rekordy o ROZNYCH id NIGDY nie sa scalane - scalenie
+ * dotyczy wylacznie dokladnie tego samego id (ten sam wpis zapisany
+ * dwukrotnie), deterministycznie.
  */
 export function normalizeArchive(letters: readonly ArchiveLetter[]): ArchiveLetter[] {
   const groups = new Map<string, ArchiveLetter[]>();
@@ -307,7 +377,6 @@ export function normalizeArchive(letters: readonly ArchiveLetter[]): ArchiveLett
     const dateRaw = date?.raw ?? letter.dateRaw;
     const normalized: ArchiveLetter = {
       ...letter,
-      id: letterId(letter.box, party, letter.subject, letter.forwarded === true, dateRaw),
       party,
       dateRaw,
       sortKey: date ? sortKeyOf(date) : letter.sortKey,
@@ -333,8 +402,119 @@ export interface UpsertResult {
 }
 
 /**
+ * Fala 41: WKLEJANIE bez nadpisywania. Kazdy listingowany list to
+ * osobny rekord - istniejacego rekordu o tym samym id NIE ruszamy
+ * (stary upsert zjadal tresc blizniaka o identycznych metadanych).
+ * Idempotenty: powtorka tego samego skanu daje added === 0.
+ */
+export function insertLetters(
+  existing: readonly ArchiveLetter[],
+  incoming: readonly ArchiveLetter[],
+): { letters: ArchiveLetter[]; added: number } {
+  const map = new Map<string, ArchiveLetter>(existing.map((l) => [l.id, l]));
+  let added = 0;
+  for (const inc of incoming) {
+    if (map.has(inc.id)) continue;
+    map.set(inc.id, inc);
+    added++;
+  }
+  return { letters: [...map.values()].sort(byNewest), added };
+}
+
+/**
+ * Fala 41: wynik JEDNEJ strony listingu wklejony do bazy. Dwa poziomy:
+ *
+ *  1. TOZSAMOSC: kazdy wpis listingu, ktorego tresci NIE ma jeszcze w
+ *     archiwum tej skrzynki, dostaje wlasny rekord (id z przebiegu
+ *     skanu). Blizniak = drugi taki wpis na tej samej stronie DOSTAJE
+ *     wlasny rekord (matchowanie bierze pod uwage WYLACZNIE stan bazy
+ *     sprzed strony, wiec dwa swieze blizniaki nigdy sie nie skleja).
+ *  2. IDEMPOTENCJA TRESCI: wpis, ktorego tresc JUZ ISTNIEJE w archiwum
+ *     tej skrzynki, NIE tworzy nowego rekordu - dopasowuje sie do
+ *     istniejacego (ktory zachowuje swoje id, tresc i flage). Powtorka
+ *     odswiezenia glowy (przesuniecie pozycji, nowy scanKey) nie mnozy
+ *     rekordow tego samego fizycznego listu, a klamra incrementalnego
+ *     przeczesu (strona w calosci znana) zatrzymuje skan bez smiecia.
+ *
+ * To NIE jest mergowanie metadanych: rekordow nikt nie scala ani nie
+ * nadpisuje - decyzja dotyczy wylacznie dopisania NOWEGO rekordu.
+ */
+export interface ListingMergeResult {
+  letters: ArchiveLetter[];
+  /** liczba dopisanych rekordow (nowe tresci). */
+  added: number;
+  /** resolvedIds[i] = id rekordu archiwum dla incoming[i]. */
+  resolvedIds: string[];
+  /** zywe id strony (dopasowane + dopisane) - do zakresowego purge. */
+  freshIds: Set<string>;
+}
+
+export function mergeListingPage(
+  existing: readonly ArchiveLetter[],
+  box: MailBox,
+  incoming: readonly ArchiveLetter[],
+): ListingMergeResult {
+  // Pula dopasowania: wielozbior rekordow skrzynki po kluczu tresci
+  // (stan PRZED ta strona - swiezi blizniak z tej strony nie moze
+  // sparowac sie z rekordem dopisanym z tej samej strony).
+  const pool = new Map<string, ArchiveLetter[]>();
+  for (const l of existing) {
+    if (l.box !== box) continue;
+    const key = contentKeyOf(l);
+    const arr = pool.get(key);
+    if (arr) arr.push(l);
+    else pool.set(key, [l]);
+  }
+  const resolvedIds: string[] = [];
+  const freshIds = new Set<string>();
+  const toInsert: ArchiveLetter[] = [];
+  for (const rec of incoming) {
+    const candidates = pool.get(contentKeyOf(rec));
+    if (candidates && candidates.length > 0) {
+      const matched = candidates.shift()!;
+      resolvedIds.push(matched.id);
+      freshIds.add(matched.id);
+    } else {
+      resolvedIds.push(rec.id);
+      freshIds.add(rec.id);
+      toInsert.push(rec);
+    }
+  }
+  const inserted = insertLetters(existing, toInsert);
+  return { letters: inserted.letters, added: inserted.added, resolvedIds, freshIds };
+}
+
+/**
+ * Fala 41: PELNY SKAN zastepuje stan skrzynki. Najpierw wklejenie
+ * strony z dopasowaniem tresci (stabilna tozsamosc rekordow miedzy
+ * przecesami), potem FIZYCZNE usuniecie rekordow skrzynki nieobecnych
+ * w swiezym zrzucie. Zwraca nowa baze + zbior usunietych id (widok
+ * skrzynki czysci sie na ich podstawie). Baza po wyjsciu pokrywa
+ * dokladnie pelny listing: kazdy wpis = rekord, zadnych duplikatow.
+ */
+export function replaceBoxLetters(
+  existing: readonly ArchiveLetter[],
+  box: MailBox,
+  incoming: readonly ArchiveLetter[],
+): { letters: ArchiveLetter[]; removedIds: Set<string>; resolvedIds: string[] } {
+  const merged = mergeListingPage(existing, box, incoming);
+  const removedIds = new Set<string>();
+  const letters = merged.letters.filter((letter) => {
+    if (letter.box !== box || merged.freshIds.has(letter.id)) return true;
+    removedIds.add(letter.id);
+    return false;
+  });
+  if (removedIds.size === 0 && merged.added === 0) {
+    return { letters: [...existing], removedIds, resolvedIds: merged.resolvedIds };
+  }
+  return { letters, removedIds, resolvedIds: merged.resolvedIds };
+}
+
+/**
  * Wkleja incoming do existing po id. Aktualizacja nadpisuje pola,
  * ale niepusta tresc incoming wygrywa z pusta (nigdy odwrotnie).
+ * Fala 41: runtime uzywa go WYLACZNIE do doplewania tresci/przeczytania
+ * w rekordzie o znanym id (pager) - nigdy do wklejania wynikow listingu.
  */
 export function upsertLetters(
   existing: readonly ArchiveLetter[],

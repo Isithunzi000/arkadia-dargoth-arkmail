@@ -3,10 +3,12 @@
  * stopki indeksacji, paska archiwum i komunikatow. Czysty core,
  * zero DOM/I/O, deterministyczny.
  *
- * Zasady (zgodne z paskiem Fala 31d):
- *  - deduplikacja miedzy skrzynkami: ten sam list w kilku skrzynkach
- *    liczony RAZ - MAX wystapien w grupie; wystapienia w obrebie
- *    skrzynki sumuja sie (Fala 35);
+ * Zasady (zgodne z paskiem Fala 31d, przeliczone Fala 41):
+ *  - kazdy listingowany wpis to osobny list: blizniaki w obrebie
+ *    skrzynki licza sie kazdy z osobna;
+ *  - deduplikacja MIEDZY skrzynkami: krotka replika (nieprzeczytany
+ *    list w "nieprzeczytane" i "odebrane") liczona RAZ - MAX po
+ *    skrzynkach w grupie klucza tresci;
  *  - Fala 28: rekordow nieobecnych na serwerze w bazie nie ma wcale
  *    (fizyczny purge przy gone-markingu), wiec zywosc nie jest tu
  *    sprawdzana - kazdy rekord jest zywy;
@@ -15,7 +17,7 @@
  */
 
 import type { ArchiveLetter } from './archive.js';
-import { contentKeyOf, occurrenceCount } from './archive.js';
+import { contentKeyOf } from './archive.js';
 import type { MailBox } from './protocol/types.js';
 
 /** Grupy blizniacze rekordow (klucz: contentKeyOf). */
@@ -31,32 +33,39 @@ export function liveArchiveGroups(letters: readonly ArchiveLetter[]): ArchiveLet
 }
 
 /**
- * Total: liczba listow w bazie (Fala 35: suma wystapien). Grupa
- * miedzy skrzynkami (ten sam list w "nieprzeczytane" i "odebrane")
- * liczy MAX - fizyczny list wystepuje w kazdej skrzynce tyle samo
- * razy, a MAX broni tez przed nierowno naliczona skrzynka.
+ * Total: liczba FIZYCZNYCH listow w bazie. Fala 41: kazdy listingowany
+ * wpis to osobny list - blizniaki w TEJ SAMEJ skrzynce licza sie
+ * kazdy z osobna. Wyjatkiem jest krotka replika miedzy skrzynkami
+ * (ten sam nieprzeczytany list siedzi w "nieprzeczytane" i "odebrane"):
+ * tam liczymy RAZ - MAX po skrzynkach w grupie klucza tresci.
  */
 export function totalLive(letters: readonly ArchiveLetter[]): number {
+  const byKey = new Map<string, Map<MailBox, number>>();
+  for (const letter of letters) {
+    const key = contentKeyOf(letter);
+    let perBox = byKey.get(key);
+    if (!perBox) {
+      perBox = new Map();
+      byKey.set(key, perBox);
+    }
+    perBox.set(letter.box, (perBox.get(letter.box) ?? 0) + 1);
+  }
   let total = 0;
-  for (const group of liveArchiveGroups(letters)) {
-    total += Math.max(...group.map((letter) => occurrenceCount(letter)));
+  for (const perBox of byKey.values()) {
+    total += Math.max(...perBox.values());
   }
   return total;
 }
 
 /**
- * Per-skrzynka: kazda skrzynka z zywym rekordem grupy dostaje
- * + liczbe wystapien rekordu (Fala 35).
+ * Per-skrzynka: kazdy rekord skrzynki to osobny list (Fala 41 -
+ * blizniaki w skrzynce sumuja sie). Suma czesci moze byc wieksza niz
+ * total (krotka replika miedzy skrzynkami liczy sie w kazdej z nich).
  */
 export function perBoxCounts(letters: readonly ArchiveLetter[]): Map<MailBox, number> {
   const counts = new Map<MailBox, number>();
-  for (const group of liveArchiveGroups(letters)) {
-    const counted = new Set<MailBox>();
-    for (const letter of group) {
-      if (counted.has(letter.box)) continue;
-      counted.add(letter.box);
-      counts.set(letter.box, (counts.get(letter.box) ?? 0) + occurrenceCount(letter));
-    }
+  for (const letter of letters) {
+    counts.set(letter.box, (counts.get(letter.box) ?? 0) + 1);
   }
   return counts;
 }

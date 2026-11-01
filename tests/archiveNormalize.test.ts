@@ -45,15 +45,17 @@ test('normalizacja: odzyskuje date z konca osoby i czysci osobe', () => {
   assert.equal(fixed.party, 'Foo, Bar');
   assert.equal(fixed.dateRaw, raw);
   assert.equal(fixed.sortKey, '1999-09-20 01:02:03');
-  assert.equal(fixed.id, archive.letterId('odebrane', 'Foo, Bar', 'Wiadomosc', false, raw));
+  // Fala 41: identyfikator NIE jest przebudowywany (tozsamosc =
+  // przebieg skanu, ktorego storage nie zna).
+  assert.equal(fixed.id, 'stary-identyfikator');
 });
 
-test('normalizacja: poprawna dateRaw odtwarza sortKey i identyfikator', () => {
+test('normalizacja: poprawna dateRaw odtwarza sortKey, identyfikator nietkniety', () => {
   const raw = 'Wt, 24 VIII 1999, 00:11:12';
   const [fixed] = archive.normalizeArchive([record({ dateRaw: raw })]);
 
   assert.equal(fixed.sortKey, '1999-08-24 00:11:12');
-  assert.equal(fixed.id, archive.letterId('odebrane', 'Foo', 'Wiadomosc', false, raw));
+  assert.equal(fixed.id, 'stary-identyfikator');
 });
 
 test('normalizacja: sam poprawny sortKey odtwarza pelna dateRaw', () => {
@@ -65,17 +67,17 @@ test('normalizacja: sam poprawny sortKey odtwarza pelna dateRaw', () => {
   assert.equal(fixed.sortKey, '1999-09-20 03:04:05');
 });
 
-test('normalizacja: scala duplikaty i zachowuje wszystkie rozne linie tresci', () => {
+test('normalizacja: TE SAME id scala deterministycznie i zachowuje linie tresci', () => {
   const raw = 'Pn, 20 IX 1999, 01:02:03';
   const first = record({
-    id: 'pierwszy',
+    id: 'ten-sam',
     party: `Foo ${raw}`,
     body: ['pierwsza', 'wspolna'],
     read: false,
     missingOnServer: true,
   });
   const second = record({
-    id: 'drugi',
+    id: 'ten-sam',
     party: 'Foo',
     dateRaw: raw,
     sortKey: '1999-09-20 01:02:03',
@@ -100,6 +102,29 @@ test('normalizacja: scala duplikaty i zachowuje wszystkie rozne linie tresci', (
   );
 });
 
+test('normalizacja: rozne id NIGDY nie sa scalane (Fala 41 - zero mergowania)', () => {
+  const raw = 'Pn, 20 IX 1999, 01:02:03';
+  const first = record({
+    id: 'pierwszy',
+    party: `Foo ${raw}`,
+    body: ['pierwsza'],
+    read: false,
+  });
+  const second = record({
+    id: 'drugi',
+    party: 'Foo',
+    dateRaw: raw,
+    sortKey: '1999-09-20 01:02:03',
+    body: ['druga'],
+    read: true,
+  });
+
+  const normalized = archive.normalizeArchive([first, second]);
+  assert.equal(normalized.length, 2, 'identyczne metadane = dwa rekordy');
+  const bodies = normalized.map((l) => l.body[0]).sort();
+  assert.deepEqual(bodies, ['druga', 'pierwsza'], 'zadna tresc nie ginie');
+});
+
 test('normalizacja: jest powtarzalna i nie zmienia wejscia', () => {
   const original = record({
     party: 'Foo Pn, 20 IX 1999, 01:02:03',
@@ -117,7 +142,7 @@ test('normalizacja: jest powtarzalna i nie zmienia wejscia', () => {
 
 test('normalizacja: rekord bez mozliwej do odzyskania daty zostaje nietkniety', () => {
   const damaged = record({
-    id: archive.letterId('odebrane', 'Foo ...', 'Wiadomosc', false, 'nieznana'),
+    id: 'uszkodzony-identyfikator',
     party: 'Foo ...',
     dateRaw: 'nieznana',
     sortKey: 'uszkodzony',

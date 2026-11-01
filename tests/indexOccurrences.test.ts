@@ -1,21 +1,16 @@
 /**
- * Fala 35b: liczenie wystapien z pelnego listingu indeksacji.
+ * Fala 41: liczniki po nowym modelu tozsamosci + klamra przeczesu.
  *
- * Decyzja 2026-10-31: liczba wystapien (blizniaki o identycznych
- * metadanych) pochodzi WYLACZNIE z pelnego listingu indeksacji -
- * wynik listingu, nie suma zapisow. Strony paginacji sa rozdzielone
- * po dniach (kotwica "przed" wyklucza dzien graniczny), wiec wszystkie
- * wystapienia jednego klucza tresci siedza na TEJ SAMEJ stronie; sonda
- * sciany (odpyt ponownie dnia granicznego) NIE moze policzyc ich dwa
- * razy. Przyrostowy przeglad (co 7 dni) leci dalej, gdy zmienila sie
- * tylko liczba wystapien (blizniak doszedl do istniejacego klucza).
- *
- * Ten plik to dowod RED: testy padaja na kodzie bez liczenia.
+ * Kazdy wylistowany wpis to osobny rekord archiwum (blizniaki o
+ * identycznych metadanych = dwa rekordy, dwa listy w licznikach).
+ * Klamra incrementalnego przeczesu = strona w calosci dopasowana po
+ * tresci do istniejacej bazy (brak nowych rekordow) - skan staje.
+ * Strona z jakakolwiek nowa trescia = brak klamry, skan leci dalej.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { letterId, fromMailboxEntry, contentKeyOf, type ArchiveLetter } from '../src/arkmail/core/archive';
+import { fromMailboxEntry, contentKeyOf, scanKeyOfEntries, type ArchiveLetter } from '../src/arkmail/core/archive';
 import { scanMailboxPages } from '../src/arkmail/core/pagination';
 import type { MailboxResult } from '../src/arkmail/core/session/mailbox';
 import {
@@ -107,7 +102,7 @@ test('skan: sonda sciany nie liczy ponownie wystapien z granicznego dnia', async
   assert.equal(result.freshCounts.get(olderKey), 1);
 });
 
-test('indeksacja: blizniaki dostaja occurrences = wynik listingu', async () => {
+test('indeksacja Fala 41: blizniaki = dwa osobne rekordy i dwa osobne listy w licznikach', async () => {
   const h = await startHarness();
   try {
     click(h, '[data-tab="archiwum"]');
@@ -125,7 +120,7 @@ test('indeksacja: blizniaki dostaja occurrences = wynik listingu', async () => {
     );
     assert.ok(
       strip.includes('3'),
-      `listow w bazie = 3 (2 wystapienia blizniaka + 1 inny), pasek: "${strip}"`,
+      `listow w bazie = 3 (2 blizniaki jako osobne rekordy + 1 inny), pasek: "${strip}"`,
     );
 
     click(h, '[data-tab="kontakty"]');
@@ -142,18 +137,22 @@ test('indeksacja: blizniaki dostaja occurrences = wynik listingu', async () => {
   }
 });
 
-test('indeksacja przyrostowa: zmiana wylacznie occurrences leci dalej ze skanem', async () => {
-  const twinId = letterId('odebrane', 'Goniec', 'Raport', false, TWIN_DATE);
-  const seed: ArchiveLetter = {
-    ...fromMailboxEntry('odebrane', {
-      number: 3, isRead: true, subject: 'Raport', forwarded: false,
-      party: 'Goniec', partyKind: 'nadawca',
-      date: { raw: TWIN_DATE, weekday: 'Wt', day: 24, month: 8, year: 1999, time: '10:00:00' },
-    }),
-    id: twinId,
-  };
+test('indeksacja przyrostowa Fala 41: strona w calosci znana z archiwum = klamra, stop bez paginacji', async () => {
+  // Ziarno = rekordy o ID z TEGO samego przebiegu skanu, ktory serwer
+  // pokaze w teście (ta sama strona, te same pozycje) - tresc strony
+  // w pelni pokryta, zadnego nowego rekordu = klamra.
+  const entry = (n: number) => ({
+    number: n, isRead: true, subject: 'Raport', forwarded: false,
+    party: 'Goniec', partyKind: 'nadawca' as const,
+    date: { raw: TWIN_DATE, weekday: 'Wt', day: 24, month: 8, year: 1999, time: '10:00:00' },
+  });
+  const entries = [entry(3), entry(2)];
+  const scanKey = scanKeyOfEntries(entries as never);
+  const seed: ArchiveLetter[] = entries.map((e, i) =>
+    fromMailboxEntry('odebrane', e as never, scanKey, i),
+  );
   const h = await startHarness({
-    archive: [seed],
+    archive: seed,
     indexMeta: {
       odebrane: new Date().toISOString(),
       nieprzeczytane: new Date().toISOString(),
@@ -164,8 +163,6 @@ test('indeksacja przyrostowa: zmiana wylacznie occurrences leci dalej ze skanem'
   try {
     click(h, '[data-tab="archiwum"]');
     click(h, '.arkmail-index-all');
-    // Odebrane: uciety listing z para blizniakow (nowy blizniak doszedl
-    // do istniejacego klucza - added = 0, occurrences 1 -> 2).
     await waitRt(
       () => h.f.sent.filter((c) => c === 'listy odebrane').length === 1,
       'indeksacja: listing odebranych',
@@ -173,11 +170,42 @@ test('indeksacja przyrostowa: zmiana wylacznie occurrences leci dalej ze skanem'
     h.f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     for (const line of TWIN_LINES) h.f.fire(line, 'mail');
     h.f.fire('> ', 'prompt');
-    // Stary kontrakt: stop po stronie 1 (added = 0) - nie ma paginacji.
-    // Nowy: occurrences sie zmienily, wiec skan idzie dalej.
+    // Klamra: strona w calosci dopasowana po tresci (added 0) - skan
+    // STAJE, kotwica paginacji nie wylatuje.
+    await new Promise((r) => setTimeout(r, 700));
+    assert.ok(
+      !h.f.sent.some((c) => c.startsWith('listy odebrane przed')),
+      'brak paginacji na klamrze',
+    );
+  } finally {
+    await stopHarness();
+  }
+});
+
+test('indeksacja przyrostowa Fala 41: nowa tresc na stronie = brak klamry, skan leci dalej', async () => {
+  const h = await startHarness({
+    indexMeta: {
+      odebrane: new Date().toISOString(),
+      nieprzeczytane: new Date().toISOString(),
+      wyslane: new Date().toISOString(),
+      niewyslane: new Date().toISOString(),
+    },
+  });
+  try {
+    click(h, '[data-tab="archiwum"]');
+    click(h, '.arkmail-index-all');
+    await waitRt(
+      () => h.f.sent.filter((c) => c === 'listy odebrane').length === 1,
+      'indeksacja: listing odebranych',
+    );
+    h.f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
+    for (const line of TWIN_LINES) h.f.fire(line, 'mail');
+    h.f.fire('> ', 'prompt');
+    // Pusta baza: kazdy wpis to nowa tresc (dopisane 2 rekordy) - skan
+    // idzie dalej (klamra dopiero na stronie bez nowych tresci).
     await waitRt(
       () => h.f.sent.some((c) => c.startsWith('listy odebrane przed')),
-      'paginacja po zmianie occurrences',
+      'paginacja po nowej tresci',
     );
   } finally {
     await stopHarness();

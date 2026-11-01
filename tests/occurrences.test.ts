@@ -56,28 +56,27 @@ test('occurrences: pole nadpisuje domyslna jedynke', () => {
   assert.equal(occurrenceCount(archived({ occurrences: 10 })), 10);
 });
 
-test('occurrences: totalLive sumuje wystapienia', () => {
-  const letters = [archived({ occurrences: 10 }), archived({ subject: 'Inny' })];
-  assert.equal(totalLive(letters), 11, '10 wystapien blizniaka + 1 inny list');
+test('liczniki Fala 41: kazdy rekord (listingowany list) liczy sie osobno', () => {
+  // Dwa blizniaki w tej samej skrzynce = dwa rekordy = dwa listy.
+  const letters = [archived(), archived(), archived({ subject: 'Inny' })];
+  assert.equal(totalLive(letters), 3, '2 blizniaki + 1 inny, zadnego sklejania');
 });
 
-test('occurrences: grupa miedzy skrzynkami liczy MAX (ten sam fizyczny list)', () => {
-  const letters = [
-    archived({ occurrences: 10 }),
-    archived({ box: 'nieprzeczytane', occurrences: 10 }),
-  ];
-  assert.equal(totalLive(letters), 10, 'nie 20 - to ten sam list w dwoch skrzynkach');
+test('liczniki Fala 41: krotka replika miedzy skrzynkami liczy RAZ (MAX)', () => {
+  const letters = [archived(), archived({ box: 'nieprzeczytane' })];
+  assert.equal(totalLive(letters), 1, 'nie 2 - to ten sam list w dwoch skrzynkach');
 });
 
-test('occurrences: perBoxCounts liczy wystapienia per skrzynka', () => {
+test('liczniki Fala 41: perBoxCounts liczy rekordy per skrzynka', () => {
   const letters = [
-    archived({ occurrences: 10 }),
-    archived({ box: 'nieprzeczytane', occurrences: 10 }),
+    archived(),
+    archived(),
+    archived({ box: 'nieprzeczytane' }),
     archived({ subject: 'Inny' }),
   ];
   const counts = perBoxCounts(letters);
-  assert.equal(counts.get('odebrane'), 11);
-  assert.equal(counts.get('nieprzeczytane'), 10);
+  assert.equal(counts.get('odebrane'), 3);
+  assert.equal(counts.get('nieprzeczytane'), 1);
 });
 
 test('occurrences: kontakty sumuja wystapienia korespondencji', () => {
