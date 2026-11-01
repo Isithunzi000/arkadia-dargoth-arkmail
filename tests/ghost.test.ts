@@ -134,6 +134,22 @@ test('ghost: kursor nie na koncu = brak podpowiedzi', () => {
   assert.equal(ghostRest(c, '[data-field="adresat"]'), '');
 });
 
+test('ghost: filtr kontaktow podpowiada nazwy i aliasy', () => {
+  const s = new MailUiStore({ tab: 'kontakty' });
+  s.setContacts([contact('Bar', 300, 'foo'), contact('Corge', 200)]);
+  const c = mount(s);
+  const el = input(c, '[data-filter="kontakty"]');
+  type(el, 'co');
+  assert.equal(ghostRest(c, '[data-filter="kontakty"]'), 'rge');
+  key(el, 'ArrowRight');
+  assert.equal(el.value, 'Corge');
+  // Akceptacja dispatchuje 'input' - repaint filtruje liste.
+  const rows = c.querySelectorAll('.arkmail-contact') as unknown as { length: number };
+  assert.equal(rows.length, 1, 'po akceptacji lista zaweżona do Corge');
+  type(el, 'fo');
+  assert.equal(ghostRest(c, '[data-filter="kontakty"]'), 'o', 'alias tez podpowiada');
+});
+
 test('ghost: pole tematu szukajki podpowiada tematy z archiwum', () => {
   const s = new MailUiStore();
   s.applyMailbox('odebrane', {

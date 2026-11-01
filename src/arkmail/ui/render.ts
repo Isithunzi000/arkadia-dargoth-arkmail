@@ -1463,6 +1463,11 @@ export function mountMailUi(
     controls.appendChild(input);
     controls.appendChild(sel);
     pane.appendChild(controls);
+    // Fala 40 (zgloszenie 2026-11-01): filtr kontaktow z ghostem jak
+    // pole Osoba w Archiwum - kandydaci z kontaktow + aliasow,
+    // strzalka w prawo wpisuje kanoniczna forme. Akceptacja dispatchuje
+    // 'input', wiec repaint listy odpala sie sam.
+    attachGhost(doc, input, personSource);
     const list = doc.createElement('div');
     pane.appendChild(list);
     const repaint = () => {
