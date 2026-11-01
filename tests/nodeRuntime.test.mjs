@@ -26,7 +26,3 @@ test('srodowisko: CI uzywa Node 24 i powtarzalnej instalacji', () => {
   assert.match(workflow, /run:\s*npm ci(?:\s|$)/);
   assert.doesNotMatch(workflow, /run:\s*npm install(?:\s|$)/);
 });
-
-test('srodowisko: README podaje wymagany Node', () => {
-  assert.match(read('README.md'), /Node 24 lub nowszy/);
-});

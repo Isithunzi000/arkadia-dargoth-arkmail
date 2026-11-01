@@ -1,8 +1,10 @@
 # Protokół poczty Arkadii — specyfikacja dla ArkMail (i przyszłych portów)
 
-Źródła prawdy: prawdziwe logi gry (`tests/fixtures/*.json`, sesje 2025-12 → 2026-10),
-`arkadia.rpg.pl/help/command/*`, wiki `Poczta`, kod klienta Dargoth (`poczta.ts`,
-`letter.ts` — MIT). Każda reguła poniżej jest przypięta testem do fixture'a.
+Źródła prawdy: zanonimizowane logi gry (`tests/fixtures/*.json`),
+`arkadia.rpg.pl/help/command/*`, wiki `Poczta`, kod klienta Dargoth
+(`poczta.ts`, `letter.ts` — MIT). Każda reguła poniżej jest przypięta
+testem do fixture'a. Przykładowe tematy, daty i aliasy w dokumencie są
+randomowe — nie pochodzą z żadnej postaci.
 
 ## Warstwy protokołu
 
@@ -35,11 +37,11 @@ Parser zawsze najpierw robi `stripClientPrefix`.
 ```
 Listy odebrane:                                  <- naglowek, wariant bez suffixu
 Listy wyslane (prezentowane jest pierwsze 50):   <- wariant uciety do 50
- 3. *R* Temat: Elementy rozbitego szkielka       <- wpis: numer desc, *R* = przeczytany
-Nadawca: Foo                        N, 21 XII 2025, 01:15:04
- 2. Temat: Opowiesci...                          <- brak *R* = nieprzeczytany
-Odbiorcy: Xyzzy                N, 21 XII 2025, 00:31:18   <- wyslane/niewyslane
- 2. Temat: zalakowany pergamin (forwardowany)    <- suffix dla forwardowanych
+ 3. *R* Temat: karteczka                         <- wpis: numer desc, *R* = przeczytany
+Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04
+ 2. Temat: notatka na karteczce                  <- brak *R* = nieprzeczytany
+Odbiorcy: Xyzzy                Nd, 22 VIII 1999, 00:31:18   <- wyslane/niewyslane
+ 2. Temat: liscik (forwardowany)                 <- suffix dla forwardowanych
 ```
 
 - Numery malejąco (najnowszy najpierw), zakres 1..50.
@@ -48,7 +50,7 @@ Odbiorcy: Xyzzy                N, 21 XII 2025, 00:31:18   <- wyslane/niewyslane
   (wysłane/niewysłane); date od osoby oddziela co najmniej jedna spacja.
   Dluga lista osob bywa skrocona wielokropkiem, a daty moze nie byc.
 - Data: `<DzienTygodnia>, <d> <MiesiacRzymski> <rrrr>, <gg:mm:ss>`
-  (np. `Wt, 23 XII 2025, 00:11:12`).
+  (np. `Wt, 24 VIII 1999, 00:11:12`).
 
 ### Warianty puste
 
@@ -60,7 +62,7 @@ Nie znaleziono zadnych takich wyslanych listow.        <- filtr bez trafien
 
 ## Szukanie po stronie serwera (`?listy`)
 
-Pelna skladnia z pomocy w grze (`?listy`, przechwycona 2026-04):
+Pelna skladnia z pomocy w grze (`?listy`):
 
 ```
 listy [nieprzeczytane/otrzymane/wyslane/niewyslane]
@@ -74,7 +76,7 @@ listy [nieprzeczytane/otrzymane/wyslane/niewyslane]
   wiec `o temacie X o tresci Y` traktuje `o tresci Y` jako czesc tematu i
   zwraca pusto; odwrotna kolejnosc (`o tresci X o temacie Y`) dziala, bo
   `o tresci` i daty sa tokenizowane. Wszystkie filtry lacza sie AND.
-  Potwierdzone w grze 2026-10-23 seria 9 komend: daty lacza sie z trescia
+  Potwierdzone w grze seria komend: daty lacza sie z trescia
   i tematem, wylacznosc `po`/`przed` trzyma w kombinacjach. Plugin toleruje
   linie otoczenia w srodku listingu (np. naglowek skrzynki) — parser
   liniowy je pomija.
@@ -84,10 +86,9 @@ listy [nieprzeczytane/otrzymane/wyslane/niewyslane]
 - Pomoc mowi `otrzymane`, ale `odebrane` tez dziala (zweryfikowane w logach);
   ArkMail uzywa nazw skrzynek `odebrane|wyslane|niewyslane|nieprzeczytane`.
 - `odebrane` **zawiera** `nieprzeczytane` — nieprzeczytany list odebrany
-  pojawia sie tez na listing odebranych (**potwierdzone w grze
-  2026-10-22**). Skrzynki serwerowe sa pelne od zawsze (serwer nie
-  sprzata skrzynek), wiec liczby w obu listingach pokrywaja sie co do
-  nieprzeczytanych.
+  pojawia sie tez na listing odebranych (potwierdzone w grze). Skrzynki
+  serwerowe sa pelne od zawsze (serwer nie sprzata skrzynek), wiec liczby
+  w obu listingach pokrywaja sie co do nieprzeczytanych.
 - `do [kogo]` = adresat (skrzynki wyslane/niewyslane), `od [kogo]` = nadawca
   (odebrane/nieprzeczytane). Serwer i tak akceptuje obie formy, ArkMail
   dobiera wlasciwa po skrzynce.
@@ -112,16 +113,14 @@ przy wywołaniu handlera bez formularza.
 ### Semantyka granic dat (zweryfikowane w logach)
 
 - `przed <data>` jest **dzienno-granularne i WYLACZNE**: list z dnia
-  granicznego NIE wchodzi w wynik. **Potwierdzone w grze 2026-10-22**
-  (test na zywej sesji: `listy odebrane przed 7 X 2026` pomija listy
-  z 7 X). Wlaczny koniec zakresu w UI realizujemy wysylajac
-  `przed <dzien po>` (ArkMail liczy kolejny dzien kalendarzowo —
-  funkcja `nextDay`).
+  granicznego NIE wchodzi w wynik (potwierdzone w grze). Wlaczny koniec
+  zakresu w UI realizujemy wysylajac `przed <dzien po>` (ArkMail liczy
+  kolejny dzien kalendarzowo — funkcja `nextDay`).
 - `po <data>` jest takze **dzienno-granularne i WYLACZNE** — list z dnia
-  granicznego NIE wchodzi w wynik (**potwierdzone w grze 2026-10-23**).
-  Wlaczny poczatek zakresu w UI realizujemy wysylajac
-  `po <dzien przed>` (funkcja `prevDay`, Fala 29). Obie granice sa wiec
-  symetryczne: `po` dostaje -1 dzien, `przed` +1 dzien.
+  granicznego NIE wchodzi w wynik (potwierdzone w grze). Wlaczny poczatek
+  zakresu w UI realizujemy wysylajac `po <dzien przed>` (funkcja `prevDay`,
+  Fala 29). Obie granice sa wiec symetryczne: `po` dostaje -1 dzien,
+  `przed` +1 dzien.
 - `dzis|wczoraj|przedwczoraj` i `dnia <data>` sa alternatywa dla pary
   `po`/`przed` — ArkMail uzywa wylacznie `po`/`przed` (deterministyczne).
 
@@ -138,11 +137,11 @@ przy wywołaniu handlera bez formularza.
   sie z liczba — dopasowujemy luzno, `pierwsz`).
 - Numery sa **renumerowane** w kontekscie wyniku: **1 = najnowszy pasujacy
   list, N = najstarszy**; serwer wypisuje je od najstarszego do najnowszego
-  (numery maleja w dol). Zweryfikowane w logach (sesja 2026-10-18: strona
-  50→1 z datami rosnacymi; `przeczytaj list N` otwiera wpis o numerze N).
-  Numery NIE odnosza sie do numerow pelnego listingu. Dlatego wyniki
-  szukania w ArkMail nie maja paginacji ani wczytywania starszych; otwarcie
-  listu dziala w kontekscie ostatniego (przefiltrowanego) listingu.
+  (numery maleja w dol). Zweryfikowane w logach (strona 50→1 z datami
+  rosnacymi; `przeczytaj list N` otwiera wpis o numerze N). Numery NIE
+  odnosza sie do numerow pelnego listingu. Dlatego wyniki szukania w
+  ArkMail nie maja paginacji ani wczytywania starszych; otwarcie listu
+  dziala w kontekscie ostatniego (przefiltrowanego) listingu.
 
 ## List (`przeczytaj list N`)
 
@@ -151,14 +150,14 @@ List : 1
 Od   : Corge
 Temat: --
 Do   : Gracz i Baz
-Data : Wt, 23 XII 2025, 00:11:12
+Data : Wt, 24 VIII 1999, 00:11:12
 <tresc, dowolne linie, w tym ramki rysowane przez gre>
 [1-3 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) --          <- pager prompt
 ```
 
 Opcjonalny nagłówek `DW   : ...`. Nagłówek `Do   :` BYWA PUSTY (list do
-siebie wysłany z samym DW — log 2026-10-18). List wysłany z DW ląduje
-u odbiorców DW w odebranych (Od: nadawca, Do: ktoś inny, DW: my).
+siebie wysłany z samym DW — zweryfikowane w logach). List wysłany z DW
+ląduje u odbiorców DW w odebranych (Od: nadawca, Do: ktoś inny, DW: my).
 Treść kończy się pager promptem.
 
 ## Pager
@@ -171,7 +170,7 @@ Treść kończy się pager promptem.
   i prompt `DW: ` wraca. Sukces: `List jest gotowy do wyslania.` i powrót pagera.
 - Błędy: `Zly numer listu: 4.`, `Zadne listy nie zostaly wybrane.`
 
-### Pelna pomoc pagera (`?` w trakcie czytania, log 2026-10-18)
+### Pelna pomoc pagera (`?` w trakcie czytania)
 
 Serwer nazywa pager **"edytorem poczty"** (naglowek pomocy: "Komendy
 dostepne w edytorze poczty"). Komplet komend:
@@ -191,7 +190,7 @@ e           skasuj WSZYSTKIE zaznaczone
 .           pokaz aktualny list
 <num>       pokaz list <num>
 <           poprzedni list
-> lub ENTER nastepny list (pusta linia = nastepny; log 2026-10-18)
+> lub ENTER nastepny list (pusta linia = nastepny)
 n [<num>]   zapisz tresc jako notatke
 !<komenda>  wykonaj komende spoza pagera (dziala nawet w trakcie pisania)
 ?           ta pomoc
@@ -264,7 +263,7 @@ obowiązują w formularzu i bezpośrednio w handlerze wysyłki.
   sa widoczne, a wysylki composera ida z echem (`→ napisz list`, ...) —
   gracz widzi dokladnie to, co przy recznym pisaniu listu.
 - **Lot zwierzecia pocztowego nigdy nie jest gagowany** — `wyslij
-  zwierze` nie bierze blokady sesji, wiec `Wysylasz X na poczte.`,
+  zwierze` nie bierze blokady sesji, wiec `Wysylasz <zwierze> na poczte.`,
   powrot (`Wsrod trzepotu skrzydel ...`) i dostawa niewyslanych sa
   zawsze widoczne. Od Fali 28h komenda z przycisku pluginu tez ma echo.
 
@@ -272,7 +271,7 @@ obowiązują w formularzu i bezpośrednio w handlerze wysyłki.
 
 ```
 Posiadasz nastepujace zdefiniowane aliasy pocztowe:
-	poltorak: Bar
+	foo: Bar
 ```
 
 Wpis: tab, nazwa, dwukropek, rozwiniecie (możliwe wiele celów — parsowane
@@ -283,8 +282,13 @@ po przecinku). ArkMail aliasów NIE tworzy — tylko odczyt i użycie.
 ```
 Masz nowa poczte od Foo.         (notification.mail; imię w dopełniaczu)
 Goniec przyniosl nowa partie listow. (other)
-Wysylasz Kruk na poczte.           (other; też "Wysylasz Kruka...")
+Wysylasz <zwierze> na poczte.      (other; np. "Wysylasz kruka...")
 ```
+
+`Goniec przyniosl ...` to generyczny komunikat otoczenia serwera (ktoś
+dopiero co wysłał listy w świecie gry), nie zdarzenie z listem gracza.
+`<zwierze>` zależy od gracza — komenda `wyslij zwierze` wysyła zwierzę
+właściciela (kruk, sowa, gołąb itp.), a serwer odmienia jego nazwę.
 
 GMCP: moduł `Mail 1`, pakiet `mail.state` = `{unread, unreceived, unsent}`
 (auto-push po zmianie). Klient Dargoth ma chip w stopce na tym stanie.
@@ -301,7 +305,7 @@ Licznik w nawiasie kwadratowym, imiona po przecinku, ostatni separator ` i `.
 
 Serwer pokazuje max 50 najnowszych (`prezentowane jest pierwsze 50`).
 Starsze: `listy <skrzynka> przed <d> <miesiac rzymski> <yyyy>`
-(zweryfikowane w logach: `listy wyslane przed 9 iii 2026`) — ArkMail
+(zweryfikowane w logach: `listy wyslane przed 9 ix 1999`) — ArkMail
 paginuje wstecz i buduje lokalne archiwum poza limitem.
 Granice `przed` i `po` sa wylaczne i dzienne, wiec wiecej niz 50 listow z jednego dnia
 tworzy niedostepna czesc listingu. Nie ma potwierdzonej

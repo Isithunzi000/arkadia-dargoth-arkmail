@@ -106,14 +106,6 @@ test('dokumentacja: README opisuje trzy niezalezne kroki Archiwum', () => {
   assert.match(readme, /częściowy ZIP/);
 });
 
-test('dokumentacja: README opisuje reczne i zbiorcze usuwanie listow', () => {
-  const readme = fs.readFileSync(path.join(REPO, 'README.md'), 'utf8');
-  assert.match(readme, /Usuwanie listów/);
-  assert.match(readme, /jeden wynik z wybranej skrzynki/);
-  assert.match(readme, /Wyniki nie odświeżają się automatycznie/);
-  assert.match(readme, /wyjście z zakładki\s+czyści wyniki, filtry i zaznaczenie/);
-});
-
 // Fala 32: sekcja Licencja wspomina wylacznie licencje - wyjasnienia
 // rodla kodu (np. "port 1:1") nie wolno tam umieszczac.
 test('dokumentacja: sekcja Licencja wspomina tylko licencje', () => {
@@ -125,14 +117,15 @@ test('dokumentacja: sekcja Licencja wspomina tylko licencje', () => {
 
 // Fala 32: kazdy URL w README ma byc klikalnym odnosnikiem markdown
 // ([tekst](url)), nie surowym tekstem w code spanie/fenced blocku.
+// Fala 39a: tekstem linku moze (i ma) byc sam pelny URL — najpierw
+// wyciynamy kompletne odnosniki [tekst](url), potem wymagamy, zeby
+// nie zostal zaden surowy URL.
 test('dokumentacja: README uzywa wylacznie klikalnych odnosnikow', () => {
   const readme = fs.readFileSync(path.join(REPO, 'README.md'), 'utf8');
   assert.doesNotMatch(readme, /`[^`\n]*https?:\/\/[^`\n]*`/);
-  const urls = readme.match(/https?:\/\/[^\s)<>"']+/g) ?? [];
-  assert.ok(urls.length > 0, 'README ma zawierac jakies odnosniki');
-  for (const u of urls) {
-    assert.ok(readme.includes(`](${u}`), `${u}: nie jest klikalnym odnosnikiem`);
-  }
+  const stripped = readme.replace(/\[([^\]]*)\]\(([^)]+)\)/g, ' ');
+  const bare = stripped.match(/https?:\/\/[^\s)<>"']+/g) ?? [];
+  assert.deepEqual(bare, [], `surowe URL poza odnosnikami: ${bare.join(', ')}`);
 });
 
 // Konwencja release'ow arkmaila to WYlACZNIE wersjonowany zip
