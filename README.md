@@ -14,11 +14,11 @@ archiwum i pisanie listów.
 
 Wtyczka ładowana jest z powyższego adresu przy każdym uruchomieniu
 klienta — aktualizacje przychodzą same, bez ponownej instalacji. Numer
-wersji widnieje w nagłówku okna.
+wersji widnieje w stopce okna.
 
 ## Użycie
 
-`/arkmail` otwiera i zamyka okno pluginu.
+`/arkmail` otwiera okno pluginu.
 
 ## Licencja
 
