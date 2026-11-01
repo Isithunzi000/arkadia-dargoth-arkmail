@@ -133,12 +133,12 @@ test('pobieranie: legacy-zombie (missingOnServer) purgowany przy ladowaniu', asy
   }
 });
 
-test('eksport: pusty blizniak nie zwieksza liczby pominietych, wynik jest deterministyczny', () => {
+test('eksport: kazdy rekord liczony osobno, wynik jest deterministyczny', () => {
   const twins = bodyTwin();
   const first = archiveExportEntries(twins);
   const second = archiveExportEntries([...twins].reverse());
-  assert.equal(first.entries.length, 1);
-  assert.equal(first.skipped, 0, 'ten sam list jest zapisany z drugiego rekordu');
+  assert.equal(first.entries.length, 1, 'rekord z trescia daje plik');
+  assert.equal(first.skipped, 1, 'rekord bez tresci pominiety (per rekord, bez pozyczania)');
   assert.deepEqual(second, first, 'kolejnosc rekordow nie zmienia eksportu');
 });
 
@@ -153,9 +153,10 @@ test('statusy: liczniki pobierania i ZIP uwzgledniaja grupy oraz niedostepne dat
     await openArchive(h);
     const steps = stepTexts(h);
     // Fala 28: legacy-zombie jest purgowany przy ladowaniu - nie jest
-    // liczony ani w kolumnie pobierania, ani w ZIP.
+    // liczony ani w kolumnie pobierania, ani w ZIP. Fala 41: kazdy
+    // rekord bez tresci liczy sie osobno (blizniak nie pozycza tresci).
     assert.match(steps[1], /Gotowe: 1 list z trescia \(1 bez daty\)\./);
-    assert.match(steps[2], /Gotowe: 1 list do zapisu \(1 bez tresci\)\./);
+    assert.match(steps[2], /Gotowe: 1 list do zapisu \(2 bez tresci\)\./);
   } finally {
     await stopHarness();
   }

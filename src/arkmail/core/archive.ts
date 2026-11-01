@@ -43,16 +43,18 @@ export interface ArchiveLetter {
   read: boolean;
   body: string[];
   /**
-   * Fala 35: liczba wystapien listu na serwerze (blizniaki o
-   * identycznych metadanych wylistowane pod roznymi numerami).
-   * Brak pola = 1 (zapisy ze starych wersji). Ustawiana wylacznie
-   * z pelnego listingu indeksacji - wynik listingu, nie suma zapisow.
+   * LEGACY (Fala 35, wycofane Fala 41): dawniej liczba wystapien
+   * scalonego rekordu. Runtime nie czyta tego pola; zostaje w typie
+   * wylacznie dla danych zapisanych przez stare wersje (normalize
+   * przenosi je bez zmian). Kontakty czytaja je jako domyslna 1.
    */
   occurrences?: number;
   /**
-   * Fala 35: tresci wystapien 2..n przeczytane kazde osobno (petla
-   * pobierania czyta kazde wystapienie; body = wystapienie 1). Bez
-   * deduplikacji bajtow - dwa identyczne wystapienia to dwie kopie.
+   * LEGACY (Fala 35, wycofane Fala 41): dawne tresci wystapien 2..n
+   * scalonego rekordu. Runtime nie czyta tego pola; zostaje w typie
+   * wylacznie dla danych zapisanych przez stare wersje (tresci nie
+   * ginia - storage ich nie kasuje, eksport Fali 41 idzie per rekord
+   * po body).
    */
   extraBodies?: string[][];
   /**
@@ -83,14 +85,6 @@ export interface ArchiveFilter {
 
 const SENDER_BOXES: ReadonlySet<MailBox> = new Set(['odebrane', 'nieprzeczytane']);
 const RECIPIENT_BOXES: ReadonlySet<MailBox> = new Set(['wyslane', 'niewyslane']);
-
-/** Kolejnosc kanoniczna skrzynki dla blizniaka (Fala 17c/18a). */
-export const BOX_RANK: Record<MailBox, number> = {
-  odebrane: 0,
-  nieprzeczytane: 1,
-  wyslane: 2,
-  niewyslane: 3,
-};
 
 /** FNV-1a 32-bit, hex - deterministyczny skrot bez zaleznosci. */
 export function fnv1a(input: string): string {
@@ -159,66 +153,12 @@ export function recordId(box: MailBox, scanKey: string, position: number): strin
   return fnv1a([box, scanKey, String(position)].join('|'));
 }
 
-/** Wystapienia rekordu (Fala 35): brak pola = 1 (zapis legacy). */
-export function occurrenceCount(letter: ArchiveLetter): number {
-  return letter.occurrences ?? 1;
-}
-
-/** Wszystkie przeczytane tresci wystapien: body + extraBodies, bez dedupu. */
-export function bodiesOf(letter: ArchiveLetter): string[][] {
-  return [letter.body, ...(letter.extraBodies ?? [])];
-}
-
-/**
- * Fala 35c: wypelnia sloty tresci per wystapienie (body = wystapienie 1,
- * extraBodies = 2..n). Brakujace sloty zostaja puste (pobieranie dociaga
- * je pozniej); occurrences rosnie, gdy dostarczono wiecej tresci niz
- * dotychczasowy rozmiar. Czysta funkcja - zwraca nowy rekord.
- */
-export function withOccurrenceBodies(
-  letter: ArchiveLetter,
-  bodies: string[][],
-): ArchiveLetter {
-  const n = Math.max(occurrenceCount(letter), bodies.length);
-  const prev = bodiesOf(letter);
-  const merged: string[][] = [];
-  for (let i = 0; i < n; i++) merged.push(bodies[i] ?? prev[i] ?? []);
-  return {
-    ...letter,
-    occurrences: n,
-    body: merged[0] ?? [],
-    extraBodies: merged.slice(1),
-  };
-}
-
-/**
- * Fala 35: nadpisuje liczbe wystapien rekordow skrzynki o danym
- * kluczu tresci wynikiem listingu (NIE sumuje). Klucz jest
- * jednodniowy (dataRaw wchodzi w sklad), wiec jedna strona paginacji
- * pokazuje wszystkie jego wystapienia. Zwraca nowa tablice i liczbe
- * zmienionych rekordow.
- */
-export function setOccurrences(
-  existing: readonly ArchiveLetter[],
-  box: MailBox,
-  contentKey: string,
-  count: number,
-): { letters: ArchiveLetter[]; changed: number } {
-  let changed = 0;
-  const letters = existing.map((l) => {
-    if (l.box !== box || contentKeyOf(l) !== contentKey) return l;
-    if ((l.occurrences ?? 1) === count) return l;
-    changed += 1;
-    return { ...l, occurrences: count };
-  });
-  return { letters, changed };
-}
-
 /**
  * Klucz TRESCI rekordu (Fala 17c): jak letterId, ale BEZ skrzynki.
- * Ten sam list istnieje w archiwum podwojnie, gdy jest nieprzeczytany
- * (rekordy "nieprzeczytane" i "odebrane" maja rozne id) - petla
- * pobierania tresci grupuje po tym kluczu i pobiera blizniaka RAZ.
+ * Uzywany do licznikow (deduplikacja krotkiej repliki miedzy
+ * skrzynkami - patrz archiveStats) i kasowania zbiorczego. Tozsamosc
+ * rekordu NIE polega na tym kluczu (Fala 41: recordId z przebiegu
+ * skanu) - rozne rekordy maja ten sam klucz tresci (blizniaki).
  */
 export function contentKeyOf(letter: ArchiveLetter): string {
   return fnv1a(
@@ -351,9 +291,6 @@ function mergeArchiveDuplicates(group: ArchiveLetter[]): ArchiveLetter {
     number: Math.max(...group.map((letter) => letter.number)),
     read: group.some((letter) => letter.read),
     body,
-    // Fala 35: te same id = te same metadane = te same wystapienia;
-    // MAX chroni przed podwojnym liczeniem przy scalaniu duplikatow.
-    occurrences: Math.max(...group.map((letter) => occurrenceCount(letter))),
   };
   return merged;
 }

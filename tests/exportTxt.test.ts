@@ -139,7 +139,7 @@ function zipNames(zip: Uint8Array): string[] {
   return names;
 }
 
-test('eksport archiwum: dedup blizniakow, folder per skrzynka, pomijanie bez tresci', () => {
+test('eksport archiwum: plik per rekord, folder per skrzynka, pomijanie bez tresci', () => {
   const base = {
     number: 1,
     isRead: true,
@@ -168,11 +168,15 @@ test('eksport archiwum: dedup blizniakow, folder per skrzynka, pomijanie bez tre
   };
   const { entries, skipped } = archiveExportEntries([twinUnread, twinRead, noBody, sent]);
   assert.equal(skipped, 1, 'bez-tresciowy pominiety');
-  assert.equal(entries.length, 2, 'blizniak zdeduplikowany, wyslany osobno');
+  assert.equal(entries.length, 3, 'replika miedzy skrzynkami = osobny plik w kazdej skrzynce');
   const names = entries.map((e) => e.name);
   assert.ok(
-    names.some((n) => n.startsWith('odebrane/1999-08-24_00-11-12_corge_najnowszy.txt')),
-    'blizniak w kanonicznym folderze odebrane',
+    names.some((n) => n.startsWith('nieprzeczytane/1999-08-24_00-11-12_corge_najnowszy')),
+    'replika w folderze nieprzeczytane',
+  );
+  assert.ok(
+    names.some((n) => n.startsWith('odebrane/1999-08-24_00-11-12_corge_najnowszy')),
+    'replika w folderze odebrane',
   );
   assert.ok(names.some((n) => n.startsWith('wyslane/')), 'wyslany w folderze wyslane');
 });

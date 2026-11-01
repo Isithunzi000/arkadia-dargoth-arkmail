@@ -16,7 +16,6 @@
 import type { MailBox } from './protocol/types.js';
 import type { MailboxEntry } from './session/mailbox.js';
 import type { ArchiveLetter } from './archive.js';
-import { occurrenceCount } from './archive.js';
 
 export type ContactSource = 'people' | 'korespondencja' | 'alias';
 
@@ -207,8 +206,10 @@ export function contactsFromArchive(letters: readonly ArchiveLetter[]): Contact[
     korespondencja: korespondencjaFromLetters(
       letters
         .filter((l) => l.box !== 'niewyslane')
-        // Fala 35: rekord wnosi liczbe wystapien (dedup ponizej sumuje).
-        .map((l) => ({ ...archiveToLetterLike(l), count: occurrenceCount(l) })),
+        // Fala 41: kazdy rekord to osobny list (dedup ponizej sumuje).
+        // Zapisy legacy z polem occurrences (Fala 35) czytaja je jako
+        // domyslna 1 - runtime nie polega juz na tym polu.
+        .map((l) => ({ ...archiveToLetterLike(l), count: l.occurrences ?? 1 })),
     ),
     aliasy: [],
   });

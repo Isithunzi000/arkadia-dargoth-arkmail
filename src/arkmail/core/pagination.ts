@@ -3,6 +3,7 @@ import type { MailBox } from './protocol/types.js';
 import type { MailboxEntry, MailboxResult } from './session/mailbox.js';
 import { fnv1a } from './archive.js';
 
+
 export const PAGE_PACE_MS = 400;
 export const ANCHOR_RETRY_WAITS_MS = [2500, 4000, 4000];
 
@@ -23,11 +24,6 @@ export interface PageScanResult {
   oldestSeenDay: string | null;
   gapDays: string[];
   skipWhy: string | null;
-  /**
-   * Fala 35: liczba swiezych wierszy per klucz tresci w CAŁYM skanie
-   * (wystapienia; sonda sciany nie doklada ponownie dnia granicznego).
-   */
-  freshCounts: Map<string, number>;
 }
 
 export interface PageScanOptions {
@@ -40,8 +36,6 @@ export interface PageScanOptions {
   onPage: (
     result: Extract<MailboxResult, { kind: 'lista' }>,
     pages: number,
-    /** Fala 35: swieze wiersze strony per klucz tresci (wynik listingu). */
-    fresh: ReadonlyMap<string, number>,
   ) => PageVisit | Promise<PageVisit>;
   onEmpty?: (result: Extract<MailboxResult, { kind: 'pusta' }>) => void;
   onBaseRefresh?: (result: MailboxResult) => void;
@@ -86,12 +80,13 @@ const gapReason = (day: string): string =>
  */
 export async function scanMailboxPages(options: PageScanOptions): Promise<PageScanResult> {
   const { box } = options;
-  // Fala 35: liczba wierszy klucza widziana w skanie (wynik
-  // listingu; wszystkie wystapienia klucza siedza na jednej stronie,
-  // bo klucz jest jednodniowy). Ponowne pokazanie tych samych wierszy
-  // (serwer odpowiada wolno / sonda sciany) nie zmienia liczby.
+  // Wykrywanie POWTORKI strony w skanie: klucz jednodniowy (dataRaw
+  // wchodzi w sklad), wiec wszystkie jego wiersze siedza na jednej
+  // stronie. Powrot kotwicy do juz widzianej tresci (serwer odpowiada
+  // wolno) daje freshCount = 0 - sygnal do ponowien kotwicy i sondy
+  // sciany. Nie mylic z "nowe rekordy" (to raportuje onPage przez
+  // archiveAdded / stop).
   const seenCounts = new Map<string, number>();
-  const freshCounts = new Map<string, number>();
   const all: MailboxEntry[] = [];
   const gapDays: string[] = [];
   let pages = 0;
@@ -109,7 +104,7 @@ export async function scanMailboxPages(options: PageScanOptions): Promise<PageSc
     skipWhy: string | null = null,
   ): PageScanResult => ({
     end, pages, addedToView, archiveAdded, all, oldestSeenDay,
-    gapDays: [...gapDays], skipWhy, freshCounts,
+    gapDays: [...gapDays], skipWhy,
   });
   const addGap = (day: string): void => {
     if (gapDays.includes(day)) return;
@@ -129,26 +124,19 @@ export async function scanMailboxPages(options: PageScanOptions): Promise<PageSc
       return finish('complete');
     }
 
-    // Fala 35: wystapienia = wiersze klucza na NAJSWIEZSZEJ stronie
-    // go pokazujacej (wynik listingu, semantyka nadpisania). Blizniaki
-    // licza sie wielokrotnie; ponowne pokazanie tych samych wierszy
-    // (sonda sciany / serwer odpowiada wolno) przy tej samej liczbie nie doklada.
+    // Najstarszy dzien widziany w skanie (granica paginacji / luk)
+    // + zliczanie wierszy per klucz tresci (wykrywanie powtorki).
     const rowsPerKey = new Map<string, number>();
     for (const entry of result.entries) {
-      // Fala 35: klucz zgodny z contentKeyOf archiwum (fnv1a) -
-      // setOccurrences w indeksacji dopasowuje po tym samym hashu.
       const k = fnv1a(entryKey(entry));
       rowsPerKey.set(k, (rowsPerKey.get(k) ?? 0) + 1);
       const day = isoDay(entry);
       if (day !== null && (oldestSeenDay === null || day < oldestSeenDay)) oldestSeenDay = day;
     }
-    const pageFresh = new Map<string, number>();
     let freshCount = 0;
     for (const [k, n] of rowsPerKey) {
       if ((seenCounts.get(k) ?? 0) !== n) {
         seenCounts.set(k, n);
-        freshCounts.set(k, n);
-        pageFresh.set(k, n);
         freshCount += n;
       }
     }
@@ -167,7 +155,7 @@ export async function scanMailboxPages(options: PageScanOptions): Promise<PageSc
     }
 
     pages += 1;
-    const visit = await options.onPage(result, pages, pageFresh);
+    const visit = await options.onPage(result, pages);
     addedToView += visit.addedToView ?? 0;
     archiveAdded += visit.archiveAdded ?? 0;
     if (options.cancelled()) return finish('cancelled');

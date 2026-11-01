@@ -10,7 +10,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { fromMailboxEntry, contentKeyOf, scanKeyOfEntries, type ArchiveLetter } from '../src/arkmail/core/archive';
+import { fromMailboxEntry, scanKeyOfEntries, type ArchiveLetter } from '../src/arkmail/core/archive';
 import { scanMailboxPages } from '../src/arkmail/core/pagination';
 import type { MailboxResult } from '../src/arkmail/core/session/mailbox';
 import {
@@ -31,35 +31,6 @@ const TWIN_LINES = [
   ' 2. *R* Temat: Raport',
   `Nadawca: Goniec                       ${TWIN_DATE}`,
 ];
-
-test('skan: freshCounts liczy wystapienia (blizniaki = 2) i podaje per strone', async () => {
-  const page = {
-    kind: 'lista' as const,
-    header: { box: 'odebrane' as const, truncated: false },
-    entries: [
-      { number: 3, isRead: true, subject: 'Raport', forwarded: false, party: 'Goniec', partyKind: 'nadawca' as const, date: { raw: TWIN_DATE, weekday: 'Wt', day: 24, month: 8, year: 1999, time: '10:00:00' } },
-      { number: 2, isRead: true, subject: 'Raport', forwarded: false, party: 'Goniec', partyKind: 'nadawca' as const, date: { raw: TWIN_DATE, weekday: 'Wt', day: 24, month: 8, year: 1999, time: '10:00:00' } },
-    ],
-  };
-  const scans: Array<ReadonlyMap<string, number>> = [];
-  const result = await scanMailboxPages({
-    box: 'odebrane',
-    cancelled: () => false,
-    fetchPage: async () => page,
-    wait: async () => {},
-    onPage: (res, pages, fresh) => {
-      scans.push(fresh);
-      return {};
-    },
-  });
-  assert.equal(result.end, 'complete');
-  const key = contentKeyOf(
-    fromMailboxEntry('odebrane', page.entries[0] as never) as ArchiveLetter,
-  );
-  assert.equal(result.freshCounts.get(key), 2, 'dwa wystapienia blizniaka');
-  assert.equal(scans.length, 1);
-  assert.equal(scans[0]!.get(key), 2, 'per strona: wynik listingu');
-});
 
 test('skan: sonda sciany nie liczy ponownie wystapien z granicznego dnia', async () => {
   const twin = (n: number) => ({
@@ -91,15 +62,8 @@ test('skan: sonda sciany nie liczy ponownie wystapien z granicznego dnia', async
   });
   // Sonda odpytuje ponownie dzien graniczny; tu wrocil tez starszy
   // list z poprzedniego dnia - jest luka dnia 23 (ponad 50 listow),
-  // wiec listing konczy sie niedomkniety. Liczenie wystapien nie
-  // doklada blizniakow z granicznego dnia drugi raz.
+  // wiec listing konczy sie niedomkniety.
   assert.equal(result.end, 'incomplete', 'sonda trafila na starszy dzien = luka, nie domkniecie');
-  const twinKey = contentKeyOf(
-    fromMailboxEntry('odebrane', twin(3) as never) as ArchiveLetter,
-  );
-  assert.equal(result.freshCounts.get(twinKey), 2, 'sonda nie doklada - 2, nie 4');
-  const olderKey = contentKeyOf(fromMailboxEntry('odebrane', older as never) as ArchiveLetter);
-  assert.equal(result.freshCounts.get(olderKey), 1);
 });
 
 test('indeksacja Fala 41: blizniaki = dwa osobne rekordy i dwa osobne listy w licznikach', async () => {
