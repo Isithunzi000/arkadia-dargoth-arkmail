@@ -1,10 +1,9 @@
 /**
- * Fala 18a (zgloszenie 2026-10-20 pkt 1/3/4): widok archiwum zwija
- * blizniaki (nieprzeczytane+odebrane) do jednego wiersza, ukrywa
- * rekordy oznaczone jako znikniete z serwera, filtr skrzynki i tresci
- * dziala po CA LEJ grupie blizniakow. Kompletny listing (bez uciecia)
- * oznacza nieobecne rekordy jako znikniete; kontakty i eksport je
- * pomijaja.
+ * Widok archiwum (Fala 41): JEDEN REKORD = JEDEN WIERSZ. Zadnego
+ * zwijania blizniakow - dwa listy o identycznych metadanych pokazuja
+ * sie jako dwa osobne wiersze. Filtry (skrzynka, tresc, osoba, temat,
+ * daty) dzialaja per rekord. Rekordy znikniete z serwera sa fizycznie
+ * usuwane z bazy (purge), wiec w widoku ich nie ma.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -42,32 +41,35 @@ function entry(box: MailBox, over: Partial<MailboxEntry> = {}): ArchiveLetter {
   return fromMailboxEntry(box, e);
 }
 
-test('blizniak nieprzeczytane+odebrane zwija sie do jednego wiersza (kanoniczna: odebrane)', () => {
+test('blizniak nieprzeczytane+odebrane to DWA wiersze (per rekord)', () => {
   const twinA = entry('nieprzeczytane', { isRead: false });
   const twinB = entry('odebrane');
   assert.notEqual(twinA.id, twinB.id, 'zalozenie: osobne rekordy w archiwum');
   const rows = filterVisibleArchive([twinA, twinB], {});
-  assert.equal(rows.length, 1, 'jeden wiersz zamiast dwoch');
-  assert.equal(rows[0].box, 'odebrane', 'reprezentant ze skrzynki kanonicznej');
+  assert.equal(rows.length, 2, 'kazdy rekord = osobny wiersz');
+  assert.deepEqual(
+    rows.map((l) => l.id).sort(),
+    [twinA.id, twinB.id].sort(),
+    'obydwa rekordy widoczne',
+  );
 });
 
-test('reprezentant grupy: rekord z trescia wygrywa z kanonicznym bez tresci', () => {
+test('kazdy rekord zachowuje swoja tresc i wlasny wiersz', () => {
   const bezTresci = entry('odebrane');
   const zTrescia = { ...entry('nieprzeczytane', { isRead: false }), body: ['tresc'] };
   const rows = filterVisibleArchive([bezTresci, zTrescia], {});
-  assert.equal(rows.length, 1);
-  assert.deepEqual(rows[0].body, ['tresc'], 'wiersz ma tresc blizniaka');
+  assert.equal(rows.length, 2, 'oba rekordy widoczne, zadnego zwijania');
+  const withBody = rows.find((l) => l.id === zTrescia.id);
+  assert.deepEqual(withBody?.body, ['tresc'], 'rekord zachowuje wlasna tresc');
 });
 
-test('filtr skrzynki dopasowuje grupe po dowolnej skrzynce blizniaka', () => {
+test('filtr skrzynki dziala per rekord', () => {
   const twinA = entry('nieprzeczytane', { isRead: false });
   const twinB = entry('odebrane');
   const wyslany = entry('wyslane', { party: 'Qux', subject: 'Raport' });
   const rows = filterVisibleArchive([twinA, twinB, wyslany], { skrzynka: 'nieprzeczytane' });
-  assert.equal(rows.length, 1, 'grupa przechodzi przez blizniaka');
-  assert.equal(rows[0].subject, 'Perly');
-  // ...ale reprezentant pokazuje skrzynke kanoniczna, nie zombie:
-  assert.equal(rows[0].box, 'odebrane');
+  assert.equal(rows.length, 1, 'tylko rekord z nieprzeczytanych');
+  assert.equal(rows[0].id, twinA.id);
   assert.equal(
     filterVisibleArchive([twinA, twinB, wyslany], { skrzynka: 'wyslane' }).length,
     1,
@@ -75,22 +77,23 @@ test('filtr skrzynki dopasowuje grupe po dowolnej skrzynce blizniaka', () => {
   );
 });
 
-test('Fala 28: purge usuwa rekord znikniety z serwera; grupa z zywym blizniakiem zostaje', () => {
+test('purge usuwa rekord znikniety z serwera; zywy blizniak zostaje jako wlasny wiersz', () => {
   const flagged = { ...entry('nieprzeczytane', { isRead: false }), missingOnServer: true };
   const zywy = entry('odebrane');
   const purged = purgeGoneLetters([flagged, zywy], 'nieprzeczytane', new Set());
   const rows = filterVisibleArchive(purged.letters, {});
-  assert.equal(rows.length, 1, 'grupa zyje przez odebrane');
+  assert.equal(rows.length, 1, 'tylko zywy rekord zostaje w widoku');
   assert.equal(rows[0].box, 'odebrane');
   const samZnikniety = purgeGoneLetters([flagged], 'nieprzeczytane', new Set());
   assert.equal(samZnikniety.letters.length, 0, 'sam zombie fizycznie usuniety');
 });
 
-test('filtr tresci dopasowuje grupe po tresci dowolnego blizniaka', () => {
+test('filtr tresci dziala per rekord (tylko rekord z trescia przechodzi)', () => {
   const bezTresci = entry('odebrane');
   const zTrescia = { ...entry('nieprzeczytane', { isRead: false }), body: ['sekretne wiesci'] };
   const rows = filterVisibleArchive([bezTresci, zTrescia], { tresc: 'wiesci' });
-  assert.equal(rows.length, 1, 'tresc blizniaka przepuszcza grupe');
+  assert.equal(rows.length, 1, 'tylko rekord z pasujaca trescia');
+  assert.equal(rows[0].id, zTrescia.id);
   assert.equal(filterVisibleArchive([bezTresci, zTrescia], { tresc: 'nie-ma' }).length, 0);
 });
 
@@ -121,7 +124,8 @@ test('kolejnosc wyniku: od najnowszych (deterministycznie po grupach)', () => {
   const r2 = filterVisibleArchive([nowszy, starszy, nowszyTwin], {});
   assert.deepEqual(
     r1.map((l) => l.subject),
-    ['Nowy', 'Stary'],
+    ['Nowy', 'Nowy', 'Stary'],
+    'oba rekordy Nowy widoczne osobno',
   );
   assert.deepEqual(
     r1.map((l) => l.id),
