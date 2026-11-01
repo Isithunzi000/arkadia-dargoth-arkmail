@@ -136,9 +136,17 @@ test('usuwanie: filtry i skrzynka trafiaja do recznego wyszukiwania', () => {
   assert.equal(calls[2].args[0] as MailBox, 'wyslane');
   click(container.querySelector('.arkmail-deletion-clear-filters'));
   assert.equal(store.state.deletion.filters.temat, '');
-  // C3: czyszczenie filtrow NIE kasuje wyniku ani zaznaczenia - tylko
-  // nowe zakonczone wyszukiwanie (apply/clearDeletionResult) je podmienia.
+  // Fala 40: czyszczenie filtrow odpala ponowny listing z pustym query
+  // (parzystosc z Archiwum - tam "Wyczysc filtry" od razu pokazuje
+  // pelna liste; filtr usuwania jest serwerowy, wiec bez refetcha
+  // stary, przefiltrowany widok zostawal na ekranie). Wynik i
+  // zaznaczenie nadal kasuje dopiero zakonczone wyszukiwanie
+  // (apply/clearDeletionResult), nie samo klikniecie.
   assert.equal(store.state.deletion.result !== null, true);
+  assert.equal(calls.length, 4);
+  assert.equal(calls[3].name, 'deletion-search');
+  assert.equal(calls[3].args[0] as MailBox, 'wyslane');
+  assert.deepEqual(calls[3].args[1] as ListingSearch, {}, 'refetch z pustym query');
   off();
 });
 

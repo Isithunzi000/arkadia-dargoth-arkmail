@@ -507,6 +507,10 @@ export function mountMailUi(
         (el as HTMLInputElement).value = '';
       });
       store.setDeletionFilters(emptyDeletionFilters());
+      // Fala 40: filtr usuwania jest serwerowy - po wyczyszczeniu pol
+      // trzeba pobrac listing jeszcze raz (parzystosc z Archiwum),
+      // inaczej stary, przefiltrowany wynik zostaje na ekranie.
+      handlers.onDeletionSearch?.(store.state.deletion.box, {});
     });
     controls.appendChild(clearFilters);
     pane.appendChild(controls);
