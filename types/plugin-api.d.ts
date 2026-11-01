@@ -6096,7 +6096,7 @@ export interface TransportLegResetPayload {
 /** Payload of the transport trigger events (`transport.stop`, `transport.destination`...). */
 
 export interface TransportStopEventPayload {
-    /** Transport name, e.g. "Statek Nuln - Kraina Zgromadzenia". */
+    /** Transport name, e.g. "Statek Albatros - Kraina Zgromadzenia". */
     transport: string;
     /** Label of the stop reached (or, for `approaching`, about to be reached). */
     stop: string;

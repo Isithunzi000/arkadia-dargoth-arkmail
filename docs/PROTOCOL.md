@@ -282,7 +282,7 @@ po przecinku). ArkMail aliasów NIE tworzy — tylko odczyt i użycie.
 ```
 Masz nowa poczte od Foo.         (notification.mail; imię w dopełniaczu)
 Goniec przyniosl nowa partie listow. (other)
-Wysylasz <zwierze> na poczte.      (other; np. "Wysylasz kruka...")
+Wysylasz <zwierze> na poczte.      (other; np. "Wysylasz sowa...")
 ```
 
 `Goniec przyniosl ...` to generyczny komunikat otoczenia serwera (ktoś
