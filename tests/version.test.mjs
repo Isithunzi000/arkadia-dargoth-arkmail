@@ -149,7 +149,8 @@ test('dokumentacja: README opisuje odswiezanie i grupowanie listow', () => {
   assert.match(readme, /osobie, temacie, treści i dacie/);
   assert.match(readme, /Puste pola i przycisk Szukaj odświeżają aktywną skrzynkę/);
   assert.match(readme, /W Usuwaniu przycisk Odswiez ponawia ostatnie wyszukiwanie/);
-  assert.match(readme, /powtórzone wpisy tego samego listu/);
+  assert.match(readme, /traktujemy\s+jak osobne listy/);
+  assert.match(readme, /każde wystąpienie ze swoją treścią i jako osobny/);
   assert.match(readme, /pusta lub błędna data nie oznacza zniknięcia listu/);
 });
 

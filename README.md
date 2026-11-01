@@ -50,9 +50,11 @@ operację — pobieranie treści i zapis ZIP nie uruchamia indeksacji:
    zapisanych i pominiętych listów).
 3. Zapis ZIP — archiwum na dysku.
 
-Archiwum łączy powtórzone wpisy tego samego listu i liczy je raz; treść
-w jednym z powiązanych wpisów wystarcza dla całej grupy. Komunikat
-wyjaśnia też, że pusta lub błędna data nie oznacza zniknięcia listu.
+Listy o identycznych metadanych (ta sama osoba, temat i data) traktujemy
+jak osobne listy: tyle razy, ile serwer wylistował taki wpis, tyle razy
+występuje w archiwum — każde wystąpienie ze swoją treścią i jako osobny
+plik w zapisie ZIP. Komunikat wyjaśnia też, że pusta lub błędna data nie
+oznacza zniknięcia listu.
 
 **Usuwanie listów.** Pobiera jeden wynik z wybranej skrzynki; można go
 zawęzić filtrami, zaznaczyć wiele pozycji i usunąć po potwierdzeniu.
@@ -61,12 +63,16 @@ wyszukiwanie.
 
 ## Znane ograniczenia
 
-- Dwa listy o identycznych metadanych (nadawca, temat, data) są w widoku
-  skrzynki liczone jako jeden; treść obu nadal dostępna po rozwinięciu
-  paginacji archiwum.
 - Przy ponad 50 listach dziennie paginacja "Wczytaj starsze" może
-  przeskoczyć dzień bez listów — wynik zależy od kotwicy liczonej
-  po stronie serwera.
+  przeskoczyć dzień, w którym było ich więcej — serwer nie pokazuje
+  takiego dnia w całości i w archiwum brakuje danych z niego. Wtyczka
+  wykrywa taką lukę i mówi, z którego dnia brakuje.
+- Numer listu jest ulotny: po dodaniu lub skasowaniu listu serwer
+  przenumerowuje skrzynkę. Wtyczka paruje wpisy po treści i metadanych,
+  więc fizyczna tożsamość listu między osobnymi sesjami bywa nie do
+  ustalenia.
+- Między pokazaniem listy a kliknięciem ktoś mógł ją skasować — wtedy
+  wtyczka odświeża widok i informuje, zamiast otwierać pusty ekran.
 
 ## Licencja
 
