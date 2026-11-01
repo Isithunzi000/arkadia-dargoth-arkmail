@@ -6,8 +6,8 @@ archiwum i pisanie listów.
 ## Instalacja
 
 1. Otwórz klienta Dargoth.
-2. Dodaj wtyczkę z adresu
-   [https://isithunzi000.github.io/arkadia-dargoth-arkmail/arkmail.js](https://isithunzi000.github.io/arkadia-dargoth-arkmail/arkmail.js).
+2. Dodaj wtyczkę z adresu:
+   [https://isithunzi000.github.io/arkadia-dargoth-arkmail/arkmail.js](https://isithunzi000.github.io/arkadia-dargoth-arkmail/arkmail.js)
 3. W grze wpisz `/arkmail`, aby otworzyć okno poczty.
 
 ## Aktualizacje
