@@ -25,7 +25,7 @@ randomowe — nie pochodzą z żadnej postaci.
 
 Linie pocztowe przychodzą z klasami: `mail` (listingi, listy, pager),
 `editor.mail` (edytor, numeracja linii), `notification.mail` (nowa poczta).
-Część komunikatów ma klasę `other` (`Goniec przyniosl...`, `Wysylasz ...`).
+Część komunikatów ma klasę `other` (np. `Wysylasz ...`).
 Klasa jest wskazówką, NIE gwarancją — parser rozpoznaje po treści.
 
 **Uwaga na prefix klienta:** klient Dargoth dokleja `[ POCZTA ] ` do linii
@@ -281,12 +281,9 @@ po przecinku). ArkMail aliasów NIE tworzy — tylko odczyt i użycie.
 
 ```
 Masz nowa poczte od Foo.         (notification.mail; imię w dopełniaczu)
-Goniec przyniosl nowa partie listow. (other)
 Wysylasz <zwierze> na poczte.      (other; np. "Wysylasz sowa...")
 ```
 
-`Goniec przyniosl ...` to generyczny komunikat otoczenia serwera (ktoś
-dopiero co wysłał listy w świecie gry), nie zdarzenie z listem gracza.
 `<zwierze>` zależy od gracza — komenda `wyslij zwierze` wysyła zwierzę
 właściciela (kruk, sowa, gołąb itp.), a serwer odmienia jego nazwę.
 

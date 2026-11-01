@@ -72,7 +72,6 @@ export interface MailAliasDef {
 
 export type MailNotification =
   | { kind: 'nowa-poczte'; nadawca: string }
-  | { kind: 'goniec' }
   | { kind: 'wysylasz'; zwierze: string }
   | { kind: 'powrot-zwierzecia'; zwierze: string }
   | { kind: 'list-wyslany' }

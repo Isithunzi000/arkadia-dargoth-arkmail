@@ -2257,9 +2257,6 @@ export async function init(api: PluginApi) {
       if (ui.state.notifyEnabled) notify(api, `Masz nowa poczte od ${n.nadawca}.`);
       scheduleRefresh(["odebrane", "nieprzeczytane"]);
       scheduleDelayedInboxRefresh();
-    } else if (n.kind === "goniec") {
-      scheduleRefresh(["odebrane", "nieprzeczytane"]);
-      scheduleDelayedInboxRefresh();
     } else if (n.kind === "wysylasz") {
       // Fala 13b: gracz wyslal zwierze recznie (komenda w gre) -
       // uzbrajamy lot, zeby przycisk nie zrobil duplikatu w locie.

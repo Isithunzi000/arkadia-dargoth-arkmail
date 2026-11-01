@@ -203,7 +203,6 @@ export function parseNotification(text: string): MailNotification | null {
   const t = stripClientPrefix(text);
   const nowa = t.match(/^Masz nowa poczte od ([A-Za-z]+)\.$/);
   if (nowa) return { kind: 'nowa-poczte', nadawca: nowa[1] };
-  if (t === 'Goniec przyniosl nowa partie listow.') return { kind: 'goniec' };
   const wysylasz = t.match(/^Wysylasz ([A-Za-z]+) na poczte\.$/);
   if (wysylasz) return { kind: 'wysylasz', zwierze: wysylasz[1] };
   // Powrot zwierzecia pocztowego (Fala 13b). Dwa warianty zaobserwowane

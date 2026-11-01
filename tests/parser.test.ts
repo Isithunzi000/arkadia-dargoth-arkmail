@@ -172,10 +172,9 @@ test('aliasy pocztowe: blok z naglowkiem i wpisami tabowanymi', () => {
 
 // --- powiadomienia --------------------------------------------------------
 
-test('powiadomienia: nowa poczte (z prefiksem klienta), goniec, wysylasz', () => {
+test('powiadomienia: nowa poczte (z prefiksem klienta), wysylasz', () => {
   assert.deepEqual(parseNotification('Masz nowa poczte od Foo.'), { kind: 'nowa-poczte', nadawca: 'Foo' });
   assert.deepEqual(parseNotification(' [ POCZTA ] Masz nowa poczte od Wibble.'), { kind: 'nowa-poczte', nadawca: 'Wibble' });
-  assert.deepEqual(parseNotification('Goniec przyniosl nowa partie listow.'), { kind: 'goniec' });
   assert.deepEqual(parseNotification('Wysylasz Sroka na poczte.'), { kind: 'wysylasz', zwierze: 'Sroka' });
   assert.deepEqual(parseNotification('Wysylasz Sroki na poczte.'), { kind: 'wysylasz', zwierze: 'Sroki' });
   // Fala 13b: powrot zwierzecia - dwa warianty z logow.
@@ -249,7 +248,6 @@ test('powiadomienia: linia po modyfikacji triggera klienta (prefix+suffix nowych
     kind: 'nowa-poczte',
     nadawca: 'Bar',
   });
-  assert.deepEqual(parseNotification('Goniec przyniosl nowa partie listow.\n'), { kind: 'goniec' });
 });
 
 test('listing: naglowek "Wybrane listy" (strona z filtrem/paginacji)', () => {

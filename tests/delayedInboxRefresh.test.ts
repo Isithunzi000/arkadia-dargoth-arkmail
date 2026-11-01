@@ -9,7 +9,7 @@
  * odswiezenia (identyczna ramka GMCP jest ignorowana), wiec nowy list
  * byl niewidoczny do recznego Odswiez (zgloszenie 2026-10-19, pkt 2/7).
  *
- * Kontrakt: po "nowa-poczte"/"goniec" plugin robi refresh natychmiast
+ * Kontrakt: po "nowa-poczte" plugin robi refresh natychmiast
  * (jak dotad) PLUS jeden opozniony retry po ~10 s (i kolejny po ~25 s),
  * zeby zlapac list po lagu serwera. Retry koalescuja z innymi
  * odswiezeniami przez scheduleRefresh (zbiornik).
