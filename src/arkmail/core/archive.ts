@@ -86,7 +86,7 @@ export const BOX_RANK: Record<MailBox, number> = {
 };
 
 /** FNV-1a 32-bit, hex - deterministyczny skrot bez zaleznosci. */
-function fnv1a(input: string): string {
+export function fnv1a(input: string): string {
   let h = 0x811c9dc5;
   for (let i = 0; i < input.length; i++) {
     h ^= input.charCodeAt(i);
@@ -123,6 +123,29 @@ export function occurrenceCount(letter: ArchiveLetter): number {
 /** Wszystkie przeczytane tresci wystapien: body + extraBodies, bez dedupu. */
 export function bodiesOf(letter: ArchiveLetter): string[][] {
   return [letter.body, ...(letter.extraBodies ?? [])];
+}
+
+/**
+ * Fala 35: nadpisuje liczbe wystapien rekordow skrzynki o danym
+ * kluczu tresci wynikiem listingu (NIE sumuje). Klucz jest
+ * jednodniowy (dataRaw wchodzi w sklad), wiec jedna strona paginacji
+ * pokazuje wszystkie jego wystapienia. Zwraca nowa tablice i liczbe
+ * zmienionych rekordow.
+ */
+export function setOccurrences(
+  existing: readonly ArchiveLetter[],
+  box: MailBox,
+  contentKey: string,
+  count: number,
+): { letters: ArchiveLetter[]; changed: number } {
+  let changed = 0;
+  const letters = existing.map((l) => {
+    if (l.box !== box || contentKeyOf(l) !== contentKey) return l;
+    if ((l.occurrences ?? 1) === count) return l;
+    changed += 1;
+    return { ...l, occurrences: count };
+  });
+  return { letters, changed };
 }
 
 /**

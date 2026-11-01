@@ -46,6 +46,7 @@ import {
   normalizeArchive,
   purgeGoneLetters,
   purgeGoneLettersNewerThan,
+  setOccurrences,
   upsertLetters,
   type ArchiveLetter,
 } from "./core/archive";
@@ -1050,13 +1051,30 @@ export async function init(api: PluginApi) {
             ui.setBusy(`Indeksuje skrzynke ${box} (${i + 1}/${INDEX_BOXES.length})...`);
             const seen = new Set<string>();
             const sweepMode = indexSweepMode(ui.state.indexMeta, box, Date.now());
-            const mergeIndexPage = (res: Extract<MailboxResult, { kind: "lista" }>) => {
+            // Fala 35: wynik listingu nadpisuje occurrences (najswiezsza
+            // strona pokazujaca klucz), nigdy nie sumuje.
+            const mergeIndexPage = (
+              res: Extract<MailboxResult, { kind: "lista" }>,
+              fresh: ReadonlyMap<string, number>,
+            ) => {
               const entries = res.entries.map((entry) => fromMailboxEntry(box, entry));
               for (const entry of entries) seen.add(entry.id);
               const merged = upsertLetters(ui.state.archive, entries);
-              ui.setArchive(merged.letters);
+              // Po upsert: wystapienia dopiero teraz, gdy rekordy klucza
+              // istnieja (nowe wchodza z occurrences = 1, wynik listingu
+              // nadpisuje).
+              let letters = merged.letters;
+              let occurrenceChanged = false;
+              for (const [key, count] of fresh) {
+                const applied = setOccurrences(letters, box, key, count);
+                if (applied.changed > 0) {
+                  letters = applied.letters;
+                  occurrenceChanged = true;
+                }
+              }
+              ui.setArchive(letters);
               persistArchive();
-              return merged;
+              return { ...merged, occurrenceChanged };
             };
             const applyFirstIndexPage = (res: Extract<MailboxResult, { kind: "lista" }>): void => {
               stampEntries(box, res.entries);
@@ -1081,7 +1099,9 @@ export async function init(api: PluginApi) {
               onBaseRefresh: (res) => {
                 if (res.kind === "lista") {
                   applyFirstIndexPage(res);
-                  mergeIndexPage(res);
+                  // Baza = swieza strona pierwsza: klucze juz policzone
+                  // przy pierwszym przejsciu - bez rekontowania.
+                  mergeIndexPage(res, NO_FRESH);
                 } else {
                   bumpCtx(box);
                   ui.applyMailbox(box, res);
@@ -1095,7 +1115,7 @@ export async function init(api: PluginApi) {
                   rebuildContacts();
                 }
               },
-              onPage: (res, pages) => {
+              onPage: (res, pages, fresh) => {
                 ui.setIndexRun({ boxIndex: i, box, pages });
                 if (pages === 1) {
                   applyFirstIndexPage(res);
@@ -1103,11 +1123,16 @@ export async function init(api: PluginApi) {
                   stampEntries(box, res.entries);
                   ui.appendMailboxPage(box, res.entries, res.header.truncated);
                 }
-                const merged = mergeIndexPage(res);
+                const merged = mergeIndexPage(res, fresh);
                 rebuildContacts();
                 return {
                   archiveAdded: merged.added,
-                  stop: sweepMode === "incremental" && merged.added === 0,
+                  // Fala 35: nowy blizniak przy istniejacym kluczu to
+                  // zmiana occurrences - przeglad leci dalej.
+                  stop:
+                    sweepMode === "incremental" &&
+                    merged.added === 0 &&
+                    !merged.occurrenceChanged,
                 };
               },
             });
@@ -1337,6 +1362,9 @@ export async function init(api: PluginApi) {
   };
 
   /** Flaga biezacej petli pobierania tresci (jedna na raz; null = brak). */
+  /** Fala 35: pusty wynik liczenia dla sciezek bez danych per strona. */
+  const NO_FRESH: ReadonlyMap<string, number> = new Map();
+
   let archiveDownloadFlag: { cancelled: boolean } | null = null;
 
   /**
