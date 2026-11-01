@@ -89,7 +89,7 @@ export async function scanMailboxPages(options: PageScanOptions): Promise<PageSc
   // Fala 35: liczba wierszy klucza widziana w skanie (wynik
   // listingu; wszystkie wystapienia klucza siedza na jednej stronie,
   // bo klucz jest jednodniowy). Ponowne pokazanie tych samych wierszy
-  // (serwer muli / sonda sciany) nie zmienia liczby.
+  // (serwer odpowiada wolno / sonda sciany) nie zmienia liczby.
   const seenCounts = new Map<string, number>();
   const freshCounts = new Map<string, number>();
   const all: MailboxEntry[] = [];
@@ -132,7 +132,7 @@ export async function scanMailboxPages(options: PageScanOptions): Promise<PageSc
     // Fala 35: wystapienia = wiersze klucza na NAJSWIEZSZEJ stronie
     // go pokazujacej (wynik listingu, semantyka nadpisania). Blizniaki
     // licza sie wielokrotnie; ponowne pokazanie tych samych wierszy
-    // (sonda sciany / serwer muli) przy tej samej liczbie nie doklada.
+    // (sonda sciany / serwer odpowiada wolno) przy tej samej liczbie nie doklada.
     const rowsPerKey = new Map<string, number>();
     for (const entry of result.entries) {
       // Fala 35: klucz zgodny z contentKeyOf archiwum (fnv1a) -
@@ -161,7 +161,7 @@ export async function scanMailboxPages(options: PageScanOptions): Promise<PageSc
         return day !== null && day < excludedDay;
       });
       if (!reachedOlderDay) {
-        return finish('incomplete', 'serwer chwilowo muli - sprobuj ponownie za chwile');
+        return finish('incomplete', 'serwer chwilowo odpowiada wolno - sprobuj ponownie za chwile');
       }
       addGap(probeDay);
     }
@@ -202,7 +202,7 @@ export async function scanMailboxPages(options: PageScanOptions): Promise<PageSc
         result = await options.fetchPage(olderListingCommand(box, oldestDuplicate.date));
         continue;
       }
-      return finish('incomplete', 'serwer chwilowo muli - sprobuj ponownie za chwile');
+      return finish('incomplete', 'serwer chwilowo odpowiada wolno - sprobuj ponownie za chwile');
     }
 
     anchorRetries = 0;

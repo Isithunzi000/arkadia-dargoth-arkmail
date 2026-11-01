@@ -8,6 +8,8 @@
  *  - znakow "·" i "—" (czcionki mudowate; UI jest ASCII).
  * Dotyczy wszystkich linii zrodla - komunikatow i komentarzy (jeden
  * standard slownictwa w calym kodzie, bez wyjatkow "bo tylko komentarz").
+ * Fala 38: porownanie bez rozrozniania wielkosci liter - wielka litera
+ * na poczatku zdania nie omija juz guarda.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -46,7 +48,7 @@ test('audyt: zakazane slowa i znaki nie wystepuja w src/', () => {
     const lines = text.split('\n');
     lines.forEach((line, index) => {
       for (const [banned, hint] of BANNED) {
-        if (line.includes(banned)) {
+        if (line.toLowerCase().includes(banned.toLowerCase())) {
           hits.push(`${file.split('/src/')[1]}:${index + 1}: "${banned}" (${hint})`);
         }
       }

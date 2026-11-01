@@ -94,7 +94,7 @@ export const INDEX_PACE_MS = PAGE_PACE_MS;
  * pauza (2,5 s, potem 4 s) + klepniecie listingu bazowego (odswieza
  * kontekst listingu serwera, Fala 14f: jeden globalny listing) i
  * dopiero powtorka kotwicy. Duplikat po wyczerpaniu prob = serwer
- * muli, skrzynka pomijana.
+ * odpowiada wolno, skrzynka pomijana.
  */
 export const INDEX_ANCHOR_RETRY_WAITS_MS = ANCHOR_RETRY_WAITS_MS;
 /**
@@ -1167,7 +1167,7 @@ export async function init(api: PluginApi) {
             rebuildContacts();
             notify(
               api,
-              `Zindeksowano wszystkie skrzynki (listow w bazie: ${totalLive(ui.state.archive)}).`,
+              `Zindeksowano wszystkie skrzynki (${formatListCount(totalLive(ui.state.archive))} w bazie).`,
             );
           } else {
             rebuildContacts();
@@ -1642,7 +1642,7 @@ export async function init(api: PluginApi) {
             notify(
               api,
               "Przerwano pobieranie - lista na serwerze nie zgadza sie z baza. " +
-                "Zindeksuj skrzynki od nowa i sprobuj ponownie.",
+                "Indeksuj skrzynki od nowa i sprobuj ponownie.",
             );
           } else if (breakerTripped) {
             notify(
@@ -1653,7 +1653,7 @@ export async function init(api: PluginApi) {
           } else if (flag.cancelled) {
             notify(api, `Przerwano pobieranie tresci (pobrano: ${done} z ${total}).`);
           } else if (failed === 0 && missing === 0) {
-            notify(api, `Pobrano tresci do archiwum (listow: ${done}).`);
+            notify(api, `Pobrano tresci do archiwum (${formatListCount(done)}).`);
           } else {
             const parts: string[] = [];
             if (failed > 0) parts.push(`nieudane: ${failed}`);
@@ -1699,7 +1699,7 @@ export async function init(api: PluginApi) {
     notify(
       api,
       ok
-        ? `Zapisano listy do ZIP (plikow: ${entries.length})` +
+        ? `Zapisano listy do ZIP (${entries.length} ${entries.length === 1 ? 'plik' : 'plikow'})` +
             (skipped > 0 ? `; pominietych bez tresci: ${skipped}` : "") +
             "."
         : "Nie udalo sie zapisac pliku - klient nie obsluguje pobierania.",
@@ -2084,7 +2084,7 @@ export async function init(api: PluginApi) {
             );
             ui.setArchive(merged.letters);
             persistArchive();
-            notify(api, `Wyniki szukania (listow: ${res.entries.length}).`);
+            notify(api, `Wyniki szukania (${formatListCount(res.entries.length)}).`);
           } else {
             notify(api, "Brak pasujacych listow.");
           }

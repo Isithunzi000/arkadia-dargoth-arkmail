@@ -4,7 +4,7 @@
  * baza = pierwsze 50 wpisow i liczniki klamaly).
  * - brama Kontaktow: bez kompletnego indeksu przycisk "Indeksuj
  *   wszystkie skrzynki" zamiast mylacych licznikow; po indeksacji
- *   dotychczasowy widok + stopka "Zindeksowano ...; listow w bazie: N".
+ *   dotychczasowy widok + stopka "Zindeksowano ...; N listow w bazie".
  * - indeksacja: kompletny listing kazdej skrzynki (z paginacja
  *   kotwiczaca jak "Wczytaj wszystkie") dokleja wszystko do archiwum,
  *   oznacza znikniete z serwera i stawia flage per skrzynka.
@@ -216,7 +216,7 @@ test('Indeksuj wszystkie: paginacja kotwicowa, flagi, gone-marking, odblokowanie
     } | null;
     assert.ok(foot, 'opis indeksacji');
     assert.match(String(foot.textContent ?? ''), /^Kompletna indeksacja od: 20\d\d-\d\d-\d\d/);
-    assert.ok(String(foot.textContent ?? '').includes('listow w bazie: 3'), 'rozmiar bazy');
+    assert.ok(String(foot.textContent ?? '').includes('3 listy w bazie'), 'rozmiar bazy');
   } finally {
     await stopHarness();
   }

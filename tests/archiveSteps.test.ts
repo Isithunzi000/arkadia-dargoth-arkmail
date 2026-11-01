@@ -73,7 +73,7 @@ test('archiwum: czesciowy indeks pozwala zapisac dostepne tresci z ostrzezeniem'
     click(h, '.arkmail-arch-export');
     await waitRt(() => captured.length === 1, 'zapis czesciowego ZIP');
     assert.deepEqual(h.f.sent, []);
-    assert.ok(notifyText(h.f, 'plikow: 1'));
+    assert.ok(notifyText(h.f, 'Zapisano listy do ZIP (1 plik)'));
     assert.ok(notifyText(h.f, 'pominietych bez tresci: 1'));
     const steps = Array.from(h.content.querySelectorAll('.arkmail-archive-step')).map((step) =>
       String((step as { textContent?: string }).textContent ?? ''),

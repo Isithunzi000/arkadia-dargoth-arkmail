@@ -165,7 +165,7 @@ test('total: stopka indeksacji liczy zywe grupy (blizniak raz), nie surowe rekor
     } | null;
     assert.ok(foot, 'stopka istnieje');
     assert.ok(
-      String(foot!.textContent).includes('listow w bazie: 1'),
+      String(foot!.textContent).includes('1 list w bazie'),
       `stopka: ${foot!.textContent}`,
     );
   } finally {

@@ -161,7 +161,7 @@ test('blizniaki: baza chce wiecej wystapien niz pokazuje listing = indeksuj od n
       'pobieranie: swiezy listing skrzynki',
     );
     replayTwinListing(h);
-    await waitRt(() => notifyText(h.f, 'Zindeksuj'), 'komunikat o ponownej indeksacji');
+    await waitRt(() => notifyText(h.f, 'Indeksuj skrzynki od nowa'), 'komunikat o ponownej indeksacji');
     assert.ok(
       !h.f.sent.some((c) => c.startsWith('przeczytaj list')),
       'zero odczytow przy niespójnej bazie',

@@ -148,7 +148,7 @@ test('skrzynka z mieleniem kotwicy: 3 proby z klepnieciem + sonda wykluczajaca d
     // Fala 24d: kazdy duplikat strony dostaje probe: pauza (2,5 s, potem
     // 4 s) + klepniecie listingu bazowego (odswieza kontekst serwera),
     // dopiero potem powtorka kotwicy. Trzy proby; czwarty duplikat
-    // z rzedu = serwer muli, skrzynka pomijana.
+    // z rzedu = serwer odpowiada wolno, skrzynka pomijana.
     const proba = async (nr: number) => {
       replaySameWyslane(); // duplikat strony kotwicowej (freshCount 0)
       await waitRt(
@@ -174,7 +174,7 @@ test('skrzynka z mieleniem kotwicy: 3 proby z klepnieciem + sonda wykluczajaca d
       () => f.sent.includes('listy wyslane przed 20 XII 2025'),
       'sonda wykluczajaca dzien graniczny (Fala 26c)',
     );
-    replaySameWyslane(); // serwer ignoruje wykluczenie dnia = muli naprawde
+    replaySameWyslane(); // serwer ignoruje wykluczenie dnia = odpowiada wolno naprawde
     // niewyslane: puste - pominiecie wyslanych nie moze zabic petli.
     // (prolog NIE pobiera niewyslanych - pierwsze 'listy niewyslane'
     // jest z indeksacji).
@@ -184,7 +184,7 @@ test('skrzynka z mieleniem kotwicy: 3 proby z klepnieciem + sonda wykluczajaca d
     // nadal zamknieta (3/4 flagi). Fala 20c: powod PO LUDZKU, zero
     // zargonu ("kotwica", "postep") w komunikatach dla gracza.
     await waitRt(
-      () => notifyText(f, 'pominiete: wyslane (serwer chwilowo muli - sprobuj ponownie za chwile)'),
+      () => notifyText(f, 'pominiete: wyslane (serwer chwilowo odpowiada wolno - sprobuj ponownie za chwile)'),
       'raport z powodem pomieciecia',
     );
     assert.ok(
@@ -351,7 +351,7 @@ test('ponad 50 listow jednego dnia: starsze dni sa pobierane, a luka jest zapisa
   // wszystkie wpisy z 20 XII) - kotwica "przed 21 XII" strukturalnie
   // zwraca TA SAMA strone (serwer wyklucza tylko dzien graniczny),
   // wiec strażnik mielenia pomijal skrzynke z komunikatem "serwer
-  // chwilowo muli", mimo ze dane byly kompletne. Fala 26c: po
+  // chwilowo odpowiada wolno", mimo ze dane byly kompletne. Fala 26c: po
   // wyczerpaniu prob z klepnieciem plugin strzela sonde kotwica
   // WYKLUCZAJACA dzien graniczny ("przed 20 XII"). Swieze starsze
   // wpisy = to byla sciana, nie mielenie - paginacja jedzie dalej.
@@ -419,7 +419,7 @@ test('ponad 50 listow jednego dnia: starsze dni sa pobierane, a luka jest zapisa
     await waitRt(() => notifyText(f, 'Indeksowanie niekompletne'), 'uczciwy raport');
     assert.ok(notifyText(f, 'ponad 50 listow z dnia 2025-12-20'), 'raport wskazuje luke');
     assert.ok(!notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'brak falszywego kompletu');
-    assert.ok(!notifyText(f, 'muli'), 'bez falszywego komunikatu o mieleniu');
+    assert.ok(!notifyText(f, 'odpowiada wolno'), 'bez falszywego komunikatu o wolnym serwerze');
     // Opozniony retry skrzynki odbiorczej z prologu (test > 10 s).
     await waitRt(
       () => f.sent.filter((c) => c === 'listy odebrane').length === 3,
@@ -449,7 +449,7 @@ test('ponad 50 listow jednego dnia bez starszych wpisow: luka, nie komplet', asy
   // dzien graniczny dostaje pusta odpowiedz wariantem filtrowanym
   // ("Nie znaleziono..."), co jest kompletna prawda o skrzynce
   // (Fala 19a). Skrzynka dostaje flage, raport koncowy jest pelny -
-  // zadne "pominiete: wyslane (serwer chwilowo muli...)".
+  // zadne "pominiete: wyslane (serwer chwilowo odpowiada wolno...)".
   const h = await startHarness();
   const { f } = h;
   try {
@@ -509,7 +509,7 @@ test('ponad 50 listow jednego dnia bez starszych wpisow: luka, nie komplet', asy
     await waitRt(() => notifyText(f, 'Indeksowanie niekompletne'), 'uczciwy raport');
     assert.ok(notifyText(f, 'ponad 50 listow z dnia 2025-12-20'), 'raport wskazuje luke');
     assert.ok(!notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'brak falszywego kompletu');
-    assert.ok(!notifyText(f, 'muli'), 'bez falszywego komunikatu o mieleniu');
+    assert.ok(!notifyText(f, 'odpowiada wolno'), 'bez falszywego komunikatu o wolnym serwerze');
     click(h, '[data-tab="kontakty"]');
     await waitRt(() => !!h.content.querySelector('.arkmail-index-gaps'), 'zapisana luka w widoku');
     assert.ok(textOf(h, '.arkmail-index-gaps').includes('wyslane: 2025-12-20'), 'dzien i skrzynka luki');

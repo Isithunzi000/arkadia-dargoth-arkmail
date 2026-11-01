@@ -53,7 +53,7 @@ export function matchSelectionOnFreshListing(
 /**
  * Fizycznie usuwa lokalne rekordy skasowane na serwerze (Fala 28 -
  * wczesniej: flaga missingOnServer, rekord siedzial w bazie wiecznie
- * i totalne liczniki klamaly). Znikniecie calej tozsamosci wymaga
+ * i totalne liczniki klamaly). Usuniecie calej tozsamosci wymaga
  * usuniecia wszystkich kopii widocznych na swiezym wyniku.
  */
 export function applyConfirmedDeletions(

@@ -1391,10 +1391,10 @@ export function mountMailUi(
     // Fala 28: ta sama miara co pasek archiwum (totalLive - zywe
     // grupy po deduplikacji blizniakow), nie surowa dlugosc bazy.
     foot.textContent = state.indexRun
-      ? `Indeksowanie trwa: ${state.indexRun.box} (${state.indexRun.boxIndex + 1}/${INDEX_BOXES.length}), stron: ${state.indexRun.pages} | listow w bazie: ${totalLive(state.archive)}`
+      ? `Indeksowanie trwa: ${state.indexRun.box} (${state.indexRun.boxIndex + 1}/${INDEX_BOXES.length}), stron: ${state.indexRun.pages} | ${formatListCount(totalLive(state.archive))} w bazie`
       : allBoxesIndexed(state.indexMeta)
-        ? `Kompletna indeksacja od: ${dates[0]!.slice(0, 10)} | listow w bazie: ${totalLive(state.archive)}`
-        : `Indeksacja niekompletna | listow w bazie: ${totalLive(state.archive)}`;
+        ? `Kompletna indeksacja od: ${dates[0]!.slice(0, 10)} | ${formatListCount(totalLive(state.archive))} w bazie`
+        : `Indeksacja niekompletna | ${formatListCount(totalLive(state.archive))} w bazie`;
     pane.appendChild(foot);
     const gaps = INDEX_BOXES.flatMap((box) =>
       (state.archiveGaps[box] ?? []).map((day) => `${box}: ${day}`),
@@ -1402,7 +1402,7 @@ export function mountMailUi(
     if (gaps.length > 0) {
       const gapNote = doc.createElement('div');
       gapNote.className = 'arkmail-dim arkmail-index-gaps';
-      gapNote.textContent = `Niedostepne przez limit serwera - ${gaps.join(', ')}`;
+      gapNote.textContent = `Brakuje danych z dni: ${gaps.join(', ')}`;
       pane.appendChild(gapNote);
     }
     // Fala 18c (zgloszenie 2026-10-20 pkt 1): kontakty liczone z
@@ -1839,7 +1839,7 @@ export function mountMailUi(
           const n = occurrenceCount(l);
           meta.textContent =
             n > 1
-              ? `${dir} ${l.party} | ${l.box} | ${n} ${n === 2 ? 'listy' : 'listow'}`
+              ? `${dir} ${l.party} | ${l.box} | ${formatListCount(n)}`
               : `${dir} ${l.party} | ${l.box}`;
           row.appendChild(meta);
           // Fala 16h: archiwum klikalne (zgloszenie pkt 9) - tresc

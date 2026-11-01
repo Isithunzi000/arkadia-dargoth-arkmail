@@ -155,3 +155,21 @@ test('archiwum: rekord pojedynczy bez zmian (bez licznika i rozwijania)', () => 
     m.off();
   }
 });
+
+test('archiwum: liczebnik wystapien poprawny dla 3, 4 i 5 (Fala 38)', () => {
+  for (const [n, expected, wrong] of [
+    [3, '3 listy', '3 listow'],
+    [4, '4 listy', '4 listow'],
+    [5, '5 listow', ''],
+  ] as const) {
+    const twin = withOccurrenceBodies(archived({ id: `t-n${n}` }), Array.from({ length: n }, () => ['Tresc.']));
+    const m = mount([twin]);
+    try {
+      const rowText = text(m.container, '.arkmail-arch-entry');
+      assert.ok(rowText.includes(expected), `forma liczebnika dla ${n}: "${rowText}"`);
+      if (wrong) assert.ok(!rowText.includes(wrong), `forma odrzucona dla ${n}: "${rowText}"`);
+    } finally {
+      m.off();
+    }
+  }
+});

@@ -315,7 +315,7 @@ test('archiwum: Zapisz wszystkie (ZIP) pobiera pliki TXT, puste archiwum = toast
       names.every((n) => n.startsWith('odebrane/') && n.endsWith('.txt')),
       'foldery per skrzynka',
     );
-    assert.ok(notifyText(f, 'Zapisano listy do ZIP (plikow: 3)'), 'toast podsumowania');
+    assert.ok(notifyText(f, 'Zapisano listy do ZIP (3 plikow)'), 'toast podsumowania');
   } finally {
     setDownloadImpl(null);
     captured.length = 0;

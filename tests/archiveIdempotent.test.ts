@@ -185,7 +185,7 @@ test('archiwum: blizniak nieprzeczytane/odebrane pobierany RAZ, tresc w obu reko
     replayLetter(h, 3, 'najstarszy', 'Tresc najstarszego.');
 
     // Dokladnie 3 odczyty (blizniak NIE jest pobierany drugi raz).
-    await waitRt(() => notifyText(f, 'Pobrano tresci do archiwum (listow: 3)'), 'podsumowanie');
+    await waitRt(() => notifyText(f, 'Pobrano tresci do archiwum (3 listy)'), 'podsumowanie');
     assert.equal(
       f.sent.filter((s) => s.startsWith('przeczytaj list')).length,
       3,

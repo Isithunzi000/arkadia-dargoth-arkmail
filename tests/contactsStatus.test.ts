@@ -45,10 +45,10 @@ test('status i luki sa nad kontaktami, a czyszczenie usuwa je z widoku i stanu',
       const status = container.querySelector('.arkmail-index-foot');
       assert.ok(status);
       assert.match(status.textContent ?? '', /Kompletna indeksacja od: 2026-01-01/);
-      assert.match(status.textContent ?? '', /listow w bazie: 1/);
+      assert.match(status.textContent ?? '', /1 list w bazie/);
       const gaps = container.querySelector('.arkmail-index-gaps');
       assert.ok(gaps);
-      assert.match(gaps.textContent ?? '', /wyslane: 2025-12-20/);
+      assert.match(gaps.textContent ?? '', /Brakuje danych z dni: wyslane: 2025-12-20/);
       const pane = container.querySelector('[data-pane-key="kontakty"]')!;
       const children = Array.from(pane.children);
       const statusIndex = children.indexOf(status);
