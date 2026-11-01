@@ -18,30 +18,7 @@ wersji widnieje w nagłówku okna.
 
 ## Użycie
 
-`/arkmail` otwiera i zamyka okno; reszta to przyciski i zakładki.
-Puste pola i przycisk Szukaj odświeżają aktywną skrzynkę; wpisanie
-filtrów uruchamia szukanie po stronie serwera: osobie, temacie, treści
-i dacie. Skrzynka nie kończy się na 50 — starsze listy wczytuje się
-przyciskiem na dole listy.
-
-Zakładka Usuwanie pobiera jeden wynik z wybranej skrzynki; można go
-zawęzić filtrami, zaznaczyć wiele pozycji i usunąć po potwierdzeniu.
-W Usuwaniu przycisk Odswiez ponawia ostatnie wyszukiwanie.
-
-**Archiwum.** Trzy niezależne kroki — pobieranie treści i zapis ZIP
-nie uruchamia indeksacji:
-
-1. Indeksacja — spis wszystkich listów postaci.
-2. Pobranie treści — pełne listy; gdy serwer części nie udostępni,
-   można zapisać częściowy ZIP (komunikat podaje liczby zapisanych
-   i pominiętych listów).
-3. Zapis ZIP — archiwum na dysku.
-
-Listy o identycznych metadanych (ta sama osoba, temat i data)
-traktujemy jak osobne listy: tyle razy, ile serwer wylistował taki
-wpis, tyle razy występuje w archiwum — każde wystąpienie ze swoją
-treścią i jako osobny plik w zapisie ZIP; pusta lub błędna data nie
-oznacza zniknięcia listu.
+`/arkmail` otwiera i zamyka okno pluginu.
 
 ## Licencja
 

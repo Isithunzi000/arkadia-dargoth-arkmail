@@ -97,13 +97,16 @@ test('dokumentacja: docelowy magazyn archiwum jest opisany jako IndexedDB', () =
   assert.doesNotMatch(protocol, /IndexedDB\s+swiadomie odlozone/);
 });
 
-test('dokumentacja: README opisuje trzy niezalezne kroki Archiwum', () => {
+// Fala 40 (zgloszenie 2026-11-01): sekcja Użycie zawiera WYlACZNIE
+// sposob uruchomienia (alias) - dawne akapity o szukajce, Usuwaniu,
+// Archiwum i metadanych-blizniakach wylecialy na rozkaz.
+test('dokumentacja: README Użycie opisuje tylko uruchomienie aliasem', () => {
   const readme = fs.readFileSync(path.join(REPO, 'README.md'), 'utf8');
-  assert.match(readme, /1\. Indeksacja/);
-  assert.match(readme, /2\. Pobranie treści/);
-  assert.match(readme, /3\. Zapis ZIP/);
-  assert.match(readme, /nie uruchamia indeksacji/);
-  assert.match(readme, /częściowy ZIP/);
+  const usage = readme.split('## Użycie')[1] ?? '';
+  assert.match(usage, /\/arkmail/);
+  assert.doesNotMatch(usage, /Zakładka Usuwanie/);
+  assert.doesNotMatch(usage, /identycznych metadanych/);
+  assert.doesNotMatch(usage, /1\. Indeksacja/);
 });
 
 // Fala 32: sekcja Licencja wspomina wylacznie licencje - wyjasnienia
@@ -137,15 +140,6 @@ test('dokumentacja: README nie odwoluje sie do assetu arkmail.zip', () => {
   assert.doesNotMatch(readme, /arkmail\.zip/);
 });
 
-test('dokumentacja: README opisuje odswiezanie i grupowanie listow', () => {
-  const readme = fs.readFileSync(path.join(REPO, 'README.md'), 'utf8').replace(/\s+/g, ' ');
-  assert.match(readme, /osobie, temacie, treści i dacie/);
-  assert.match(readme, /Puste pola i przycisk Szukaj odświeżają aktywną skrzynkę/);
-  assert.match(readme, /W Usuwaniu przycisk Odswiez ponawia ostatnie wyszukiwanie/);
-  assert.match(readme, /traktujemy\s+jak osobne listy/);
-  assert.match(readme, /każde wystąpienie ze swoją treścią i jako osobny/);
-  assert.match(readme, /pusta lub błędna data nie oznacza zniknięcia listu/);
-});
 
 test('dokumentacja: walidacja listu i filtrow jest opisana', () => {
   const protocol = fs.readFileSync(path.join(REPO, 'docs/PROTOCOL.md'), 'utf8');
