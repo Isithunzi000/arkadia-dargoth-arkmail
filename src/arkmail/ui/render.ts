@@ -15,9 +15,7 @@ import {
   type ListingSearch,
 } from '../core/protocol/commands.js';
 import {
-  bodiesOf,
   filterVisibleArchive,
-  occurrenceCount,
   type ArchiveFilter,
   type ArchiveLetter,
 } from '../core/archive.js';
@@ -69,13 +67,6 @@ export interface MailUiHandlers {
    * starsze montaze testowe go nie podaja (jak onClearCache).
    */
   onOpenArchiveLetter?(letter: ArchiveLetter): void;
-  /**
-   * Fala 35e: klik w konkretne wystapienie blizniaka (1-based) z
-   * rozwinięcia wiersza archiwum. Podglad tresci tego slotu albo
-   * doczyt z serwera (index.ts). Opcjonalny: starsze montaze
-   * testowe go nie podaja.
-   */
-  onOpenArchiveOccurrence?(letter: ArchiveLetter, occurrence: number): void;
   /**
    * Masowe pobieranie tresci do archiwum (Fala 16h). Start petli; w
    * trakcie petli drugi klik = Przerwij (jak onLoadAll). Opcjonalny:
@@ -1816,7 +1807,7 @@ export function mountMailUi(
           : 'Od dnia pozniej niz Do dnia - daty pomijane.';
         pane.insertBefore(err, list);
       }
-      // Fala 18a: blizniaki jednym wierszem, nieobecne ukryte (core).
+      // Fala 41: jeden wiersz na rekord, nieobecne ukryte (core).
       const rows = filterVisibleArchive(state.archive, effFilter);
       // Podpis filtra tresci: tresc zna tylko pobrane listy - bez
       // podpowiedzi filtr "milczaco" nic nie znajdowal (zgloszenie
@@ -1845,49 +1836,12 @@ export function mountMailUi(
           // Fala 9e: "od/do" zamiast nawiasow technicznych; skrzynka
           // po ludzku, z kierunkiem strony listu.
           const dir = l.box === 'odebrane' || l.box === 'nieprzeczytane' ? 'od' : 'do';
-          const n = occurrenceCount(l);
-          meta.textContent =
-            n > 1
-              ? `${dir} ${l.party} | ${l.box} | ${formatListCount(n)}`
-              : `${dir} ${l.party} | ${l.box}`;
+          meta.textContent = `${dir} ${l.party} | ${l.box}`;
           row.appendChild(meta);
           // Fala 16h: archiwum klikalne (zgloszenie pkt 9) - tresc
           // z cache albo doczyt z serwera po re-kotwicy (index.ts).
           row.addEventListener('click', () => handlers.onOpenArchiveLetter?.(l));
-          if (n <= 1) return [row];
-          // Fala 35e: blizniaki - przelacznik rozwija liste wystapien.
-          const toggle = doc.createElement('button');
-          toggle.className = 'arkmail-arch-expand arkmail-btn-reset';
-          toggle.textContent = 'Wystapienia';
-          const expanded = doc.createElement('div');
-          expanded.className = 'arkmail-arch-occ-list';
-          expanded.style.display = 'none';
-          const slots = bodiesOf(l);
-          for (let i = 0; i < n; i++) {
-            const line = doc.createElement('div');
-            line.className = 'arkmail-arch-occ';
-            const hasBody = (slots[i] && slots[i]!.length > 0) === true;
-            line.textContent = hasBody
-              ? `${i + 1}. tresc w bazie`
-              : `${i + 1}. brak tresci`;
-            if (hasBody) {
-              line.addEventListener('click', () =>
-                handlers.onOpenArchiveOccurrence?.(l, i + 1),
-              );
-            } else {
-              // Bez tresci: ta sama sciezka doczytu co klik w wiersz
-              // (re-kotwica + odczyt jednego wystapienia z serwera).
-              line.addEventListener('click', () => handlers.onOpenArchiveLetter?.(l));
-            }
-            expanded.appendChild(line);
-          }
-          toggle.addEventListener('click', (ev) => {
-            ev.stopPropagation();
-            const show = expanded.style.display === 'none';
-            expanded.style.display = show ? '' : 'none';
-            toggle.textContent = show ? 'Zwin' : 'Wystapienia';
-          });
-          return [row, toggle, expanded];
+          return [row];
         }),
       );
       if (rows.length === 0) {

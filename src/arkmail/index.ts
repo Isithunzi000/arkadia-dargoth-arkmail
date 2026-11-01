@@ -40,7 +40,6 @@ import {
 } from "./core/pagination";
 import { contactsFromArchive } from "./core/contacts";
 import {
-  bodiesOf,
   fromMailboxEntry,
   fromOpenedLetter,
   mergeListingPage,
@@ -1825,26 +1824,6 @@ export async function init(api: PluginApi) {
       }
       // Bez tresci: pseudo-wpis (ctx undefined -> zawsze re-kotwica po
       // dacie) i ta sama sciezka odczytu co klik w liste skrzynki.
-      openArchiveFromServer(letter);
-    },
-    onOpenArchiveOccurrence: (letter, occurrence) => {
-      // Fala 35e: podglad konkretnego wystapienia blizniaka (1-based).
-      // Slot z trescia otwiera sie z pamieci; pusty - doczyt z serwera
-      // (jedno wystapienie klucza, ta sama sciezka co klik w wiersz).
-      const slot = bodiesOf(letter)[occurrence - 1];
-      if (slot && slot.length > 0) {
-        const senderBox = letter.box === "odebrane" || letter.box === "nieprzeczytane";
-        ui.openLetter(letter.box, {
-          number: letter.number,
-          from: senderBox ? letter.party : "",
-          subject: letter.subject,
-          to: senderBox ? "" : letter.party,
-          cc: null,
-          date: letter.dateRaw,
-          body: slot,
-        });
-        return;
-      }
       openArchiveFromServer(letter);
     },
     onDownloadArchiveBodies: () => runArchiveDownload(),

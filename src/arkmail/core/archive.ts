@@ -586,28 +586,10 @@ export function purgeGoneLettersNewerThan(
 }
 
 /**
- * Reprezentant grupy blizniakow (Fala 18a): rekord z trescia wygrywa
- * (wiersz i otwarcie z cache), potem skrzynka kanoniczna (odebrane
- * przed nieprzeczytanymi - zombie po przeczytaniu nie rzadzi widokiem),
- * potem id (determinizm).
- */
-function representativeOf(group: ArchiveLetter[]): ArchiveLetter {
-  return [...group].sort(
-    (a, b) =>
-      Number(b.body.length > 0) - Number(a.body.length > 0) ||
-      BOX_RANK[a.box] - BOX_RANK[b.box] ||
-      (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-  )[0];
-}
-
-/**
- * Widok archiwum (Fala 18a, zgloszenie 2026-10-20 pkt 1/3): ten sam
- * list widoczny w kilku skrzynkach (nieprzeczytany jest i tu, i tu)
- * pokazuje sie JEDEN raz - grupa po kluczu tresci. Fala 28: rekordow
- * nieobecnych na serwerze w bazie nie ma wcale (fizyczny purge), wiec
- * zywosc nie jest sprawdzana. Filtr skrzynki i tresci dziala po
- * CA LEJ grupie (reszta filtrow po reprezentancie - party/temat/daty
- * sa w grupie identyczne).
+ * Widok archiwum (Fala 41): jeden wiersz na REKORD. Filtry dzialaja
+ * po polach samego rekordu (skrzynka, tresc, nadawca/adresat, osoba,
+ * temat, daty). Fala 28: rekordow nieobecnych na serwerze w bazie
+ * nie ma wcale (fizyczny purge), wiec zywosc nie jest sprawdzana.
  */
 const validArchiveDate = (value: string | undefined): string | undefined =>
   value !== undefined && fromISODate(value) !== null ? value : undefined;
@@ -618,35 +600,27 @@ export function filterVisibleArchive(
 ): ArchiveLetter[] {
   const odDaty = validArchiveDate(filter.odDaty);
   const doDaty = validArchiveDate(filter.doDaty);
-  const groups = new Map<string, ArchiveLetter[]>();
-  for (const l of letters) {
-    const key = contentKeyOf(l);
-    const arr = groups.get(key);
-    if (arr) arr.push(l);
-    else groups.set(key, [l]);
-  }
   const out: ArchiveLetter[] = [];
-  for (const group of groups.values()) {
-    if (filter.skrzynka !== undefined && !group.some((l) => l.box === filter.skrzynka)) continue;
+  for (const l of letters) {
+    if (filter.skrzynka !== undefined && l.box !== filter.skrzynka) continue;
     if (
       filter.tresc !== undefined &&
-      !group.some((l) => norm(l.body.join('\n')).includes(norm(filter.tresc!)))
+      !norm(l.body.join('\n')).includes(norm(filter.tresc!))
     )
       continue;
-    const rep = representativeOf(group);
     if (filter.od !== undefined) {
-      if (!SENDER_BOXES.has(rep.box)) continue;
-      if (!norm(rep.party).includes(norm(filter.od))) continue;
+      if (!SENDER_BOXES.has(l.box)) continue;
+      if (!norm(l.party).includes(norm(filter.od))) continue;
     }
     if (filter.do !== undefined) {
-      if (!RECIPIENT_BOXES.has(rep.box)) continue;
-      if (!norm(rep.party).includes(norm(filter.do))) continue;
+      if (!RECIPIENT_BOXES.has(l.box)) continue;
+      if (!norm(l.party).includes(norm(filter.do))) continue;
     }
-    if (filter.osoba !== undefined && !norm(rep.party).includes(norm(filter.osoba))) continue;
-    if (filter.temat !== undefined && !norm(rep.subject).includes(norm(filter.temat))) continue;
-    if (odDaty !== undefined && rep.sortKey.slice(0, 10) < odDaty) continue;
-    if (doDaty !== undefined && rep.sortKey.slice(0, 10) > doDaty) continue;
-    out.push(rep);
+    if (filter.osoba !== undefined && !norm(l.party).includes(norm(filter.osoba))) continue;
+    if (filter.temat !== undefined && !norm(l.subject).includes(norm(filter.temat))) continue;
+    if (odDaty !== undefined && l.sortKey.slice(0, 10) < odDaty) continue;
+    if (doDaty !== undefined && l.sortKey.slice(0, 10) > doDaty) continue;
+    out.push(l);
   }
   return out.sort(byNewest);
 }

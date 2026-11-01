@@ -152,10 +152,10 @@ test('archiwum: blizniak nieprzeczytane/odebrane - per rekord, kazdy z wlasna tr
     await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec listingu');
 
     click(h, '[data-tab="archiwum"]');
-    // Widok ZWIJA blizniaki do jednego wiersza (reprezentant grupy),
-    // ale w danych sa DWA rekordy i kazdy z nich jest kandydatem
-    // do pobrania (Fala 41: per rekord, nie per grupa).
-    assert.equal(archiveRows(h, 'najnowszy').length, 1, 'blizniak zwiniety do jednego wiersza');
+    // Widok per rekord (Fala 41): replica nieprzeczytana to OSOBNY
+    // rekord = osobny wiersz; w danych sa DWA rekordy i kazdy z nich
+    // jest kandydatem do pobrania (per rekord, nie per grupa).
+    assert.equal(archiveRows(h, 'najnowszy').length, 2, 'replica jako osobny wiersz');
 
     downloadBtn(h).dispatchEvent(new h.window.Event('click')); // uzbrojenie
     downloadBtn(h).dispatchEvent(new h.window.Event('click')); // start
@@ -212,7 +212,7 @@ test('archiwum: blizniak nieprzeczytane/odebrane - per rekord, kazdy z wlasna tr
       'kazdy rekord-blizniak pobrany osobno',
     );
 
-    // Tresc w cache rekordu reprezentanta (klik = podglad, zero komend).
+    // Tresc w cache kazdego rekordu (klik = podglad, zero komend).
     const base = f.sent.length;
     for (const row of archiveRows(h, 'najnowszy')) {
       row.dispatchEvent(new h.window.Event('click'));
