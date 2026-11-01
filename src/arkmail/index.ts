@@ -40,14 +40,17 @@ import {
 } from "./core/pagination";
 import { contactsFromArchive } from "./core/contacts";
 import {
+  bodiesOf,
   contentKeyOf,
   fromMailboxEntry,
   fromOpenedLetter,
   normalizeArchive,
+  occurrenceCount,
   purgeGoneLetters,
   purgeGoneLettersNewerThan,
   setOccurrences,
   upsertLetters,
+  withOccurrenceBodies,
   type ArchiveLetter,
 } from "./core/archive";
 import { totalLive } from "./core/archiveStats";
@@ -1397,9 +1400,11 @@ export async function init(api: PluginApi) {
       notify(api, SESSION_BUSY_MSG);
       return;
     }
-    // Najpierw grupujemy wszystkie dostepne rekordy. Tresc w jednym
-    // rekordzie blizniaka wystarcza dla calej grupy. Kandydat musi miec
-    // prawidlowa date, bo bez niej nie mozna odnalezc listu na serwerze.
+    // Najpierw grupujemy wszystkie dostepne rekordy. Blizniaki wspoldziela
+    // jeden rekord z occurrences slotami tresci (Fala 35) - grupa jest
+    // "do pobrania", dopoki CHOC JEDEN slot jest pusty. Kandydat musi
+    // miec prawidlowa date, bo bez niej nie mozna odnalezc listu na
+    // serwerze.
     const groups = new Map<string, ArchiveLetter[]>();
     for (const l of ui.state.archive) {
       const key = contentKeyOf(l);
@@ -1408,7 +1413,12 @@ export async function init(api: PluginApi) {
       else groups.set(key, [l]);
     }
     const pending = [...groups.values()].filter((group) =>
-      group.every((l) => l.body.length === 0),
+      group.every((l) => {
+        const slots = bodiesOf(l);
+        return (
+          slots.length < occurrenceCount(l) || slots.some((b) => b.length === 0)
+        );
+      }),
     );
     const candidates = pending.filter((group) => {
       const dateRaw = group[0]!.dateRaw;
@@ -1449,8 +1459,30 @@ export async function init(api: PluginApi) {
         // resetuja licznik, bo dowodza, ze polaczenie zyje.
         let consecutiveErrors = 0;
         let breakerTripped = false;
+        // Fala 35c: grupy jednowystapieniowe ida stara sciezka
+        // (re-kotwica + jeden odczyt); wielowystapieniowe swiezym
+        // listingiem skrzynki z odczytem kazdego wiersza klucza.
+        const singles = candidates.filter((g) => occurrenceCount(g[0]!) === 1);
+        const multis = candidates.filter((g) => occurrenceCount(g[0]!) > 1);
+        // Fala 35c: listing pokazal mniej wystapien niz baza (albo
+        // skan sie nie domknal) = baza nieswieza; dalsze pobieranie
+        // bez ponownej indeksacji nie jest bezpieczne.
+        let reindexNeeded = false;
+        const reportProgress = (): void => {
+          const processed = done + failed + missing;
+          const now = Date.now();
+          const dt = now - lastAt;
+          lastAt = now;
+          emaMs = emaMs === null ? dt : 0.3 * dt + 0.7 * emaMs;
+          const etaMs =
+            processed >= 3 && emaMs !== null
+              ? Math.max(1000, Math.round(emaMs * (total - processed)))
+              : null;
+          ui.setArchiveDownload({ done: processed, total, etaMs });
+          ui.setBusy(`Pobieram tresci do archiwum (${processed}/${total})...`);
+        };
         try {
-          for (const group of candidates) {
+          for (const group of singles) {
             if (flag.cancelled) break;
             // Kolejnosc prob: przychodzace przez "odebrane" (rekord
             // "nieprzeczytane" znika z listingu po przeczytaniu),
@@ -1502,24 +1534,117 @@ export async function init(api: PluginApi) {
               consecutiveErrors += 1;
               if (consecutiveErrors >= DOWNLOAD_BREAKER_LIMIT) breakerTripped = true;
             }
-            const processed = done + failed + missing;
-            const now = Date.now();
-            const dt = now - lastAt;
-            lastAt = now;
-            emaMs = emaMs === null ? dt : 0.3 * dt + 0.7 * emaMs;
-            const etaMs =
-              processed >= 3 && emaMs !== null
-                ? Math.max(1000, Math.round(emaMs * (total - processed)))
-                : null;
-            ui.setArchiveDownload({ done: processed, total, etaMs });
-            ui.setBusy(
-              `Pobieram tresci do archiwum (${processed}/${total})...`,
-            );
+            reportProgress();
             if (breakerTripped) break;
             if (flag.cancelled) break;
             await sleepOrCancel(LOAD_ALL_PACE_MS, flag);
           }
-          if (breakerTripped) {
+          // ── Fala 35c: grupy wielowystapieniowe ──
+          // Skan skrzynki pokazuje wszystkie wystapienia klucza tresci
+          // (strony sa rozdzielone po dniach, klucz jest jednodniowy).
+          // Kazdy wiersz listingu to osobny list z wlasna trescia:
+          // odczyt per wiersz, tresc do slotu o numerze wiersza.
+          if (!flag.cancelled && !breakerTripped && !reindexNeeded && multis.length > 0) {
+            const scanOrder = (
+              ["odebrane", "nieprzeczytane", "wyslane", "niewyslane"] as MailBox[]
+            ).filter((b) => multis.some((g) => g.some((l) => l.box === b)));
+            for (const box of scanOrder) {
+              if (flag.cancelled || breakerTripped || reindexNeeded) break;
+              const groupsHere = multis.filter((g) => g.some((l) => l.box === box));
+              const rowsByKey = new Map<string, MailboxEntry[]>();
+              const scan = await scanMailboxPages({
+                box,
+                cancelled: () => flag.cancelled,
+                fetchPage: (command) => mailbox.fetch(box, command),
+                wait: (ms) => sleepOrCancel(ms, flag),
+                onPage: (res) => {
+                  if (res.kind === "lista") {
+                    for (const entry of res.entries) {
+                      const k = contentKeyOf(fromMailboxEntry(box, entry));
+                      const arr = rowsByKey.get(k);
+                      if (arr) arr.push(entry);
+                      else rowsByKey.set(k, [entry]);
+                    }
+                  }
+                  return {};
+                },
+              });
+              if (flag.cancelled) break;
+              if (scan.end !== "complete") {
+                // Niedomkniety listing = dane czesciowe; porownanie
+                // z baza nie jest bezpieczne.
+                reindexNeeded = true;
+                break;
+              }
+              for (const group of groupsHere) {
+                if (flag.cancelled || breakerTripped || reindexNeeded) break;
+                const record = group[0]!;
+                const slotsNow = bodiesOf(record);
+                if (
+                  slotsNow.length >= occurrenceCount(record) &&
+                  slotsNow.every((s) => s.length > 0)
+                )
+                  continue;
+                const rows = rowsByKey.get(contentKeyOf(record)) ?? [];
+                const slots = slotsNow;
+                const n = Math.max(occurrenceCount(record), slots.length);
+                if (rows.length < n) {
+                  // Baza chce wiecej wystapien, niz pokazuje listing:
+                  // cos doszlo albo przestalo sie pojawiac - indeks do odswiezenia.
+                  // Bez purge: fizyczna tozsamosc wystapien nieznana.
+                  reindexNeeded = true;
+                  break;
+                }
+                const collected: string[][] = [...slots];
+                let groupFailed = false;
+                for (let i = 0; i < n; i++) {
+                  if (collected[i] && collected[i]!.length > 0) continue;
+                  if (flag.cancelled) break;
+                  const row = rows[i]!;
+                  try {
+                    transport!.beginModal();
+                    try {
+                      const res = await pager.readLetter(row.number, () => flag.cancelled);
+                      collected[i] = res.letter.body;
+                      consecutiveErrors = 0;
+                    } finally {
+                      transport!.endModal();
+                    }
+                  } catch {
+                    if (!flag.cancelled) {
+                      failed += 1;
+                      consecutiveErrors += 1;
+                      if (consecutiveErrors >= DOWNLOAD_BREAKER_LIMIT) breakerTripped = true;
+                    }
+                    groupFailed = true;
+                    break;
+                  }
+                  await sleepOrCancel(LOAD_ALL_PACE_MS, flag);
+                }
+                // Zapis zawsze, gdy cos nowego przyszlo (czesciowe
+                // sloty tez zostaja - kolejna proba dociagnie reszte).
+                const changed = collected.some((s, i) => s !== slots[i]);
+                if (changed) {
+                  const fillAll = group.map((l) => withOccurrenceBodies(l, collected));
+                  const mergedAll = upsertLetters(ui.state.archive, fillAll);
+                  ui.setArchive(mergedAll.letters);
+                  persistArchive();
+                }
+                if (!groupFailed && bodiesOf(withOccurrenceBodies(record, collected)).every((s) => s.length > 0)) {
+                  done += 1;
+                }
+                reportProgress();
+                if (breakerTripped) break;
+              }
+            }
+          }
+          if (reindexNeeded) {
+            notify(
+              api,
+              "Przerwano pobieranie - lista na serwerze nie zgadza sie z baza. " +
+                "Zindeksuj skrzynki od nowa i sprobuj ponownie.",
+            );
+          } else if (breakerTripped) {
             notify(
               api,
               "Przerwano pobieranie - serwer poczty nie odpowiada. " +

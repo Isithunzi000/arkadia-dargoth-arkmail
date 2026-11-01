@@ -126,6 +126,28 @@ export function bodiesOf(letter: ArchiveLetter): string[][] {
 }
 
 /**
+ * Fala 35c: wypelnia sloty tresci per wystapienie (body = wystapienie 1,
+ * extraBodies = 2..n). Brakujace sloty zostaja puste (pobieranie dociaga
+ * je pozniej); occurrences rosnie, gdy dostarczono wiecej tresci niz
+ * dotychczasowy rozmiar. Czysta funkcja - zwraca nowy rekord.
+ */
+export function withOccurrenceBodies(
+  letter: ArchiveLetter,
+  bodies: string[][],
+): ArchiveLetter {
+  const n = Math.max(occurrenceCount(letter), bodies.length);
+  const prev = bodiesOf(letter);
+  const merged: string[][] = [];
+  for (let i = 0; i < n; i++) merged.push(bodies[i] ?? prev[i] ?? []);
+  return {
+    ...letter,
+    occurrences: n,
+    body: merged[0] ?? [],
+    extraBodies: merged.slice(1),
+  };
+}
+
+/**
  * Fala 35: nadpisuje liczbe wystapien rekordow skrzynki o danym
  * kluczu tresci wynikiem listingu (NIE sumuje). Klucz jest
  * jednodniowy (dataRaw wchodzi w sklad), wiec jedna strona paginacji
