@@ -916,10 +916,10 @@ export async function init(api: PluginApi) {
         } else if (scan.end === "incomplete") {
           notify(
             api,
-            `Wczytano dostepne listy (dodanych do listy: ${scan.addedToView}). ${scan.skipWhy ?? "Sprobuj ponownie za chwile"}.`,
+            `Wczytano dostepne listy: ${ui.state.boxes[box]?.entries.length ?? 0} w widoku (dodano do widoku: ${scan.addedToView}). ${scan.skipWhy ?? "Sprobuj ponownie za chwile"}.`,
           );
         } else {
-          notify(api, `Wczytano starsze listy (dodanych do listy: ${scan.addedToView}).`);
+          notify(api, `Wczytano starsze listy: ${ui.state.boxes[box]?.entries.length ?? 0} w widoku (dodano do widoku: ${scan.addedToView}).`);
         }
       })
       .catch((err: unknown) => {
@@ -988,7 +988,7 @@ export async function init(api: PluginApi) {
             },
           });
           if (scan.end === "cancelled") {
-            notify(api, `Przerwano (dodanych do listy: ${scan.addedToView}).`);
+            notify(api, `Przerwano (dodano do widoku: ${scan.addedToView}).`);
             return;
           }
           if (scan.end === "complete") {
@@ -1003,11 +1003,11 @@ export async function init(api: PluginApi) {
               ui.setIndexMeta({ ...ui.state.indexMeta, [box]: new Date().toISOString() });
               persistIndexMeta();
             }
-            notify(api, `Wczytano wszystkie (dodanych do listy: ${scan.addedToView}).`);
+            notify(api, `Wczytano wszystkie: ${ui.state.boxes[box]?.entries.length ?? 0} list (dodano do widoku: ${scan.addedToView}).`);
           } else {
             notify(
               api,
-              `Wczytano dostepne listy (dodanych do listy: ${scan.addedToView}). ${scan.skipWhy ?? "Sprobuj ponownie za chwile"}.`,
+              `Wczytano dostepne listy: ${ui.state.boxes[box]?.entries.length ?? 0} w widoku (dodano do widoku: ${scan.addedToView}). ${scan.skipWhy ?? "Sprobuj ponownie za chwile"}.`,
             );
           }
         } finally {

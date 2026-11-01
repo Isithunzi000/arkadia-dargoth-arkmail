@@ -68,7 +68,7 @@ test('paginacja: wczytaj starsze dokleja strone "Wybrane" do widoku i archiwum',
     f.fire('Nadawca: Waldo                          Nd, 15 VIII 1999, 10:00:00', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(() => content.querySelectorAll('.arkmail-entry').length === 4, 'merge strony');
-    await waitFor(() => notifyText(f, 'dodanych do listy: 1'), 'notify o dopisaniu starszych do archiwum');
+    await waitFor(() => notifyText(f, 'dodano do widoku: 1'), 'notify o dopisaniu starszych do archiwum');
 
     // Klik 2: kotwica = 14 XII + 1 dzien = 16 VIII 1999.
     click(h, '.arkmail-older');
@@ -156,7 +156,7 @@ test('wczytaj wszystkie: petla stron az do konca (kotwica przesuwa sie co strone
     f.fire('Nadawca: Baz                          Pn, 9 VIII 1999, 09:00:00', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(
-      () => notifyText(f, 'Wczytano wszystkie (dodanych do listy: 2)'),
+      () => notifyText(f, 'Wczytano wszystkie: 5 list (dodano do widoku: 2)'),
       'notify podsumowania petli',
     );
     assert.equal(content.querySelectorAll('.arkmail-entry').length, 5, '3 + 2 wpisy po merge');
@@ -189,7 +189,7 @@ test('wczytaj wszystkie: Przerwij zatrzymuje petle miedzy stronami', async () =>
     await waitRt(() => textOf(h, '.arkmail-older-all').includes('Przerwij'), 'Przerwij w petli');
 
     click(h, '.arkmail-older-all'); // = Przerwij
-    await waitRt(() => notifyText(f, 'Przerwano (dodanych do listy: 1)'), 'notify przerwania');
+    await waitRt(() => notifyText(f, 'Przerwano (dodano do widoku: 1)'), 'notify przerwania');
 
     // Pacing by minal - komendy paginacji nie leca dalej.
     await new Promise((r) => setTimeout(r, 500));
@@ -265,7 +265,7 @@ test('kontakty: wczytaj starsze odbudowuje kontakty z dopisanej strony (Fala 24b
     f.fire(' 9. *R* Temat: pradawny', 'mail');
     f.fire('Nadawca: Baz                          Pn, 9 VIII 1999, 09:00:00', 'mail');
     f.fire('> ', 'prompt');
-    await waitFor(() => notifyText(f, 'dodanych do listy: 1'), 'notify o dopisaniu starszych');
+    await waitFor(() => notifyText(f, 'dodano do widoku: 1'), 'notify o dopisaniu starszych');
 
     click(h, '[data-tab="kontakty"]');
     await waitRt(() => !!h.content.querySelector('.arkmail-contact'), 'wiersze kontaktow');
@@ -297,7 +297,7 @@ test('kontakty: wczytaj wszystkie odbudowuje kontakty po zakonczeniu petli (Fala
     f.fire('Nadawca: Baz                          Pn, 9 VIII 1999, 09:00:00', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(
-      () => notifyText(f, 'Wczytano wszystkie (dodanych do listy: 1)'),
+      () => notifyText(f, 'Wczytano wszystkie: 4 list (dodano do widoku: 1)'),
       'notify konca petli',
     );
 
@@ -334,7 +334,7 @@ test('wczytaj wszystkie: naturalne domkniecie skrzynki stempluje indexMeta (Fala
     f.fire('Nadawca: Baz                          Pn, 9 VIII 1999, 09:00:00', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(
-      () => notifyText(f, 'Wczytano wszystkie (dodanych do listy: 1)'),
+      () => notifyText(f, 'Wczytano wszystkie: 4 list (dodano do widoku: 1)'),
       'notify konca petli',
     );
 
@@ -407,7 +407,7 @@ test('wczytaj wszystkie: przechodzi poza 40 stron i konczy dopiero na pelnej odp
     await waitRt(() => anchors() === 42, 'strona 42 poza dawny limit');
     firePage(42, false);
     await waitRt(
-      () => notifyText(f, 'Wczytano wszystkie (dodanych do listy: 42)'),
+      () => notifyText(f, 'Wczytano wszystkie: 45 list (dodano do widoku: 42)'),
       'komplet po 42 stronach',
     );
   } finally {
@@ -443,7 +443,7 @@ test('wczytaj wszystkie: komunikat liczy wpisy dodane do widoku, nie tylko nowe 
     f.fire(`Nadawca: Foo                        ${dateRaw}`, 'mail');
     f.fire('> ', 'prompt');
     await waitRt(
-      () => notifyText(f, 'Wczytano wszystkie (dodanych do listy: 1)'),
+      () => notifyText(f, 'Wczytano wszystkie: 4 list (dodano do widoku: 1)'),
       'licznik nowych wierszy widoku',
     );
   } finally {
