@@ -10,7 +10,7 @@
  */
 
 import type { ArchiveLetter } from './archive.js';
-import { BOX_RANK, contentKeyOf } from './archive.js';
+import { BOX_RANK, bodiesOf, contentKeyOf, occurrenceCount, withOccurrenceBodies } from './archive.js';
 import { parseMailDate } from './protocol/parser.js';
 import type { MailBox } from './protocol/types.js';
 
@@ -85,10 +85,14 @@ export interface ExportEntry {
 }
 
 /**
- * Eksport calego archiwum: tylko listy Z trescia (bez-tresciowe
- * pomijane i liczone), rekordy nieobecne na serwerze pomijane (Fala
- * 18a), blizniaki nieprzeczytane/odebrane deduplikowane po kluczu
- * tresci (Fala 17c) - plik laduje w folderze skrzynki kanonicznej.
+ * Eksport calego archiwum: jeden plik per wystapienie (Fala 35d,
+ * variant 2): N wylistowanych listow = N plikow, kazdy slot tresci
+ * rekordu (body = wystapienie 1, extraBodies = 2..n) to osobny plik
+ * z numerem porzadkowym _01.._NN w nazwie. Rekord z occurrences = 1
+ * zachowuje dawna nazwe bez numeru. Slot bez tresci: pominiety i
+ * liczony. Blizniaki nieprzeczytane/odebrane deduplikowane po kluczu
+ * tresci (Fala 17c) - pliki laduja w folderze skrzynki kanonicznej.
+ * Rekordy nieobecne na serwerze pomijane (Fala 18a).
  * Kolizje nazw dostaja suffiks -2, -3, ...
  * Wynik posortowany od najnowszych (deterministycznie).
  */
@@ -107,21 +111,52 @@ export function archiveExportEntries(letters: readonly ArchiveLetter[]): {
     BOX_RANK[a.box] - BOX_RANK[b.box] || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   const representatives = [...byKey.values()].map((group) => {
     const canonical = [...group].sort(byCanonicalBox)[0]!;
-    const withBody = group.filter((letter) => letter.body.length > 0).sort(byCanonicalBox)[0];
-    return withBody ? { ...canonical, body: withBody.body } : canonical;
+    // Kanoniczny rekord z kompletem slotow: jesli sam jest pusty,
+    // pozyczamy sloty od blizniaczego rekordu z innej skrzynki.
+    const withBodies = group
+      .filter((letter) => bodiesOf(letter).some((s) => s.length > 0))
+      .sort(byCanonicalBox)[0];
+    return withBodies ? withOccurrenceBodies(canonical, bodiesOf(withBodies)) : canonical;
   });
-  const skipped = representatives.filter((letter) => letter.body.length === 0).length;
-  const sorted = representatives.filter((letter) => letter.body.length > 0).sort((a, b) => {
-    if (a.sortKey !== b.sortKey) return a.sortKey < b.sortKey ? 1 : -1;
-    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  // Fala 35d: rozwiniecie per wystapienie - kazdy slot z trescia
+  // to osobny plik z numerem porzadkowym.
+  interface Expanded {
+    letter: ArchiveLetter;
+    body: string[];
+    ordinal: number | null;
+  }
+  let skipped = 0;
+  const expanded: Expanded[] = [];
+  for (const letter of representatives) {
+    const n = occurrenceCount(letter);
+    const slots = bodiesOf(letter);
+    if (n <= 1) {
+      if (letter.body.length > 0) expanded.push({ letter, body: letter.body, ordinal: null });
+      else skipped += 1;
+      continue;
+    }
+    for (let i = 0; i < n; i++) {
+      const slot = slots[i];
+      if (slot && slot.length > 0) {
+        expanded.push({ letter, body: slot, ordinal: i + 1 });
+      } else {
+        skipped += 1;
+      }
+    }
+  }
+  const sorted = [...expanded].sort((a, b) => {
+    if (a.letter.sortKey !== b.letter.sortKey) return a.letter.sortKey < b.letter.sortKey ? 1 : -1;
+    if (a.letter.id !== b.letter.id) return a.letter.id < b.letter.id ? -1 : 1;
+    return (a.ordinal ?? 0) - (b.ordinal ?? 0);
   });
   const used = new Map<string, number>();
-  const entries: ExportEntry[] = sorted.map((l) => {
-    const base = `${l.box}/${txtFileName(l.party, l.subject, l.dateRaw)}`;
+  const entries: ExportEntry[] = sorted.map(({ letter, body, ordinal }) => {
+    let base = `${letter.box}/${txtFileName(letter.party, letter.subject, letter.dateRaw)}`;
+    if (ordinal !== null) base = base.replace(/\.txt$/, `_${String(ordinal).padStart(2, '0')}.txt`);
     const n = (used.get(base) ?? 0) + 1;
     used.set(base, n);
     const name = n === 1 ? base : base.replace(/\.txt$/, `-${n}.txt`);
-    return { name, txt: archiveLetterTxt(l) };
+    return { name, txt: archiveLetterTxt({ ...letter, body }) };
   });
   return { entries, skipped };
 }
