@@ -1,25 +1,20 @@
 /**
- * Idempotentne pobieranie tresci do archiwum (Fala 17c, zgloszenie
- * 2026-10-19/20 pkt 3).
+ * Idempotentne pobieranie tresci do archiwum (Fala 17c + Fala 41).
  *
- * Blad z sesji: petla "Pobierz tresci" po przerwaniu zaczynala mielic
- * od nowa - w tym blizniacze rekordy tego samego listu (letterId
- * zawiera skrzynke, wiec list nieprzeczytany istnieje w archiwum
- * podwojnie: nieprzeczytane + odebrane) oraz zombie-wpisy listow,
- * ktorych serwer juz nie ma (kazdy restart petli mielil je do
- * timeoutu).
+ * Fala 17c: po przerwaniu petla nie mielila od nowa zombie-wpisow
+ * listow, ktorych serwer juz nie ma.
  *
- * Kontrakt:
- *  - kandydaci grupowani po kluczu TRESCI (party|subject|forwarded|
- *    dateRaw, bez skrzynki): blizniak pobierany RAZ, tresc laduje
- *    we wszystkich rekordach grupy; pobranie idzie przez skrzynke
- *    kanoniczna (odebrane dla listow przychodzacych) - rekord z
- *    "nieprzeczytane" po przeczytaniu znika z tego listingu, wiec
- *    re-kotwica po nim bylaby falszywym chybiem;
- *  - list, ktorego re-kotwica nie znajduje na swiezym listingu,
- *    jest FIZYCZNIE usuwany z archiwum (Fala 28 - zamiast znacznika
- *    missingOnServer, po ktorym zombie siedzialy w bazie wiecznie);
- *    powrot listu do listingu (upsert) odtwarza rekord;
+ * Kontrakt (Fala 41, per rekord):
+ *  - kandydatem jest KAZDY rekord z pusta trescia i prawidlowa data;
+ *    blizniak o identycznych metadanych ma wlasny odczyt ze swojego
+ *    wiersza i tresc laduje dokladnie w swoim rekordzie,
+ *  - re-kotwica wybiera wiersz PO archiveId rekordu; brak wiersza o
+ *    tej tozsamosci = missing: rekord fizycznie wypada z archiwum
+ *    (Fala 28), a petla probuje pozostale skrzynki (replica moze
+ *    istniec gdzie indziej); blizniak o tych samych metadanych
+ *    zostaje nietkniety,
+ *  - blad (timeout, blad serwera) KONCZY proby rekordu - ta sama siec
+ *    i serwer obsluguja wszystkie skrzynki,
  *  - podsumowanie petli raportuje znikniete listy osobno.
  */
 import { test } from 'node:test';
@@ -135,7 +130,7 @@ function archiveRows(h: Harness, fragment: string): Array<{ dispatchEvent(e: unk
   return rows;
 }
 
-test('archiwum: blizniak nieprzeczytane/odebrane pobierany RAZ, tresc w obu rekordach', async () => {
+test('archiwum: blizniak nieprzeczytane/odebrane - per rekord, kazdy z wlasna trescia', async () => {
   const h = await startHarness();
   const { f } = h;
   try {
@@ -157,46 +152,67 @@ test('archiwum: blizniak nieprzeczytane/odebrane pobierany RAZ, tresc w obu reko
     await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec listingu');
 
     click(h, '[data-tab="archiwum"]');
-    // Fala 18a: widok ZWIJA blizniaki do jednego wiersza (reprezentant
-    // grupy) - rekordy w danych sa nadal dwa, dowodzi tego petla
-    // pobierania (grupa = 1 kandydat) i cache ponizej.
+    // Widok ZWIJA blizniaki do jednego wiersza (reprezentant grupy),
+    // ale w danych sa DWA rekordy i kazdy z nich jest kandydatem
+    // do pobrania (Fala 41: per rekord, nie per grupa).
     assert.equal(archiveRows(h, 'najnowszy').length, 1, 'blizniak zwiniety do jednego wiersza');
 
     downloadBtn(h).dispatchEvent(new h.window.Event('click')); // uzbrojenie
     downloadBtn(h).dispatchEvent(new h.window.Event('click')); // start
-    // Grupa blizniakow = JEDEN kandydat: total 3, nie 4.
-    await waitRt(
-      () => downloadBtn(h).textContent.includes('(0/3)') || f.sent.length > 0,
-      'start petli',
-    );
-    await waitRt(() => f.sent.includes('listy odebrane przed 25 VIII 1999'), 're-kotwica grupy');
-    replayListing3(h);
-    await waitRt(() => f.sent.includes('przeczytaj list 1'), 'odczyt grupy blizniakow');
-    replayLetter(h, 1, 'najnowszy', 'Tresc najnowszego.');
 
-    await waitRt(() => f.sent.includes('listy odebrane przed 24 VIII 1999'), 're-kotwica 2');
-    replayListing3(h);
-    await waitRt(() => f.sent.includes('przeczytaj list 2'), 'odczyt 2');
-    replayLetter(h, 2, 'srodkowy', 'Tresc srodkowego.');
+    // Napedzanie zalezne od kolejnosci kandydatow (blizniaki maja te
+    // sama date, wiec ich kolejnosc po id - obie prawidlowe). Kierunek
+    // odpowiedzi: nieprzeczytane pierwszy raz = listing z listem, kazde
+    // kolejne = pusto (po odczycie listu nieprzeczytanych juz nie ma);
+    // odebrane = pelny listing; pozostale skrzynki = pusto.
+    let unreadAnswered = false;
+    let idx = f.sent.length;
+    const subjectOf = (n: number): string =>
+      n === 1 ? 'najnowszy' : n === 2 ? 'srodkowy' : 'najstarszy';
+    const bodyOf = (n: number): string =>
+      n === 1 ? 'Tresc najnowszego.' : n === 2 ? 'Tresc srodkowego.' : 'Tresc najstarszego.';
+    for (let guard = 0; ; guard++) {
+      assert.ok(guard < 4000, 'napedzanie pobierania nie dokonczylo sie');
+      if (notifyText(f, 'Pobrano tresci')) break;
+      if (f.sent.length <= idx) {
+        await new Promise((r) => setTimeout(r, 25));
+        continue;
+      }
+      const cmd = f.sent[idx]!;
+      idx++;
+      if (cmd.startsWith('listy nieprzeczytane przed')) {
+        if (!unreadAnswered) {
+          unreadAnswered = true;
+          f.fire('Listy nieprzeczytane:', 'mail');
+          f.fire(' 1. Temat: najnowszy', 'mail');
+          f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
+        } else {
+          f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
+        }
+        f.fire('> ', 'prompt');
+      } else if (cmd.startsWith('listy odebrane przed')) {
+        replayListing3(h);
+      } else if (cmd.startsWith('listy wyslane przed')) {
+        f.fire('Nie masz zadnych wyslanych listow.', 'mail');
+        f.fire('> ', 'prompt');
+      } else if (cmd.startsWith('listy niewyslane przed')) {
+        f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
+        f.fire('> ', 'prompt');
+      } else if (cmd.startsWith('przeczytaj list')) {
+        const n = Number(cmd.split(' ').pop());
+        replayLetter(h, n, subjectOf(n), bodyOf(n));
+      }
+    }
 
-    await waitRt(() => f.sent.includes('listy odebrane przed 23 VIII 1999'), 're-kotwica 3');
-    replayListing3(h);
-    await waitRt(() => f.sent.includes('przeczytaj list 3'), 'odczyt 3');
-    replayLetter(h, 3, 'najstarszy', 'Tresc najstarszego.');
-
-    // Dokladnie 3 odczyty (blizniak NIE jest pobierany drugi raz).
-    await waitRt(() => notifyText(f, 'Pobrano tresci do archiwum (3 listy)'), 'podsumowanie');
-    assert.equal(
-      f.sent.filter((s) => s.startsWith('przeczytaj list')).length,
-      3,
-      'blizniak nie generuje drugiego odczytu',
-    );
+    // 4 kandydaci = 4 odczyty (replica NIE jest zasypywana trescia
+    // brata - ma wlasny odczyt ze swojej skrzynki).
+    await waitRt(() => notifyText(f, 'Pobrano tresci do archiwum (4 listy)'), 'podsumowanie');
     assert.ok(
-      !f.sent.some((s) => s.startsWith('listy nieprzeczytane przed')),
-      'zadnej re-kotwicy po skrzynce nieprzeczytanych',
+      notifyText(f, 'Pobrano tresci do archiwum (4 listy)'),
+      'kazdy rekord-blizniak pobrany osobno',
     );
 
-    // Tresc w cache OBU rekordow blizniaczy (klik = podglad, zero komend).
+    // Tresc w cache rekordu reprezentanta (klik = podglad, zero komend).
     const base = f.sent.length;
     for (const row of archiveRows(h, 'najnowszy')) {
       row.dispatchEvent(new h.window.Event('click'));
@@ -208,6 +224,7 @@ test('archiwum: blizniak nieprzeczytane/odebrane pobierany RAZ, tresc w obu reko
     await stopHarness();
   }
 });
+
 
 test('archiwum: list znikniety z serwera jest purgowany i pomijany przy restarcie', async () => {
   const h = await startHarness();
@@ -233,6 +250,23 @@ test('archiwum: list znikniety z serwera jest purgowany i pomijany przy restarci
     await waitRt(() => f.sent.includes('listy odebrane przed 25 VIII 1999'), 're-kotwica 1');
     replayListingBezNajnowszego();
 
+    // Fala 41: missing z odebranych zamyka sie dopiero po probie
+    // pozostalych skrzynek (replica moze istniec gdzie indziej) - 3
+    // kolejne kotwice z pustymi listingami.
+    const emptyLine: Record<string, string> = {
+      nieprzeczytane: 'Nie masz zadnych nieprzeczytanych listow.',
+      wyslane: 'Nie masz zadnych wyslanych listow.',
+      niewyslane: 'Nie masz zadnych niewyslanych listow.',
+    };
+    for (const box of ['nieprzeczytane', 'wyslane', 'niewyslane']) {
+      await waitRt(
+        () => f.sent.some((c) => c.startsWith(`listy ${box} przed`)),
+        `kotwica missing: ${box}`,
+      );
+      f.fire(emptyLine[box]!, 'mail');
+      f.fire('> ', 'prompt');
+    }
+
     // Petla jedzie dalej: srodkowy i najstarszy pobierane normalnie
     // (numery z listingu bez najnowszego: srodkowy = 1, najstarszy = 2).
     await waitRt(() => f.sent.includes('listy odebrane przed 24 VIII 1999'), 're-kotwica 2');
@@ -256,9 +290,11 @@ test('archiwum: list znikniety z serwera jest purgowany i pomijany przy restarci
       1,
       'znikniety list nie jest mielony ponownie',
     );
+    // 6 kotwic pobierania: 3 proby odebrane (kazdy kandydat) + 3 kotwice
+    // missing po pozostalych skrzynkach. Restart nie dodaje zadnej.
     assert.equal(
       f.sent.filter((s) => / przed \d+ [IVX]+ \d{4}$/.test(s)).length,
-      3,
+      6,
       'restart bez nowych re-kotwic pobierania',
     );
   } finally {

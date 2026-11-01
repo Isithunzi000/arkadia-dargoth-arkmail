@@ -51,18 +51,39 @@ test('missing przy pobieraniu: grupa wypada z archiwum I wiersz znika z widoku',
     click(h, '[data-tab="archiwum"]');
     await startDownload(h);
 
-    // Re-kotwica 1: szukamy najnowszego (Corge, 23 XII). Listing bez
-    // niego -> kind 'missing' -> purge grupy. Listing zawiera srodkowego
-    // (juz w archiwum - upsert no-op), zeby liczba rekordow po purgu
-    // byla miarodajna (listingi re-kotwic tez trafiaja do archiwum).
+    // Re-kotwica 1: szukamy najnowszego (Corge, 24 VIII). Listing bez
+    // niego -> kind 'missing' -> purge rekordu. Listing zawiera srodkowego
+    // (juz w archiwum - dopasowanie tresci, zero duplikatu), zeby liczba
+    // rekordow po purgu byla miarodajna (listingi re-kotwic tez trafiaja
+    // do archiwum).
     await waitRt(() => anchors(h).length === 1, 're-kotwica 1');
     f.fire('Listy odebrane:', 'mail');
     f.fire(' 1. *R* Temat: srodkowy', 'mail');
     f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire('> ', 'prompt');
 
-    // Re-kotwica 2: srodkowy (Foo, 22 XII) - pelny odczyt.
-    await waitRt(() => anchors(h).length === 2, 're-kotwica 2');
+    // Fala 41: missing z odebranych zamyka sie dopiero po probie
+    // pozostalych skrzynek (replica moze istniec gdzie indziej) - 3
+    // kolejne kotwice, kazda z pustym listingiem.
+    const emptyLine: Record<string, string> = {
+      nieprzeczytane: 'Nie masz zadnych nieprzeczytanych listow.',
+      wyslane: 'Nie masz zadnych wyslanych listow.',
+      niewyslane: 'Nie masz zadnych niewyslanych listow.',
+    };
+    for (const box of ['nieprzeczytane', 'wyslane', 'niewyslane']) {
+      await waitRt(
+        () => f.sent.some((c) => c.startsWith(`listy ${box} przed`)),
+        `kotwica missing: ${box}`,
+      );
+      f.fire(emptyLine[box]!, 'mail');
+      f.fire('> ', 'prompt');
+    }
+
+    // Re-kotwica 2: srodkowy (Foo, 23 VIII) - pelny odczyt.
+    await waitRt(
+      () => f.sent.filter((c) => c.startsWith('listy odebrane przed')).length === 2,
+      're-kotwica 2',
+    );
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 1. *R* Temat: srodkowy', 'mail');
     f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
@@ -80,8 +101,11 @@ test('missing przy pobieraniu: grupa wypada z archiwum I wiersz znika z widoku',
     f.fire('[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ', 'mail');
     f.fire('> ', 'prompt');
 
-    // Re-kotwica 3: najstarszy (Foo, 21 XII) - pelny odczyt.
-    await waitRt(() => anchors(h).length === 3, 're-kotwica 3');
+    // Re-kotwica 3: najstarszy (Foo, 22 VIII) - pelny odczyt.
+    await waitRt(
+      () => f.sent.filter((c) => c.startsWith('listy odebrane przed')).length === 3,
+      're-kotwica 3',
+    );
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 1. *R* Temat: najstarszy', 'mail');
     f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');

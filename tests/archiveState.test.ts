@@ -66,17 +66,21 @@ function stepTexts(h: Harness): string[] {
   ).map((step) => String(step.textContent ?? ''));
 }
 
-test('pobieranie: tresc w jednym rekordzie blizniaka wystarcza dla calej grupy', async () => {
+test('pobieranie: rekord blizniaka bez tresci jest kandydatem (per rekord)', async () => {
   const h = await startHarness({ archive: bodyTwin() });
   try {
     await openArchive(h);
     startDownload(h);
     await waitRt(
       () => h.f.sent.length > 0 || notifyText(h.f, 'Wszystkie listy w bazie maja tresci.'),
-      'koniec sprawdzania grupy',
+      'start pobierania',
     );
-    assert.deepEqual(h.f.sent, [], 'grupa z trescia nie jest pobierana ponownie');
-    assert.ok(notifyText(h.f, 'Wszystkie listy w bazie maja tresci.'));
+    // Fala 41: kazdy rekord osobno - pusty blizniak DOSTAJE wlasny
+    // odczyt (tresc brata go nie zaspokaja). Konczymy natychmiast po
+    // pierwszej komendzie - pelny przebieg per rekord w
+    // downloadPerRecord.test.ts.
+    assert.ok(h.f.sent.length > 0, 'pusty rekord blizniaka jest pobierany');
+    assert.ok(!notifyText(h.f, 'Wszystkie listy w bazie maja tresci.'));
   } finally {
     await stopHarness();
   }

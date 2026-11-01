@@ -87,6 +87,20 @@ async function answerMissing(h: Harness, n: number): Promise<void> {
   f.fire('> ', 'prompt');
 }
 
+/** Odpowiada pustym listingiem wlasnej skrzynki (missing per skrzynka). */
+async function answerEmptyBox(h: Harness, n: number): Promise<void> {
+  await waitRt(() => anchors(h).length === n, `re-kotwica ${n}`);
+  const box = anchors(h).at(-1)!.split(' ')[1]!;
+  const line =
+    box === 'nieprzeczytane'
+      ? 'Nie masz zadnych nieprzeczytanych listow.'
+      : box === 'wyslane'
+        ? 'Nie masz zadnych wyslanych listow.'
+        : 'Nie masz zadnych niewyslanych listow.';
+  h.f.fire(line, 'mail');
+  h.f.fire('> ', 'prompt');
+}
+
 /** Odpowiada poprawnym odczytem (listing + tresc, kind 'ok'). */
 async function answerOk(h: Harness, n: number): Promise<void> {
   await waitRt(() => anchors(h).length === n, `re-kotwica ${n}`);
@@ -170,9 +184,15 @@ test('breaker: znikniety list (missing) resetuje licznik bledow', async () => {
     // breaker strzelilby na 3. kandydacie.
     await answerError(h, 1);
     await answerError(h, 2);
-    await answerMissing(h, 3); // odebrane 23 XII zniknely
-    await answerError(h, 4);
-    await answerError(h, 5);
+    // Kandydat 24 VIII zniknal z serwera: missing zamyka sie dopiero
+    // po probie WSZYSTKICH skrzynek (replica moze istniec gdzie
+    // indziej) - kotwice 3-6, potem dalsi kandydaci normalnie.
+    await answerMissing(h, 3); // odebrane 24 VIII: listu nie ma
+    await answerEmptyBox(h, 4); // nieprzeczytane
+    await answerEmptyBox(h, 5); // wyslane
+    await answerEmptyBox(h, 6); // niewyslane
+    await answerError(h, 7); // odebrane 23 VIII
+    await answerError(h, 8); // odebrane 22 VIII
 
     await waitRt(
       () => notifyText(f, 'Pobrano tresci (0 z 5; nieudane: 4; nie ma juz w skrzynce: 1)'),

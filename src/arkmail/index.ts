@@ -41,17 +41,14 @@ import {
 import { contactsFromArchive } from "./core/contacts";
 import {
   bodiesOf,
-  contentKeyOf,
   fromMailboxEntry,
   fromOpenedLetter,
   mergeListingPage,
   normalizeArchive,
-  occurrenceCount,
   purgeGoneLettersNewerThan,
   replaceBoxLetters,
   scanKeyOfEntries,
   upsertLetters,
-  withOccurrenceBodies,
   type ArchiveLetter,
 } from "./core/archive";
 import { totalLive } from "./core/archiveStats";
@@ -875,7 +872,21 @@ export async function init(api: PluginApi) {
           ui.setArchive(merged.letters);
           persistArchive();
           stampEntries(box, res.entries, merged.resolvedIds);
-          fresh = res.entries.find((item) => entryKey(item) === entryKey(entry)) ?? null;
+          // Fala 41: wpis wybierany WYLACZNIE po tozsamosci rekordu
+          // (archiveId ze stemplowania) - blizniak o identycznych
+          // metadanych trafia na WLASNY wiersz, a brak wiersza o tej
+          // tozsamosci = konkretny listu juz nie ma na serwerze
+          // (missing), nawet gdy inny blizniak nadal jest na stronie.
+          // Fallback metadane + numer zostaje tylko dla wpisow bez
+          // archiveId (zapisy legacy sprzed Fali 41).
+          if (entry.archiveId !== undefined) {
+            fresh = res.entries.find((item) => item.archiveId === entry.archiveId) ?? null;
+          } else {
+            fresh =
+              res.entries.find(
+                (item) => entryKey(item) === entryKey(entry) && item.number === entry.number,
+              ) ?? null;
+          }
           return { stop: fresh !== null };
         },
       });
@@ -1322,6 +1333,11 @@ export async function init(api: PluginApi) {
         ? "nadawca"
         : "odbiorcy",
     date: letter.dateRaw ? parseMailDate(letter.dateRaw) : null,
+    // Fala 41: tozsamosc rekordu niesie pseudo-wpis - re-kotwica strony
+    // wybiera wpis PO archiveId (blizniak o identycznych metadanych ma
+    // wlasne id i wlasny wiersz listingu), a tresc z pagera laduje
+    // dokladnie w tym rekordzie.
+    archiveId: letter.id,
   });
 
   /**
@@ -1398,9 +1414,11 @@ export async function init(api: PluginApi) {
    * kolejne listy bez tresci pod JEDNA blokada sesji, tempo jak loadAll.
    * Drugi klik przycisku = Przerwij. Blad pojedynczego listu nie zabija
    * petli - liczony i podsumowany na koncu.
-   * Fala 17c (zgloszenie pkt 3): petla jest IDEMPOTENTNA - kandydaci
-   * grupowani po kluczu tresci (blizniak pobierany raz), rekordy
-   * nieobecne na serwerze oznaczane i pomijane przy restarcie.
+   * Fala 41: kandydatem jest KAZDY rekord z pusta trescia - kazdy
+   * wiersz listingu to osobny rekord, wiec kazdy dostaje wlasny odczyt
+   * ze swojego wiersza i tresc laduje dokladnie w nim. Zadnego
+   * grupowania po kluczu tresci ani slotow occurrences (maszyneria
+   * wielowystapieniowa Fali 35c wypada z runtime'u).
    * Fala 31a: circuit breaker - 3 bledy z rzedu (siec/serwer lezy)
    * zatrzymuja petle z jasnym komunikatem, zamiast mielic reszte
    * kandydatow do konca. Sukces i 'missing' licznik resetuja.
@@ -1415,40 +1433,20 @@ export async function init(api: PluginApi) {
       notify(api, SESSION_BUSY_MSG);
       return;
     }
-    // Najpierw grupujemy wszystkie dostepne rekordy. Blizniaki wspoldziela
-    // jeden rekord z occurrences slotami tresci (Fala 35) - grupa jest
-    // "do pobrania", dopoki CHOC JEDEN slot jest pusty. Kandydat musi
-    // miec prawidlowa date, bo bez niej nie mozna odnalezc listu na
-    // serwerze.
-    const groups = new Map<string, ArchiveLetter[]>();
-    for (const l of ui.state.archive) {
-      const key = contentKeyOf(l);
-      const arr = groups.get(key);
-      if (arr) arr.push(l);
-      else groups.set(key, [l]);
-    }
-    const pending = [...groups.values()].filter((group) =>
-      group.every((l) => {
-        const slots = bodiesOf(l);
-        return (
-          slots.length < occurrenceCount(l) || slots.some((b) => b.length === 0)
-        );
-      }),
+    // Kandydat: rekord z pusta trescia. Musi miec prawidlowa date, bo
+    // bez niej nie mozna odnalezc listu na serwerze.
+    const noBody = ui.state.archive.filter((l) => l.body.length === 0);
+    const candidates = noBody.filter(
+      (l) => l.dateRaw !== null && parseMailDate(l.dateRaw) !== null,
     );
-    const candidates = pending.filter((group) => {
-      const dateRaw = group[0]!.dateRaw;
-      return dateRaw !== null && parseMailDate(dateRaw) !== null;
-    });
     if (candidates.length === 0) {
       notify(
         api,
         ui.state.archive.length === 0
           ? "Skrzynki sa puste - nie ma czego pobierac."
-          : pending.length > 0
-            ? `Nie mozna pobrac tresci - listy bez prawidlowej daty: ${pending.length}.`
-            : groups.size === 0
-              ? "Brak dostepnych listow do pobrania - nie ma juz w skrzynce."
-              : "Wszystkie listy w bazie maja tresci.",
+          : noBody.length > 0
+            ? `Nie mozna pobrac tresci - listy bez prawidlowej daty: ${noBody.length}.`
+            : "Wszystkie listy w bazie maja tresci.",
       );
       return;
     }
@@ -1470,19 +1468,10 @@ export async function init(api: PluginApi) {
         let missing = 0;
         // Fala 31a (circuit breaker): serie bledow Z RZEDU zatrzymuja
         // petle. Sukces i 'missing' (serwer odpowiedzial - listu juz
-        // nie ma w skrzynce)
-        // resetuja licznik, bo dowodza, ze polaczenie zyje.
+        // nie ma w skrzynce) resetuja licznik, bo dowodza, ze
+        // polaczenie zyje.
         let consecutiveErrors = 0;
         let breakerTripped = false;
-        // Fala 35c: grupy jednowystapieniowe ida stara sciezka
-        // (re-kotwica + jeden odczyt); wielowystapieniowe swiezym
-        // listingiem skrzynki z odczytem kazdego wiersza klucza.
-        const singles = candidates.filter((g) => occurrenceCount(g[0]!) === 1);
-        const multis = candidates.filter((g) => occurrenceCount(g[0]!) > 1);
-        // Fala 35c: listing pokazal mniej wystapien niz baza (albo
-        // skan sie nie domknal) = baza nieswieza; dalsze pobieranie
-        // bez ponownej indeksacji nie jest bezpieczne.
-        let reindexNeeded = false;
         const reportProgress = (): void => {
           const processed = done + failed + missing;
           const now = Date.now();
@@ -1497,53 +1486,53 @@ export async function init(api: PluginApi) {
           ui.setBusy(`Pobieram tresci do archiwum (${processed}/${total})...`);
         };
         try {
-          for (const group of singles) {
-            if (flag.cancelled) break;
-            // Kolejnosc prob: przychodzace przez "odebrane" (rekord
-            // "nieprzeczytane" znika z listingu po przeczytaniu),
-            // wychodzace przez "wyslane"; tylko skrzynki obecne
-            // w grupie blizniakow.
-            const present = new Set(group.map((l) => l.box));
+          for (const record of candidates) {
+            if (flag.cancelled || breakerTripped) break;
+            // Kolejnosc prob: najpierw skrzynka rekordu, potem pozostale
+            // w kolejnosci kanonicznej (replica "nieprzeczytane"
+            // odczytuje sie przez "odebrane", bo nieprzeczytany wiersz
+            // znika z listingu po przeczytaniu).
             const order = (
-              ["odebrane", "nieprzeczytane", "wyslane", "niewyslane"] as MailBox[]
-            ).filter((b) => present.has(b));
+              [record.box, "odebrane", "nieprzeczytane", "wyslane", "niewyslane"] as MailBox[]
+            ).filter((b, i, arr) => arr.indexOf(b) === i);
             let result: FetchBodyResult = { kind: "error" };
-            // Fala 31: skrzynka ostatniej proby - przy 'missing' z niej
-            // wypada wiersz widoku (box z petli nie jest tu w zakresie).
-            let triedBox: MailBox | null = null;
             for (const box of order) {
               if (flag.cancelled) break;
               // Fala 17a: Przerwij domyka tez pager w toku (shouldAbort).
-              triedBox = box;
-              result = await fetchArchiveBody(group[0], {
+              result = await fetchArchiveBody(record, {
                 shouldAbort: () => flag.cancelled,
                 box,
               });
               if (result.kind === "ok") break;
+              // 'missing' z jednej skrzynki nie konczy prob - replica
+              // moze nadal istniec w innej skrzynce. Blad (timeout,
+              // blad serwera) KONCZY proby tego rekordu: ta sama siec
+              // i ten sam serwer obsluguja wszystkie skrzynki, wiec
+              // powtarzanie nie ma sensu - a przy padnietym serwerze
+              // czterokrotniloby komendy do zera.
+              if (result.kind === "error") break;
             }
             if (result.kind === "ok") {
               done += 1;
               consecutiveErrors = 0;
-              // Tresc do WSZYSTKICH rekordow blizniaczych grupy.
-              const fill = group
-                .filter((l) => l.body.length === 0)
-                .map((l) => ({ ...l, body: result.body }));
-              if (fill.length > 0) {
-                const merged = upsertLetters(ui.state.archive, fill);
-                ui.setArchive(merged.letters);
-                persistArchive();
-              }
+              // Tresc z pagera wplynela przez fetchArchiveBody ->
+              // fromOpenedLetter(fresh z archiveId rekordu) -> upsert
+              // DOKLADNIE na ten rekord (blizniak nietkniety).
             } else if (result.kind === "missing" && !flag.cancelled) {
               missing += 1;
               consecutiveErrors = 0;
-              // Fala 28: brak na serwerze -> fizyczny purge grupy z archiwum.
-              const goneIds = new Set(group.map((l) => l.id));
-              ui.setArchive(ui.state.archive.filter((l) => !goneIds.has(l.id)));
+              // Fala 28: brak na serwerze -> fizyczny purge TYLKO tego
+              // rekordu (blizniak o tych samych metadanych zostaje).
+              ui.setArchive(ui.state.archive.filter((l) => l.id !== record.id));
               persistArchive();
               // Fala 31: domkniecie parowania - martwy wiersz znika tez
-              // z widoku skrzynki (ostatnia niesparowana sciezka;
-              // bez tego wiersz byl klikalny i liczyl sie w badge).
-              if (triedBox !== null) pruneGoneFromView(triedBox, goneIds);
+              // z widoku skrzynki (bez tego wiersz byl klikalny i liczyl
+              // sie w badge). Przeczesujemy WSZYSTKIE skrzynki: wiersz
+              // siedzi w widoku skrzynki rekordu, a petla prob mogla
+              // skonczyc sie na innej skrzynce.
+              for (const b of ["odebrane", "nieprzeczytane", "wyslane", "niewyslane"] as MailBox[]) {
+                pruneGoneFromView(b, new Set([record.id]));
+              }
             } else if (!flag.cancelled) {
               failed += 1;
               consecutiveErrors += 1;
@@ -1554,113 +1543,7 @@ export async function init(api: PluginApi) {
             if (flag.cancelled) break;
             await sleepOrCancel(LOAD_ALL_PACE_MS, flag);
           }
-          // ── Fala 35c: grupy wielowystapieniowe ──
-          // Skan skrzynki pokazuje wszystkie wystapienia klucza tresci
-          // (strony sa rozdzielone po dniach, klucz jest jednodniowy).
-          // Kazdy wiersz listingu to osobny list z wlasna trescia:
-          // odczyt per wiersz, tresc do slotu o numerze wiersza.
-          if (!flag.cancelled && !breakerTripped && !reindexNeeded && multis.length > 0) {
-            const scanOrder = (
-              ["odebrane", "nieprzeczytane", "wyslane", "niewyslane"] as MailBox[]
-            ).filter((b) => multis.some((g) => g.some((l) => l.box === b)));
-            for (const box of scanOrder) {
-              if (flag.cancelled || breakerTripped || reindexNeeded) break;
-              const groupsHere = multis.filter((g) => g.some((l) => l.box === box));
-              const rowsByKey = new Map<string, MailboxEntry[]>();
-              const scan = await scanMailboxPages({
-                box,
-                cancelled: () => flag.cancelled,
-                fetchPage: (command) => mailbox.fetch(box, command),
-                wait: (ms) => sleepOrCancel(ms, flag),
-                onPage: (res) => {
-                  if (res.kind === "lista") {
-                    const scanKey = scanKeyOfEntries(res.entries);
-                    res.entries.forEach((entry, i) => {
-                      const k = contentKeyOf(fromMailboxEntry(box, entry, scanKey, i));
-                      const arr = rowsByKey.get(k);
-                      if (arr) arr.push(entry);
-                      else rowsByKey.set(k, [entry]);
-                    });
-                  }
-                  return {};
-                },
-              });
-              if (flag.cancelled) break;
-              if (scan.end !== "complete") {
-                // Niedomkniety listing = dane czesciowe; porownanie
-                // z baza nie jest bezpieczne.
-                reindexNeeded = true;
-                break;
-              }
-              for (const group of groupsHere) {
-                if (flag.cancelled || breakerTripped || reindexNeeded) break;
-                const record = group[0]!;
-                const slotsNow = bodiesOf(record);
-                if (
-                  slotsNow.length >= occurrenceCount(record) &&
-                  slotsNow.every((s) => s.length > 0)
-                )
-                  continue;
-                const rows = rowsByKey.get(contentKeyOf(record)) ?? [];
-                const slots = slotsNow;
-                const n = Math.max(occurrenceCount(record), slots.length);
-                if (rows.length < n) {
-                  // Baza chce wiecej wystapien, niz pokazuje listing:
-                  // cos doszlo albo przestalo sie pojawiac - indeks do odswiezenia.
-                  // Bez purge: fizyczna tozsamosc wystapien nieznana.
-                  reindexNeeded = true;
-                  break;
-                }
-                const collected: string[][] = [...slots];
-                let groupFailed = false;
-                for (let i = 0; i < n; i++) {
-                  if (collected[i] && collected[i]!.length > 0) continue;
-                  if (flag.cancelled) break;
-                  const row = rows[i]!;
-                  try {
-                    transport!.beginModal();
-                    try {
-                      const res = await pager.readLetter(row.number, () => flag.cancelled);
-                      collected[i] = res.letter.body;
-                      consecutiveErrors = 0;
-                    } finally {
-                      transport!.endModal();
-                    }
-                  } catch {
-                    if (!flag.cancelled) {
-                      failed += 1;
-                      consecutiveErrors += 1;
-                      if (consecutiveErrors >= DOWNLOAD_BREAKER_LIMIT) breakerTripped = true;
-                    }
-                    groupFailed = true;
-                    break;
-                  }
-                  await sleepOrCancel(LOAD_ALL_PACE_MS, flag);
-                }
-                // Zapis zawsze, gdy cos nowego przyszlo (czesciowe
-                // sloty tez zostaja - kolejna proba dociagnie reszte).
-                const changed = collected.some((s, i) => s !== slots[i]);
-                if (changed) {
-                  const fillAll = group.map((l) => withOccurrenceBodies(l, collected));
-                  const mergedAll = upsertLetters(ui.state.archive, fillAll);
-                  ui.setArchive(mergedAll.letters);
-                  persistArchive();
-                }
-                if (!groupFailed && bodiesOf(withOccurrenceBodies(record, collected)).every((s) => s.length > 0)) {
-                  done += 1;
-                }
-                reportProgress();
-                if (breakerTripped) break;
-              }
-            }
-          }
-          if (reindexNeeded) {
-            notify(
-              api,
-              "Przerwano pobieranie - lista na serwerze nie zgadza sie z baza. " +
-                "Indeksuj skrzynki od nowa i sprobuj ponownie.",
-            );
-          } else if (breakerTripped) {
+          if (breakerTripped) {
             notify(
               api,
               "Przerwano pobieranie - serwer poczty nie odpowiada. " +
