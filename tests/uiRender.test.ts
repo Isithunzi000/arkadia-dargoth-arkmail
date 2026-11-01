@@ -563,7 +563,6 @@ test('render: kontakty - filtr i sort lokalne (bez store), wiersz z data', () =>
   });
   s.setContacts(mergeContacts({
     people: [],
-    przedstawieni: [],
     aliasy: [],
     korespondencja: [
       { name: 'Bar', direction: 'in', dateRaw: 'Cz, 28 X 1999, 00:31:37', dateKey: 19991028 },

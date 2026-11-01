@@ -280,17 +280,3 @@ export function parseComposeResult(text: string): ComposeResult | null {
   return null;
 }
 
-// --- przedstawieni ----------------------------------------------------------------------
-
-// "[28] Osoby, ktore zostaly ci ostatnio przedstawione, to A, B, C i D."
-const PRZEDSTAWIENI_RE = /^\[\d+\] Osoby, ktore zostaly ci ostatnio przedstawione, to (.+)\.$/;
-
-export function parsePrzedstawieni(text: string): string[] | null {
-  const m = text.match(PRZEDSTAWIENI_RE);
-  if (!m) return null;
-  // "Foo, Quux, ..., Zonk i Waldo" - ostatni separator to " i ".
-  const parts = m[1].split(', ');
-  const last = parts.pop()!;
-  const lastSplit = last.split(' i ');
-  return [...parts, ...lastSplit].map((s) => s.trim()).filter(Boolean);
-}

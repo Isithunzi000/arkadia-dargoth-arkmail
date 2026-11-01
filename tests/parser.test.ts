@@ -21,7 +21,6 @@ import {
   parseComposeEcho,
   parseEditorEcho,
   parseComposeResult,
-  parsePrzedstawieni,
   parseMailDate,
   stripClientPrefix,
   type ProtoLine,
@@ -222,19 +221,6 @@ test('compose: echo promptow, numeracja linii, wynik', () => {
   assert.equal(parseComposeResult('List zostal wyslany.'), null);
 });
 
-// --- przedstawieni --------------------------------------------------------
-
-test('przedstawieni: licznik w nawiasie, lista z "i" przed ostatnim', () => {
-  const lines = fixture('przedstawieni').map((l) => l.text);
-  const line = lines.find((t) => t.includes('przedstawione, to'));
-  assert.ok(line, 'linia przedstawieni w fixture');
-  const names = parsePrzedstawieni(line);
-  assert.ok(names);
-  assert.equal(names.length, 28);
-  assert.equal(names[0], 'Foo');
-  assert.equal(names[27], 'Waldo');
-  assert.ok(names.includes('Bar'));
-});
 
 test('powiadomienia: linia po modyfikacji triggera klienta (prefix+suffix nowych linii)', () => {
   // Trigger klienta (newMail.ts) dokleja "\n[ POCZTA ] " z przodu i "\n\n"

@@ -1,6 +1,5 @@
 /**
  * Testy scalania kontaktow ArkMail (czysty core).
- * Zrodla: people (klient, mianownik+opis+guild), przedstawieni (scraping),
  * korespondencja (listingi/listy - mianownik), aliasy pocztowe.
  * Powiadomienie "Masz nowa poczte od X" NIE tworzy kontaktu - imie jest
  * w dopelniaczu (np. 'od Xa' dla imienia na X); sluzy tylko do odswiezania.
@@ -17,7 +16,7 @@ import {
 } from '../src/arkmail/core/contacts';
 
 function input(partial: Partial<ContactInput>): ContactInput {
-  return { people: [], przedstawieni: [], korespondencja: [], aliasy: [], ...partial };
+  return { people: [], korespondencja: [], aliasy: [], ...partial };
 }
 
 test('korespondencja tworzy kontakt z licznikami i data', () => {
@@ -50,16 +49,6 @@ test('people dokleja opis i guild; match bez wzgledu na wielkosc liter', () => {
   assert.ok(c.sources.includes('people') && c.sources.includes('korespondencja'));
 });
 
-test('przedstawieni dolaczaja jako znani bez korespondencji', () => {
-  const out = mergeContacts(input({
-    przedstawieni: ['Foo', 'Waldo'],
-    korespondencja: [{ name: 'Foo', direction: 'in' }],
-  }));
-  assert.equal(out.length, 2);
-  const waldo = out.find((c) => c.name === 'Waldo')!;
-  assert.deepEqual(waldo.sources, ['przedstawieni']);
-  assert.equal(waldo.lettersReceived, 0);
-});
 
 test('alias pocztowy wskazujacy na kontakt: mailAlias + zrodlo alias', () => {
   const out = mergeContacts(input({
@@ -91,21 +80,17 @@ test('sortowanie: alfabetycznie po kanonicznej nazwie', () => {
   assert.deepEqual(out.map((c) => c.name), ['Flob', 'Foo', 'Snork']);
 });
 
-test('pelny obraz z logow: 28 przedstawionych + korespondencja + aliasy', () => {
-  const przedstawieni = ['Foo', 'Quux', 'Zot', 'Bamf', 'Garply', 'Bork', 'Baz', 'Snafu',
-    'Corge', 'Foobar', 'Fum', 'Bazola', 'Zippy', 'Bar', 'Kibo', 'Wibble', 'Wobble',
-    'Wubble', 'Flob', 'Doofer', 'Thingy', 'Oof', 'Rab', 'Zab', 'Blorf', 'Flarp', 'Zonk', 'Waldo'];
+test('pelny obraz z logow: korespondencja + aliasy', () => {
   const out = mergeContacts(input({
-    przedstawieni,
     korespondencja: [
       { name: 'Corge', direction: 'in', dateRaw: 'Wt, 24 VIII 1999, 00:11:12' },
       { name: 'Garply', direction: 'out', dateRaw: 'Nd, 22 VIII 1999, 00:31:18' },
     ],
     aliasy: [{ name: 'foo', targets: ['Bar'] }],
   }));
-  assert.equal(out.length, 28);
+  assert.equal(out.length, 3);
   const gen = out.find((c) => c.name === 'Corge')!;
-  assert.deepEqual(gen.sources.sort(), ['korespondencja', 'przedstawieni']);
+  assert.deepEqual(gen.sources.sort(), ['korespondencja']);
   const gw = out.find((c) => c.name === 'Bar')!;
   assert.equal(gw.mailAlias, 'foo');
 });
