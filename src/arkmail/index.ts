@@ -1840,6 +1840,29 @@ export async function init(api: PluginApi) {
       });
   };
 
+  /**
+   * Doczyt wpisu archiwum z serwera (wspolny dla kliku w wiersz i
+   * w puste wystapienie blizniaka, Fala 35e): pseudo-wpis
+   * (ctx undefined -> zawsze re-kotwica po dacie) i ta sama sciezka
+   * odczytu co klik w liste skrzynki.
+   */
+  const openArchiveFromServer = (letter: ArchiveLetter): void => {
+    if (lock.locked) {
+      notify(api, SESSION_BUSY_MSG);
+      return;
+    }
+    ui.setBusy(`Czytam list: ${letter.subject}...`);
+    const pseudo = archivePseudoEntry(letter);
+    const generation = connectionGeneration;
+    void runExclusive(() => openWithResolve(letter.box, pseudo))
+      .catch((err: unknown) => {
+        if (!isOperationCancelled(err)) notify(api, "Nie udalo sie odczytac listu.");
+      })
+      .finally(() => {
+        if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
+      });
+  };
+
   handlersRef = {
     onDeletionSearch: (box, query) => {
       const validationError = validateListingSearch(query);
@@ -1903,20 +1926,27 @@ export async function init(api: PluginApi) {
       }
       // Bez tresci: pseudo-wpis (ctx undefined -> zawsze re-kotwica po
       // dacie) i ta sama sciezka odczytu co klik w liste skrzynki.
-      if (lock.locked) {
-        notify(api, SESSION_BUSY_MSG);
+      openArchiveFromServer(letter);
+    },
+    onOpenArchiveOccurrence: (letter, occurrence) => {
+      // Fala 35e: podglad konkretnego wystapienia blizniaka (1-based).
+      // Slot z trescia otwiera sie z pamieci; pusty - doczyt z serwera
+      // (jedno wystapienie klucza, ta sama sciezka co klik w wiersz).
+      const slot = bodiesOf(letter)[occurrence - 1];
+      if (slot && slot.length > 0) {
+        const senderBox = letter.box === "odebrane" || letter.box === "nieprzeczytane";
+        ui.openLetter(letter.box, {
+          number: letter.number,
+          from: senderBox ? letter.party : "",
+          subject: letter.subject,
+          to: senderBox ? "" : letter.party,
+          cc: null,
+          date: letter.dateRaw,
+          body: slot,
+        });
         return;
       }
-      ui.setBusy(`Czytam list: ${letter.subject}...`);
-      const pseudo = archivePseudoEntry(letter);
-      const generation = connectionGeneration;
-      void runExclusive(() => openWithResolve(letter.box, pseudo))
-        .catch((err: unknown) => {
-          if (!isOperationCancelled(err)) notify(api, "Nie udalo sie odczytac listu.");
-        })
-        .finally(() => {
-          if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
-        });
+      openArchiveFromServer(letter);
     },
     onDownloadArchiveBodies: () => runArchiveDownload(),
     // Indeksacja wszystkich skrzynek jako osobna operacja.

@@ -445,6 +445,10 @@ export const STYLES = `
   cursor: default;
 }
 .arkmail-contact-stats, .arkmail-arch-meta { color: ${FG_DIM}; font-size: 12px; }
+.arkmail-arch-expand { margin-left: 8px; }
+.arkmail-arch-occ-list { margin: 2px 0 6px 18px; }
+.arkmail-arch-occ { color: ${FG_DIM}; font-size: 12px; cursor: pointer; }
+.arkmail-arch-occ:hover { color: ${FG}; }
 .arkmail-contact-controls {
   display: flex;
   flex-wrap: wrap;
