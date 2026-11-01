@@ -23,17 +23,17 @@ function input(partial: Partial<ContactInput>): ContactInput {
 test('korespondencja tworzy kontakt z licznikami i data', () => {
   const out = mergeContacts(input({
     korespondencja: [
-      { name: 'Foo', direction: 'in', dateRaw: 'N, 21 XII 2025, 01:15:04' },
-      { name: 'Foo', direction: 'in', dateRaw: 'Pn, 22 XII 2025, 02:20:05' },
-      { name: 'Foo', direction: 'out', dateRaw: 'N, 21 XII 2025, 00:20:12' },
-      { name: 'Bar', direction: 'out', dateRaw: 'Sr, 7 I 2026, 02:07:56' },
+      { name: 'Foo', direction: 'in', dateRaw: 'Nd, 22 VIII 1999, 01:15:04' },
+      { name: 'Foo', direction: 'in', dateRaw: 'Pn, 23 VIII 1999, 02:20:05' },
+      { name: 'Foo', direction: 'out', dateRaw: 'Nd, 22 VIII 1999, 00:20:12' },
+      { name: 'Bar', direction: 'out', dateRaw: 'Sr, 8 IX 1999, 02:07:56' },
     ],
   }));
   assert.equal(out.length, 2);
   const af = out.find((c) => c.name === 'Foo')!;
   assert.equal(af.lettersReceived, 2);
   assert.equal(af.lettersSent, 1);
-  assert.equal(af.lastContactRaw, 'Pn, 22 XII 2025, 02:20:05', 'najnowsza data wygrywa');
+  assert.equal(af.lastContactRaw, 'Pn, 23 VIII 1999, 02:20:05', 'najnowsza data wygrywa');
   assert.deepEqual(af.sources, ['korespondencja']);
 });
 
@@ -64,10 +64,10 @@ test('przedstawieni dolaczaja jako znani bez korespondencji', () => {
 test('alias pocztowy wskazujacy na kontakt: mailAlias + zrodlo alias', () => {
   const out = mergeContacts(input({
     korespondencja: [{ name: 'Bar', direction: 'out' }],
-    aliasy: [{ name: 'poltorak', targets: ['Bar'] }],
+    aliasy: [{ name: 'foo', targets: ['Bar'] }],
   }));
   const g = out.find((c) => c.name === 'Bar')!;
-  assert.equal(g.mailAlias, 'poltorak');
+  assert.equal(g.mailAlias, 'foo');
   assert.ok(g.sources.includes('alias'));
 });
 
@@ -98,16 +98,16 @@ test('pelny obraz z logow: 28 przedstawionych + korespondencja + aliasy', () => 
   const out = mergeContacts(input({
     przedstawieni,
     korespondencja: [
-      { name: 'Corge', direction: 'in', dateRaw: 'Wt, 23 XII 2025, 00:11:12' },
-      { name: 'Garply', direction: 'out', dateRaw: 'N, 21 XII 2025, 00:31:18' },
+      { name: 'Corge', direction: 'in', dateRaw: 'Wt, 24 VIII 1999, 00:11:12' },
+      { name: 'Garply', direction: 'out', dateRaw: 'Nd, 22 VIII 1999, 00:31:18' },
     ],
-    aliasy: [{ name: 'poltorak', targets: ['Bar'] }],
+    aliasy: [{ name: 'foo', targets: ['Bar'] }],
   }));
   assert.equal(out.length, 28);
   const gen = out.find((c) => c.name === 'Corge')!;
   assert.deepEqual(gen.sources.sort(), ['korespondencja', 'przedstawieni']);
   const gw = out.find((c) => c.name === 'Bar')!;
-  assert.equal(gw.mailAlias, 'poltorak');
+  assert.equal(gw.mailAlias, 'foo');
 });
 
 test('contactsFromBoxes: korespondencja z listingow + baza people', () => {
@@ -116,7 +116,7 @@ test('contactsFromBoxes: korespondencja z listingow + baza people', () => {
       entries: [
         { number: 3, isRead: true, subject: 'Perly', forwarded: false,
           party: 'Foo', partyKind: 'nadawca' as const,
-          date: { raw: 'Wt, 23 XII 2025, 00:11:12', weekday: 'Wt', day: 23, month: 12, year: 2025, time: '00:11:12' } },
+          date: { raw: 'Wt, 24 VIII 1999, 00:11:12', weekday: 'Wt', day: 24, month: 8, year: 1999, time: '00:11:12' } },
       ],
     },
     wyslane: {
@@ -165,26 +165,26 @@ test('splitParty: przecinek (listingi), " i " (naglowki), mieszane', () => {
 });
 
 test('splitParty: odrzuca daty, godziny, dni tygodnia i wielokropki', () => {
-  assert.deepEqual(splitParty('Foo, ..., N, 2 III 2026, 03:04:05'), ['Foo']);
+  assert.deepEqual(splitParty('Foo, ..., Pn, 20 IX 1999, 03:04:05'), ['Foo']);
   assert.deepEqual(splitParty('Poniedzialek, Corge i Waldo'), ['Corge', 'Waldo']);
   assert.deepEqual(splitParty('Baz'), ['Baz']);
 });
 
 test('contactsFromBoxes: wielu odbiorcow z listingu - split i dedup (dane z logow)', () => {
-  // Realny listing wyslanych: 'Odbiorcy: Fred, Grault   N, 19 IV 2026, 02:49:49'
-  // oraz 'Odbiorcy: Grault, Fred   N, 19 IV 2026, 03:03:00'.
+  // Realny listing wyslanych: 'Odbiorcy: Fred, Grault   Nd, 31 X 1999, 02:49:49'
+  // oraz 'Odbiorcy: Grault, Fred   Nd, 31 X 1999, 03:03:00'.
   const boxes = {
     wyslane: {
       entries: [
-        { number: 40, isRead: true, subject: 'karteczka', forwarded: false,
+        { number: 40, isRead: true, subject: 'liscik 3', forwarded: false,
           party: 'Fred, Grault', partyKind: 'odbiorcy' as const,
-          date: { raw: 'N, 19 IV 2026, 02:49:49', weekday: 'N', day: 19, month: 4, year: 2026, time: '02:49:49' } },
-        { number: 39, isRead: true, subject: 'karteczka', forwarded: false,
+          date: { raw: 'Nd, 31 X 1999, 02:49:49', weekday: 'N', day: 31, month: 10, year: 1999, time: '02:49:49' } },
+        { number: 39, isRead: true, subject: 'liscik 3', forwarded: false,
           party: 'Grault, Fred', partyKind: 'odbiorcy' as const,
-          date: { raw: 'N, 19 IV 2026, 03:03:00', weekday: 'N', day: 19, month: 4, year: 2026, time: '03:03:00' } },
-        { number: 38, isRead: true, subject: 'karteczka', forwarded: false,
+          date: { raw: 'Nd, 31 X 1999, 03:03:00', weekday: 'N', day: 31, month: 10, year: 1999, time: '03:03:00' } },
+        { number: 38, isRead: true, subject: 'liscik 3', forwarded: false,
           party: 'Bar', partyKind: 'odbiorcy' as const,
-          date: { raw: 'Cz, 16 IV 2026, 00:31:37', weekday: 'Cz', day: 16, month: 4, year: 2026, time: '00:31:37' } },
+          date: { raw: 'Cz, 28 X 1999, 00:31:37', weekday: 'Cz', day: 28, month: 10, year: 1999, time: '00:31:37' } },
       ],
     },
   };
@@ -195,8 +195,8 @@ test('contactsFromBoxes: wielu odbiorcow z listingu - split i dedup (dane z logo
   const fred = out.find((c) => c.name === 'Fred')!;
   assert.equal(fred.lettersSent, 2, 'Fred byl adresatem dwoch listow');
   assert.equal(out.find((c) => c.name === 'Bar')!.lettersSent, 1);
-  assert.equal(grault.lastContactRaw, 'N, 19 IV 2026, 03:03:00', 'nowszy list wygrywa (czas rozbija remis dnia)');
-  assert.equal(grault.lastContactKey, 20260419030300, 'klucz yyyymmddHHMMSS z MailDate');
+  assert.equal(grault.lastContactRaw, 'Nd, 31 X 1999, 03:03:00', 'nowszy list wygrywa (czas rozbija remis dnia)');
+  assert.equal(grault.lastContactKey, 19991031030300, 'klucz yyyymmddHHMMSS z MailDate');
 });
 
 test('contactsFromBoxes: ostatni kontakt wg sparsowanej daty, nie leksykalnie', () => {
@@ -225,10 +225,10 @@ test('viewContacts: filtr po nazwie i aliasie (case-insensitive)', () => {
       { name: 'Bar', direction: 'in' },
       { name: 'Grault', direction: 'out' },
     ],
-    aliasy: [{ name: 'poltorak', targets: ['Grault'] }],
+    aliasy: [{ name: 'foo', targets: ['Grault'] }],
   }));
   assert.deepEqual(viewContacts(contacts, { filter: 'bar' }).map((c) => c.name), ['Bar']);
-  assert.deepEqual(viewContacts(contacts, { filter: 'POLT' }).map((c) => c.name), ['Grault'],
+  assert.deepEqual(viewContacts(contacts, { filter: 'FOO' }).map((c) => c.name), ['Grault'],
     'filtr trafia tez w alias pocztowy');
   assert.deepEqual(viewContacts(contacts, { filter: 'zzz' }), []);
   assert.equal(viewContacts(contacts, {}).length, 2, 'bez filtra: wszystkie kontakty');
@@ -238,10 +238,10 @@ test('viewContacts: filtr po nazwie i aliasie (case-insensitive)', () => {
 test('viewContacts: sort nazwa / liczba / ostatni kontakt', () => {
   const contacts = mergeContacts(input({
     korespondencja: [
-      { name: 'Bar', direction: 'in', dateRaw: 'Cz, 16 IV 2026, 00:31:37', dateKey: 20260416 },
+      { name: 'Bar', direction: 'in', dateRaw: 'Cz, 28 X 1999, 00:31:37', dateKey: 19991028 },
       { name: 'Bar', direction: 'in' },
       { name: 'Bar', direction: 'out' },
-      { name: 'Grault', direction: 'out', dateRaw: 'N, 19 IV 2026, 03:03:00', dateKey: 20260419 },
+      { name: 'Grault', direction: 'out', dateRaw: 'Nd, 31 X 1999, 03:03:00', dateKey: 19991031 },
       { name: 'Garply', direction: 'in' },
       { name: 'Garply', direction: 'out' },
     ],
@@ -259,7 +259,7 @@ test('viewContacts: sort nazwa / liczba / ostatni kontakt', () => {
 // --- Fala 9c: ten sam list w kilku skrzynkach liczony RAZ -------------------
 
 test('contactsFromBoxes: nieprzeczytany list w odebranych i nieprzeczytanych liczy sie raz', () => {
-  const date = { raw: 'Cz, 24 XII 2025, 08:00:00', weekday: 'Cz', day: 24, month: 12, year: 2025, time: '08:00:00' };
+  const date = { raw: 'Sr, 25 VIII 1999, 08:00:00', weekday: 'Sr', day: 25, month: 8, year: 1999, time: '08:00:00' };
   const entry = { number: 1, isRead: false, subject: 'Swiezy', forwarded: false,
     party: 'Grault', partyKind: 'nadawca' as const, date };
   const out = contactsFromBoxes({
@@ -271,8 +271,8 @@ test('contactsFromBoxes: nieprzeczytany list w odebranych i nieprzeczytanych lic
 });
 
 test('contactsFromBoxes: rozne listy tego samego dnia licza sie osobno', () => {
-  const d1 = { raw: 'Cz, 24 XII 2025, 08:00:00', weekday: 'Cz', day: 24, month: 12, year: 2025, time: '08:00:00' };
-  const d2 = { raw: 'Cz, 24 XII 2025, 09:30:00', weekday: 'Cz', day: 24, month: 12, year: 2025, time: '09:30:00' };
+  const d1 = { raw: 'Sr, 25 VIII 1999, 08:00:00', weekday: 'Sr', day: 25, month: 8, year: 1999, time: '08:00:00' };
+  const d2 = { raw: 'Sr, 25 VIII 1999, 09:30:00', weekday: 'Sr', day: 25, month: 8, year: 1999, time: '09:30:00' };
   const out = contactsFromBoxes({
     odebrane: { entries: [
       { number: 2, isRead: true, subject: 'A', forwarded: false, party: 'Grault', partyKind: 'nadawca' as const, date: d1 },
@@ -284,7 +284,7 @@ test('contactsFromBoxes: rozne listy tego samego dnia licza sie osobno', () => {
 });
 
 test('contactsFromBoxes: dedup nie scala roznych kierunkow ani roznych osob', () => {
-  const date = { raw: 'Cz, 24 XII 2025, 08:00:00', weekday: 'Cz', day: 24, month: 12, year: 2025, time: '08:00:00' };
+  const date = { raw: 'Sr, 25 VIII 1999, 08:00:00', weekday: 'Sr', day: 25, month: 8, year: 1999, time: '08:00:00' };
   const out = contactsFromBoxes({
     odebrane: { entries: [
       { number: 1, isRead: true, subject: 'Perly', forwarded: false, party: 'Grault', partyKind: 'nadawca' as const, date },

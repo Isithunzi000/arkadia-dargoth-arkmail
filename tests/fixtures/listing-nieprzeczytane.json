@@ -1,7 +1,6 @@
 {
   "name": "listing-nieprzeczytane",
   "opis": "Listing nieprzeczytanych (brak *R*) + przeczytanie listu 1 + wyjscie q",
-  "zrodlo": "session_1766262715076.html",
   "lines": [
     {
       "cls": "mail",
@@ -9,11 +8,11 @@
     },
     {
       "cls": "mail",
-      "text": " 1. Temat: Elementy rozbitego szkielka"
+      "text": " 1. Temat: liscik"
     },
     {
       "cls": "mail",
-      "text": "Nadawca: Foo                        N, 21 XII 2025, 01:15:04"
+      "text": "Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04"
     },
     {
       "cls": "",
@@ -41,31 +40,31 @@
     },
     {
       "cls": "mail",
-      "text": "Temat: Elementy rozbitego szkielka"
+      "text": "Temat: liscik"
     },
     {
       "cls": "mail",
-      "text": "Data : N, 21 XII 2025, 01:15:04"
+      "text": "Data : Nd, 22 VIII 1999, 01:15:04"
     },
     {
       "cls": "mail",
-      "text": "Hej,"
+      "text": "Dzien dobry,"
     },
     {
       "cls": "mail",
-      "text": "nie moge sie doczekac, az mi opowiesz. Mam rozumiec, ze udaliscie sie do Nuln?"
+      "text": "Pisze krotko, bo sprawa pilna."
     },
     {
       "cls": "mail",
-      "text": "No i w ktorej kwestii mialam racje, na bogow, tak wiele pytan, tak malo odpowiedzi."
+      "text": "Spotkajmy sie wkrotce na Rynku."
     },
     {
       "cls": "mail",
-      "text": "Ide teraz w gory. Daj znac, jak Cie najdzie, zeby uchylic rabka."
+      "text": "Pozdrawiam."
     },
     {
       "cls": "mail",
-      "text": "af"
+      "text": "Do uslyszenia."
     },
     {
       "cls": "mail",

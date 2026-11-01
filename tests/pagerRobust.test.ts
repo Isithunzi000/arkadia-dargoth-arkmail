@@ -36,7 +36,7 @@ const settle = <T>(p: Promise<T>): Promise<Settled<T>> =>
 const FRAMED_LETTER: ProtoLine[] = [
   { cls: 'mail', text: 'List : 1' },
   { cls: 'mail', text: 'Od   : Gracz' },
-  { cls: 'mail', text: 'Temat: karteczka z rosomakiem' },
+  { cls: 'mail', text: 'Temat: notatka 3' },
   { cls: 'mail', text: 'Do   : Waldo' },
   { cls: 'mail', text: 'DW   : Bar' },
   { cls: 'mail', text: 'Data : Pt, 21 VIII 2026, 18:25:34' },
@@ -95,7 +95,7 @@ test('sklejona linia prompt+odrzucenie: wykrycie, q i ponowienie odczytu', async
   await t.replay([
     { cls: 'mail', text: 'List : 1' },
     { cls: 'mail', text: 'Od   : Bar' },
-    { cls: 'mail', text: 'Temat: karteczka' },
+    { cls: 'mail', text: 'Temat: liscik 3' },
     { cls: 'mail', text: 'Data : Pn, 13 VII 2026, 02:13:58' },
     { cls: 'mail', text: '' },
     { cls: 'mail', text: 'Kocham Cie' },

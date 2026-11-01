@@ -60,11 +60,11 @@ function replayFreshListing(h: Harness): void {
   const { f } = h;
   f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
   f.fire(' 3. *R* Temat: inny', 'mail');
-  f.fire('Nadawca: Grault                         Wt, 23 XII 2025, 01:00:00', 'mail');
+  f.fire('Nadawca: Grault                         Wt, 24 VIII 1999, 01:00:00', 'mail');
   f.fire(' 2. *R* Temat: najnowszy', 'mail');
-  f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+  f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire(' 1. *R* Temat: srodkowy', 'mail');
-  f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+  f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
   f.fire('> ', 'prompt');
 }
 
@@ -79,7 +79,7 @@ test('ctx: pusty listing uniewaznia kontekst - klik w wpis robi re-kotwice', asy
 
     click(h, '.arkmail-entry'); // najnowszy z odebranych (stary kontekst)
     await waitFor(
-      () => f.sent.includes('listy odebrane przed 24 XII 2025'),
+      () => f.sent.includes('listy odebrane przed 25 VIII 1999'),
       're-kotwica: listing po dacie listu (dzien po)',
     );
     assert.ok(

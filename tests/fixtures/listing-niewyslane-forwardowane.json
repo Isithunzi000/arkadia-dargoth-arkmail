@@ -1,7 +1,6 @@
 {
   "name": "listing-niewyslane-forwardowane",
   "opis": "Niewyslane z '(forwardowany)' + poczatek listing odebranych 50 (pojedyncze odstepy)",
-  "zrodlo": "session_1768158676240.html",
   "lines": [
     {
       "cls": "command",
@@ -17,19 +16,19 @@
     },
     {
       "cls": "mail",
-      "text": " 2. Temat: zalakowany pergamin (forwardowany)"
+      "text": " 2. Temat: bilecik 6 (forwardowany)"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Bar                                     N, 11 I 2026, 21:55:14"
+      "text": "Odbiorcy: Bar                                     Nd, 12 IX 1999, 21:55:14"
     },
     {
       "cls": "mail",
-      "text": " 1. Temat: karteczka z rosomakiem (forwardowany)"
+      "text": " 1. Temat: zapiska 3 (forwardowany)"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Bar                                     N, 11 I 2026, 21:55:57"
+      "text": "Odbiorcy: Bar                                     Nd, 12 IX 1999, 21:55:57"
     },
     {
       "cls": "command",
@@ -45,43 +44,43 @@
     },
     {
       "cls": "mail",
-      "text": "50. *R* Temat: Skrawek papieru"
+      "text": "50. *R* Temat: dopisek 2"
     },
     {
       "cls": "mail",
-      "text": "Nadawca: Bar                           Sr, 7 I 2026, 02:07:56"
+      "text": "Nadawca: Bar                           Sr, 8 IX 1999, 02:07:56"
     },
     {
       "cls": "mail",
-      "text": "49. *R* Temat: Niewyprawiona skora goblina"
+      "text": "49. *R* Temat: notatka 2"
     },
     {
       "cls": "mail",
-      "text": "Nadawca: Bar                           Sr, 7 I 2026, 02:13:37"
+      "text": "Nadawca: Bar                           Sr, 8 IX 1999, 02:13:37"
     },
     {
       "cls": "mail",
-      "text": "48. *R* Temat: Skrawek papieru"
+      "text": "48. *R* Temat: dopisek 2"
     },
     {
       "cls": "mail",
-      "text": "Nadawca: Bar                           Sr, 7 I 2026, 02:14:24"
+      "text": "Nadawca: Bar                           Sr, 8 IX 1999, 02:14:24"
     },
     {
       "cls": "mail",
-      "text": "47. *R* Temat: karteczka"
+      "text": "47. *R* Temat: liscik 3"
     },
     {
       "cls": "mail",
-      "text": "Nadawca: Foo                         Sr, 7 I 2026, 02:31:22"
+      "text": "Nadawca: Foo                         Sr, 8 IX 1999, 02:31:22"
     },
     {
       "cls": "mail",
-      "text": "46. *R* Temat: Mokry skrawek papieru"
+      "text": "46. *R* Temat: karteczka 2"
     },
     {
       "cls": "mail",
-      "text": "Nadawca: Bar                           Sr, 7 I 2026, 03:44:15"
+      "text": "Nadawca: Bar                           Sr, 8 IX 1999, 03:44:15"
     }
   ]
 }

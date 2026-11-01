@@ -1,7 +1,6 @@
 {
   "name": "listing-niewyslane",
   "opis": "Listing niewyslanych: Odbiorcy zamiast Nadawcy",
-  "zrodlo": "session_1766262715076.html",
   "lines": [
     {
       "cls": "mail",
@@ -9,19 +8,19 @@
     },
     {
       "cls": "mail",
-      "text": " 2. Temat: Elementy rozbitego szkielka"
+      "text": " 2. Temat: liscik"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Foo                                  N, 21 XII 2025, 00:20:12"
+      "text": "Odbiorcy: Foo                                  Nd, 22 VIII 1999, 00:20:12"
     },
     {
       "cls": "mail",
-      "text": " 1. Temat: Opowiesci, zabawa i utracone wspomnienia"
+      "text": " 1. Temat: bilecik 2"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Xyzzy                                 N, 21 XII 2025, 00:31:18"
+      "text": "Odbiorcy: Xyzzy                                 Nd, 22 VIII 1999, 00:31:18"
     },
     {
       "cls": "command",
@@ -37,7 +36,7 @@
     },
     {
       "cls": "room.contents.living",
-      "text": "Zielonooka przejeta dziewczyna."
+      "text": "Przejeta dziewczyna."
     },
     {
       "cls": "prompt",

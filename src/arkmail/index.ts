@@ -711,7 +711,7 @@ export async function init(api: PluginApi) {
    * Serwer wysyla je po zalogowaniu oraz przy otrzymywaniu i czytaniu
    * poczty; klient emituje jako "gmcp.mail.state" (path lowercasowany
    * w gmcp.ts). Po co, skoro sa linie tekstowe: one potrafia sie rozjechac
-   * ze stanem (log 2026-01-04 01:03 - "Masz nowa poczte od Bar.", a 15 s
+   * ze stanem (log 1999-09-05 01:03 - "Masz nowa poczte od Bar.", a 15 s
    * pozniej przy ladowaniu zwierzecia "Nie masz zadnych nieprzeczytanych
    * listow.", choć list byl w skrzynce). GMCP jest WYZWALACZEM odswiezenia;
    * badge nadal liczy sie z listingow (computeBadge).
@@ -2268,7 +2268,7 @@ export async function init(api: PluginApi) {
       disarmSlucham();
     } else if (n.kind === "slucham") {
       // Fala 13d: "Slucham?" w oknie po naszym wyslaniu = serwer nie zna
-      // komendy, czyli brak zwierzecia pocztowego (log 2025-12-21).
+      // komendy, czyli brak zwierzecia pocztowego (log 1999-08-22).
       if (sluchamArmed) {
         disarmSlucham();
         endAnimalFlight();

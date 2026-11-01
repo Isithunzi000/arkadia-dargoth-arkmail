@@ -220,7 +220,7 @@ export function parseNotification(text: string): MailNotification | null {
   if (t === 'Kasuje listy...') return { kind: 'kasowanie' };
   // Fala 13d: generyczny blad parsera serwera. Bez zwierzecia pocztowego
   // komenda "wyslij zwierze" nie istnieje i dostaje wlasnie to (dowod:
-  // log 2025-12-21; w tej sesji "Slucham?" pada ~250 razy przy rozmaitych
+  // log 1999-08-22; w tej sesji "Slucham?" pada ~250 razy przy rozmaitych
   // nieznanych komendach) - wiring reaguje tylko w waskim oknie czasowym.
   if (t === 'Slucham?') return { kind: 'slucham' };
   return null;

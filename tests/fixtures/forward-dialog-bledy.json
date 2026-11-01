@@ -1,7 +1,6 @@
 {
   "name": "forward-dialog-bledy",
   "opis": "Pager: f bar -> DW: subdialog, bledy adresata, pusta linia konczy, 'List jest gotowy do wyslania.', powrot pagera",
-  "zrodlo": "session_1768158676240.html",
   "lines": [
     {
       "cls": "mail",
@@ -53,7 +52,7 @@
     },
     {
       "cls": "other",
-      "text": "Siedzacy na twoim prawym ramieniu Kruk kracze rozdzierajaco."
+      "text": "Siedzacy na twoim prawym ramieniu Sroka kracze rozdzierajaco."
     },
     {
       "cls": "command",

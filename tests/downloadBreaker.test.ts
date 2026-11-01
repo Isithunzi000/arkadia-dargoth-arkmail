@@ -49,16 +49,16 @@ const downloadBtn = (h: Harness): { textContent: string; dispatchEvent(e: unknow
   return b;
 };
 
-/** Laduje skrzynke wyslane z 2 listami (dni 24 i 25 XII 2025). */
+/** Laduje skrzynke wyslane z 2 listami (dni 24 i 26 VIII 1999). */
 async function loadWyslane(h: Harness): Promise<void> {
   const { f } = h;
   click(h, '[data-box="wyslane"]');
   await waitRt(() => f.sent.includes('listy wyslane'), 'komenda listy wyslane');
   f.fire('Listy wyslane (prezentowane jest pierwsze 50):', 'mail');
   f.fire(' 2. Temat: paczka', 'mail');
-  f.fire('Odbiorcy: Bar                           Sr, 24 XII 2025, 10:00:00', 'mail');
+  f.fire('Odbiorcy: Bar                           Sr, 25 VIII 1999, 10:00:00', 'mail');
   f.fire(' 1. Temat: wyjsciowy', 'mail');
-  f.fire('Odbiorcy: Bar                           Cz, 25 XII 2025, 11:00:00', 'mail');
+  f.fire('Odbiorcy: Bar                           Cz, 26 VIII 1999, 11:00:00', 'mail');
   f.fire('> ', 'prompt');
   await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji wyslanych');
 }
@@ -83,7 +83,7 @@ async function answerMissing(h: Harness, n: number): Promise<void> {
   const { f } = h;
   f.fire('Listy odebrane:', 'mail');
   f.fire(' 1. *R* Temat: inny', 'mail');
-  f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+  f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
   f.fire('> ', 'prompt');
 }
 
@@ -93,13 +93,13 @@ async function answerOk(h: Harness, n: number): Promise<void> {
   const { f } = h;
   f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
   f.fire(' 1. *R* Temat: najnowszy', 'mail');
-  f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+  f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire('> ', 'prompt');
   await waitRt(() => f.sent.includes('przeczytaj list 1'), 'odczyt listu');
   f.fire('List : 1', 'mail');
   f.fire('Od   : Corge', 'mail');
   f.fire('Temat: najnowszy', 'mail');
-  f.fire('Data : Wt, 23 XII 2025, 00:11:12', 'mail');
+  f.fire('Data : Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire('', 'mail');
   f.fire('Tresc najnowszego.', 'mail');
   f.fire('[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ', 'mail');

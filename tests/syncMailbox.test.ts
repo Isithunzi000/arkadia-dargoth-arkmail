@@ -63,11 +63,11 @@ const entry = (
     party: opts.party ?? 'Foo',
     partyKind: 'nadawca',
     date: {
-      raw: opts.raw ?? `N, ${10 + seq} XII 2025, 10:00:00`,
+      raw: opts.raw ?? `N, ${10 + seq} VIII 1999, 10:00:00`,
       weekday: 'N',
       day: 10 + seq,
-      month: 12,
-      year: 2025,
+      month: 8,
+      year: 1999,
       time: '10:00:00',
     },
   };
@@ -75,16 +75,16 @@ const entry = (
 
 test('sync: aktualizuje wpisy w miejscu i zachowuje wczytane starsze strony', () => {
   const s = new MailUiStore();
-  const e1 = entry('najstarszy', { raw: 'N, 21 XII 2025, 01:15:04' });
-  const e2 = entry('srodkowy', { isRead: false, raw: 'Pn, 22 XII 2025, 02:20:05' });
-  const e3 = entry('najnowszy', { raw: 'Wt, 23 XII 2025, 00:11:12' });
+  const e1 = entry('najstarszy', { raw: 'Nd, 22 VIII 1999, 01:15:04' });
+  const e2 = entry('srodkowy', { isRead: false, raw: 'Pn, 23 VIII 1999, 02:20:05' });
+  const e3 = entry('najnowszy', { raw: 'Wt, 24 VIII 1999, 00:11:12' });
   s.applyMailbox('odebrane', {
     kind: 'lista',
     header: { box: 'odebrane', truncated: true },
     entries: [e1, e2, e3],
   });
-  const o1 = entry('prastary', { party: 'Waldo', raw: 'So, 20 XII 2025, 10:00:00' });
-  const o2 = entry('antyczny', { party: 'Baz', raw: 'Pt, 19 XII 2025, 09:00:00' });
+  const o1 = entry('prastary', { party: 'Waldo', raw: 'So, 21 VIII 1999, 10:00:00' });
+  const o2 = entry('antyczny', { party: 'Baz', raw: 'Pt, 20 VIII 1999, 09:00:00' });
   s.appendMailboxPage('odebrane', [o1, o2], true);
   assert.equal(s.state.boxes.odebrane!.entries.length, 5, '5 wpisow przed sync');
 
@@ -102,15 +102,15 @@ test('sync: aktualizuje wpisy w miejscu i zachowuje wczytane starsze strony', ()
 
 test('sync: nowe listy dokleja NA KONCU tablicy (koniec najnowszy)', () => {
   const s = new MailUiStore();
-  const e1 = entry('najstarszy', { raw: 'N, 21 XII 2025, 01:15:04' });
-  const e2 = entry('srodkowy', { raw: 'Pn, 22 XII 2025, 02:20:05' });
-  const e3 = entry('najnowszy', { raw: 'Wt, 23 XII 2025, 00:11:12' });
+  const e1 = entry('najstarszy', { raw: 'Nd, 22 VIII 1999, 01:15:04' });
+  const e2 = entry('srodkowy', { raw: 'Pn, 23 VIII 1999, 02:20:05' });
+  const e3 = entry('najnowszy', { raw: 'Wt, 24 VIII 1999, 00:11:12' });
   s.applyMailbox('odebrane', {
     kind: 'lista',
     header: { box: 'odebrane', truncated: true },
     entries: [e1, e2, e3],
   });
-  const nowy = entry('swiezy', { party: 'Grault', raw: 'Cz, 24 XII 2025, 08:00:00' });
+  const nowy = entry('swiezy', { party: 'Grault', raw: 'Sr, 25 VIII 1999, 08:00:00' });
   const r = sync(s, 'odebrane', [e1, e2, e3, nowy], true);
   assert.deepEqual(r, { updated: 3, added: 1, removed: 0 });
   const entries = s.state.boxes.odebrane!.entries;
@@ -132,9 +132,9 @@ test('sync: null gdy brak widoku lub widok pusty (caller robi applyMailbox)', ()
 
 test('sync: kompletny listing (bez uciecia) usuwa wpisy, ktorych serwer nie raportuje', () => {
   const s = new MailUiStore();
-  const e1 = entry('najstarszy', { raw: 'N, 21 XII 2025, 01:15:04' });
-  const e2 = entry('srodkowy', { raw: 'Pn, 22 XII 2025, 02:20:05' });
-  const e3 = entry('najnowszy', { raw: 'Wt, 23 XII 2025, 00:11:12' });
+  const e1 = entry('najstarszy', { raw: 'Nd, 22 VIII 1999, 01:15:04' });
+  const e2 = entry('srodkowy', { raw: 'Pn, 23 VIII 1999, 02:20:05' });
+  const e3 = entry('najnowszy', { raw: 'Wt, 24 VIII 1999, 00:11:12' });
   s.applyMailbox('nieprzeczytane', {
     kind: 'lista',
     header: { box: 'nieprzeczytane', truncated: false },
@@ -153,7 +153,7 @@ test('sync: kompletny listing (bez uciecia) usuwa wpisy, ktorych serwer nie rapo
 
 test('sync: znacznik uciecia zdejmowany dopiero, gdy listing kompletny', () => {
   const s = new MailUiStore();
-  const e1 = entry('najstarszy', { raw: 'N, 21 XII 2025, 01:15:04' });
+  const e1 = entry('najstarszy', { raw: 'Nd, 22 VIII 1999, 01:15:04' });
   s.applyMailbox('odebrane', {
     kind: 'lista',
     header: { box: 'odebrane', truncated: true },
@@ -167,7 +167,7 @@ test('sync: znacznik uciecia zdejmowany dopiero, gdy listing kompletny', () => {
 
 test('sync: kompletny listing moze ponownie stac sie uciety', () => {
   const s = new MailUiStore();
-  const e1 = entry('najstarszy', { raw: 'N, 21 XII 2025, 01:15:04' });
+  const e1 = entry('najstarszy', { raw: 'Nd, 22 VIII 1999, 01:15:04' });
   s.applyMailbox('odebrane', {
     kind: 'lista',
     header: { box: 'odebrane', truncated: false },
@@ -183,12 +183,12 @@ test('sync: kompletny listing moze ponownie stac sie uciety', () => {
 async function loadOlderPage(h: Harness): Promise<void> {
   const { f, waitFor } = h;
   click(h, '.arkmail-older');
-  await waitFor(() => f.sent.includes('listy odebrane przed 22 XII 2025'), 'kotwica');
+  await waitFor(() => f.sent.includes('listy odebrane przed 23 VIII 1999'), 'kotwica');
   f.fire('Wybrane listy odebrane:', 'mail');
   f.fire(' 2. *R* Temat: prastary', 'mail');
-  f.fire('Nadawca: Waldo                          So, 20 XII 2025, 10:00:00', 'mail');
+  f.fire('Nadawca: Waldo                          So, 21 VIII 1999, 10:00:00', 'mail');
   f.fire(' 1. *R* Temat: antyczny', 'mail');
-  f.fire('Nadawca: Baz                          Pt, 19 XII 2025, 09:00:00', 'mail');
+  f.fire('Nadawca: Baz                          Pt, 20 VIII 1999, 09:00:00', 'mail');
   f.fire('> ', 'prompt');
   await waitFor(() => h.content.querySelectorAll('.arkmail-entry').length === 5, '5 wierszy');
 }
@@ -214,11 +214,11 @@ test('klik skrzynki po wczytaniu starszych: sync zachowuje 5 wierszy i aktualizu
     // Swieza strona: 'najnowszy' bez *R* (kiedys nieprzeczytany wrocil).
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 3. *R* Temat: najstarszy', 'mail');
-    f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
     f.fire(' 2. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire(' 1. Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
 
     // Najpierw czekamy az swiezy listing ZOSTANIE zastosowany (znacznik
@@ -252,20 +252,20 @@ test('powiadomienie o nowej poczcie: nowy list ląduje na GORZE widoku, strony z
     );
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 4. *R* Temat: najstarszy', 'mail');
-    f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
     f.fire(' 3. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire(' 2. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire(' 1. Temat: swiezy', 'mail');
-    f.fire('Nadawca: Grault                         Cz, 24 XII 2025, 08:00:00', 'mail');
+    f.fire('Nadawca: Grault                         Sr, 25 VIII 1999, 08:00:00', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(
       () => f.sent.filter((c) => c === 'listy nieprzeczytane').length === 2,
       'refresh nieprzeczytanych',
     );
     f.fire(' 1. Temat: swiezy', 'mail');
-    f.fire('Nadawca: Grault                         Cz, 24 XII 2025, 08:00:00', 'mail');
+    f.fire('Nadawca: Grault                         Sr, 25 VIII 1999, 08:00:00', 'mail');
     f.fire('> ', 'prompt');
 
     await waitFor(() => content.querySelectorAll('.arkmail-entry').length === 6, '6 wierszy');
@@ -320,19 +320,19 @@ const onDay = (e: MailboxEntry, day: number, time = '10:00:00'): MailboxEntry =>
 
 test('sync: uciety listing z granica dnia usuwa tylko nowsze znikniete wpisy', () => {
   const s = new MailUiStore();
-  const starszy = onDay(entry('starszy', { raw: 'N, 21 XII 2025, 01:15:04' }), 21); // < granica
-  const granicznyA = onDay(entry('graniczny-rano', { raw: 'Pn, 22 XII 2025, 02:20:05' }), 22, '02:20:05');
-  const granicznyB = onDay(entry('graniczny-wieczor', { raw: 'Pn, 22 XII 2025, 23:50:00' }), 22, '23:50:00');
-  const nowszy = onDay(entry('nowszy', { party: 'Corge', raw: 'Wt, 23 XII 2025, 00:11:12' }), 23); // > granica
+  const starszy = onDay(entry('starszy', { raw: 'Nd, 22 VIII 1999, 01:15:04' }), 22); // < granica
+  const granicznyA = onDay(entry('graniczny-rano', { raw: 'Pn, 23 VIII 1999, 02:20:05' }), 23, '02:20:05');
+  const granicznyB = onDay(entry('graniczny-wieczor', { raw: 'Pn, 23 VIII 1999, 23:50:00' }), 23, '23:50:00');
+  const nowszy = onDay(entry('nowszy', { party: 'Corge', raw: 'Wt, 24 VIII 1999, 00:11:12' }), 24); // > granica
   s.applyMailbox('odebrane', {
     kind: 'lista',
     header: { box: 'odebrane', truncated: true },
     entries: [starszy, granicznyA, granicznyB, nowszy],
   });
 
-  // Swieza strona ucieta, najstarszy dzien na niej = 22 XII: raportuje
-  // tylko granicznyA; brak nowszego (23 XII) = skasowany na serwerze.
-  const r = syncPrune(s, 'odebrane', [granicznyA], true, '2025-12-22');
+  // Swieza strona ucieta, najstarszy dzien na niej = 23 VIII: raportuje
+  // tylko granicznyA; brak nowszego (24 VIII) = skasowany na serwerze.
+  const r = syncPrune(s, 'odebrane', [granicznyA], true, '1999-08-23');
   assert.deepEqual(r, { updated: 1, added: 0, removed: 1 }, 'usuniety tylko nowszy znikniety');
   const subjects = s.state.boxes.odebrane!.entries.map((e) => e.subject);
   assert.deepEqual(
@@ -346,14 +346,14 @@ test('sync: granica dnia nie rusza wpisow bez daty', () => {
   const s = new MailUiStore();
   const bezDaty = entry('bez-daty');
   bezDaty.date = null;
-  const nowszy = onDay(entry('nowszy', { party: 'Corge', raw: 'Wt, 23 XII 2025, 00:11:12' }), 23);
-  const graniczny = onDay(entry('graniczny', { raw: 'Pn, 22 XII 2025, 02:20:05' }), 22, '02:20:05');
+  const nowszy = onDay(entry('nowszy', { party: 'Corge', raw: 'Wt, 24 VIII 1999, 00:11:12' }), 24);
+  const graniczny = onDay(entry('graniczny', { raw: 'Pn, 23 VIII 1999, 02:20:05' }), 23, '02:20:05');
   s.applyMailbox('odebrane', {
     kind: 'lista',
     header: { box: 'odebrane', truncated: true },
     entries: [bezDaty, graniczny, nowszy],
   });
-  const r = syncPrune(s, 'odebrane', [graniczny], true, '2025-12-22');
+  const r = syncPrune(s, 'odebrane', [graniczny], true, '1999-08-23');
   assert.deepEqual(r, { updated: 1, added: 0, removed: 1 }, 'tylko nowszy z data usuniety');
   const subjects = s.state.boxes.odebrane!.entries.map((e) => e.subject);
   assert.deepEqual(subjects, ['bez-daty', 'graniczny'], 'wpis bez daty zostaje');
@@ -361,8 +361,8 @@ test('sync: granica dnia nie rusza wpisow bez daty', () => {
 
 test('sync: bez granicy dnia (3 argumenty) uciety listing nic nie usuwa - jak dotad', () => {
   const s = new MailUiStore();
-  const e1 = entry('najstarszy', { raw: 'N, 21 XII 2025, 01:15:04' });
-  const e2 = entry('najnowszy', { party: 'Corge', raw: 'Wt, 23 XII 2025, 00:11:12' });
+  const e1 = entry('najstarszy', { raw: 'Nd, 22 VIII 1999, 01:15:04' });
+  const e2 = entry('najnowszy', { party: 'Corge', raw: 'Wt, 24 VIII 1999, 00:11:12' });
   s.applyMailbox('odebrane', {
     kind: 'lista',
     header: { box: 'odebrane', truncated: true },
@@ -391,7 +391,7 @@ test('integracja: puste Szukaj odswieza pelna skrzynke i usuwa skasowany nowszy 
     // Najstarszy dzien strony = 22 XII = granica.
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 1. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire('> ', 'prompt');
 
     await waitFor(() => count() === 2, 'martwy wpis zniknal z widoku');

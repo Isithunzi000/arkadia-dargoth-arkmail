@@ -179,7 +179,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     { cls: 'mail', text: 'Od   : Foo' },
     { cls: 'mail', text: 'Temat: --' },
     { cls: 'mail', text: 'Do   : Bar' },
-    { cls: 'mail', text: 'Data : Wt, 23 XII 2025, 00:11:12' },
+    { cls: 'mail', text: 'Data : Wt, 24 VIII 1999, 00:11:12' },
     { cls: 'mail', text: 'tresc...' },
   ]);
   abort = true;
@@ -199,11 +199,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // --- E11: sonda sciany (26c): komendy kotwicy normalna vs sonda ---------------
 {
-  const oldest = { day: 20, month: 12, year: 2025 };
+  const oldest = { day: 21, month: 8, year: 1999 };
   const normalna = olderListingCommand('wyslane', nextDay(oldest));
   const sonda = olderListingCommand('wyslane', oldest);
-  ok('E11a kotwica naklada dzien (przed D+1)', normalna === 'listy wyslane przed 21 XII 2025', normalna);
-  ok('E11b sonda wyklucza dzien (przed D)', sonda === 'listy wyslane przed 20 XII 2025', sonda);
+  ok('E11a kotwica naklada dzien (przed D+1)', normalna === 'listy wyslane przed 22 VIII 1999', normalna);
+  ok('E11b sonda wyklucza dzien (przed D)', sonda === 'listy wyslane przed 21 VIII 1999', sonda);
 }
 
 // --- R1: SessionLock: serializacja, wyjatki, idempotentne zwolnienie ----------

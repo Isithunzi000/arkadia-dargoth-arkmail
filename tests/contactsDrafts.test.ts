@@ -27,7 +27,7 @@ function entry(over: Partial<MailboxEntry> = {}): MailboxEntry {
     forwarded: false,
     party: 'Qux',
     partyKind: 'odbiorcy',
-    date: date('Wt, 23 XII 2025, 00:11:12'),
+    date: date('Wt, 24 VIII 1999, 00:11:12'),
     ...over,
   };
 }

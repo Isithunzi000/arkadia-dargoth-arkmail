@@ -32,7 +32,7 @@ function entry(over: Partial<MailboxEntry> = {}): MailboxEntry {
     forwarded: false,
     party: 'Foo',
     partyKind: 'nadawca',
-    date: date('Wt, 23 XII 2025, 00:11:12'),
+    date: date('Wt, 24 VIII 1999, 00:11:12'),
     ...over,
   };
 }
@@ -82,7 +82,7 @@ test('archiwum: sortowanie malejaco po dacie (najnowsze pierwsze)', () => {
   const starszy = fromMailboxEntry('odebrane', entry({
     number: 1,
     subject: 'Stary',
-    date: date('Pn, 1 I 2024, 10:00:00'),
+    date: date('Pn, 1 I 1998, 10:00:00'),
   }));
   const nowszy = fromMailboxEntry('odebrane', entry());
   const { letters } = upsertLetters([], [starszy, nowszy]);
@@ -101,9 +101,9 @@ test('archiwum: filtr tematu - podciag, bez rozrozniania wielkosci', () => {
 
 test('archiwum: filtr tresc przeszukuje body, filtr od po stronie listu', () => {
   const a = fromMailboxEntry('odebrane', entry());
-  const zTrescia: ArchiveLetter = { ...a, body: ['Grazie za wiesci.'] };
+  const zTrescia: ArchiveLetter = { ...a, body: ['Pisze krotko, bo sprawa pilna.'] };
   const { letters } = upsertLetters([], [zTrescia]);
-  assert.equal(filterLetters(letters, { tresc: 'wiesci' }).length, 1);
+  assert.equal(filterLetters(letters, { tresc: 'pilna' }).length, 1);
   assert.equal(filterLetters(letters, { tresc: 'nie-ma-tego' }).length, 0);
   assert.equal(filterLetters(letters, { od: 'fo' }).length, 1);
   assert.equal(filterLetters(letters, { od: 'inny' }).length, 0);
@@ -116,21 +116,21 @@ test('archiwum: filtr tresc przeszukuje body, filtr od po stronie listu', () => 
 test('archiwum: zakres dat wlacznie (odDaty/doDaty)', () => {
   const a = fromMailboxEntry('odebrane', entry());
   const { letters } = upsertLetters([], [a]);
-  assert.equal(filterLetters(letters, { odDaty: '2025-12-01', doDaty: '2025-12-31' }).length, 1);
-  assert.equal(filterLetters(letters, { odDaty: '2026-01-01' }).length, 0);
-  assert.equal(filterLetters(letters, { doDaty: '2025-12-22' }).length, 0);
+  assert.equal(filterLetters(letters, { odDaty: '1999-08-09', doDaty: '1999-09-01' }).length, 1);
+  assert.equal(filterLetters(letters, { odDaty: '1999-09-02' }).length, 0);
+  assert.equal(filterLetters(letters, { doDaty: '1999-08-23' }).length, 0);
 });
 
 test('paginacja: komenda listy <skrzynka> przed <d> <M RZYMSKI> <y>', () => {
   // Serwer wymaga WIELKIEJ litery miesiaca (log 2026-10-17: "Data zostala
   // podana w zlym formacie. Przykladowy format to: 13 X 2007.").
   assert.equal(
-    olderListingCommand('wyslane', date('Cz, 9 III 2026, 12:00:00')),
-    'listy wyslane przed 9 III 2026',
+    olderListingCommand('wyslane', date('Pn, 27 IX 1999, 12:00:00')),
+    'listy wyslane przed 27 IX 1999',
   );
   assert.equal(
-    olderListingCommand('odebrane', date('Wt, 23 XII 2025, 00:11:12')),
-    'listy odebrane przed 23 XII 2025',
+    olderListingCommand('odebrane', date('Wt, 24 VIII 1999, 00:11:12')),
+    'listy odebrane przed 24 VIII 1999',
   );
 });
 
@@ -174,7 +174,7 @@ test('fromOpenedLetter: z wpisu listingu - id zgodne, flaga forwarded, read', ()
     subject: 'najnowszy',
     to: '',
     cc: null,
-    date: 'Wt, 23 XII 2025, 00:11:12',
+    date: 'Wt, 24 VIII 1999, 00:11:12',
     body: ['czesc', 'co slychac'],
   };
   const a = fromOpenedLetter('odebrane', letter, e);
@@ -188,16 +188,16 @@ test('fromOpenedLetter: bez wpisu listingu - fallback z naglowkow pagera', () =>
   const letter = {
     number: 7,
     from: '',
-    subject: 'karteczka',
+    subject: 'liscik 3',
     to: 'Bar',
     cc: null,
-    date: 'Cz, 16 IV 2026, 00:31:37',
+    date: 'Cz, 28 X 1999, 00:31:37',
     body: ['x'],
   };
   const wyslany = fromOpenedLetter('wyslane', letter);
   assert.equal(wyslany.party, 'Bar', 'wyslane: strona listu to adresat (Do)');
-  assert.equal(wyslany.sortKey, '2026-04-16 00:31:37');
+  assert.equal(wyslany.sortKey, '1999-10-28 00:31:37');
   const odebrany = fromOpenedLetter('odebrane', { ...letter, from: 'Grault' });
   assert.equal(odebrany.party, 'Grault', 'odebrane: strona listu to nadawca (Od)');
-  assert.equal(odebrany.dateRaw, 'Cz, 16 IV 2026, 00:31:37');
+  assert.equal(odebrany.dateRaw, 'Cz, 28 X 1999, 00:31:37');
 });

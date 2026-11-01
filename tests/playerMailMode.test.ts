@@ -55,7 +55,7 @@ test('powrot zwierzecia odswieza tez niewyslane i wyslane (Fala 24f1)', async ()
   answered.clear();
   const h = await startHarness();
   try {
-    h.f.fire('Wsrod trzepotu skrzydel Kruk laduje na twoim prawym ramieniu.', 'mail');
+    h.f.fire('Wsrod trzepotu skrzydel Sroka laduje na twoim prawym ramieniu.', 'mail');
     await answerEmpty(h, 'odebrane');
     await answerEmpty(h, 'nieprzeczytane');
     await answerEmpty(h, 'niewyslane');

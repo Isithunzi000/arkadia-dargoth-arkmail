@@ -2,7 +2,7 @@
  * Opozniony retry odswiezenia odebranych po nowej poczcie (Fala 16a).
  *
  * Problem (log sesji 2026-10-19 16:47:36): "[ POCZTA ] Masz nowa poczte
- * od Kruka." i GMCP przychodza NATYCHMIAST, ale serwer aktualizuje
+ * od Baza." i GMCP przychodza NATYCHMIAST, ale serwer aktualizuje
  * skrzynke odebranych z lagiem - listing pobrany od razu NIE zawieral
  * nowego listu (najnowszy wpis nadal z 7 X); dopiero reczny refresh
  * ~22 s pozniej pokazal list. Zadne kolejne zdarzenie nie wyzwalalo
@@ -48,11 +48,11 @@ test('harness: po nowej poczcie leci refresh natychmiast i opozniony retry', asy
     await waitFor(() => countSent(f.sent, 'listy odebrane') === base + 1, 'natychmiastowy refresh odebranych');
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 3. *R* Temat: najstarszy', 'mail');
-    f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
     f.fire(' 2. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(() => f.sent.includes('listy nieprzeczytane'), 'refresh nieprzeczytanych');
     f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');

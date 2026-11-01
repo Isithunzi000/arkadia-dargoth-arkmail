@@ -61,7 +61,7 @@ test('mailbox: sierocy pager zjada "listy" - q, prompt gry i powtorka komendy', 
   await t.replay([
     { cls: 'mail', text: 'Listy odebrane (prezentowane jest pierwsze 50):' },
     { cls: 'mail', text: ' 1. *R* Temat: najnowszy' },
-    { cls: 'mail', text: 'Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12' },
+    { cls: 'mail', text: 'Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12' },
     { cls: 'prompt', text: '> ' },
   ]);
   const out = await op;
@@ -98,7 +98,7 @@ test('pager: shouldAbort w toku odczytu - domkniecie q i odrzucenie "przerwano"'
     { cls: 'mail', text: 'List : 1' },
     { cls: 'mail', text: 'Od   : Corge' },
     { cls: 'mail', text: 'Temat: najnowszy' },
-    { cls: 'mail', text: 'Data : Wt, 23 XII 2025, 00:11:12' },
+    { cls: 'mail', text: 'Data : Wt, 24 VIII 1999, 00:11:12' },
     { cls: 'mail', text: '' },
     { cls: 'mail', text: 'Tresc pierwszego.' },
     { cls: 'mail', text: PAGER_PROMPT },
@@ -130,11 +130,11 @@ function replayListing3(h: Harness): void {
   const { f } = h;
   f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
   f.fire(' 3. *R* Temat: najstarszy', 'mail');
-  f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+  f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
   f.fire(' 2. *R* Temat: srodkowy', 'mail');
-  f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+  f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
   f.fire(' 1. *R* Temat: najnowszy', 'mail');
-  f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+  f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire('> ', 'prompt');
 }
 
@@ -143,7 +143,7 @@ function replayLetter(h: Harness, numer: number, subject: string, body: string):
   f.fire(`List : ${numer}`, 'mail');
   f.fire('Od   : Corge', 'mail');
   f.fire(`Temat: ${subject}`, 'mail');
-  f.fire('Data : Wt, 23 XII 2025, 00:11:12', 'mail');
+  f.fire('Data : Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire('', 'mail');
   f.fire(body, 'mail');
   f.fire(`[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: ${numer}) -- `, 'mail');
@@ -168,7 +168,7 @@ test('archiwum: wyjatek z re-kotwicy nie zabija petli pobierania tresci', async 
     // Petla uzyje wpisow z aktualnej bazy.
 
     await waitRt(
-      () => f.sent.includes('listy odebrane przed 24 XII 2025'),
+      () => f.sent.includes('listy odebrane przed 25 VIII 1999'),
       're-kotwica pierwszego listu',
     );
     // Serwer odpowiada linia-bledem: fetch odrzuca, resolveEntry rzuca.
@@ -176,7 +176,7 @@ test('archiwum: wyjatek z re-kotwicy nie zabija petli pobierania tresci', async 
 
     // Petla ma policzyc porazke i jechac dalej - re-kotwica drugiego listu.
     await waitRt(
-      () => f.sent.includes('listy odebrane przed 23 XII 2025'),
+      () => f.sent.includes('listy odebrane przed 24 VIII 1999'),
       'petla zyje: re-kotwica drugiego listu po wyjatku',
     );
     replayListing3(h);
@@ -184,7 +184,7 @@ test('archiwum: wyjatek z re-kotwicy nie zabija petli pobierania tresci', async 
     replayLetter(h, 2, 'srodkowy', 'Tresc drugiego.');
 
     await waitRt(
-      () => f.sent.includes('listy odebrane przed 22 XII 2025'),
+      () => f.sent.includes('listy odebrane przed 23 VIII 1999'),
       're-kotwica trzeciego listu',
     );
     replayListing3(h);

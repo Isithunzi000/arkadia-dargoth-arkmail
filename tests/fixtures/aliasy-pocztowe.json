@@ -1,7 +1,6 @@
 {
   "name": "aliasy-pocztowe",
   "opis": "Wydruk zdefiniowanych aliasow pocztowych",
-  "zrodlo": "session_1770479989737.html",
   "lines": [
     {
       "cls": "other",
@@ -25,7 +24,7 @@
     },
     {
       "cls": "mail",
-      "text": "\tpoltorak: Bar"
+      "text": "\tfoo: Bar"
     },
     {
       "cls": "prompt",
@@ -33,7 +32,7 @@
     },
     {
       "cls": "comm",
-      "text": "Smukly kruczowlosy elf (Tsches NPC) mowi do siebie: Ciekawe kiedy otworza gildie bardow..."
+      "text": "Smukly elf (NPC) mowi do siebie: Ciekawe, kiedy otworza gildie bardow..."
     },
     {
       "cls": "command",
@@ -41,7 +40,7 @@
     },
     {
       "cls": "other",
-      "text": "Nazwa klubu: Hanza Kwiecisty Poltorak"
+      "text": "Nazwa klubu: Klub Foo"
     },
     {
       "cls": "other",

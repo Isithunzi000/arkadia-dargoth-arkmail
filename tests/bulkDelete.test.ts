@@ -25,7 +25,7 @@ const entry = (
   number: number,
   party: string,
   subject: string,
-  dateRaw = 'Wt, 23 XII 2025, 00:11:12',
+  dateRaw = 'Wt, 24 VIII 1999, 00:11:12',
 ): MailboxEntry => ({
   number,
   isRead: true,
@@ -36,9 +36,9 @@ const entry = (
   date: {
     raw: dateRaw,
     weekday: 'Wt',
-    day: 23,
-    month: 12,
-    year: 2025,
+    day: 24,
+    month: 8,
+    year: 1999,
     time: dateRaw.slice(-8),
   },
 });
@@ -76,7 +76,7 @@ test('usuwanie zbiorcze: duplikaty porownywane sa jako liczba wystapien', async 
 test('usuwanie zbiorcze: potwierdzony list i jego blizniak USUWANE fizycznie z Archiwum (Fala 28)', async () => {
   const { applyConfirmedDeletions } = await loadModule();
   const removed = entry(4, 'Foo', 'A');
-  const other = entry(3, 'Bar', 'B', 'Pn, 22 XII 2025, 02:20:05');
+  const other = entry(3, 'Bar', 'B', 'Pn, 23 VIII 1999, 02:20:05');
   const archive = [
     fromMailboxEntry('odebrane', removed),
     fromMailboxEntry('nieprzeczytane', { ...removed, isRead: false }),

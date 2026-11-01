@@ -71,11 +71,11 @@ const letterBodyShows = (h: Harness, fragment: string): boolean =>
 const LISTING3_FULL = [
   'Listy odebrane:',
   ' 3. *R* Temat: najstarszy',
-  'Nadawca: Foo                        N, 21 XII 2025, 01:15:04',
+  'Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04',
   ' 2. *R* Temat: srodkowy',
-  'Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05',
+  'Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05',
   ' 1. *R* Temat: najnowszy',
-  'Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12',
+  'Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12',
 ];
 
 /** Listing z trzema wpisami prologu (numery jak na starcie). */
@@ -83,11 +83,11 @@ function replayListing3(h: Harness): void {
   const { f } = h;
   f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
   f.fire(' 3. *R* Temat: najstarszy', 'mail');
-  f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+  f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
   f.fire(' 2. *R* Temat: srodkowy', 'mail');
-  f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+  f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
   f.fire(' 1. *R* Temat: najnowszy', 'mail');
-  f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+  f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire('> ', 'prompt');
 }
 
@@ -97,7 +97,7 @@ function replayLetter(h: Harness, numer: number, subject: string, body: string):
   f.fire(`List : ${numer}`, 'mail');
   f.fire('Od   : Corge', 'mail');
   f.fire(`Temat: ${subject}`, 'mail');
-  f.fire('Data : Wt, 23 XII 2025, 00:11:12', 'mail');
+  f.fire('Data : Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire('', 'mail');
   f.fire(body, 'mail');
   f.fire(`[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: ${numer}) -- `, 'mail');
@@ -123,17 +123,17 @@ test('archiwum: pobieranie tresci - uzbrojenie, petla, podsumowanie, cache', asy
 
     // Drugi klik startuje pobieranie kandydatow z aktualnej bazy.
     clickDownload(h);
-    await waitRt(() => f.sent.includes('listy odebrane przed 24 XII 2025'), 're-kotwica najnowszego');
+    await waitRt(() => f.sent.includes('listy odebrane przed 25 VIII 1999'), 're-kotwica najnowszego');
     replayListing3(h);
     await waitRt(() => f.sent.includes('przeczytaj list 1'), 'odczyt najnowszego');
     replayLetter(h, 1, 'najnowszy', 'Tresc pierwszego.');
 
-    await waitRt(() => f.sent.includes('listy odebrane przed 23 XII 2025'), 're-kotwica srodkowego');
+    await waitRt(() => f.sent.includes('listy odebrane przed 24 VIII 1999'), 're-kotwica srodkowego');
     replayListing3(h);
     await waitRt(() => f.sent.includes('przeczytaj list 2'), 'odczyt srodkowego');
     replayLetter(h, 2, 'srodkowy', 'Tresc drugiego.');
 
-    await waitRt(() => f.sent.includes('listy odebrane przed 22 XII 2025'), 're-kotwica najstarszego');
+    await waitRt(() => f.sent.includes('listy odebrane przed 23 VIII 1999'), 're-kotwica najstarszego');
     replayListing3(h);
     await waitRt(() => f.sent.includes('przeczytaj list 3'), 'odczyt najstarszego');
     replayLetter(h, 3, 'najstarszy', 'Tresc trzeciego.');
@@ -176,7 +176,7 @@ test('archiwum: pobieranie tresci - Przerwij konczy petle po biezacym liscie', a
     click(h, '[data-tab="archiwum"]');
     clickDownload(h); // uzbrojenie
     clickDownload(h); // start
-    await waitRt(() => f.sent.includes('listy odebrane przed 24 XII 2025'), 're-kotwica');
+    await waitRt(() => f.sent.includes('listy odebrane przed 25 VIII 1999'), 're-kotwica');
     replayListing3(h);
     await waitRt(() => f.sent.includes('przeczytaj list 1'), 'odczyt pierwszego');
 
@@ -195,7 +195,7 @@ test('archiwum: pobieranie tresci - Przerwij konczy petle po biezacym liscie', a
     );
     assert.ok(!f.sent.includes('przeczytaj list 2'), 'petla stala po przerwaniu');
     assert.ok(
-      !f.sent.includes('listy odebrane przed 23 XII 2025'),
+      !f.sent.includes('listy odebrane przed 24 VIII 1999'),
       'brak kolejnej re-kotwicy po przerwaniu',
     );
   } finally {

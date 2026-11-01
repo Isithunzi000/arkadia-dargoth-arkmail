@@ -18,7 +18,7 @@ import assert from 'node:assert/strict';
 import { fromMailboxEntry, withOccurrenceBodies, type ArchiveLetter } from '../src/arkmail/core/archive';
 import { archiveExportEntries } from '../src/arkmail/core/exportTxt';
 
-const DATE_RAW = 'Wt, 23 XII 2025, 10:00:00';
+const DATE_RAW = 'Wt, 24 VIII 1999, 10:00:00';
 
 const entry = (subject: string) =>
   fromMailboxEntry('odebrane', {
@@ -28,7 +28,7 @@ const entry = (subject: string) =>
     forwarded: false,
     party: 'Goniec',
     partyKind: 'nadawca' as const,
-    date: { raw: DATE_RAW, weekday: 'Wt', day: 23, month: 12, year: 2025, time: '10:00:00' },
+    date: { raw: DATE_RAW, weekday: 'Wt', day: 24, month: 8, year: 1999, time: '10:00:00' },
   });
 
 test('eksport: occurrences = 2 daje DWA pliki z wlasnymi tresciami i numerami', () => {
@@ -76,7 +76,7 @@ test('eksport: occurrences = 1 zachowuje dawna nazwe bez numeru', () => {
   assert.equal(skipped, 0);
   assert.equal(entries.length, 1);
   assert.ok(
-    /\/2025-12-23_10-00-00_goniec_inny\.txt$/.test(entries[0]!.name),
+    /\/1999-08-24_10-00-00_goniec_inny\.txt$/.test(entries[0]!.name),
     `dawna nazwa bez numeru: ${entries[0]!.name}`,
   );
 });

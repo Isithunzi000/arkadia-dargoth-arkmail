@@ -75,16 +75,16 @@ test('blad 2 (D3): kontakty pokazuja "Indeksowanie w toku" podczas pedzla (zgodn
 test('blad 2 (D3): ponowna indeksacja przy kompletnym indexMeta - "Przerwij" widoczne w kontaktach', async () => {
   const h = await startHarness({
     indexMeta: {
-      odebrane: '2025-12-01T00:00:00.000Z',
-      nieprzeczytane: '2025-12-01T00:00:00.000Z',
-      wyslane: '2025-12-01T00:00:00.000Z',
-      niewyslane: '2025-12-01T00:00:00.000Z',
+      odebrane: '1999-08-09T00:00:00.000Z',
+      nieprzeczytane: '1999-08-09T00:00:00.000Z',
+      wyslane: '1999-08-09T00:00:00.000Z',
+      niewyslane: '1999-08-09T00:00:00.000Z',
     },
   });
   try {
     const { f, waitFor, content } = h;
     click(h, '[data-tab="kontakty"]');
-    assert.match(paneText(h), /Kompletna indeksacja od: 2025-12-01/, 'setup: kompletny stan');
+    assert.match(paneText(h), /Kompletna indeksacja od: 1999-08-09/, 'setup: kompletny stan');
     // Ponowna indeksacja startuje z archiwum (tam przycisk jest zawsze).
     click(h, '[data-tab="archiwum"]');
     click(h, '.arkmail-index-all');

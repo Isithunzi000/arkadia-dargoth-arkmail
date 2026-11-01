@@ -1,7 +1,6 @@
 {
   "name": "przedstawieni",
   "opis": "Wydruk przedstawieni: '[28] Osoby, ktore zostaly ci ostatnio przedstawione, to ... i Waldo.'",
-  "zrodlo": "session_1767792313938.html",
   "lines": [
     {
       "cls": "command",

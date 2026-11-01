@@ -27,7 +27,7 @@ import {
   waitRt,
 } from './harness';
 
-const TWIN_DATE = 'Wt, 23 XII 2025, 10:00:00';
+const TWIN_DATE = 'Wt, 24 VIII 1999, 10:00:00';
 
 /** Dwa wiersze blizniakow: identyczne metadane, rozne numery. */
 const TWIN_LINES = [
@@ -42,8 +42,8 @@ test('skan: freshCounts liczy wystapienia (blizniaki = 2) i podaje per strone', 
     kind: 'lista' as const,
     header: { box: 'odebrane' as const, truncated: false },
     entries: [
-      { number: 3, isRead: true, subject: 'Raport', forwarded: false, party: 'Goniec', partyKind: 'nadawca' as const, date: { raw: TWIN_DATE, weekday: 'Wt', day: 23, month: 12, year: 2025, time: '10:00:00' } },
-      { number: 2, isRead: true, subject: 'Raport', forwarded: false, party: 'Goniec', partyKind: 'nadawca' as const, date: { raw: TWIN_DATE, weekday: 'Wt', day: 23, month: 12, year: 2025, time: '10:00:00' } },
+      { number: 3, isRead: true, subject: 'Raport', forwarded: false, party: 'Goniec', partyKind: 'nadawca' as const, date: { raw: TWIN_DATE, weekday: 'Wt', day: 24, month: 8, year: 1999, time: '10:00:00' } },
+      { number: 2, isRead: true, subject: 'Raport', forwarded: false, party: 'Goniec', partyKind: 'nadawca' as const, date: { raw: TWIN_DATE, weekday: 'Wt', day: 24, month: 8, year: 1999, time: '10:00:00' } },
     ],
   };
   const scans: Array<ReadonlyMap<string, number>> = [];
@@ -70,12 +70,12 @@ test('skan: sonda sciany nie liczy ponownie wystapien z granicznego dnia', async
   const twin = (n: number) => ({
     number: n, isRead: true, subject: 'Raport', forwarded: false,
     party: 'Goniec', partyKind: 'nadawca' as const,
-    date: { raw: TWIN_DATE, weekday: 'Wt', day: 23, month: 12, year: 2025, time: '10:00:00' },
+    date: { raw: TWIN_DATE, weekday: 'Wt', day: 24, month: 8, year: 1999, time: '10:00:00' },
   });
   const older = {
     number: 1, isRead: true, subject: 'Starszy', forwarded: false,
     party: 'Corge', partyKind: 'nadawca' as const,
-    date: { raw: 'Pn, 22 XII 2025, 09:00:00', weekday: 'Pn', day: 22, month: 12, year: 2025, time: '09:00:00' },
+    date: { raw: 'Pn, 23 VIII 1999, 09:00:00', weekday: 'Pn', day: 23, month: 8, year: 1999, time: '09:00:00' },
   };
   const page = (entries: unknown[], truncated: boolean): MailboxResult =>
     ({ kind: 'lista', header: { box: 'odebrane', truncated }, entries } as unknown as MailboxResult);
@@ -84,8 +84,8 @@ test('skan: sonda sciany nie liczy ponownie wystapien z granicznego dnia', async
     cancelled: () => false,
     fetchPage: async (command?: string) => {
       if (!command) return page([twin(3), twin(2)], true);
-      if (command === 'listy odebrane przed 24 XII 2025') return page([twin(3), twin(2)], true);
-      if (command === 'listy odebrane przed 23 XII 2025')
+      if (command === 'listy odebrane przed 25 VIII 1999') return page([twin(3), twin(2)], true);
+      if (command === 'listy odebrane przed 24 VIII 1999')
         return page([twin(3), twin(2), older], false);
       return { kind: 'pusta', box: 'odebrane', reason: 'puste' } as MailboxResult;
     },
@@ -114,7 +114,7 @@ test('indeksacja: blizniaki dostaja occurrences = wynik listingu', async () => {
     click(h, '.arkmail-index-all');
     await driveIndexAll(h, {
       odebrane: ['Listy odebrane:', ...TWIN_LINES, ' 1. *R* Temat: Inny',
-        'Nadawca: Corge                       Wt, 23 XII 2025, 11:00:00'],
+        'Nadawca: Corge                       Wt, 24 VIII 1999, 11:00:00'],
     });
     await waitRt(() => notifyText(h.f, 'Zindeksowano wszystkie skrzynki'), 'koniec indeksacji');
 
@@ -148,7 +148,7 @@ test('indeksacja przyrostowa: zmiana wylacznie occurrences leci dalej ze skanem'
     ...fromMailboxEntry('odebrane', {
       number: 3, isRead: true, subject: 'Raport', forwarded: false,
       party: 'Goniec', partyKind: 'nadawca',
-      date: { raw: TWIN_DATE, weekday: 'Wt', day: 23, month: 12, year: 2025, time: '10:00:00' },
+      date: { raw: TWIN_DATE, weekday: 'Wt', day: 24, month: 8, year: 1999, time: '10:00:00' },
     }),
     id: twinId,
   };

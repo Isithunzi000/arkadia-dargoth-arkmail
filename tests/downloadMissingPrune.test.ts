@@ -58,14 +58,14 @@ test('missing przy pobieraniu: grupa wypada z archiwum I wiersz znika z widoku',
     await waitRt(() => anchors(h).length === 1, 're-kotwica 1');
     f.fire('Listy odebrane:', 'mail');
     f.fire(' 1. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire('> ', 'prompt');
 
     // Re-kotwica 2: srodkowy (Foo, 22 XII) - pelny odczyt.
     await waitRt(() => anchors(h).length === 2, 're-kotwica 2');
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 1. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(
       () => f.sent.filter((c) => c.startsWith('przeczytaj list')).length === 1,
@@ -74,7 +74,7 @@ test('missing przy pobieraniu: grupa wypada z archiwum I wiersz znika z widoku',
     f.fire('List : 1', 'mail');
     f.fire('Od   : Foo', 'mail');
     f.fire('Temat: srodkowy', 'mail');
-    f.fire('Data : Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Data : Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire('', 'mail');
     f.fire('Tresc srodkowego.', 'mail');
     f.fire('[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ', 'mail');
@@ -84,7 +84,7 @@ test('missing przy pobieraniu: grupa wypada z archiwum I wiersz znika z widoku',
     await waitRt(() => anchors(h).length === 3, 're-kotwica 3');
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 1. *R* Temat: najstarszy', 'mail');
-    f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(
       () => f.sent.filter((c) => c.startsWith('przeczytaj list')).length === 2,
@@ -93,7 +93,7 @@ test('missing przy pobieraniu: grupa wypada z archiwum I wiersz znika z widoku',
     f.fire('List : 1', 'mail');
     f.fire('Od   : Foo', 'mail');
     f.fire('Temat: najstarszy', 'mail');
-    f.fire('Data : N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire('Data : Nd, 22 VIII 1999, 01:15:04', 'mail');
     f.fire('', 'mail');
     f.fire('Tresc najstarszego.', 'mail');
     f.fire('[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ', 'mail');

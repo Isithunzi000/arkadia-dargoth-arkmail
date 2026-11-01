@@ -7,10 +7,10 @@ import type { ArchiveLetter } from '../src/arkmail/core/archive';
 
 const HANDLERS = {} as MailUiHandlers;
 const META = {
-  odebrane: '2026-01-04T10:00:00.000Z',
-  nieprzeczytane: '2026-01-02T10:00:00.000Z',
-  wyslane: '2026-01-03T10:00:00.000Z',
-  niewyslane: '2026-01-01T10:00:00.000Z',
+  odebrane: '1999-09-05T10:00:00.000Z',
+  nieprzeczytane: '1999-09-03T10:00:00.000Z',
+  wyslane: '1999-09-04T10:00:00.000Z',
+  niewyslane: '1999-09-02T10:00:00.000Z',
 };
 
 function letter(): ArchiveLetter {
@@ -21,8 +21,8 @@ function letter(): ArchiveLetter {
     party: 'Foo',
     subject: 'Temat',
     forwarded: false,
-    dateRaw: 'Pn, 2 III 2026, 01:02:03',
-    sortKey: '2026-03-02 01:02:03',
+    dateRaw: 'Pn, 20 IX 1999, 01:02:03',
+    sortKey: '1999-09-20 01:02:03',
     read: false,
     body: [],
   };
@@ -35,7 +35,7 @@ test('status i luki sa nad kontaktami, a czyszczenie usuwa je z widoku i stanu',
     const store = new MailUiStore({
       archive: [letter()],
       indexMeta: META,
-      archiveGaps: { wyslane: ['2025-12-20'] },
+      archiveGaps: { wyslane: ['1999-08-21'] },
     });
     store.setContacts([{ name: 'Foo', sources: [], lettersReceived: 1, lettersSent: 0 }]);
     const container = window.document.createElement('div');
@@ -44,11 +44,11 @@ test('status i luki sa nad kontaktami, a czyszczenie usuwa je z widoku i stanu',
       store.setTab('kontakty');
       const status = container.querySelector('.arkmail-index-foot');
       assert.ok(status);
-      assert.match(status.textContent ?? '', /Kompletna indeksacja od: 2026-01-01/);
+      assert.match(status.textContent ?? '', /Kompletna indeksacja od: 1999-09-02/);
       assert.match(status.textContent ?? '', /1 list w bazie/);
       const gaps = container.querySelector('.arkmail-index-gaps');
       assert.ok(gaps);
-      assert.match(gaps.textContent ?? '', /Brakuje danych z dni: wyslane: 2025-12-20/);
+      assert.match(gaps.textContent ?? '', /Brakuje danych z dni: wyslane: 1999-08-21/);
       const pane = container.querySelector('[data-pane-key="kontakty"]')!;
       const children = Array.from(pane.children);
       const statusIndex = children.indexOf(status);
@@ -62,7 +62,7 @@ test('status i luki sa nad kontaktami, a czyszczenie usuwa je z widoku i stanu',
       store.clearCacheData();
       assert.deepEqual(store.state.indexMeta, {});
       assert.deepEqual(store.state.archiveGaps, {});
-      assert.doesNotMatch(container.textContent ?? '', /2026-01-01|2025-12-20/);
+      assert.doesNotMatch(container.textContent ?? '', /1999-09-02|1999-08-21/);
     } finally {
       off();
     }

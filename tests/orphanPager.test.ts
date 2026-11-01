@@ -74,7 +74,7 @@ test('udany fetch zdejmuje podejrzenie', async () => {
   const p = mailbox.fetch('odebrane');
   t.emit({ cls: 'mail', text: 'Listy odebrane (prezentowane jest pierwsze 50):' });
   t.emit({ cls: 'mail', text: ' 1. *R* Temat: najnowszy' });
-  t.emit({ cls: 'mail', text: 'Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12' });
+  t.emit({ cls: 'mail', text: 'Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12' });
   t.emit({ cls: 'prompt', text: '> ' });
   const res = await p;
   assert.equal(res.kind, 'lista', 'listing doszedl');

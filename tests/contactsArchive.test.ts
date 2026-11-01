@@ -29,8 +29,8 @@ function archLetter(partial: Partial<ArchiveLetter>): ArchiveLetter {
     number: 1,
     party: 'Foo',
     subject: 'kartka',
-    dateRaw: 'Wt, 23 XII 2025, 00:11:12',
-    sortKey: '2025-12-23 00:11:12',
+    dateRaw: 'Wt, 24 VIII 1999, 00:11:12',
+    sortKey: '1999-08-24 00:11:12',
     read: true,
     body: [],
     ...partial,
@@ -45,14 +45,14 @@ test('contactsFromArchive: kierunek po skrzynce, liczniki i ostatni kontakt', ()
       box: 'wyslane',
       party: 'Foo',
       subject: 'odpowiedz',
-      dateRaw: 'Cz, 25 XII 2025, 10:00:00',
-      sortKey: '2025-12-25 10:00:00',
+      dateRaw: 'Cz, 26 VIII 1999, 10:00:00',
+      sortKey: '1999-08-26 10:00:00',
     }),
   ]);
   const af = out.find((c) => c.name === 'Foo')!;
   assert.equal(af.lettersReceived, 1, 'odebrane+nieprzeczytane to jeden list');
   assert.equal(af.lettersSent, 1);
-  assert.equal(af.lastContactRaw, 'Cz, 25 XII 2025, 10:00:00');
+  assert.equal(af.lastContactRaw, 'Cz, 26 VIII 1999, 10:00:00');
 });
 
 test('contactsFromArchive: forward w tej samej sekundzie liczy sie osobno', () => {

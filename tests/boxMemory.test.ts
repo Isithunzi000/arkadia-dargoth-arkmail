@@ -75,12 +75,12 @@ test('zakladki: klik w skrzynke ZAWSZE odswieza najnowsza strone', () => {
 async function loadOlderPage(h: Harness): Promise<void> {
   const { f, waitFor } = h;
   click(h, '.arkmail-older');
-  await waitFor(() => f.sent.includes('listy odebrane przed 22 XII 2025'), 'kotwica');
+  await waitFor(() => f.sent.includes('listy odebrane przed 23 VIII 1999'), 'kotwica');
   f.fire('Wybrane listy odebrane:', 'mail');
   f.fire(' 2. *R* Temat: prastary', 'mail');
-  f.fire('Nadawca: Waldo                          So, 20 XII 2025, 10:00:00', 'mail');
+  f.fire('Nadawca: Waldo                          So, 21 VIII 1999, 10:00:00', 'mail');
   f.fire(' 1. *R* Temat: antyczny', 'mail');
-  f.fire('Nadawca: Baz                          Pt, 19 XII 2025, 09:00:00', 'mail');
+  f.fire('Nadawca: Baz                          Pt, 20 VIII 1999, 09:00:00', 'mail');
   f.fire('> ', 'prompt');
   await waitFor(() => h.content.querySelectorAll('.arkmail-entry').length === 5, '5 wierszy');
 }
@@ -108,13 +108,13 @@ test('zakladki: powrot na skrzynke odswieza najnowsza strone (sync zachowuje wcz
     // wpisy w miejscu - doczytane starsze strony NIE znikaja.
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 4. *R* Temat: najstarszy', 'mail');
-    f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
     f.fire(' 3. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire(' 2. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire(' 1. Temat: swiezy', 'mail');
-    f.fire('Nadawca: Grault                         Cz, 24 XII 2025, 08:00:00', 'mail');
+    f.fire('Nadawca: Grault                         Sr, 25 VIII 1999, 08:00:00', 'mail');
     f.fire('> ', 'prompt');
     // Najpierw czekamy az swiezy listing ZOSTANIE zastosowany (nowy list
     // widoczny) - inaczej waitFor zlapalby stan sprzed async zapisu.
@@ -147,20 +147,20 @@ test('zakladki: powiadomienie scala swieza strone zamiast kasowac wczytane', asy
     );
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 4. *R* Temat: najstarszy', 'mail');
-    f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
     f.fire(' 3. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire(' 2. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire(' 1. Temat: swiezy', 'mail');
-    f.fire('Nadawca: Grault                         Cz, 24 XII 2025, 08:00:00', 'mail');
+    f.fire('Nadawca: Grault                         Sr, 25 VIII 1999, 08:00:00', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(
       () => f.sent.filter((c) => c === 'listy nieprzeczytane').length === 2,
       'refresh nieprzeczytanych',
     );
     f.fire(' 1. Temat: swiezy', 'mail');
-    f.fire('Nadawca: Grault                         Cz, 24 XII 2025, 08:00:00', 'mail');
+    f.fire('Nadawca: Grault                         Sr, 25 VIII 1999, 08:00:00', 'mail');
     f.fire('> ', 'prompt');
     // 5 wczytanych + 1 nowy = 6 wierszy; stare strony NIE znikaja.
     await waitFor(() => content.querySelectorAll('.arkmail-entry').length === 6, '6 wierszy');

@@ -26,12 +26,12 @@ import {
 async function loadOlderPage(h: Harness): Promise<void> {
   const { f, waitFor } = h;
   click(h, '.arkmail-older');
-  await waitFor(() => f.sent.includes('listy odebrane przed 22 XII 2025'), 'kotwica paginacji');
+  await waitFor(() => f.sent.includes('listy odebrane przed 23 VIII 1999'), 'kotwica paginacji');
   f.fire('Wybrane listy odebrane:', 'mail');
   f.fire(' 2. *R* Temat: prastary', 'mail');
-  f.fire('Nadawca: Waldo                          So, 20 XII 2025, 10:00:00', 'mail');
+  f.fire('Nadawca: Waldo                          So, 21 VIII 1999, 10:00:00', 'mail');
   f.fire(' 1. *R* Temat: antyczny', 'mail');
-  f.fire('Nadawca: Baz                          Pt, 19 XII 2025, 09:00:00', 'mail');
+  f.fire('Nadawca: Baz                          Pt, 20 VIII 1999, 09:00:00', 'mail');
   f.fire('> ', 'prompt');
   await waitFor(
     () => h.content.querySelectorAll('.arkmail-entry').length === 5,
@@ -44,11 +44,11 @@ function replayFreshListing(h: Harness): void {
   const { f } = h;
   f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
   f.fire(' 3. *R* Temat: inny', 'mail');
-  f.fire('Nadawca: Grault                         Wt, 23 XII 2025, 01:00:00', 'mail');
+  f.fire('Nadawca: Grault                         Wt, 24 VIII 1999, 01:00:00', 'mail');
   f.fire(' 2. *R* Temat: najnowszy', 'mail');
-  f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+  f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire(' 1. *R* Temat: srodkowy', 'mail');
-  f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+  f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
   f.fire('> ', 'prompt');
 }
 
@@ -58,7 +58,7 @@ function replayLetter(h: Harness, n: number): void {
   f.fire(`List : ${n}`, 'mail');
   f.fire('Od   : Corge', 'mail');
   f.fire('Temat: najnowszy', 'mail');
-  f.fire('Data : Wt, 23 XII 2025, 00:11:12', 'mail');
+  f.fire('Data : Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire('', 'mail');
   f.fire('Tresc karteczki.', 'mail');
   f.fire(`[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: ${n}) -- `, 'mail');
@@ -76,7 +76,7 @@ test('re-kotwiczenie: wpis ze starej strony pobiera swiezy kontekst i numer', as
     // a ostatnim listingiem serwera jest doklejona strona starsza.
     click(h, '.arkmail-entry');
     await waitFor(
-      () => f.sent.includes('listy odebrane przed 24 XII 2025'),
+      () => f.sent.includes('listy odebrane przed 25 VIII 1999'),
       're-kotwica: listing po dacie listu (dzien po)',
     );
     replayFreshListing(h);
@@ -104,11 +104,11 @@ test('re-kotwiczenie: wpis z biezacego kontekstu otwiera sie bez dodatkowego fet
     // Swiezy listing identyczny z prologiem: "najnowszy" ma numer 1.
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 3. *R* Temat: najstarszy', 'mail');
-    f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
     f.fire(' 2. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec refreshu');
     const sentBefore = f.sent.length;
@@ -133,13 +133,13 @@ test('re-kotwiczenie: wpis nie znaleziony na swiezym listingu -> komunikat, brak
 
     click(h, '.arkmail-entry');
     await waitFor(
-      () => f.sent.includes('listy odebrane przed 24 XII 2025'),
+      () => f.sent.includes('listy odebrane przed 25 VIII 1999'),
       're-kotwica: listing po dacie listu',
     );
     // Swiezy listing BEZ kliknietego listu (skasowany w miedzyczasie).
     f.fire('Listy odebrane:', 'mail');
     f.fire(' 1. *R* Temat: inny', 'mail');
-    f.fire('Nadawca: Grault                         Wt, 23 XII 2025, 01:00:00', 'mail');
+    f.fire('Nadawca: Grault                         Wt, 24 VIII 1999, 01:00:00', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(() => notifyText(f, 'odswiez skrzynke'), 'komunikat o braku listu');
     assert.ok(!f.sent.some((c) => c.startsWith('przeczytaj')), 'nie wyslano przeczytaj na slepo');
@@ -157,7 +157,7 @@ test('re-kotwiczenie: kasowanie po zmianie kontekstu uzywa swiezego numeru', asy
     // wiec otwarcie najnowszego listu idzie przez re-kotwice.
     click(h, '.arkmail-entry');
     await waitFor(
-      () => f.sent.includes('listy odebrane przed 24 XII 2025'),
+      () => f.sent.includes('listy odebrane przed 25 VIII 1999'),
       're-kotwica przed otwarciem',
     );
     replayFreshListing(h);
@@ -192,15 +192,15 @@ test('re-kotwiczenie: kasowanie po zmianie kontekstu uzywa swiezego numeru', asy
     click(h, '.arkmail-del');
     click(h, '.arkmail-del');
     await waitFor(
-      () => f.sent.filter((c) => c === 'listy odebrane przed 24 XII 2025').length === 2,
+      () => f.sent.filter((c) => c === 'listy odebrane przed 25 VIII 1999').length === 2,
       're-kotwica przed kasowaniem (druga - pierwsza byla przy otwarciu)',
     );
     // Na tej stronie "najnowszy" ma numer 4.
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 5. *R* Temat: zupelnie inny', 'mail');
-    f.fire('Nadawca: Zump                          Wt, 23 XII 2025, 03:00:00', 'mail');
+    f.fire('Nadawca: Zump                          Wt, 24 VIII 1999, 03:00:00', 'mail');
     f.fire(' 4. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(() => f.sent.includes('przeczytaj list 4'), 'swiezy numer 4 do pagera');
     replayLetter(h, 4);

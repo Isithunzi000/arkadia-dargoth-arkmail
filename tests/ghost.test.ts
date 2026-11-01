@@ -95,16 +95,16 @@ test('ghost: pole adresata podpowiada kontakt, strzalka w prawo wpisuje kanonicz
 
 test('ghost: najswiezszy kontakt wygrywa; alias tez podpowiada', () => {
   const s = new MailUiStore({ tab: 'napisz' });
-  s.setContacts([contact('Bar', 300, 'poltorak'), contact('Baz', 100)]);
+  s.setContacts([contact('Bar', 300, 'foo'), contact('Baz', 100)]);
   const c = mount(s);
   // 'b' -> Bar (swiezsza), nie Baz.
   type(input(c, '[data-field="adresat"]'), 'b');
   assert.equal(ghostRest(c, '[data-field="adresat"]'), 'ar');
   // alias jako kandydat
-  type(input(c, '[data-field="dw"]'), 'pol');
-  assert.equal(ghostRest(c, '[data-field="dw"]'), 'torak');
+  type(input(c, '[data-field="dw"]'), 'fo');
+  assert.equal(ghostRest(c, '[data-field="dw"]'), 'o');
   key(input(c, '[data-field="dw"]'), 'ArrowRight');
-  assert.equal(input(c, '[data-field="dw"]').value, 'poltorak');
+  assert.equal(input(c, '[data-field="dw"]').value, 'foo');
 });
 
 test('ghost: brak kandydata i pelne trafienie = brak ducha; blur chowa', () => {
@@ -145,8 +145,8 @@ test('ghost: pole tematu szukajki podpowiada tematy z archiwum', () => {
   });
   s.setArchive([
     arch('Perly z morza', '2026-05-01 00:00:00'),
-    arch('perly', '2026-04-01 00:00:00'),
-    arch('Inny temat', '2026-03-01 00:00:00'),
+    arch('perly', '1999-10-13 00:00:00'),
+    arch('Inny temat', '1999-09-19 00:00:00'),
   ]);
   const c = mount(s);
   const el = input(c, '[data-search="temat"]');

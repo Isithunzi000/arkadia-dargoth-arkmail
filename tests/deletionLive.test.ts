@@ -33,7 +33,7 @@ test('usuwanie: komenda gracza nie kasuje wynikow i zaznaczenia', async () => {
     await waitRt(() => h.f.sent.includes('listy odebrane'), 'komenda listingu');
     h.f.fire('Listy odebrane:', 'mail');
     h.f.fire(' 1. *R* Temat: Temat A', 'mail');
-    h.f.fire('Nadawca: Bar                         Wt, 23 XII 2025, 00:11:12', 'mail');
+    h.f.fire('Nadawca: Bar                         Wt, 24 VIII 1999, 00:11:12', 'mail');
     h.f.fire('> ', 'prompt');
     await waitRt(() => h.content.querySelectorAll('.arkmail-deletion-entry').length === 1, 'wynik');
     const field = h.content.querySelector('[data-deletion-number="1"]') as {

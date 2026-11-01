@@ -9,7 +9,7 @@ const OPEN: ProtoLine[] = [
   { cls: 'mail', text: 'List : 2' },
   { cls: 'mail', text: 'Od   : Foo' },
   { cls: 'mail', text: 'Temat: Test' },
-  { cls: 'mail', text: 'Data : Wt, 23 XII 2025, 00:11:12' },
+  { cls: 'mail', text: 'Data : Wt, 24 VIII 1999, 00:11:12' },
   { cls: 'mail', text: '' },
   { cls: 'mail', text: 'Tresc.' },
   { cls: 'mail', text: PAGER },

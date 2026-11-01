@@ -1,19 +1,18 @@
 {
   "name": "list-gotowy-do-wyslania",
   "opis": "Edytor poza urzedem: numeracja linii + 'List jest gotowy do wyslania.' (kolejka do niewyslanych)",
-  "zrodlo": "session_1766262715076.html",
   "lines": [
     {
       "cls": "other",
-      "text": "Otaczajaca statek mgla klebi sie i przyprawia o uczucie bezruchu, jak gdyby okret zawieszony byl w miejscu poza Czasem."
+      "text": "Na niebie nie ma ani jednej chmurki."
     },
     {
       "cls": "other",
-      "text": "Gesta mgla opada tak szybko, jak uprzednio podniosla sie, zas wokol az po horyzont znow jestes w stanie dostrzec granatowe wody oceanu."
+      "text": "Powiewa swieze, lekkie powietrze."
     },
     {
       "cls": "other",
-      "text": "Statek przecina granatowe fale oceanu."
+      "text": "W oddali slychac odglosy miasta."
     },
     {
       "cls": "command",
@@ -21,11 +20,11 @@
     },
     {
       "cls": "command",
-      "text": "→ Foo"
+      "text": "→ Bar"
     },
     {
       "cls": "command",
-      "text": "→ Elementy rozbitego szkielka"
+      "text": "→ liscik"
     },
     {
       "cls": "mail",
@@ -57,7 +56,7 @@
     },
     {
       "cls": "command",
-      "text": "→  |     Foo                                                      |   "
+      "text": "→  |     Bar                                                      |   "
     },
     {
       "cls": "command",
@@ -65,59 +64,47 @@
     },
     {
       "cls": "command",
-      "text": "→  |     Nic nie dzieje sie bez powodu. Chyba...                      |   "
+      "text": "→  |     Pisze krotko, bo sprawa pilna.                               |   "
     },
     {
       "cls": "command",
-      "text": "→  |     Spotkalem  jednego  jegomoscia,  ktory mnie rozpoznal. Byl   |   "
+      "text": "→  |     Spotkajmy sie wkrotce na Rynku.                              |   "
     },
     {
       "cls": "command",
-      "text": "→  |     towarzyszem  broni  ojca  jakis  czas.  Widzial  mnie jako   |   "
+      "text": "→  |     Ps. Wszystko gra.                                            |   "
     },
     {
       "cls": "command",
-      "text": "→  |     mlodzika,  ale ponoc wygladam jak skora zdarta z ojca. Tak   |   "
+      "text": "→  |     Pozdrawiam.                                                  |   "
     },
     {
       "cls": "command",
-      "text": "→  |     udalo  mu sie mnie rozpoznac. Zadalem mu mnostwo pytan, on   |   "
+      "text": "→  |     Do uslyszenia.                                               |   "
     },
     {
       "cls": "command",
-      "text": "→  |     udzielil  odpowiedzi,  aczkolwiek nie wszystkie tajemnice,   |   "
+      "text": "→  |     Tyle na teraz.                                               |   "
     },
     {
       "cls": "command",
-      "text": "→  |     czy watpliwosci zostaly rozwiane.                            |   "
+      "text": "→  |     Ps. Wszystko gra.                                            |   "
     },
     {
       "cls": "command",
-      "text": "→  |     Udalismy  sie  wspolnie  tam,  gdzie wszystko sie zaczelo.   |   "
+      "text": "→  |     Dzien dobry,                                                 |   "
     },
     {
       "cls": "command",
-      "text": "→  |     Pamiec powoli wraca.                                         |   "
+      "text": "→  |     Pozdrawiam.                                                  |   "
     },
     {
       "cls": "command",
-      "text": "→  |     Pewnie  Ciebie  ucieszy  fakt,  ze  mialas  racje w jednej   |   "
+      "text": "→  |     Pisze krotko, bo sprawa pilna.                               |   "
     },
     {
       "cls": "command",
-      "text": "→  |     kwestii.                                                     |   "
-    },
-    {
-      "cls": "command",
-      "text": "→  |                                                                  |   "
-    },
-    {
-      "cls": "command",
-      "text": "→  |     Cwicz  duzo  z  kijkiem, najlepiej oburacz, co by z wprawy   |   "
-    },
-    {
-      "cls": "command",
-      "text": "→  |     nie wyjsc.                                                   |   "
+      "text": "→  |     Tyle na teraz.                                                     |   "
     },
     {
       "cls": "command",
@@ -125,7 +112,19 @@
     },
     {
       "cls": "command",
-      "text": "→  |     Caluje w nosek                                               |   "
+      "text": "→  |     Spotkajmy sie wkrotce na Rynku.                              |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |     Do uslyszenia.                                                   |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |                                                                  |   "
+    },
+    {
+      "cls": "command",
+      "text": "→  |     Ps. Wszystko gra.                                               |   "
     },
     {
       "cls": "command",
@@ -177,7 +176,7 @@
     },
     {
       "cls": "other",
-      "text": "Woda, wszedzie wokol tylko woda... monotonny krajobraz rozciaga sie az po horyzont."
+      "text": "Slonce powoli zbliza sie do horyzontu."
     },
     {
       "cls": "prompt",
@@ -185,23 +184,23 @@
     },
     {
       "cls": "other",
-      "text": "Statek przecina granatowe fale oceanu."
+      "text": "W oddali slychac odglosy miasta."
     },
     {
       "cls": "other",
-      "text": "Statek kolysze sie lagodnie, plynac wraz z silnym pradem oceanicznym."
+      "text": "Od strony poludniowej wieje lekki wiatr."
     },
     {
       "cls": "other",
-      "text": "Statek przecina granatowe fale oceanu."
+      "text": "W oddali slychac odglosy miasta."
     },
     {
       "cls": "other",
-      "text": "Statek kolysze sie lagodnie, plynac wraz z silnym pradem oceanicznym."
+      "text": "Od strony poludniowej wieje lekki wiatr."
     },
     {
       "cls": "other",
-      "text": "Okret zbliza sie do brzegu, wplywajac na spokojne wody zatoki Urbimo."
+      "text": "Zblizasz sie do brzegu, wplywajac na spokojne wody zatoki."
     }
   ]
 }

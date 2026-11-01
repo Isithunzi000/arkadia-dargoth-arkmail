@@ -1,7 +1,6 @@
 {
   "name": "brak-adresata-compose",
   "opis": "napisz list z literowka: Adresat: Nie ma takiego adresata (gracza, aliasu): thud. (mala litera), abort",
-  "zrodlo": "session_1767792313938.html",
   "lines": [
     {
       "cls": "command",

@@ -1,7 +1,6 @@
 {
   "name": "powiadomienia",
   "opis": "Powiadomienia pocztowe (klasy notification.mail i other); prefix '[ POCZTA ]' dokleja klient, parser ma tolerowac",
-  "zrodlo": "agregat z mail_anchors.txt",
   "lines": [
     {
       "cls": "notification.mail",
@@ -21,11 +20,11 @@
     },
     {
       "cls": "other",
-      "text": "Wysylasz Kruk na poczte."
+      "text": "Wysylasz Sroka na poczte."
     },
     {
       "cls": "other",
-      "text": "Wysylasz Kruka na poczte."
+      "text": "Wysylasz Sroki na poczte."
     }
   ]
 }

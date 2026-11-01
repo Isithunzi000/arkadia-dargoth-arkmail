@@ -48,9 +48,9 @@ test('pusta skrzynka wariantem "Nie znaleziono..." tez dostaje flage (4/4)', asy
     );
     f.fire('Listy odebrane:', 'mail');
     f.fire(' 2. *R* Temat: najstarszy', 'mail');
-    f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
     f.fire(' 1. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire('> ', 'prompt');
     // nieprzeczytane (2. wystapienie): puste wariantem bazowym
     await waitRt(
@@ -90,11 +90,11 @@ test('pusta strona kotwicowa (reason "filtr") domyka skrzynke z flaga', async ()
     );
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 2. *R* Temat: najstarszy', 'mail');
-    f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
     f.fire(' 1. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire('> ', 'prompt');
-    await waitRt(() => f.sent.includes('listy odebrane przed 22 XII 2025'), 'kotwica odebrane');
+    await waitRt(() => f.sent.includes('listy odebrane przed 23 VIII 1999'), 'kotwica odebrane');
     f.fire('Nie znaleziono zadnych takich odebranych listow.', 'mail');
     // reszta pusta wariantem bazowym
     await waitRt(
@@ -125,7 +125,7 @@ test('skrzynka z mieleniem kotwicy: 3 proby z klepnieciem + sonda wykluczajaca d
     );
     f.fire('Listy odebrane:', 'mail');
     f.fire(' 1. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire('> ', 'prompt');
     // nieprzeczytane: puste.
     await waitRt(
@@ -140,11 +140,11 @@ test('skrzynka z mieleniem kotwicy: 3 proby z klepnieciem + sonda wykluczajaca d
     const replaySameWyslane = () => {
       f.fire('Listy wyslane (prezentowane jest pierwsze 50):', 'mail');
       f.fire(' 1. Temat: paczka', 'mail');
-      f.fire('Odbiorcy: Bar                           Wt, 20 XII 2025, 09:00:00', 'mail');
+      f.fire('Odbiorcy: Bar                           So, 21 VIII 1999, 09:00:00', 'mail');
       f.fire('> ', 'prompt');
     };
     replaySameWyslane();
-    await waitRt(() => f.sent.includes('listy wyslane przed 21 XII 2025'), 'kotwica wyslane');
+    await waitRt(() => f.sent.includes('listy wyslane przed 22 VIII 1999'), 'kotwica wyslane');
     // Fala 24d: kazdy duplikat strony dostaje probe: pauza (2,5 s, potem
     // 4 s) + klepniecie listingu bazowego (odswieza kontekst serwera),
     // dopiero potem powtorka kotwicy. Trzy proby; czwarty duplikat
@@ -157,7 +157,7 @@ test('skrzynka z mieleniem kotwicy: 3 proby z klepnieciem + sonda wykluczajaca d
       );
       replaySameWyslane(); // odpowiedz na klepniecie (wynik pomijany)
       await waitRt(
-        () => f.sent.filter((c) => c === 'listy wyslane przed 21 XII 2025').length === 1 + nr,
+        () => f.sent.filter((c) => c === 'listy wyslane przed 22 VIII 1999').length === 1 + nr,
         `powtorka kotwicy ${nr}`,
       );
     };
@@ -171,7 +171,7 @@ test('skrzynka z mieleniem kotwicy: 3 proby z klepnieciem + sonda wykluczajaca d
     // sonda wyklucza - zlamany filtr daty = dopiero to jest trwale
     // mielenie.
     await waitRt(
-      () => f.sent.includes('listy wyslane przed 20 XII 2025'),
+      () => f.sent.includes('listy wyslane przed 21 VIII 1999'),
       'sonda wykluczajaca dzien graniczny (Fala 26c)',
     );
     replaySameWyslane(); // serwer ignoruje wykluczenie dnia = odpowiada wolno naprawde
@@ -202,7 +202,7 @@ test('skrzynka z mieleniem kotwicy: 3 proby z klepnieciem + sonda wykluczajaca d
     );
     f.fire('Listy odebrane:', 'mail');
     f.fire(' 1. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(
       () => f.sent.filter((c) => c === 'listy nieprzeczytane').length === 3,
@@ -244,12 +244,12 @@ test('tempo stron w indeksacji: 400 ms miedzy stronami (Fala 24d)', async () => 
     );
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 2. *R* Temat: najstarszy', 'mail');
-    f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
     f.fire(' 1. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire('> ', 'prompt');
     const t0 = Date.now();
-    await waitRt(() => f.sent.includes('listy odebrane przed 22 XII 2025'), 'kotwica odebrane');
+    await waitRt(() => f.sent.includes('listy odebrane przed 23 VIII 1999'), 'kotwica odebrane');
     const dt = Date.now() - t0;
     assert.ok(dt >= 350, `pauza przed kotwica ${dt} ms < 350 ms`);
     // Domkniecie: kotwica pusta, reszta skrzynek pusta - czysty koniec.
@@ -288,7 +288,7 @@ test('incydentalny duplikat strony kotwicowej: klepniecie + retry ratuja skrzynk
     );
     f.fire('Listy odebrane:', 'mail');
     f.fire(' 1. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire('> ', 'prompt');
     // nieprzeczytane: puste.
     await waitRt(
@@ -301,11 +301,11 @@ test('incydentalny duplikat strony kotwicowej: klepniecie + retry ratuja skrzynk
     const pageOne = () => {
       f.fire('Listy wyslane (prezentowane jest pierwsze 50):', 'mail');
       f.fire(' 1. Temat: paczka', 'mail');
-      f.fire('Odbiorcy: Bar                           Wt, 20 XII 2025, 09:00:00', 'mail');
+      f.fire('Odbiorcy: Bar                           So, 21 VIII 1999, 09:00:00', 'mail');
       f.fire('> ', 'prompt');
     };
     pageOne();
-    await waitRt(() => f.sent.includes('listy wyslane przed 21 XII 2025'), 'kotwica wyslane');
+    await waitRt(() => f.sent.includes('listy wyslane przed 22 VIII 1999'), 'kotwica wyslane');
     // ...kotwica #1: DUPLIKAT strony (incydent, freshCount 0)...
     pageOne();
     // ...plugin NIE powtarza kotwicy od razu: najpierw pauza 2,5 s
@@ -318,23 +318,23 @@ test('incydentalny duplikat strony kotwicowej: klepniecie + retry ratuja skrzynk
     const dt = Date.now() - t0;
     assert.ok(dt >= 2400, `pauza przed klepnieciem ${dt} ms < 2400 ms`);
     assert.equal(
-      f.sent.filter((c) => c === 'listy wyslane przed 21 XII 2025').length,
+      f.sent.filter((c) => c === 'listy wyslane przed 22 VIII 1999').length,
       1,
       'powtorka kotwicy dopiero PO klepnieciu',
     );
     pageOne(); // odpowiedz na klepniecie (wynik pomijany)
     // ...dopiero teraz powtorka kotwicy...
     await waitRt(
-      () => f.sent.filter((c) => c === 'listy wyslane przed 21 XII 2025').length === 2,
+      () => f.sent.filter((c) => c === 'listy wyslane przed 22 VIII 1999').length === 2,
       'retry kotwicy po klepnieciu',
     );
     // ...kotwica #2: dobra strona z NOWYM wpisem (truncated)...
     f.fire('Listy wyslane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 1. Temat: stara paczka', 'mail');
-    f.fire('Odbiorcy: Gracz                           Pn, 19 XII 2025, 10:00:00', 'mail');
+    f.fire('Odbiorcy: Gracz                           Pt, 20 VIII 1999, 10:00:00', 'mail');
     f.fire('> ', 'prompt');
     // ...paginacja jedzie dalej, kotwica #3 pusta = koniec skrzynki.
-    await waitRt(() => f.sent.includes('listy wyslane przed 20 XII 2025'), 'kotwica 2 wyslane');
+    await waitRt(() => f.sent.includes('listy wyslane przed 21 VIII 1999'), 'kotwica 2 wyslane');
     f.fire('Nie znaleziono zadnych takich wyslanych listow.', 'mail');
     // niewyslane: puste - pelne 4/4 mimo incydentu na wyslanych.
     await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksacja: niewyslane');
@@ -367,7 +367,7 @@ test('ponad 50 listow jednego dnia: starsze dni sa pobierane, a luka jest zapisa
     );
     f.fire('Listy odebrane:', 'mail');
     f.fire(' 1. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire('> ', 'prompt');
     // nieprzeczytane: puste.
     await waitRt(
@@ -380,11 +380,11 @@ test('ponad 50 listow jednego dnia: starsze dni sa pobierane, a luka jest zapisa
     const replaySameWyslane = () => {
       f.fire('Listy wyslane (prezentowane jest pierwsze 50):', 'mail');
       f.fire(' 1. Temat: paczka', 'mail');
-      f.fire('Odbiorcy: Bar                           Wt, 20 XII 2025, 09:00:00', 'mail');
+      f.fire('Odbiorcy: Bar                           So, 21 VIII 1999, 09:00:00', 'mail');
       f.fire('> ', 'prompt');
     };
     replaySameWyslane();
-    await waitRt(() => f.sent.includes('listy wyslane przed 21 XII 2025'), 'kotwica wyslane');
+    await waitRt(() => f.sent.includes('listy wyslane przed 22 VIII 1999'), 'kotwica wyslane');
     const proba = async (nr: number) => {
       replaySameWyslane();
       await waitRt(
@@ -393,7 +393,7 @@ test('ponad 50 listow jednego dnia: starsze dni sa pobierane, a luka jest zapisa
       );
       replaySameWyslane();
       await waitRt(
-        () => f.sent.filter((c) => c === 'listy wyslane przed 21 XII 2025').length === 1 + nr,
+        () => f.sent.filter((c) => c === 'listy wyslane przed 22 VIII 1999').length === 1 + nr,
         `powtorka kotwicy ${nr}`,
       );
     };
@@ -403,21 +403,21 @@ test('ponad 50 listow jednego dnia: starsze dni sa pobierane, a luka jest zapisa
     replaySameWyslane(); // czwarty duplikat z rzedu
     // Sonda wykluczajaca dzien graniczny.
     await waitRt(
-      () => f.sent.includes('listy wyslane przed 20 XII 2025'),
+      () => f.sent.includes('listy wyslane przed 21 VIII 1999'),
       'sonda "przed D" (Fala 26c)',
     );
     // ...odpowiada SWIEZA starsza strona (nieucieta) = sciana
     // pokonana, skrzynka kompletna.
     f.fire('Listy wyslane:', 'mail');
     f.fire(' 1. Temat: stara paczka', 'mail');
-    f.fire('Odbiorcy: Gracz                           Pn, 19 XII 2025, 10:00:00', 'mail');
+    f.fire('Odbiorcy: Gracz                           Pt, 20 VIII 1999, 10:00:00', 'mail');
     f.fire('> ', 'prompt');
     // niewyslane: puste.
     await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksacja: niewyslane');
     f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
     // Starsze dni sa dostepne, ale czesc dnia granicznego pozostaje nieznana.
     await waitRt(() => notifyText(f, 'Indeksowanie niekompletne'), 'uczciwy raport');
-    assert.ok(notifyText(f, 'ponad 50 listow z dnia 2025-12-20'), 'raport wskazuje luke');
+    assert.ok(notifyText(f, 'ponad 50 listow z dnia 1999-08-21'), 'raport wskazuje luke');
     assert.ok(!notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'brak falszywego kompletu');
     assert.ok(!notifyText(f, 'odpowiada wolno'), 'bez falszywego komunikatu o wolnym serwerze');
     // Opozniony retry skrzynki odbiorczej z prologu (test > 10 s).
@@ -427,7 +427,7 @@ test('ponad 50 listow jednego dnia: starsze dni sa pobierane, a luka jest zapisa
     );
     f.fire('Listy odebrane:', 'mail');
     f.fire(' 1. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(
       () => f.sent.filter((c) => c === 'listy nieprzeczytane').length === 3,
@@ -437,7 +437,7 @@ test('ponad 50 listow jednego dnia: starsze dni sa pobierane, a luka jest zapisa
     await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji');
     click(h, '[data-tab="kontakty"]');
     await waitRt(() => !!h.content.querySelector('.arkmail-index-gaps'), 'zapisana luka w widoku');
-    assert.ok(textOf(h, '.arkmail-index-gaps').includes('wyslane: 2025-12-20'), 'dzien i skrzynka luki');
+    assert.ok(textOf(h, '.arkmail-index-gaps').includes('wyslane: 1999-08-21'), 'dzien i skrzynka luki');
   } finally {
     await stopHarness();
   }
@@ -462,7 +462,7 @@ test('ponad 50 listow jednego dnia bez starszych wpisow: luka, nie komplet', asy
     );
     f.fire('Listy odebrane:', 'mail');
     f.fire(' 1. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire('> ', 'prompt');
     // nieprzeczytane: puste.
     await waitRt(
@@ -475,11 +475,11 @@ test('ponad 50 listow jednego dnia bez starszych wpisow: luka, nie komplet', asy
     const replaySameWyslane = () => {
       f.fire('Listy wyslane (prezentowane jest pierwsze 50):', 'mail');
       f.fire(' 1. Temat: paczka', 'mail');
-      f.fire('Odbiorcy: Bar                           Wt, 20 XII 2025, 09:00:00', 'mail');
+      f.fire('Odbiorcy: Bar                           So, 21 VIII 1999, 09:00:00', 'mail');
       f.fire('> ', 'prompt');
     };
     replaySameWyslane();
-    await waitRt(() => f.sent.includes('listy wyslane przed 21 XII 2025'), 'kotwica wyslane');
+    await waitRt(() => f.sent.includes('listy wyslane przed 22 VIII 1999'), 'kotwica wyslane');
     const proba = async (nr: number) => {
       replaySameWyslane();
       await waitRt(
@@ -488,7 +488,7 @@ test('ponad 50 listow jednego dnia bez starszych wpisow: luka, nie komplet', asy
       );
       replaySameWyslane();
       await waitRt(
-        () => f.sent.filter((c) => c === 'listy wyslane przed 21 XII 2025').length === 1 + nr,
+        () => f.sent.filter((c) => c === 'listy wyslane przed 22 VIII 1999').length === 1 + nr,
         `powtorka kotwicy ${nr}`,
       );
     };
@@ -499,7 +499,7 @@ test('ponad 50 listow jednego dnia bez starszych wpisow: luka, nie komplet', asy
     // Sonda wykluczajaca dzien graniczny dostaje PUSTA odpowiedz =
     // brak starszych listow = skrzynka zindeksowana w calosci.
     await waitRt(
-      () => f.sent.includes('listy wyslane przed 20 XII 2025'),
+      () => f.sent.includes('listy wyslane przed 21 VIII 1999'),
       'sonda "przed D" (Fala 26c)',
     );
     f.fire('Nie znaleziono zadnych takich wyslanych listow.', 'mail');
@@ -507,12 +507,12 @@ test('ponad 50 listow jednego dnia bez starszych wpisow: luka, nie komplet', asy
     await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksacja: niewyslane');
     f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
     await waitRt(() => notifyText(f, 'Indeksowanie niekompletne'), 'uczciwy raport');
-    assert.ok(notifyText(f, 'ponad 50 listow z dnia 2025-12-20'), 'raport wskazuje luke');
+    assert.ok(notifyText(f, 'ponad 50 listow z dnia 1999-08-21'), 'raport wskazuje luke');
     assert.ok(!notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'brak falszywego kompletu');
     assert.ok(!notifyText(f, 'odpowiada wolno'), 'bez falszywego komunikatu o wolnym serwerze');
     click(h, '[data-tab="kontakty"]');
     await waitRt(() => !!h.content.querySelector('.arkmail-index-gaps'), 'zapisana luka w widoku');
-    assert.ok(textOf(h, '.arkmail-index-gaps').includes('wyslane: 2025-12-20'), 'dzien i skrzynka luki');
+    assert.ok(textOf(h, '.arkmail-index-gaps').includes('wyslane: 1999-08-21'), 'dzien i skrzynka luki');
     // Opozniony retry skrzynki odbiorczej z prologu (test > 10 s).
     await waitRt(
       () => f.sent.filter((c) => c === 'listy odebrane').length === 3,
@@ -520,7 +520,7 @@ test('ponad 50 listow jednego dnia bez starszych wpisow: luka, nie komplet', asy
     );
     f.fire('Listy odebrane:', 'mail');
     f.fire(' 1. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(
       () => f.sent.filter((c) => c === 'listy nieprzeczytane').length === 3,

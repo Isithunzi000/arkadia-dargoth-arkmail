@@ -37,36 +37,36 @@ function record(over: Partial<ArchiveLetter> = {}): ArchiveLetter {
 }
 
 test('normalizacja: odzyskuje date z konca osoby i czysci osobe', () => {
-  const raw = 'Pn, 2 III 2026, 01:02:03';
+  const raw = 'Pn, 20 IX 1999, 01:02:03';
   const [fixed] = archive.normalizeArchive([
     record({ party: `Foo, Bar ${raw}` }),
   ]);
 
   assert.equal(fixed.party, 'Foo, Bar');
   assert.equal(fixed.dateRaw, raw);
-  assert.equal(fixed.sortKey, '2026-03-02 01:02:03');
+  assert.equal(fixed.sortKey, '1999-09-20 01:02:03');
   assert.equal(fixed.id, archive.letterId('odebrane', 'Foo, Bar', 'Wiadomosc', false, raw));
 });
 
 test('normalizacja: poprawna dateRaw odtwarza sortKey i identyfikator', () => {
-  const raw = 'Wt, 23 XII 2025, 00:11:12';
+  const raw = 'Wt, 24 VIII 1999, 00:11:12';
   const [fixed] = archive.normalizeArchive([record({ dateRaw: raw })]);
 
-  assert.equal(fixed.sortKey, '2025-12-23 00:11:12');
+  assert.equal(fixed.sortKey, '1999-08-24 00:11:12');
   assert.equal(fixed.id, archive.letterId('odebrane', 'Foo', 'Wiadomosc', false, raw));
 });
 
 test('normalizacja: sam poprawny sortKey odtwarza pelna dateRaw', () => {
   const [fixed] = archive.normalizeArchive([
-    record({ sortKey: '2026-03-02 03:04:05' }),
+    record({ sortKey: '1999-09-20 03:04:05' }),
   ]);
 
-  assert.equal(fixed.dateRaw, 'Pn, 2 III 2026, 03:04:05');
-  assert.equal(fixed.sortKey, '2026-03-02 03:04:05');
+  assert.equal(fixed.dateRaw, 'Pn, 20 IX 1999, 03:04:05');
+  assert.equal(fixed.sortKey, '1999-09-20 03:04:05');
 });
 
 test('normalizacja: scala duplikaty i zachowuje wszystkie rozne linie tresci', () => {
-  const raw = 'Pn, 2 III 2026, 01:02:03';
+  const raw = 'Pn, 20 IX 1999, 01:02:03';
   const first = record({
     id: 'pierwszy',
     party: `Foo ${raw}`,
@@ -78,7 +78,7 @@ test('normalizacja: scala duplikaty i zachowuje wszystkie rozne linie tresci', (
     id: 'drugi',
     party: 'Foo',
     dateRaw: raw,
-    sortKey: '2026-03-02 01:02:03',
+    sortKey: '1999-09-20 01:02:03',
     number: 9,
     body: ['druga', 'wspolna'],
     read: true,
@@ -102,7 +102,7 @@ test('normalizacja: scala duplikaty i zachowuje wszystkie rozne linie tresci', (
 
 test('normalizacja: jest powtarzalna i nie zmienia wejscia', () => {
   const original = record({
-    party: 'Foo Pn, 2 III 2026, 01:02:03',
+    party: 'Foo Pn, 20 IX 1999, 01:02:03',
     body: ['tresc'],
   });
   const snapshot = structuredClone(original);
@@ -128,7 +128,7 @@ test('normalizacja: rekord bez mozliwej do odzyskania daty zostaje nietkniety', 
 });
 
 test('normalizacja: pusta tresc duplikatu nie usuwa zapisanej tresci', () => {
-  const raw = 'Pn, 2 III 2026, 01:02:03';
+  const raw = 'Pn, 20 IX 1999, 01:02:03';
   const withBody = record({ dateRaw: raw, body: ['zachowana'] });
   const withoutBody = record({ party: `Foo ${raw}`, body: [] });
 

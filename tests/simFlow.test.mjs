@@ -106,8 +106,8 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 {
   const t = new MockTransport();
   const mb = new MailboxSession(t, OPTS);
-  const cmd = olderListingCommand('wyslane', { day: 19, month: 4, year: 2026 });
-  ok('S5a komenda kotwicy', cmd === 'listy wyslane przed 19 IV 2026', cmd);
+  const cmd = olderListingCommand('wyslane', { day: 31, month: 10, year: 1999 });
+  ok('S5a komenda kotwicy', cmd === 'listy wyslane przed 31 X 1999', cmd);
   const p = mb.fetch('wyslane', cmd);
   await t.replay(load('listing-wyslane-wybrane-przed.json'));
   const res = await p;
@@ -116,7 +116,7 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
     const nums = res.entries.map((e) => e.number);
     ok('S5c numery maleja 50->1', nums[0] === 50 && nums[49] === 1, `${nums[0]}..${nums[49]}`);
     const oldest = res.entries[0];
-    ok('S5d najstarszy pierwszy (25 III)', oldest.date?.day === 25 && oldest.date?.month === 3,
+    ok('S5d najstarszy pierwszy (06 X)', oldest.date?.day === 6 && oldest.date?.month === 10,
       `${oldest.date?.day}.${oldest.date?.month}`);
   }
 }
@@ -140,11 +140,11 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 // --- S7: komendy szukania 1:1 z helpem --------------------------------------
 {
   ok('S7a osoba+daty+temat',
-    searchListingCommand('odebrane', { osoba: 'Foo', odDaty: { day: 1, month: 3, year: 2026 }, doDaty: { day: 10, month: 3, year: 2026 }, temat: 'karteczka' })
-      === 'listy odebrane od foo po 28 II 2026 przed 11 III 2026 o temacie karteczka');
+    searchListingCommand('odebrane', { osoba: 'Foo', odDaty: { day: 19, month: 9, year: 1999 }, doDaty: { day: 28, month: 9, year: 1999 }, temat: 'liscik 3' })
+      === 'listy odebrane od foo po 18 IX 1999 przed 29 IX 1999 o temacie liscik 3');
   ok('S7b wyslane=do', searchListingCommand('wyslane', { osoba: 'Bar' }) === 'listy wyslane do bar');
   ok('S7c temat ostatni', searchListingCommand('niewyslane', { temat: 'a b c' }) === 'listy niewyslane o temacie a b c');
-  ok('S7d miesiac WIELKA rzymska', searchListingCommand('odebrane', { odDaty: { day: 7, month: 12, year: 2025 } }) === 'listy odebrane po 6 XII 2025');
+  ok('S7d miesiac WIELKA rzymska', searchListingCommand('odebrane', { odDaty: { day: 15, month: 8, year: 1999 } }) === 'listy odebrane po 14 VIII 1999');
 }
 
 // --- S8: pager: przeczytanie listu (fixture w listing-odebrane-male) --------
@@ -157,7 +157,7 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
     { cls: 'mail', text: 'Od   : Corge' },
     { cls: 'mail', text: 'Temat: --' },
     { cls: 'mail', text: 'Do   : Gracz' },
-    { cls: 'mail', text: 'Data : Wt, 23 XII 2025, 00:11:12' },
+    { cls: 'mail', text: 'Data : Wt, 24 VIII 1999, 00:11:12' },
     { cls: 'mail', text: '' },
     { cls: 'mail', text: 'Pierwsza linia tresci.' },
     { cls: 'mail', text: 'Druga linia tresci.' },

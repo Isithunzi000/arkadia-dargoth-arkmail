@@ -38,7 +38,7 @@ import {
   type Harness,
 } from './harness';
 
-const TWIN_DATE = 'Wt, 23 XII 2025, 10:00:00';
+const TWIN_DATE = 'Wt, 24 VIII 1999, 10:00:00';
 
 const twinSeed = (occurrences: number, extraBodies?: string[][]): ArchiveLetter => ({
   ...fromMailboxEntry('odebrane', {
@@ -48,7 +48,7 @@ const twinSeed = (occurrences: number, extraBodies?: string[][]): ArchiveLetter 
     forwarded: false,
     party: 'Goniec',
     partyKind: 'nadawca',
-    date: { raw: TWIN_DATE, weekday: 'Wt', day: 23, month: 12, year: 2025, time: '10:00:00' },
+    date: { raw: TWIN_DATE, weekday: 'Wt', day: 24, month: 8, year: 1999, time: '10:00:00' },
   }),
   id: letterId('odebrane', 'Goniec', 'Raport', false, TWIN_DATE),
   occurrences,
@@ -63,7 +63,7 @@ const TWIN_LISTING = [
   ' 2. *R* Temat: Raport',
   `Nadawca: Goniec                       ${TWIN_DATE}`,
   ' 1. *R* Temat: Inny',
-  'Nadawca: Corge                       Wt, 23 XII 2025, 11:00:00',
+  'Nadawca: Corge                       Wt, 24 VIII 1999, 11:00:00',
 ];
 
 function replayTwinListing(h: Harness): void {

@@ -47,7 +47,7 @@ test('ui: busy "Wczytuje wszystkie" ma wielokropek (operacja w toku)', async () 
     );
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 1. *R* Temat: starszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(
       () => /\.\.\.$/.test(textOf(h, '.arkmail-busy')),

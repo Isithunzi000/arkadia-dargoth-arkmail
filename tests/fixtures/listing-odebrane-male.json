@@ -1,7 +1,6 @@
 {
   "name": "listing-odebrane-male",
   "opis": "Puste nieprzeczytane, maly listing odebranych (3 listy, *R*, data z godzina), przeczytanie listu 1, pager prompt, wyjscie q",
-  "zrodlo": "session_1766439839339.html",
   "lines": [
     {
       "cls": "mail",
@@ -21,19 +20,19 @@
     },
     {
       "cls": "mail",
-      "text": " 3. *R* Temat: Elementy rozbitego szkielka"
+      "text": " 3. *R* Temat: liscik"
     },
     {
       "cls": "mail",
-      "text": "Nadawca: Foo                        N, 21 XII 2025, 01:15:04"
+      "text": "Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04"
     },
     {
       "cls": "mail",
-      "text": " 2. *R* Temat: Rozbite szkielka tworzace calosc"
+      "text": " 2. *R* Temat: kartka 2"
     },
     {
       "cls": "mail",
-      "text": "Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05"
+      "text": "Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05"
     },
     {
       "cls": "mail",
@@ -41,7 +40,7 @@
     },
     {
       "cls": "mail",
-      "text": "Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12"
+      "text": "Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12"
     },
     {
       "cls": "command",
@@ -65,27 +64,27 @@
     },
     {
       "cls": "mail",
-      "text": "Data : Wt, 23 XII 2025, 00:11:12"
+      "text": "Data : Wt, 24 VIII 1999, 00:11:12"
     },
     {
       "cls": "mail",
-      "text": "Ciao!"
+      "text": "Dzien dobry,"
     },
     {
       "cls": "mail",
-      "text": "Grazie za wiesci."
+      "text": "Pisze krotko, bo sprawa pilna."
     },
     {
       "cls": "mail",
-      "text": "Po pierwsze, skad pomysl, ze to moze byc dla nas interesujace?"
+      "text": "Spotkajmy sie wkrotce na Rynku."
     },
     {
       "cls": "mail",
-      "text": "Po wtore, czy bylbys zainteresowany drobnym, ale dobrze platnym, zleceniem?"
+      "text": "Pozdrawiam."
     },
     {
       "cls": "mail",
-      "text": "Corge Galli"
+      "text": "Do uslyszenia."
     },
     {
       "cls": "mail",

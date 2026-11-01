@@ -33,16 +33,16 @@ import {
 
 test('paginacja: miesiac rzymski WIELKA litera (wymog serwera)', () => {
   assert.equal(
-    olderListingCommand('wyslane', parseMailDate('Cz, 9 III 2026, 12:00:00')!),
-    'listy wyslane przed 9 III 2026',
+    olderListingCommand('wyslane', parseMailDate('Pn, 27 IX 1999, 12:00:00')!),
+    'listy wyslane przed 27 IX 1999',
   );
   assert.equal(
-    olderListingCommand('odebrane', parseMailDate('N, 21 XII 2025, 01:15:04')!),
-    'listy odebrane przed 21 XII 2025',
+    olderListingCommand('odebrane', parseMailDate('Nd, 22 VIII 1999, 01:15:04')!),
+    'listy odebrane przed 22 VIII 1999',
   );
   // kotwica paginacji: najstarsza data + 1 dzien
-  const oldest = parseMailDate('N, 21 XII 2025, 01:15:04')!;
-  assert.equal(olderListingCommand('odebrane', nextDay(oldest)), 'listy odebrane przed 22 XII 2025');
+  const oldest = parseMailDate('Nd, 22 VIII 1999, 01:15:04')!;
+  assert.equal(olderListingCommand('odebrane', nextDay(oldest)), 'listy odebrane przed 23 VIII 1999');
 });
 
 test('paginacja: wczytaj starsze dokleja strone "Wybrane" do widoku i archiwum', async () => {
@@ -51,7 +51,7 @@ test('paginacja: wczytaj starsze dokleja strone "Wybrane" do widoku i archiwum',
   try {
     await loadTruncatedBox(h);
 
-    // Klik 1: kotwica = najstarszy (21 XII) + 1 dzien = 22 XII 2025.
+    // Klik 1: kotwica = najstarszy (21 XII) + 1 dzien = 23 VIII 1999.
     click(h, '.arkmail-older');
     await waitFor(
       () => f.sent.some((c) => c.startsWith('listy odebrane przed')),
@@ -59,18 +59,18 @@ test('paginacja: wczytaj starsze dokleja strone "Wybrane" do widoku i archiwum',
     );
     assert.equal(
       f.sent.find((c) => c.startsWith('listy odebrane przed')),
-      'listy odebrane przed 22 XII 2025',
+      'listy odebrane przed 23 VIII 1999',
     );
 
     // Pelna strona "Wybrane" (suffix) - doklejana przed istniejace wpisy.
     f.fire('Wybrane listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire('50. *R* Temat: antyczny', 'mail');
-    f.fire('Nadawca: Waldo                          N, 14 XII 2025, 10:00:00', 'mail');
+    f.fire('Nadawca: Waldo                          Nd, 15 VIII 1999, 10:00:00', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(() => content.querySelectorAll('.arkmail-entry').length === 4, 'merge strony');
     await waitFor(() => notifyText(f, 'dodanych do listy: 1'), 'notify o dopisaniu starszych do archiwum');
 
-    // Klik 2: kotwica = 14 XII + 1 dzien = 15 XII 2025.
+    // Klik 2: kotwica = 14 XII + 1 dzien = 16 VIII 1999.
     click(h, '.arkmail-older');
     await waitFor(
       () => f.sent.filter((c) => c.startsWith('listy odebrane przed')).length === 2,
@@ -78,13 +78,13 @@ test('paginacja: wczytaj starsze dokleja strone "Wybrane" do widoku i archiwum',
     );
     assert.equal(
       f.sent.filter((c) => c.startsWith('listy odebrane przed'))[1],
-      'listy odebrane przed 15 XII 2025',
+      'listy odebrane przed 16 VIII 1999',
     );
 
     // Strona niepelna (bez suffixu) = koniec starszych -> przycisk znika.
     f.fire('Wybrane listy odebrane:', 'mail');
     f.fire(' 9. *R* Temat: pradawny', 'mail');
-    f.fire('Nadawca: Baz                          Pn, 1 XII 2025, 09:00:00', 'mail');
+    f.fire('Nadawca: Baz                          Pn, 9 VIII 1999, 09:00:00', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(() => content.querySelectorAll('.arkmail-entry').length === 5, 'merge koncowy');
     await waitFor(() => !content.querySelector('.arkmail-older'), 'przycisk zniknal');
@@ -129,13 +129,13 @@ test('wczytaj wszystkie: petla stron az do konca (kotwica przesuwa sie co strone
     );
     assert.equal(
       f.sent.find((c) => c.startsWith('listy odebrane przed')),
-      'listy odebrane przed 22 XII 2025',
+      'listy odebrane przed 23 VIII 1999',
     );
 
     // Strona 1 (dalej ucieta) -> petla leci dalej po pacingu.
     f.fire('Wybrane listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire('50. *R* Temat: antyczny', 'mail');
-    f.fire('Nadawca: Waldo                          N, 14 XII 2025, 10:00:00', 'mail');
+    f.fire('Nadawca: Waldo                          Nd, 15 VIII 1999, 10:00:00', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(() => textOf(h, '.arkmail-older-all').includes('Przerwij'), 'Przerwij w petli');
     assert.ok(textOf(h, '.arkmail-busy').includes('strona 1'), 'pasek operacji: postep (strona 1)');
@@ -146,14 +146,14 @@ test('wczytaj wszystkie: petla stron az do konca (kotwica przesuwa sie co strone
     );
     assert.equal(
       f.sent.filter((c) => c.startsWith('listy odebrane przed'))[1],
-      'listy odebrane przed 15 XII 2025',
+      'listy odebrane przed 16 VIII 1999',
       'kotwica przesunela sie na najstarszy znany + 1 dzien',
     );
 
     // Strona 2 niepelna (bez suffixu) = koniec starszych -> petla staje.
     f.fire('Wybrane listy odebrane:', 'mail');
     f.fire(' 9. *R* Temat: pradawny', 'mail');
-    f.fire('Nadawca: Baz                          Pn, 1 XII 2025, 09:00:00', 'mail');
+    f.fire('Nadawca: Baz                          Pn, 9 VIII 1999, 09:00:00', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(
       () => notifyText(f, 'Wczytano wszystkie (dodanych do listy: 2)'),
@@ -184,7 +184,7 @@ test('wczytaj wszystkie: Przerwij zatrzymuje petle miedzy stronami', async () =>
 
     f.fire('Wybrane listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire('50. *R* Temat: antyczny', 'mail');
-    f.fire('Nadawca: Waldo                          N, 14 XII 2025, 10:00:00', 'mail');
+    f.fire('Nadawca: Waldo                          Nd, 15 VIII 1999, 10:00:00', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(() => textOf(h, '.arkmail-older-all').includes('Przerwij'), 'Przerwij w petli');
 
@@ -221,25 +221,25 @@ test('wczytaj wszystkie: ponad 50 listow jednego dnia zapisuje luke zamiast komp
       () => f.sent.some((c) => c.startsWith('listy odebrane przed')),
       'komenda petli 1',
     );
-    const cmd = () => f.sent.filter((c) => c === 'listy odebrane przed 22 XII 2025').length;
+    const cmd = () => f.sent.filter((c) => c === 'listy odebrane przed 23 VIII 1999').length;
     const sameDay = () => {
       f.fire('Wybrane listy odebrane (prezentowane jest pierwsze 50):', 'mail');
       f.fire(' 2. *R* Temat: ranny jeden', 'mail');
-      f.fire('Nadawca: Bar                          N, 21 XII 2025, 00:45:00', 'mail');
+      f.fire('Nadawca: Bar                          Nd, 22 VIII 1999, 00:45:00', 'mail');
       f.fire(' 1. *R* Temat: ranny dwa', 'mail');
-      f.fire('Nadawca: Bar                          N, 21 XII 2025, 00:30:00', 'mail');
+      f.fire('Nadawca: Bar                          Nd, 22 VIII 1999, 00:30:00', 'mail');
       f.fire('> ', 'prompt');
     };
     sameDay();
     await waitRt(() => cmd() === 2, 'powtorka tej samej strony');
     sameDay();
     await waitRt(
-      () => f.sent.includes('listy odebrane przed 21 XII 2025'),
+      () => f.sent.includes('listy odebrane przed 22 VIII 1999'),
       'sprawdzenie starszych dni',
     );
     f.fire('Nie znaleziono zadnych takich odebranych listow.', 'mail');
     await waitRt(() => notifyText(f, 'Wczytano dostepne listy'), 'uczciwe podsumowanie');
-    assert.ok(notifyText(f, '2025-12-21'), 'komunikat wskazuje dzien z luka');
+    assert.ok(notifyText(f, '1999-08-22'), 'komunikat wskazuje dzien z luka');
     assert.ok(!notifyText(f, 'Wczytano wszystkie'), 'brak falszywego kompletu');
     assert.equal(cmd(), 2, 'petla nie powtarza tej samej strony');
   } finally {
@@ -263,7 +263,7 @@ test('kontakty: wczytaj starsze odbudowuje kontakty z dopisanej strony (Fala 24b
     // Strona niepelna z NOWYM nadawca (Baz) - trafia do archiwum.
     f.fire('Wybrane listy odebrane:', 'mail');
     f.fire(' 9. *R* Temat: pradawny', 'mail');
-    f.fire('Nadawca: Baz                          Pn, 1 XII 2025, 09:00:00', 'mail');
+    f.fire('Nadawca: Baz                          Pn, 9 VIII 1999, 09:00:00', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(() => notifyText(f, 'dodanych do listy: 1'), 'notify o dopisaniu starszych');
 
@@ -294,7 +294,7 @@ test('kontakty: wczytaj wszystkie odbudowuje kontakty po zakonczeniu petli (Fala
     // Jedyna strona niepelna = koniec starszych, petla staje.
     f.fire('Wybrane listy odebrane:', 'mail');
     f.fire(' 9. *R* Temat: pradawny', 'mail');
-    f.fire('Nadawca: Baz                          Pn, 1 XII 2025, 09:00:00', 'mail');
+    f.fire('Nadawca: Baz                          Pn, 9 VIII 1999, 09:00:00', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(
       () => notifyText(f, 'Wczytano wszystkie (dodanych do listy: 1)'),
@@ -331,7 +331,7 @@ test('wczytaj wszystkie: naturalne domkniecie skrzynki stempluje indexMeta (Fala
     // naturalnie, skrzynka przeczesana w calosci.
     f.fire('Wybrane listy odebrane:', 'mail');
     f.fire(' 9. *R* Temat: pradawny', 'mail');
-    f.fire('Nadawca: Baz                          Pn, 1 XII 2025, 09:00:00', 'mail');
+    f.fire('Nadawca: Baz                          Pn, 9 VIII 1999, 09:00:00', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(
       () => notifyText(f, 'Wczytano wszystkie (dodanych do listy: 1)'),
@@ -364,7 +364,7 @@ test('wczytaj wszystkie: przerwanie petli NIE stempluje indexMeta (Fala 24c)', a
     // Strona 1 ucieta -> petla leci dalej; gracz klika Przerwij.
     f.fire('Wybrane listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire('50. *R* Temat: antyczny', 'mail');
-    f.fire('Nadawca: Waldo                          N, 14 XII 2025, 10:00:00', 'mail');
+    f.fire('Nadawca: Waldo                          Nd, 15 VIII 1999, 10:00:00', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(() => textOf(h, '.arkmail-older-all').includes('Przerwij'), 'Przerwij w petli');
     click(h, '.arkmail-older-all');
@@ -416,7 +416,7 @@ test('wczytaj wszystkie: przechodzi poza 40 stron i konczy dopiero na pelnej odp
 });
 
 test('wczytaj wszystkie: komunikat liczy wpisy dodane do widoku, nie tylko nowe rekordy', async () => {
-  const dateRaw = 'So, 20 XII 2025, 08:00:00';
+  const dateRaw = 'So, 21 VIII 1999, 08:00:00';
   const existing: ArchiveLetter = {
     id: letterId('odebrane', 'Foo', 'juz w archiwum', false, dateRaw),
     box: 'odebrane',
@@ -425,7 +425,7 @@ test('wczytaj wszystkie: komunikat liczy wpisy dodane do widoku, nie tylko nowe 
     subject: 'juz w archiwum',
     forwarded: false,
     dateRaw,
-    sortKey: '2025-12-20 08:00:00',
+    sortKey: '1999-08-21 08:00:00',
     read: true,
     body: [],
   };

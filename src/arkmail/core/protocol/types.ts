@@ -12,7 +12,7 @@ export interface ProtoLine {
 
 export type MailBox = 'nieprzeczytane' | 'odebrane' | 'wyslane' | 'niewyslane';
 
-/** Data z naglowka listingu/listu, np. "N, 21 XII 2025, 01:15:04". */
+/** Data z naglowka listingu/listu, np. "Nd, 22 VIII 1999, 01:15:04". */
 export interface MailDate {
   raw: string;
   weekday: string;

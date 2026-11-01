@@ -1,7 +1,6 @@
 {
   "name": "listing-wyslane-50",
   "opis": "Pelny listing wyslanych z suffiksem 'prezentowane jest pierwsze 50'",
-  "zrodlo": "session_1767735497198.html",
   "lines": [
     {
       "cls": "prompt",
@@ -13,403 +12,403 @@
     },
     {
       "cls": "mail",
-      "text": "50. Temat: Elementy rozbitego szkielka"
+      "text": "50. Temat: liscik"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Foo                                  N, 21 XII 2025, 00:31:35"
+      "text": "Odbiorcy: Foo                                  Nd, 22 VIII 1999, 00:31:35"
     },
     {
       "cls": "mail",
-      "text": "49. Temat: Rozbite szkielka tworzace calosc"
+      "text": "49. Temat: kartka 2"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Foo                                  Pn, 22 XII 2025, 02:18:08"
+      "text": "Odbiorcy: Foo                                  Pn, 23 VIII 1999, 02:18:08"
     },
     {
       "cls": "mail",
-      "text": "48. Temat: Wyzima"
+      "text": "48. Temat: wiadomosc 2"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Foo                                  Pn, 22 XII 2025, 02:21:44"
+      "text": "Odbiorcy: Foo                                  Pn, 23 VIII 1999, 02:21:44"
     },
     {
       "cls": "mail",
-      "text": "47. Temat: Moze sie Wam przydac..."
+      "text": "47. Temat: liscik 2"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Corge, Baz                          Pn, 22 XII 2025, 21:30:42"
+      "text": "Odbiorcy: Corge, Baz                          Pn, 23 VIII 1999, 21:30:42"
     },
     {
       "cls": "mail",
-      "text": "46. Temat: Zalakowany pergamin"
+      "text": "46. Temat: karteczka 3"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Corge, Baz                          Wt, 23 XII 2025, 00:30:40"
+      "text": "Odbiorcy: Corge, Baz                          Wt, 24 VIII 1999, 00:30:40"
     },
     {
       "cls": "mail",
-      "text": "45. Temat: karteczka"
+      "text": "45. Temat: liscik 3"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Foo                                  Sr, 24 XII 2025, 05:31:23"
+      "text": "Odbiorcy: Foo                                  Sr, 25 VIII 1999, 05:31:23"
     },
     {
       "cls": "mail",
-      "text": "44. Temat: karteczka"
+      "text": "44. Temat: liscik 3"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Foo                                  Sr, 24 XII 2025, 05:35:30"
+      "text": "Odbiorcy: Foo                                  Sr, 25 VIII 1999, 05:35:30"
     },
     {
       "cls": "mail",
-      "text": "43. Temat: karteczka"
+      "text": "43. Temat: liscik 3"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Foo                                  Sr, 24 XII 2025, 05:52:20"
+      "text": "Odbiorcy: Foo                                  Sr, 25 VIII 1999, 05:52:20"
     },
     {
       "cls": "mail",
-      "text": "42. Temat: zalakowany pergamin pachnacy imbirem"
+      "text": "42. Temat: kartka 6"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Corge                                 Pt, 26 XII 2025, 00:55:50"
+      "text": "Odbiorcy: Corge                                 Pt, 27 VIII 1999, 00:55:50"
     },
     {
       "cls": "mail",
-      "text": "41. Temat: karteczka"
+      "text": "41. Temat: liscik 3"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Corge                                 Pt, 26 XII 2025, 02:07:41"
+      "text": "Odbiorcy: Corge                                 Pt, 27 VIII 1999, 02:07:41"
     },
     {
       "cls": "mail",
-      "text": "40. Temat: notatka na karteczce"
+      "text": "40. Temat: dopisek 3"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Baz                                    So, 27 XII 2025, 00:22:36"
+      "text": "Odbiorcy: Baz                                    So, 28 VIII 1999, 00:22:36"
     },
     {
       "cls": "mail",
-      "text": "39. Temat: zalakowany pachnacy pergamin"
+      "text": "39. Temat: notatka 6"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Foo                                  So, 27 XII 2025, 17:58:59"
+      "text": "Odbiorcy: Foo                                  So, 28 VIII 1999, 17:58:59"
     },
     {
       "cls": "mail",
-      "text": "38. Temat: zalakowany pergamin pachnacy lasem"
+      "text": "38. Temat: dopisek 6"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Baz                                    So, 27 XII 2025, 22:22:06"
+      "text": "Odbiorcy: Baz                                    So, 28 VIII 1999, 22:22:06"
     },
     {
       "cls": "mail",
-      "text": "37. Temat: karteczka"
+      "text": "37. Temat: liscik 3"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Foo                                  N, 28 XII 2025, 00:46:32"
+      "text": "Odbiorcy: Foo                                  Nd, 29 VIII 1999, 00:46:32"
     },
     {
       "cls": "mail",
-      "text": "36. Temat: zalakowany pergamin"
+      "text": "36. Temat: zapiska 6"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Flarp                                  N, 28 XII 2025, 12:51:35"
+      "text": "Odbiorcy: Flarp                                  Nd, 29 VIII 1999, 12:51:35"
     },
     {
       "cls": "mail",
-      "text": "35. Temat: wymietolona karteczka"
+      "text": "35. Temat: wiadomosc 5"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Blorf                                   Pn, 29 XII 2025, 13:42:59"
+      "text": "Odbiorcy: Blorf                                   Pn, 30 VIII 1999, 13:42:59"
     },
     {
       "cls": "mail",
-      "text": "34. Temat: wymietolona karteczka"
+      "text": "34. Temat: wiadomosc 5"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Blorf                                   Pn, 29 XII 2025, 14:06:24"
+      "text": "Odbiorcy: Blorf                                   Pn, 30 VIII 1999, 14:06:24"
     },
     {
       "cls": "mail",
-      "text": "33. Temat: pergamin zawiniety w skore jelenia"
+      "text": "33. Temat: liscik 5"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Flarp                                  Pn, 29 XII 2025, 21:28:49"
+      "text": "Odbiorcy: Flarp                                  Pn, 30 VIII 1999, 21:28:49"
     },
     {
       "cls": "mail",
-      "text": "32. Temat: wymietolona karteczka"
+      "text": "32. Temat: wiadomosc 5"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Foo                                  Wt, 30 XII 2025, 02:27:20"
+      "text": "Odbiorcy: Foo                                  Wt, 31 VIII 1999, 02:27:20"
     },
     {
       "cls": "mail",
-      "text": "31. Temat: pachnaca karteczka"
+      "text": "31. Temat: wiadomosc 3"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Foo                                  Sr, 31 XII 2025, 07:59:15"
+      "text": "Odbiorcy: Foo                                  Sr, 1 IX 1999, 07:59:15"
     },
     {
       "cls": "mail",
-      "text": "30. Temat: niewielka karteczka"
+      "text": "30. Temat: bilecik 3"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Baz                                    Sr, 31 XII 2025, 07:59:15"
+      "text": "Odbiorcy: Baz                                    Sr, 1 IX 1999, 07:59:15"
     },
     {
       "cls": "mail",
-      "text": "29. Temat: pachnacy zalakowany pergamin"
+      "text": "29. Temat: zapiska 4"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Foo                                   Pt, 2 I 2026, 03:01:49"
+      "text": "Odbiorcy: Foo                                   Pt, 3 IX 1999, 03:01:49"
     },
     {
       "cls": "mail",
-      "text": "28. Temat: pergamin zawiniety w skore jelenia"
+      "text": "28. Temat: liscik 5"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Foo                                   Pt, 2 I 2026, 22:15:27"
+      "text": "Odbiorcy: Foo                                   Pt, 3 IX 1999, 22:15:27"
     },
     {
       "cls": "mail",
-      "text": "27. Temat: pergamin zawiniety w liscie tytoniu"
+      "text": "27. Temat: karteczka 5"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Foo                                   Pt, 2 I 2026, 22:54:11"
+      "text": "Odbiorcy: Foo                                   Pt, 3 IX 1999, 22:54:11"
     },
     {
       "cls": "mail",
-      "text": "26. Temat: karteczka"
+      "text": "26. Temat: liscik 3"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Foo                                   Pt, 2 I 2026, 23:44:30"
+      "text": "Odbiorcy: Foo                                   Pt, 3 IX 1999, 23:44:30"
     },
     {
       "cls": "mail",
-      "text": "25. Temat: wyrwana karteczka"
+      "text": "25. Temat: karteczka 6"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Blorf                                    So, 3 I 2026, 03:00:15"
+      "text": "Odbiorcy: Blorf                                    So, 4 IX 1999, 03:00:15"
     },
     {
       "cls": "mail",
-      "text": "24. Temat: niewielka poszarpana karteczka"
+      "text": "24. Temat: kartka 3"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Baz, Blorf                             So, 3 I 2026, 17:30:58"
+      "text": "Odbiorcy: Baz, Blorf                             So, 4 IX 1999, 17:30:58"
     },
     {
       "cls": "mail",
-      "text": "23. Temat: pachnacy przyprawami ziolowymi pergamin"
+      "text": "23. Temat: notatka 4"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Flob                                     So, 3 I 2026, 18:36:24"
+      "text": "Odbiorcy: Flob                                     So, 4 IX 1999, 18:36:24"
     },
     {
       "cls": "mail",
-      "text": "22. Temat: pergamin dziwnie pachnacy"
+      "text": "22. Temat: wiadomosc 4"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Bar                                      N, 4 I 2026, 00:02:21"
+      "text": "Odbiorcy: Bar                                      Nd, 5 IX 1999, 00:02:21"
     },
     {
       "cls": "mail",
-      "text": "21. Temat: wyrwana karteczka"
+      "text": "21. Temat: karteczka 6"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Bar                                      N, 4 I 2026, 00:46:28"
+      "text": "Odbiorcy: Bar                                      Nd, 5 IX 1999, 00:46:28"
     },
     {
       "cls": "mail",
-      "text": "20. Temat: wyrwana karteczka"
+      "text": "20. Temat: karteczka 6"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Foo                                    N, 4 I 2026, 00:48:21"
+      "text": "Odbiorcy: Foo                                    Nd, 5 IX 1999, 00:48:21"
     },
     {
       "cls": "mail",
-      "text": "19. Temat: wymietolona karteczka"
+      "text": "19. Temat: wiadomosc 5"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Bar                                      N, 4 I 2026, 00:57:38"
+      "text": "Odbiorcy: Bar                                      Nd, 5 IX 1999, 00:57:38"
     },
     {
       "cls": "mail",
-      "text": "18. Temat: podziobana karteczka"
+      "text": "18. Temat: notatka 5"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Bar                                      N, 4 I 2026, 01:01:03"
+      "text": "Odbiorcy: Bar                                      Nd, 5 IX 1999, 01:01:03"
     },
     {
       "cls": "mail",
-      "text": "17. Temat: pasemko papieru"
+      "text": "17. Temat: dopisek 4"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Bar                                      N, 4 I 2026, 01:03:27"
+      "text": "Odbiorcy: Bar                                      Nd, 5 IX 1999, 01:03:27"
     },
     {
       "cls": "mail",
-      "text": "16. Temat: pasemko papieru"
+      "text": "16. Temat: dopisek 4"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Bar                                      N, 4 I 2026, 01:13:18"
+      "text": "Odbiorcy: Bar                                      Nd, 5 IX 1999, 01:13:18"
     },
     {
       "cls": "mail",
-      "text": "15. Temat: pachnacy pergamin"
+      "text": "15. Temat: liscik 4"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Flob                                      N, 4 I 2026, 16:43:05"
+      "text": "Odbiorcy: Flob                                      Nd, 5 IX 1999, 16:43:05"
     },
     {
       "cls": "mail",
-      "text": "14. Temat: zalakowany pachnacy misterny pergamin"
+      "text": "14. Temat: liscik 6"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Bar                                      N, 4 I 2026, 17:21:39"
+      "text": "Odbiorcy: Bar                                      Nd, 5 IX 1999, 17:21:39"
     },
     {
       "cls": "mail",
-      "text": "13. Temat: porwany pasek karteczki"
+      "text": "13. Temat: kartka 5"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Bar                                     Pn, 5 I 2026, 03:55:21"
+      "text": "Odbiorcy: Bar                                     Pn, 6 IX 1999, 03:55:21"
     },
     {
       "cls": "mail",
-      "text": "12. Temat: poplamiona karteczka"
+      "text": "12. Temat: bilecik 5"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Bar                                     Pn, 5 I 2026, 04:45:46"
+      "text": "Odbiorcy: Bar                                     Pn, 6 IX 1999, 04:45:46"
     },
     {
       "cls": "mail",
-      "text": "11. Temat: pasek karteczki"
+      "text": "11. Temat: bilecik 4"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Bar                                     Pn, 5 I 2026, 04:56:06"
+      "text": "Odbiorcy: Bar                                     Pn, 6 IX 1999, 04:56:06"
     },
     {
       "cls": "mail",
-      "text": "10. Temat: pokrwawione pasemko karteczki"
+      "text": "10. Temat: zapiska 5"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Foo                                   Wt, 6 I 2026, 02:05:31"
+      "text": "Odbiorcy: Foo                                   Wt, 7 IX 1999, 02:05:31"
     },
     {
       "cls": "mail",
-      "text": " 9. Temat: karteczka"
+      "text": " 9. Temat: liscik 3"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Foo                                   Wt, 6 I 2026, 02:11:14"
+      "text": "Odbiorcy: Foo                                   Wt, 7 IX 1999, 02:11:14"
     },
     {
       "cls": "mail",
-      "text": " 8. Temat: pasemko karteczki"
+      "text": " 8. Temat: kartka 4"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Baz, Blorf                             Wt, 6 I 2026, 16:15:45"
+      "text": "Odbiorcy: Baz, Blorf                             Wt, 7 IX 1999, 16:15:45"
     },
     {
       "cls": "mail",
-      "text": " 7. Temat: pachnacy dzikimi rozami pergamin"
+      "text": " 7. Temat: karteczka 4"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Bar                                     Wt, 6 I 2026, 22:57:43"
+      "text": "Odbiorcy: Bar                                     Wt, 7 IX 1999, 22:57:43"
     },
     {
       "cls": "mail",
-      "text": " 6. Temat: karteczka"
+      "text": " 6. Temat: liscik 3"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Foo                                   Sr, 7 I 2026, 00:58:17"
+      "text": "Odbiorcy: Foo                                   Sr, 8 IX 1999, 00:58:17"
     },
     {
       "cls": "mail",
-      "text": " 5. Temat: karteczka"
+      "text": " 5. Temat: liscik 3"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Foo                                   Sr, 7 I 2026, 01:21:07"
+      "text": "Odbiorcy: Foo                                   Sr, 8 IX 1999, 01:21:07"
     },
     {
       "cls": "mail",
-      "text": " 4. Temat: karteczka"
+      "text": " 4. Temat: liscik 3"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Bar                                     Sr, 7 I 2026, 02:03:59"
+      "text": "Odbiorcy: Bar                                     Sr, 8 IX 1999, 02:03:59"
     },
     {
       "cls": "mail",
-      "text": " 3. Temat: karteczka"
+      "text": " 3. Temat: liscik 3"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Bar                                     Sr, 7 I 2026, 02:10:05"
+      "text": "Odbiorcy: Bar                                     Sr, 8 IX 1999, 02:10:05"
     },
     {
       "cls": "mail",
-      "text": " 2. Temat: karteczka"
+      "text": " 2. Temat: liscik 3"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Foo                                   Sr, 7 I 2026, 02:30:15"
+      "text": "Odbiorcy: Foo                                   Sr, 8 IX 1999, 02:30:15"
     },
     {
       "cls": "mail",
-      "text": " 1. Temat: przemoczona karteczka"
+      "text": " 1. Temat: dopisek 5"
     },
     {
       "cls": "mail",
-      "text": "Odbiorcy: Bar                                     Sr, 7 I 2026, 03:41:48"
+      "text": "Odbiorcy: Bar                                     Sr, 8 IX 1999, 03:41:48"
     },
     {
       "cls": "command",

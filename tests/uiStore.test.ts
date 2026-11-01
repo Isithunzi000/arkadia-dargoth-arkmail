@@ -150,24 +150,24 @@ test('ui: appendMailboxPage dokleja starsza strone PRZED istniejace (dedup, kole
   const d = (raw: string) => ({
     raw,
     weekday: raw.slice(0, 2),
-    day: 1,
-    month: 12,
-    year: 2025,
-    time: '10:00:00',
+    day: Number(raw.slice(4, 6)),
+    month: 8,
+    year: 1999,
+    time: raw.slice(-8),
   });
   s.applyMailbox('odebrane', lista('odebrane', [
-    { number: 2, party: 'Foo', subject: 'B', date: d('Pn, 22 XII 2025, 02:20:05') },
-    { number: 1, party: 'Corge', subject: 'A', date: d('Wt, 23 XII 2025, 00:11:12') },
+    { number: 2, party: 'Foo', subject: 'B', date: d('Pn, 23 VIII 1999, 02:20:05') },
+    { number: 1, party: 'Corge', subject: 'A', date: d('Wt, 24 VIII 1999, 00:11:12') },
   ]));
   // strona starszych: jeden nowy (C) + duplikat istniejacego (B)
   s.appendMailboxPage('odebrane', [
     {
       number: 50, isRead: true, subject: 'C', forwarded: false,
-      party: 'Waldo', partyKind: 'nadawca', date: d('N, 14 XII 2025, 10:00:00'),
+      party: 'Waldo', partyKind: 'nadawca', date: d('Nd, 15 VIII 1999, 10:00:00'),
     },
     {
       number: 49, isRead: true, subject: 'B', forwarded: false,
-      party: 'Foo', partyKind: 'nadawca', date: d('Pn, 22 XII 2025, 02:20:05'),
+      party: 'Foo', partyKind: 'nadawca', date: d('Pn, 23 VIII 1999, 02:20:05'),
     },
   ], true);
   const v = s.state.boxes.odebrane!;

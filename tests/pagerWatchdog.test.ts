@@ -25,7 +25,7 @@ function replayLetter(h: Harness, n: number): void {
   f.fire(`List : ${n}`, 'mail');
   f.fire('Od   : Corge', 'mail');
   f.fire('Temat: najnowszy', 'mail');
-  f.fire('Data : Wt, 23 XII 2025, 00:11:12', 'mail');
+  f.fire('Data : Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire('', 'mail');
   f.fire('Tresc karteczki.', 'mail');
   f.fire(`[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: ${n}) -- `, 'mail');
@@ -87,12 +87,12 @@ test('straznik: prompt pagera pod blokada (legalny odczyt) bez dodatkowego q', a
     // wpis ma stary kontekst, wiec otwarcie idzie przez re-kotwice.
     click(h, '.arkmail-entry');
     await waitFor(
-      () => f.sent.includes('listy odebrane przed 24 XII 2025'),
+      () => f.sent.includes('listy odebrane przed 25 VIII 1999'),
       're-kotwica przed otwarciem',
     );
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(() => f.sent.includes('przeczytaj list 1'), 'przeczytaj list 1');
     replayLetter(h, 1);
@@ -101,7 +101,7 @@ test('straznik: prompt pagera pod blokada (legalny odczyt) bez dodatkowego q', a
     await waitFor(() => f.sent.filter((c) => c === 'listy odebrane').length === 2, 'refresh 11f');
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(() => !content.querySelector('.arkmail-busy'), 'koniec refreshu');
     await new Promise((r) => setTimeout(r, 300));

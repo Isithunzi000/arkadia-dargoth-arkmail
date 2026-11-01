@@ -1,7 +1,6 @@
 {
   "name": "kasowanie",
   "opis": "Pager: d 1 -> Zaznaczono -> q -> Kasuje listy... Kasuje: 1. + puste niewyslane",
-  "zrodlo": "session_1766852565008.html",
   "lines": [
     {
       "cls": "mail",
@@ -9,11 +8,11 @@
     },
     {
       "cls": "mail",
-      "text": " |       |   Dzisiaj  w  nocy  Belleteyn. Minotaur choc martwy        | "
+      "text": " |       |   Pisze krotko, bo sprawa pilna.                           | "
     },
     {
       "cls": "mail",
-      "text": " |       |   pomoze nam troche.                                       | "
+      "text": " |       |   Pozdrawiam.                                              | "
     },
     {
       "cls": "mail",
@@ -21,11 +20,11 @@
     },
     {
       "cls": "mail",
-      "text": " |       |   Jak zwykle pelen zagadek i dziwnych tresci               | "
+      "text": " |       |   Ps. Wszystko gra.                                        | "
     },
     {
       "cls": "mail",
-      "text": " |       |   Caluje w nosek                                           | "
+      "text": " |       |   Do uslyszenia.                                           | "
     },
     {
       "cls": "mail",

@@ -37,7 +37,7 @@ const LETTER: LetterContent = {
   subject: 'najnowszy',
   to: 'Waldo',
   cc: null,
-  date: 'Wt, 23 XII 2025, 00:11:12',
+  date: 'Wt, 24 VIII 1999, 00:11:12',
   body: ['Tresc.'],
 };
 
@@ -93,16 +93,16 @@ test('integracja: klik w archiwum pokazuje list, Zamknij list wraca do archiwum'
     clickArchiveRow(h, 'srodkowy');
 
     // Odczyt z serwera (re-kotwica po dacie).
-    await waitRt(() => f.sent.includes('listy odebrane przed 23 XII 2025'), 're-kotwica');
+    await waitRt(() => f.sent.includes('listy odebrane przed 24 VIII 1999'), 're-kotwica');
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 2. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(() => f.sent.includes('przeczytaj list 2'), 'odczyt');
     f.fire('List : 2', 'mail');
     f.fire('Od   : Foo', 'mail');
     f.fire('Temat: srodkowy', 'mail');
-    f.fire('Data : Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Data : Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire('', 'mail');
     f.fire('Tresc srodkowego.', 'mail');
     f.fire('[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 2) -- ', 'mail');

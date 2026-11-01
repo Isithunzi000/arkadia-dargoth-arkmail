@@ -13,7 +13,7 @@ import {
   type Harness,
 } from './harness';
 
-const DATE_RAW = 'Wt, 23 XII 2025, 00:11:12';
+const DATE_RAW = 'Wt, 24 VIII 1999, 00:11:12';
 
 function archived(subject: string, over: Partial<ArchiveLetter> = {}): ArchiveLetter {
   return {
@@ -27,9 +27,9 @@ function archived(subject: string, over: Partial<ArchiveLetter> = {}): ArchiveLe
       date: {
         raw: DATE_RAW,
         weekday: 'Wt',
-        day: 23,
-        month: 12,
-        year: 2025,
+        day: 24,
+        month: 8,
+        year: 1999,
         time: '00:11:12',
       },
     }),

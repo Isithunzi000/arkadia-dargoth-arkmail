@@ -1,7 +1,6 @@
 {
   "name": "compose-pelny",
   "opis": "Pelna sekwencja: napisz list, pipelined adresat/temat, echo Adresat: Temat: DW:, ramka pergamin2, **, numeracja, pomyslnie wyslany",
-  "zrodlo": "session_1766185077541.html",
   "lines": [
     {
       "cls": "command",
@@ -45,7 +44,7 @@
     },
     {
       "cls": "command",
-      "text": "→  |     Szanowny kolego bracie Zniwiarzu,                            |   "
+      "text": "→  |     Dzien dobry,                                                 |   "
     },
     {
       "cls": "command",
@@ -53,19 +52,19 @@
     },
     {
       "cls": "command",
-      "text": "→  |     Zgodnie   z   Nasza  ustna  umowa  zawarta  dnia  gnomiego   |   "
+      "text": "→  |     Pisze krotko, bo sprawa pilna.                               |   "
     },
     {
       "cls": "command",
-      "text": "→  |     dzisiejszego  w  karczmie w Novigradzie, na oczach elfki i   |   "
+      "text": "→  |     Spotkajmy sie wkrotce na Rynku.                              |   "
     },
     {
       "cls": "command",
-      "text": "→  |     karczmarza,  wlasciciela  tegoz przybytku, pisze do Ciebie   |   "
+      "text": "→  |     Ps. Wszystko gra.                                            |   "
     },
     {
       "cls": "command",
-      "text": "→  |     ten o to pergamin.                                           |   "
+      "text": "→  |     Pozdrawiam.                                                  |   "
     },
     {
       "cls": "command",
@@ -73,7 +72,7 @@
     },
     {
       "cls": "command",
-      "text": "→  |     Niech Ci Morr blogoslawi do samego konca                     |   "
+      "text": "→  |     Do uslyszenia.                                               |   "
     },
     {
       "cls": "command",

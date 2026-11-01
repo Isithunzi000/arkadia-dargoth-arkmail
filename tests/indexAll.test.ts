@@ -156,19 +156,19 @@ test('Indeksuj wszystkie: paginacja kotwicowa, flagi, gone-marking, odblokowanie
     // Uciety listing BEZ najnowszego listu (Corge zniknal z serwera).
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 2. *R* Temat: najstarszy', 'mail');
-    f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
     f.fire(' 1. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire('> ', 'prompt');
     // Kotwica paginacji: dzien PO najstarszym widocznym (21 XII -> 22 XII).
     await waitRt(
-      () => f.sent.includes('listy odebrane przed 22 XII 2025'),
+      () => f.sent.includes('listy odebrane przed 23 VIII 1999'),
       'indeksacja: kotwica paginacji odebranych',
     );
     // Strona 2 kompletna (bez suffixu uciecia) - nowy prastary list.
     f.fire('Listy odebrane:', 'mail');
     f.fire(' 1. *R* Temat: prastary', 'mail');
-    f.fire('Nadawca: Gronk                        S, 15 XI 2025, 10:00:00', 'mail');
+    f.fire('Nadawca: Fred                        So, 7 VIII 1999, 10:00:00', 'mail');
     f.fire('> ', 'prompt');
     // --- pozostale skrzynki puste (nieprzeczytane: prolog wyslal 1x).
     await waitRt(
@@ -197,7 +197,7 @@ test('Indeksuj wszystkie: paginacja kotwicowa, flagi, gone-marking, odblokowanie
     assert.ok(texts.every((t) => !t.includes('najnowszy')), 'znikniety list ukryty');
     assert.ok(texts.some((t) => t.includes('prastary')), 'dopisany list z paginacji');
 
-    // Kontakty odblokowane: Foo i Gronk licza sie, Corge nie.
+    // Kontakty odblokowane: Foo i Fred licza sie, Corge nie.
     click(h, '[data-tab="kontakty"]');
     await waitRt(() => !!h.content.querySelector('.arkmail-contact'), 'wiersze kontaktow');
     const names = Array.from(
@@ -206,7 +206,7 @@ test('Indeksuj wszystkie: paginacja kotwicowa, flagi, gone-marking, odblokowanie
       }>,
     ).map((r) => String(r.textContent ?? ''));
     assert.ok(names.includes('Foo'), 'kontakt z zywych listow');
-    assert.ok(names.includes('Gronk'), 'kontakt z dopisanej strony');
+    assert.ok(names.includes('Fred'), 'kontakt z dopisanej strony');
     assert.ok(!names.includes('Corge'), 'kontakt zniknietego listu odpada');
     // Opis indeksacji: najwczesniejsza data + rozmiar bazy (3 zywe
     // grupy; Fala 28: zniknieta Corge jest FIZYCZNIE purgowana, nie
@@ -262,7 +262,7 @@ test('pobieranie tresci przy kompletnej bazie: jasny toast zamiast martwego', as
     await waitRt(() => f.sent.includes('listy odebrane'), 'prolog: odebrane');
     f.fire('Listy odebrane:', 'mail');
     f.fire(' 1. *R* Temat: jedyny', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(() => f.sent.includes('listy nieprzeczytane'), 'prolog: nieprzeczytane');
     f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
@@ -276,16 +276,16 @@ test('pobieranie tresci przy kompletnej bazie: jasny toast zamiast martwego', as
     ).find((r) => String(r.textContent ?? '').includes('jedyny'));
     assert.ok(row, 'wiersz listingu');
     row.dispatchEvent(new h.window.Event('click'));
-    await waitRt(() => f.sent.includes('listy odebrane przed 24 XII 2025'), 're-kotwica');
+    await waitRt(() => f.sent.includes('listy odebrane przed 25 VIII 1999'), 're-kotwica');
     f.fire('Listy odebrane:', 'mail');
     f.fire(' 1. *R* Temat: jedyny', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(() => f.sent.includes('przeczytaj list 1'), 'odczyt');
     f.fire('List : 1', 'mail');
     f.fire('Od   : Corge', 'mail');
     f.fire('Temat: jedyny', 'mail');
-    f.fire('Data : Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Data : Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('', 'mail');
     f.fire('Tresc jedynego.', 'mail');
     f.fire('[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ', 'mail');
@@ -297,7 +297,7 @@ test('pobieranie tresci przy kompletnej bazie: jasny toast zamiast martwego', as
     );
     f.fire('Listy odebrane:', 'mail');
     f.fire(' 1. *R* Temat: jedyny', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec odczytu');
     // Archiwum ma 1 list i ma juz tresc -> pobieranie konczy sie

@@ -139,9 +139,9 @@ test('harness: stopka pokazuje (u/n) i podswietlenie dla niewyslanych', async ()
     await h.waitFor(() => h.f.sent.includes('listy niewyslane'), 'komenda listy niewyslane');
     h.f.fire('Listy niewyslane:', 'mail');
     h.f.fire(' 2. Temat: pierwszy', 'mail');
-    h.f.fire('Odbiorca: Kruk                         Wt, 23 XII 2025, 10:00:00', 'mail');
+    h.f.fire('Odbiorca: Baz                         Wt, 24 VIII 1999, 10:00:00', 'mail');
     h.f.fire(' 1. Temat: drugi', 'mail');
-    h.f.fire('Odbiorcy: Corge, Garply                 Wt, 23 XII 2025, 11:00:00', 'mail');
+    h.f.fire('Odbiorcy: Corge, Garply                 Wt, 24 VIII 1999, 11:00:00', 'mail');
     h.f.fire('> ', 'prompt');
     await h.waitFor(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji niewyslanych');
     await h.waitFor(

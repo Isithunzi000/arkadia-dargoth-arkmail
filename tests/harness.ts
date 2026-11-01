@@ -215,11 +215,11 @@ export async function loadTruncatedBox(h: Harness): Promise<void> {
   await waitFor(() => f.sent.includes('listy odebrane'), 'komenda listy odebrane');
   f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
   f.fire(' 3. *R* Temat: najstarszy', 'mail');
-  f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+  f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
   f.fire(' 2. *R* Temat: srodkowy', 'mail');
-  f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+  f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
   f.fire(' 1. *R* Temat: najnowszy', 'mail');
-  f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+  f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire('> ', 'prompt');
   await waitFor(() => f.sent.includes('listy nieprzeczytane'), 'komenda listy nieprzeczytane');
   f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');

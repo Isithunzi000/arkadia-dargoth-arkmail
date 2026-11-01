@@ -18,7 +18,7 @@ function replayLetter(h: Harness, numer: number, body: string): void {
   f.fire(`List : ${numer}`, 'mail');
   f.fire('Od   : Corge', 'mail');
   f.fire('Temat: najnowszy', 'mail');
-  f.fire('Data : Wt, 23 XII 2025, 00:11:12', 'mail');
+  f.fire('Data : Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire('', 'mail');
   f.fire(body, 'mail');
   f.fire(`[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: ${numer}) -- `, 'mail');
@@ -42,7 +42,7 @@ test('gag: listing pluginowy stlumiony, reczny listing i prompt widoczne', async
     await waitFor(() => f.sent.includes('listy odebrane'), 'komenda listy odebrane');
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     assert.ok(
       f.gagged.includes('Listy odebrane (prezentowane jest pierwsze 50):'),
@@ -81,10 +81,10 @@ test('gag: odczyt listu stumliony w calosci, prompt gry widoczny', async () => {
     const gaggedBase = f.gagged.length;
 
     click(h, '.arkmail-entry');
-    await waitFor(() => f.sent.includes('listy odebrane przed 24 XII 2025'), 're-kotwica');
+    await waitFor(() => f.sent.includes('listy odebrane przed 25 VIII 1999'), 're-kotwica');
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(() => f.sent.includes('przeczytaj list 1'), 'odczyt');
     replayLetter(h, 1, 'Tresc najtajniejsza.');
@@ -109,7 +109,7 @@ test('gag: odczyt listu stumliony w calosci, prompt gry widoczny', async () => {
     );
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(() => !content.querySelector('.arkmail-busy'), 'koniec refreshu');
 

@@ -7,7 +7,7 @@
  * event "gmcp.mail.state" (path lowercasowany w gmcp.ts klienta).
  *
  * Dlaczego potrzebne: linie tekstowe potrafia sie rozjechac z prawda
- * serwera - log 2026-01-04 01:03: "[ POCZTA ] Masz nowa poczte od Bar."
+ * serwera - log 1999-09-05 01:03: "[ POCZTA ] Masz nowa poczte od Bar."
  * i 15 s pozniej przy ladowaniu zwierzecia "Nie masz zadnych
  * nieprzeczytanych listow." (list byl w skrzynce). GMCP jest
  * deklaratywne (stan, nie zdarzenie), wiec jest lepszym wyzwalaczem;

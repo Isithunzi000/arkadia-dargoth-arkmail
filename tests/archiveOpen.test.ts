@@ -52,7 +52,7 @@ function replayLetter(h: Harness, numer: number, subject: string, body: string):
   f.fire(`List : ${numer}`, 'mail');
   f.fire('Od   : Corge', 'mail');
   f.fire(`Temat: ${subject}`, 'mail');
-  f.fire('Data : Wt, 23 XII 2025, 00:11:12', 'mail');
+  f.fire('Data : Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire('', 'mail');
   f.fire(body, 'mail');
   f.fire(`[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: ${numer}) -- `, 'mail');
@@ -66,10 +66,10 @@ test('archiwum: wpis z trescia otwiera sie z cache, zero komend', async () => {
     await loadTruncatedBox(h);
     // Nabijamy cache: otwieramy najnowszy list (re-kotwica po prologu).
     click(h, '.arkmail-entry');
-    await waitFor(() => f.sent.includes('listy odebrane przed 24 XII 2025'), 're-kotwica');
+    await waitFor(() => f.sent.includes('listy odebrane przed 25 VIII 1999'), 're-kotwica');
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(() => f.sent.includes('przeczytaj list 1'), 'odczyt');
     replayLetter(h, 1, 'najnowszy', 'Tresc z cache 777.');
@@ -78,7 +78,7 @@ test('archiwum: wpis z trescia otwiera sie z cache, zero komend', async () => {
     await waitFor(() => f.sent.filter((c) => c === 'listy odebrane').length >= 2, 'refresh');
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(() => !content.querySelector('.arkmail-busy'), 'koniec refreshu');
 
@@ -102,14 +102,14 @@ test('archiwum: wpis bez tresci = re-kotwica po dacie i odczyt z serwera', async
     const base = f.sent.length;
     clickArchiveRow(h, 'najnowszy');
     await waitFor(
-      () => f.sent.slice(base).includes('listy odebrane przed 24 XII 2025'),
+      () => f.sent.slice(base).includes('listy odebrane przed 25 VIII 1999'),
       're-kotwica po dacie listu z archiwum',
     );
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 2. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire(' 1. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(() => f.sent.slice(base).includes('przeczytaj list 2'), 'odczyt ze swiezym numerem');
     replayLetter(h, 2, 'najnowszy', 'Tresc doczytana z serwera.');
@@ -134,7 +134,7 @@ test('archiwum: wpis bez tresci = re-kotwica po dacie i odczyt z serwera', async
 
 test('archiwum: odzyskany rekord z dluga lista osob i jedna spacja przed data otwiera list', async () => {
   const party = 'Foo, Bar, Corge, Waldo, Baz, Grault';
-  const raw = 'Pn, 2 III 2026, 01:02:03';
+  const raw = 'Pn, 20 IX 1999, 01:02:03';
   const damaged: ArchiveLetter = {
     id: 'stary-identyfikator',
     box: 'odebrane',
@@ -152,7 +152,7 @@ test('archiwum: odzyskany rekord z dluga lista osob i jedna spacja przed data ot
   try {
     click(h, '[data-tab="archiwum"]');
     clickArchiveRow(h, 'odzyskany');
-    await waitRt(() => f.sent.includes('listy odebrane przed 3 III 2026'), 're-kotwica odzyskanego listu');
+    await waitRt(() => f.sent.includes('listy odebrane przed 21 IX 1999'), 're-kotwica odzyskanego listu');
     f.fire('Listy odebrane:', 'mail');
     f.fire(' 8. *R* Temat: odzyskany', 'mail');
     f.fire(`Nadawca: ${party} ${raw}`, 'mail');
@@ -168,7 +168,7 @@ test('archiwum: odzyskany rekord z dluga lista osob i jedna spacja przed data ot
 test('archiwum: re-kotwica znajduje list na kolejnej stronie', async () => {
   const h = await startHarness();
   const { f } = h;
-  const command = 'listy odebrane przed 22 XII 2025';
+  const command = 'listy odebrane przed 23 VIII 1999';
   try {
     await loadTruncatedBox(h);
     click(h, '[data-tab="archiwum"]');
@@ -176,13 +176,13 @@ test('archiwum: re-kotwica znajduje list na kolejnej stronie', async () => {
     await waitRt(() => f.sent.includes(command), 'pierwsza strona re-kotwicy');
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 9. *R* Temat: inny', 'mail');
-    f.fire('Nadawca: Foo N, 21 XII 2025, 02:00:00', 'mail');
+    f.fire('Nadawca: Foo Nd, 22 VIII 1999, 02:00:00', 'mail');
     f.fire('> ', 'prompt');
 
     await waitRt(() => f.sent.filter((c) => c === command).length === 2, 'druga strona re-kotwicy');
     f.fire('Listy odebrane:', 'mail');
     f.fire(' 7. *R* Temat: najstarszy', 'mail');
-    f.fire('Nadawca: Foo N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire('Nadawca: Foo Nd, 22 VIII 1999, 01:15:04', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(() => f.sent.includes('przeczytaj list 7'), 'odczyt z drugiej strony');
     replayLetter(h, 7, 'najstarszy', 'Tresc z drugiej strony.');
@@ -195,7 +195,7 @@ test('archiwum: re-kotwica znajduje list na kolejnej stronie', async () => {
 test('archiwum: re-kotwica nie ma dawnego limitu 40 stron', async () => {
   const h = await startHarness();
   const { f } = h;
-  const command = 'listy odebrane przed 22 XII 2025';
+  const command = 'listy odebrane przed 23 VIII 1999';
   try {
     await loadTruncatedBox(h);
     click(h, '[data-tab="archiwum"]');
@@ -211,7 +211,7 @@ test('archiwum: re-kotwica nie ma dawnego limitu 40 stron', async () => {
       );
       f.fire(` 7. *R* Temat: ${page === 41 ? 'najstarszy' : `inny ${page}`}`, 'mail');
       f.fire(
-        `Nadawca: Foo N, 21 XII 2025, ${page === 41 ? '01:15:04' : '02:00:00'}`,
+        `Nadawca: Foo Nd, 22 VIII 1999, ${page === 41 ? '01:15:04' : '02:00:00'}`,
         'mail',
       );
       f.fire('> ', 'prompt');
@@ -239,7 +239,7 @@ test('archiwum: wpis bez tresci i bez daty = toast, zadna komenda nie wylatuje',
     f.fire(' 4. Temat: bezdatny', 'mail');
     f.fire('Nadawca: Bezdatny', 'mail');
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(() => !content.querySelector('.arkmail-busy'), 'koniec refreshu');
 

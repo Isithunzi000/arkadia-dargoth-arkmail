@@ -95,10 +95,10 @@ test('harness: listing wyslanych bez *R* nie dostaje niebieskich kropek', async 
     click(h, '[data-box="wyslane"]');
     await h.waitFor(() => h.f.sent.includes('listy wyslane'), 'komenda listy wyslane');
     h.f.fire('Listy wyslane (prezentowane jest pierwsze 50):', 'mail');
-    h.f.fire(' 2. Temat: do Kruka', 'mail');
-    h.f.fire('Odbiorca: Kruk                         Wt, 23 XII 2025, 10:00:00', 'mail');
+    h.f.fire(' 2. Temat: do Baza', 'mail');
+    h.f.fire('Odbiorca: Baz                         Wt, 24 VIII 1999, 10:00:00', 'mail');
     h.f.fire(' 1. Temat: do Corge', 'mail');
-    h.f.fire('Odbiorca: Corge                      Wt, 23 XII 2025, 11:00:00', 'mail');
+    h.f.fire('Odbiorca: Corge                      Wt, 24 VIII 1999, 11:00:00', 'mail');
     h.f.fire('> ', 'prompt');
     await h.waitFor(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji wyslanych');
     await h.waitFor(

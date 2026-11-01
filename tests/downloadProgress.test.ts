@@ -138,13 +138,13 @@ async function loadBox4(h: import('./harness').Harness): Promise<void> {
   await h.waitFor(() => f.sent.includes('listy odebrane'), 'komenda listy odebrane');
   f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
   f.fire(' 4. *R* Temat: czwarty', 'mail');
-  f.fire('Nadawca: Foo                        Wt, 20 XII 2025, 09:00:00', 'mail');
+  f.fire('Nadawca: Foo                        So, 21 VIII 1999, 09:00:00', 'mail');
   f.fire(' 3. *R* Temat: najstarszy', 'mail');
-  f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+  f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
   f.fire(' 2. *R* Temat: srodkowy', 'mail');
-  f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+  f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
   f.fire(' 1. *R* Temat: najnowszy', 'mail');
-  f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+  f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire('> ', 'prompt');
   await h.waitFor(() => f.sent.includes('listy nieprzeczytane'), 'komenda listy nieprzeczytane');
   f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
@@ -156,13 +156,13 @@ function replayListing4(h: import('./harness').Harness): void {
   const { f } = h;
   f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
   f.fire(' 4. *R* Temat: czwarty', 'mail');
-  f.fire('Nadawca: Foo                        Wt, 20 XII 2025, 09:00:00', 'mail');
+  f.fire('Nadawca: Foo                        So, 21 VIII 1999, 09:00:00', 'mail');
   f.fire(' 3. *R* Temat: najstarszy', 'mail');
-  f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+  f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
   f.fire(' 2. *R* Temat: srodkowy', 'mail');
-  f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+  f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
   f.fire(' 1. *R* Temat: najnowszy', 'mail');
-  f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+  f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire('> ', 'prompt');
 }
 
@@ -194,10 +194,10 @@ test('pobieranie tresci: pasek rosnie w trakcie, ETA po 3 ukonczonych', async ()
     click(h, '.arkmail-arch-download'); // start
     // Petla uzyje czterech wpisow z aktualnej bazy.
     // 1. list (re-kotwica przed dniem po dacie listu).
-    await waitRt(() => f.sent.includes('listy odebrane przed 24 XII 2025'), 'kotwica 1');
+    await waitRt(() => f.sent.includes('listy odebrane przed 25 VIII 1999'), 'kotwica 1');
     replayListing4(h);
     await waitRt(() => f.sent.includes('przeczytaj list 1'), 'odczyt 1');
-    replayLetterAt(h, 1, 'najnowszy', 'Wt, 23 XII 2025, 00:11:12');
+    replayLetterAt(h, 1, 'najnowszy', 'Wt, 24 VIII 1999, 00:11:12');
     // Pasek widoczny w trakcie: 1/4 = 25%.
     await waitRt(() => {
       const bar = h.content.querySelector('.arkmail-busy-bar') as unknown as {
@@ -206,14 +206,14 @@ test('pobieranie tresci: pasek rosnie w trakcie, ETA po 3 ukonczonych', async ()
       return bar?.style?.width === '25%';
     }, 'pasek 25% po pierwszym liscie');
     // 2. i 3. list.
-    await waitRt(() => f.sent.includes('listy odebrane przed 23 XII 2025'), 'kotwica 2');
+    await waitRt(() => f.sent.includes('listy odebrane przed 24 VIII 1999'), 'kotwica 2');
     replayListing4(h);
     await waitRt(() => f.sent.includes('przeczytaj list 2'), 'odczyt 2');
-    replayLetterAt(h, 2, 'srodkowy', 'Pn, 22 XII 2025, 02:20:05');
-    await waitRt(() => f.sent.includes('listy odebrane przed 22 XII 2025'), 'kotwica 3');
+    replayLetterAt(h, 2, 'srodkowy', 'Pn, 23 VIII 1999, 02:20:05');
+    await waitRt(() => f.sent.includes('listy odebrane przed 23 VIII 1999'), 'kotwica 3');
     replayListing4(h);
     await waitRt(() => f.sent.includes('przeczytaj list 3'), 'odczyt 3');
-    replayLetterAt(h, 3, 'najstarszy', 'N, 21 XII 2025, 01:15:04');
+    replayLetterAt(h, 3, 'najstarszy', 'Nd, 22 VIII 1999, 01:15:04');
     // Po 3 ukonczonych ETA pojawia sie w tekscie busy (pacing petli
     // daje realne tempo, minimum "1 s").
     await waitRt(() => {
@@ -223,10 +223,10 @@ test('pobieranie tresci: pasek rosnie w trakcie, ETA po 3 ukonczonych', async ()
       return String(busy?.textContent ?? '').includes('zostalo ok.');
     }, 'ETA po trzech ukonczonych');
     // 4. list - koniec petli.
-    await waitRt(() => f.sent.includes('listy odebrane przed 21 XII 2025'), 'kotwica 4');
+    await waitRt(() => f.sent.includes('listy odebrane przed 22 VIII 1999'), 'kotwica 4');
     replayListing4(h);
     await waitRt(() => f.sent.includes('przeczytaj list 4'), 'odczyt 4');
-    replayLetterAt(h, 4, 'czwarty', 'Wt, 20 XII 2025, 09:00:00');
+    replayLetterAt(h, 4, 'czwarty', 'So, 21 VIII 1999, 09:00:00');
     await waitRt(() => notifyText(f, 'Pobrano tresci do archiwum'), 'koniec pobierania');
     await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'pasek busy zgaszony');
   } finally {

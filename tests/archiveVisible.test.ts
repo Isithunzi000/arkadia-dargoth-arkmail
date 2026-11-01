@@ -36,7 +36,7 @@ function entry(box: MailBox, over: Partial<MailboxEntry> = {}): ArchiveLetter {
     forwarded: false,
     party: 'Foo',
     partyKind: box === 'odebrane' || box === 'nieprzeczytane' ? 'nadawca' : 'odbiorcy',
-    date: date('Wt, 23 XII 2025, 00:11:12'),
+    date: date('Wt, 24 VIII 1999, 00:11:12'),
     ...over,
   };
   return fromMailboxEntry(box, e);
@@ -114,7 +114,7 @@ test('kontakty i eksport pomijaja rekordy znikniete z serwera (po purge Fala 28)
 });
 
 test('kolejnosc wyniku: od najnowszych (deterministycznie po grupach)', () => {
-  const starszy = entry('odebrane', { subject: 'Stary', date: date('N, 21 XII 2025, 01:15:04') });
+  const starszy = entry('odebrane', { subject: 'Stary', date: date('Nd, 22 VIII 1999, 01:15:04') });
   const nowszyTwin = entry('nieprzeczytane', { subject: 'Nowy', isRead: false });
   const nowszy = entry('odebrane', { subject: 'Nowy' });
   const r1 = filterVisibleArchive([starszy, nowszyTwin, nowszy], {});

@@ -1,7 +1,7 @@
 /**
  * "Slucham?" po naszym "wyslij zwierze" (Fala 13d).
  *
- * Dowod z logow (session_1766262715076, 2025-12-21 01:15:12): gracz bez
+ * Dowod z logow (session_1766262715076, 1999-08-22 01:15:12): gracz bez
  * zwierzecia pocztowego wpisal "wyslij zwierze" i dostal generyczne
  * "Slucham?" - bez zwierzecia komenda w ogole nie istnieje w parserze
  * serwera, wiec nie ma dedykowanego komunikatu pocztowego. W tej samej
@@ -88,13 +88,13 @@ test('"Slucham?" po potwierdzeniu wyslania (Wysylasz) nie konczy lotu', async ()
   try {
     click(h, '.arkmail-animal-send');
     await h.waitFor(() => h.f.sent.includes('wyslij zwierze'), 'komenda wyslij zwierze');
-    h.f.fire('Wysylasz Kruk na poczte.', 'mail');
+    h.f.fire('Wysylasz Sroka na poczte.', 'mail');
     h.f.fire('Slucham?'); // np. rownolegla nieznana komenda gracza w oknie
     await sleep(80);
     assert.ok(!sluchamToast(h), 'zero tostu po potwierdzeniu');
     assert.equal(animalDisabled(h), true, 'lot trwa');
     // Sprzatniecie: ladowanie.
-    h.f.fire('Wsrod trzepotu skrzydel Kruk laduje na twoim prawym ramieniu.', 'mail');
+    h.f.fire('Wsrod trzepotu skrzydel Sroka laduje na twoim prawym ramieniu.', 'mail');
     await answerEmpty(h, 'odebrane');
     await answerEmpty(h, 'nieprzeczytane');
     // Fala 24f1: powrot odswieza tez niewyslane i wyslane.
@@ -118,7 +118,7 @@ test('"Slucham?" po zamknieciu okna nie konczy lotu', async () => {
     await sleep(60);
     assert.ok(!sluchamToast(h), 'zero tostu po oknie');
     assert.equal(animalDisabled(h), true, 'lot trwa');
-    h.f.fire('Wsrod trzepotu skrzydel Kruk laduje na twojej rece.', 'mail');
+    h.f.fire('Wsrod trzepotu skrzydel Sroka laduje na twojej rece.', 'mail');
     await answerEmpty(h, 'odebrane');
     await answerEmpty(h, 'nieprzeczytane');
     // Fala 24f1: powrot odswieza tez niewyslane i wyslane.

@@ -124,7 +124,7 @@ function korespondencjaFromLetters(
 /** Listings wpis -> znormalizowany LetterLike (dateKey z MailDate). */
 function entryToLetterLike(box: MailBox, e: MailboxEntry): LetterLike {
   // Klucz yyyymmddHHMMSS: czas rozbija remisy tego samego dnia
-  // (logi: dwa listy 19 IV 2026 o 02:49:49 i 03:03:00).
+  // (logi: dwa listy 31 X 1999 o 02:49:49 i 03:03:00).
   const dateKey = e.date
     ? (e.date.year * 10000 + e.date.month * 100 + e.date.day) * 1000000 +
       Number(e.date.time.replace(/:/g, ''))

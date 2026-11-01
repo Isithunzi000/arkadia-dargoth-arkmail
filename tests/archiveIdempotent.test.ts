@@ -52,11 +52,11 @@ import {
 const LISTING3_FULL = [
   'Listy odebrane:',
   ' 3. *R* Temat: najstarszy',
-  'Nadawca: Foo                        N, 21 XII 2025, 01:15:04',
+  'Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04',
   ' 2. *R* Temat: srodkowy',
-  'Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05',
+  'Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05',
   ' 1. *R* Temat: najnowszy',
-  'Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12',
+  'Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12',
 ];
 
 const ENTRY: MailboxEntry = {
@@ -67,11 +67,11 @@ const ENTRY: MailboxEntry = {
   party: 'Corge',
   partyKind: 'nadawca',
   date: {
-    raw: 'Wt, 23 XII 2025, 00:11:12',
+    raw: 'Wt, 24 VIII 1999, 00:11:12',
     weekday: 'Wt',
-    day: 23,
-    month: 12,
-    year: 2025,
+    day: 24,
+    month: 8,
+    year: 1999,
     time: '00:11:12',
   },
 };
@@ -100,11 +100,11 @@ function replayListing3(h: Harness): void {
   const { f } = h;
   f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
   f.fire(' 3. *R* Temat: najstarszy', 'mail');
-  f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+  f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
   f.fire(' 2. *R* Temat: srodkowy', 'mail');
-  f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+  f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
   f.fire(' 1. *R* Temat: najnowszy', 'mail');
-  f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+  f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire('> ', 'prompt');
 }
 
@@ -113,7 +113,7 @@ function replayLetter(h: Harness, numer: number, subject: string, body: string):
   f.fire(`List : ${numer}`, 'mail');
   f.fire('Od   : Corge', 'mail');
   f.fire(`Temat: ${subject}`, 'mail');
-  f.fire('Data : Wt, 23 XII 2025, 00:11:12', 'mail');
+  f.fire('Data : Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire('', 'mail');
   f.fire(body, 'mail');
   f.fire(`[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: ${numer}) -- `, 'mail');
@@ -152,7 +152,7 @@ test('archiwum: blizniak nieprzeczytane/odebrane pobierany RAZ, tresc w obu reko
     );
     f.fire('Listy nieprzeczytane:', 'mail');
     f.fire(' 1. Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec listingu');
 
@@ -169,17 +169,17 @@ test('archiwum: blizniak nieprzeczytane/odebrane pobierany RAZ, tresc w obu reko
       () => downloadBtn(h).textContent.includes('(0/3)') || f.sent.length > 0,
       'start petli',
     );
-    await waitRt(() => f.sent.includes('listy odebrane przed 24 XII 2025'), 're-kotwica grupy');
+    await waitRt(() => f.sent.includes('listy odebrane przed 25 VIII 1999'), 're-kotwica grupy');
     replayListing3(h);
     await waitRt(() => f.sent.includes('przeczytaj list 1'), 'odczyt grupy blizniakow');
     replayLetter(h, 1, 'najnowszy', 'Tresc najnowszego.');
 
-    await waitRt(() => f.sent.includes('listy odebrane przed 23 XII 2025'), 're-kotwica 2');
+    await waitRt(() => f.sent.includes('listy odebrane przed 24 VIII 1999'), 're-kotwica 2');
     replayListing3(h);
     await waitRt(() => f.sent.includes('przeczytaj list 2'), 'odczyt 2');
     replayLetter(h, 2, 'srodkowy', 'Tresc srodkowego.');
 
-    await waitRt(() => f.sent.includes('listy odebrane przed 22 XII 2025'), 're-kotwica 3');
+    await waitRt(() => f.sent.includes('listy odebrane przed 23 VIII 1999'), 're-kotwica 3');
     replayListing3(h);
     await waitRt(() => f.sent.includes('przeczytaj list 3'), 'odczyt 3');
     replayLetter(h, 3, 'najstarszy', 'Tresc najstarszego.');
@@ -224,22 +224,22 @@ test('archiwum: list znikniety z serwera jest purgowany i pomijany przy restarci
     const replayListingBezNajnowszego = (): void => {
       f.fire('Listy odebrane:', 'mail');
       f.fire(' 2. *R* Temat: najstarszy', 'mail');
-      f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+      f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
       f.fire(' 1. *R* Temat: srodkowy', 'mail');
-      f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+      f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
       f.fire('> ', 'prompt');
     };
 
-    await waitRt(() => f.sent.includes('listy odebrane przed 24 XII 2025'), 're-kotwica 1');
+    await waitRt(() => f.sent.includes('listy odebrane przed 25 VIII 1999'), 're-kotwica 1');
     replayListingBezNajnowszego();
 
     // Petla jedzie dalej: srodkowy i najstarszy pobierane normalnie
     // (numery z listingu bez najnowszego: srodkowy = 1, najstarszy = 2).
-    await waitRt(() => f.sent.includes('listy odebrane przed 23 XII 2025'), 're-kotwica 2');
+    await waitRt(() => f.sent.includes('listy odebrane przed 24 VIII 1999'), 're-kotwica 2');
     replayListingBezNajnowszego();
     await waitRt(() => f.sent.includes('przeczytaj list 1'), 'odczyt srodkowego');
     replayLetter(h, 1, 'srodkowy', 'Tresc srodkowego.');
-    await waitRt(() => f.sent.includes('listy odebrane przed 22 XII 2025'), 're-kotwica 3');
+    await waitRt(() => f.sent.includes('listy odebrane przed 23 VIII 1999'), 're-kotwica 3');
     replayListingBezNajnowszego();
     await waitRt(() => f.sent.includes('przeczytaj list 2'), 'odczyt najstarszego');
     replayLetter(h, 2, 'najstarszy', 'Tresc najstarszego.');
@@ -252,7 +252,7 @@ test('archiwum: list znikniety z serwera jest purgowany i pomijany przy restarci
     downloadBtn(h).dispatchEvent(new h.window.Event('click')); // start
     await waitRt(() => notifyText(f, 'Wszystkie listy w bazie maja tresci.'), 'brak kandydatow po znaczniku');
     assert.equal(
-      f.sent.filter((s) => s === 'listy odebrane przed 24 XII 2025').length,
+      f.sent.filter((s) => s === 'listy odebrane przed 25 VIII 1999').length,
       1,
       'znikniety list nie jest mielony ponownie',
     );
@@ -271,8 +271,8 @@ test('archiwum: luka podczas re-kotwicy jest bledem, nie zniknieciem listu', asy
   const retries = ANCHOR_RETRY_WAITS_MS.splice(0);
   const h = await startHarness();
   const { f } = h;
-  const first = 'listy odebrane przed 24 XII 2025';
-  const second = 'listy odebrane przed 23 XII 2025';
+  const first = 'listy odebrane przed 25 VIII 1999';
+  const second = 'listy odebrane przed 24 VIII 1999';
   const count = (command: string): number => f.sent.filter((c) => c === command).length;
   try {
     await loadTruncatedBox(h);
@@ -283,14 +283,14 @@ test('archiwum: luka podczas re-kotwicy jest bledem, nie zniknieciem listu', asy
     await waitRt(() => count(first) === 1, 're-kotwica przy luce');
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 4. *R* Temat: inny', 'mail');
-    f.fire('Nadawca: Foo Wt, 23 XII 2025, 01:00:00', 'mail');
+    f.fire('Nadawca: Foo Wt, 24 VIII 1999, 01:00:00', 'mail');
     f.fire('> ', 'prompt');
 
     await waitRt(() => count(first) === 2 || count(second) === 1, 'powtorzenie strony albo stary brak listu');
     if (count(first) === 2) {
       f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
       f.fire(' 4. *R* Temat: inny', 'mail');
-      f.fire('Nadawca: Foo Wt, 23 XII 2025, 01:00:00', 'mail');
+      f.fire('Nadawca: Foo Wt, 24 VIII 1999, 01:00:00', 'mail');
       f.fire('> ', 'prompt');
       await waitRt(() => count(second) === 1, 'sonda wykluczajaca dzien');
       f.fire('Nie znaleziono zadnych takich odebranych listow.', 'mail');
@@ -300,23 +300,23 @@ test('archiwum: luka podczas re-kotwicy jest bledem, nie zniknieciem listu', asy
 
     f.fire('Listy odebrane:', 'mail');
     f.fire(' 3. *R* Temat: najstarszy', 'mail');
-    f.fire('Nadawca: Foo N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire('Nadawca: Foo Nd, 22 VIII 1999, 01:15:04', 'mail');
     f.fire(' 2. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(() => f.sent.includes('przeczytaj list 2'), 'odczyt srodkowego');
     replayLetter(h, 2, 'srodkowy', 'Tresc srodkowego.');
 
-    await waitRt(() => f.sent.includes('listy odebrane przed 22 XII 2025'), 're-kotwica najstarszego');
+    await waitRt(() => f.sent.includes('listy odebrane przed 23 VIII 1999'), 're-kotwica najstarszego');
     f.fire('Listy odebrane:', 'mail');
     f.fire(' 3. *R* Temat: najstarszy', 'mail');
-    f.fire('Nadawca: Foo N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire('Nadawca: Foo Nd, 22 VIII 1999, 01:15:04', 'mail');
     f.fire(' 2. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(() => f.sent.includes('przeczytaj list 3'), 'odczyt najstarszego');
     replayLetter(h, 3, 'najstarszy', 'Tresc najstarszego.');

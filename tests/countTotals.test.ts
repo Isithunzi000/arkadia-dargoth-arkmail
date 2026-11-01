@@ -52,11 +52,11 @@ function archived(
       party: 'Foo',
       partyKind: 'nadawca',
       date: {
-        raw: 'Wt, 23 XII 2025, 00:11:12',
+        raw: 'Wt, 24 VIII 1999, 00:11:12',
         weekday: 'Wt',
-        day: 23,
-        month: 12,
-        year: 2025,
+        day: 24,
+        month: 8,
+        year: 1999,
         time: '00:11:12',
       },
     }),
@@ -115,9 +115,9 @@ test('purge: zakresowy usuwa tylko rekordy nowsze niz granica dnia', () => {
     [old, fresh],
     'odebrane',
     new Set(),
-    '2025-12-23',
+    '1999-08-24',
   );
-  // sortKey obu = '2025-12-23 ...' -> granica dnia nietknieta.
+  // sortKey obu = '1999-08-24 ...' -> granica dnia nietknieta.
   assert.equal(out.letters.length, 2);
   assert.equal(out.removedIds.size, 0);
 });
@@ -196,7 +196,7 @@ test('total: wysylka szkicu odswieza wyslane INIEWYSLANE - szkic znika z bazy', 
     await waitFor(() => f.sent.includes('listy niewyslane'), 'listing niewyslanych');
     h.f.fire('Listy niewyslane:', 'mail');
     h.f.fire(' 1. Temat: szkic', 'mail');
-    h.f.fire('Odbiorca: Corge                         Wt, 23 XII 2025, 10:00:00', 'mail');
+    h.f.fire('Odbiorca: Corge                         Wt, 24 VIII 1999, 10:00:00', 'mail');
     h.f.fire('> ', 'prompt');
     await waitRt(() => !content.querySelector('.arkmail-busy'), 'koniec listingu niewyslanych');
 
@@ -225,7 +225,7 @@ test('total: wysylka szkicu odswieza wyslane INIEWYSLANE - szkic znika z bazy', 
     await waitFor(() => f.sent.includes('listy wyslane'), 'refresh wyslanych po wysylce');
     f.fire('Listy wyslane:', 'mail');
     f.fire(' 1. *R* Temat: Perly', 'mail');
-    f.fire('Odbiorcy: Corge                         Wt, 23 XII 2025, 11:00:00', 'mail');
+    f.fire('Odbiorcy: Corge                         Wt, 24 VIII 1999, 11:00:00', 'mail');
     f.fire('> ', 'prompt');
     // ...i refresh NIEWYSLANYCH (pelny listing pusty = szkic zniknal).
     await waitRt(

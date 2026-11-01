@@ -43,10 +43,10 @@ test('szukaj: komenda listy z filtrami serwera (skladnia ?listy)', () => {
   );
   assert.equal(
     searchListingCommand('odebrane', {
-      odDaty: { day: 1, month: 4, year: 2026 },
+      odDaty: { day: 13, month: 10, year: 1999 },
       doDaty: { day: 30, month: 4, year: 2026 },
     }),
-    'listy odebrane po 31 III 2026 przed 1 V 2026',
+    'listy odebrane po 12 X 1999 przed 1 V 2026',
     'zakres WLACZNIE: OBIE granice wykluczaja dzien graniczny (potwierdzone w grze) - po dostaje -1 dzien, przed +1 dzien',
   );
   // Fala 29: "po <data>" jest WYLACZNE jak "przed" (potwierdzone w grze
@@ -57,8 +57,8 @@ test('szukaj: komenda listy z filtrami serwera (skladnia ?listy)', () => {
     'po wylaczne: srodek miesiaca',
   );
   assert.equal(
-    searchListingCommand('odebrane', { odDaty: { day: 1, month: 3, year: 2026 } }),
-    'listy odebrane po 28 II 2026',
+    searchListingCommand('odebrane', { odDaty: { day: 19, month: 9, year: 1999 } }),
+    'listy odebrane po 18 IX 1999',
     'po wylaczne: granica miesiaca (2026 nieprzestepny)',
   );
   assert.equal(
@@ -67,8 +67,8 @@ test('szukaj: komenda listy z filtrami serwera (skladnia ?listy)', () => {
     'po wylaczne: granica miesiaca (2024 przestepny)',
   );
   assert.equal(
-    searchListingCommand('odebrane', { odDaty: { day: 1, month: 1, year: 2026 } }),
-    'listy odebrane po 31 XII 2025',
+    searchListingCommand('odebrane', { odDaty: { day: 2, month: 9, year: 1999 } }),
+    'listy odebrane po 1 IX 1999',
     'po wylaczne: granica roku',
   );
   assert.equal(
@@ -99,23 +99,23 @@ test('szukaj: komenda listy z filtrami serwera (skladnia ?listy)', () => {
 test('szukaj: tylko osoba jest mala litera, daty i pozostale filtry bez zmian', () => {
   const query = {
     osoba: 'BaR',
-    odDaty: { day: 2, month: 3, year: 2026 },
+    odDaty: { day: 20, month: 9, year: 1999 },
     tresc: 'Zachowaj TEKST',
     temat: 'WaZny Temat',
   };
   assert.equal(
     searchListingCommand('odebrane', query),
-    'listy odebrane od bar po 1 III 2026 o tresci Zachowaj TEKST o temacie WaZny Temat',
+    'listy odebrane od bar po 19 IX 1999 o tresci Zachowaj TEKST o temacie WaZny Temat',
   );
   assert.equal(
     searchDescription('odebrane', query),
-    'odebrane, nadawca: BaR, od dnia: 2026-03-02, temat: "WaZny Temat", tresc: "Zachowaj TEKST"',
+    'odebrane, nadawca: BaR, od dnia: 1999-09-20, temat: "WaZny Temat", tresc: "Zachowaj TEKST"',
     'opis dla gracza zachowuje wpisana forme',
   );
 });
 
 test('szukaj: fromISODate parsuje pole type=date; smieci odrzuca', () => {
-  assert.deepEqual(fromISODate('2026-04-01'), { day: 1, month: 4, year: 2026 });
+  assert.deepEqual(fromISODate('1999-10-13'), { day: 13, month: 10, year: 1999 });
   assert.deepEqual(fromISODate('2026-12-31'), { day: 31, month: 12, year: 2026 });
   assert.deepEqual(fromISODate('2024-02-29'), { day: 29, month: 2, year: 2024 }, 'przestepny');
   assert.equal(fromISODate(''), null);
@@ -132,10 +132,10 @@ test('szukaj: opis zapytania do bannera wynikow', () => {
   assert.equal(
     searchDescription('wyslane', {
       osoba: 'Grault',
-      odDaty: { day: 1, month: 4, year: 2026 },
+      odDaty: { day: 13, month: 10, year: 1999 },
       doDaty: { day: 30, month: 4, year: 2026 },
     }),
-    'wyslane, adresat: Grault, od dnia: 2026-04-01, do dnia: 2026-04-30',
+    'wyslane, adresat: Grault, od dnia: 1999-10-13, do dnia: 2026-04-30',
   );
   assert.equal(
     searchDescription('odebrane', { tresc: 'morze' }),
@@ -168,7 +168,7 @@ test('szukaj integracja: komenda z UI, wyniki w widoku, Wyczysc bez refetchu', a
     // Wynik: strona "Wybrane" z renumeracja (1 wpis).
     f.fire('Wybrane listy odebrane:', 'mail');
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(() => content.querySelectorAll('.arkmail-entry').length === 1, 'wynik w widoku');
     assert.ok(textOf(h, '.arkmail-search-banner').includes('Corge'), 'banner wynikow');

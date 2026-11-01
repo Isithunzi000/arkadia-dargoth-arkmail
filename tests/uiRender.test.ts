@@ -39,7 +39,7 @@ function arch(over: Partial<ArchiveLetter> = {}): ArchiveLetter {
     party: 'Foo',
     subject: 'Perly',
     dateRaw: null,
-    sortKey: '2025-12-23 00:11:12',
+    sortKey: '1999-08-24 00:11:12',
     read: true,
     body: [],
     ...over,
@@ -270,9 +270,9 @@ test('render: filtr archiwum po temacie - lokalny, bez store', () => {
 test('render: archiwum - filtry osoba/skrzynka/daty/tresc (lokalne, bez store)', () => {
   const s = new MailUiStore({ tab: 'archiwum' });
   s.setArchive([
-    arch({ id: 'a1', box: 'odebrane', party: 'Bar', subject: 'Perly', sortKey: '2026-04-16 00:31:37', body: ['masz perly'] }),
+    arch({ id: 'a1', box: 'odebrane', party: 'Bar', subject: 'Perly', sortKey: '1999-10-28 00:31:37', body: ['masz perly'] }),
     arch({ id: 'b2', box: 'wyslane', party: 'Grault', subject: 'Rachunek', number: 4, sortKey: '2026-05-01 10:00:00', body: ['plac'] }),
-    arch({ id: 'c3', box: 'wyslane', party: 'Garply', subject: 'Perly sprzedam', number: 5, sortKey: '2026-03-01 09:00:00' }),
+    arch({ id: 'c3', box: 'wyslane', party: 'Garply', subject: 'Perly sprzedam', number: 5, sortKey: '1999-09-19 09:00:00' }),
   ]);
   const { container, off } = mount(s);
   const rows = () => container.querySelectorAll('.arkmail-arch-entry').length;
@@ -304,7 +304,7 @@ test('render: archiwum - filtry osoba/skrzynka/daty/tresc (lokalne, bez store)',
 
   const od = container.querySelector('[data-filter="odDaty"]') as unknown as HTMLInputElement;
   assert.ok(od, 'filtr odDaty istnieje');
-  od.value = '2026-04-01';
+  od.value = '1999-10-13';
   fireEvent(od, 'input');
   assert.equal(rows(), 2, 'odDaty odcina marcowy list');
   const doDaty = container.querySelector('[data-filter="doDaty"]') as unknown as HTMLInputElement;
@@ -508,11 +508,11 @@ test('render: wiersz listu ma kolumny nadawcy, tematu i daty', () => {
     entries: [
       entry({
         date: {
-          raw: 'N, 21 XII 2025, 01:15:04',
+          raw: 'Nd, 22 VIII 1999, 01:15:04',
           weekday: 'N',
-          day: 21,
-          month: 12,
-          year: 2025,
+          day: 22,
+          month: 8,
+          year: 1999,
           time: '01:15:04',
         },
       }),
@@ -521,7 +521,7 @@ test('render: wiersz listu ma kolumny nadawcy, tematu i daty', () => {
   const row = container.querySelector('.arkmail-entry')!;
   assert.ok(row.querySelector('.arkmail-entry-party')?.textContent?.includes('Foo'));
   assert.ok(row.querySelector('.arkmail-entry-subject')?.textContent?.includes('Perly'));
-  assert.ok(row.querySelector('.arkmail-entry-date')?.textContent?.includes('21 XII 2025'));
+  assert.ok(row.querySelector('.arkmail-entry-date')?.textContent?.includes('22 VIII 1999'));
   off();
 });
 
@@ -534,7 +534,7 @@ test('render: naglowek listu z wyroznionym tematem i wierszem meta', () => {
     subject: 'Perly',
     to: 'Gracz',
     cc: null,
-    date: 'N, 21 XII 2025, 01:15:04',
+    date: 'Nd, 22 VIII 1999, 01:15:04',
     body: ['czesc'],
   });
   assert.ok(
@@ -544,7 +544,7 @@ test('render: naglowek listu z wyroznionym tematem i wierszem meta', () => {
   const meta = container.querySelector('.arkmail-letter-meta')?.textContent ?? '';
   assert.ok(meta.includes('Foo'), 'meta ma nadawce');
   assert.ok(meta.includes('Gracz'), 'meta ma adresata');
-  assert.ok(meta.includes('21 XII 2025'), 'meta ma date');
+  assert.ok(meta.includes('22 VIII 1999'), 'meta ma date');
   off();
 });
 
@@ -566,10 +566,10 @@ test('render: kontakty - filtr i sort lokalne (bez store), wiersz z data', () =>
     przedstawieni: [],
     aliasy: [],
     korespondencja: [
-      { name: 'Bar', direction: 'in', dateRaw: 'Cz, 16 IV 2026, 00:31:37', dateKey: 20260416 },
+      { name: 'Bar', direction: 'in', dateRaw: 'Cz, 28 X 1999, 00:31:37', dateKey: 19991028 },
       { name: 'Bar', direction: 'in' },
       { name: 'Bar', direction: 'out' },
-      { name: 'Grault', direction: 'out', dateRaw: 'N, 19 IV 2026, 03:03:00', dateKey: 20260419 },
+      { name: 'Grault', direction: 'out', dateRaw: 'Nd, 31 X 1999, 03:03:00', dateKey: 19991031 },
       { name: 'Garply', direction: 'in' },
       { name: 'Garply', direction: 'out' },
     ],
@@ -580,7 +580,7 @@ test('render: kontakty - filtr i sort lokalne (bez store), wiersz z data', () =>
   assert.deepEqual(names(), ['Bar', 'Garply', 'Grault'], 'domyslnie sort po nazwie');
   const firstRow = container.querySelector('.arkmail-contact')!;
   assert.ok(firstRow.textContent?.includes('wyslane: 1'), 'liczniki w wierszu');
-  assert.ok(firstRow.textContent?.includes('16 IV 2026'), 'data ostatniego kontaktu w wierszu');
+  assert.ok(firstRow.textContent?.includes('28 X 1999'), 'data ostatniego kontaktu w wierszu');
 
   const input = container.querySelector('.arkmail-contact-filter') as unknown as HTMLInputElement;
   assert.ok(input, 'pole filtra kontaktow istnieje');
@@ -631,7 +631,7 @@ test('render: pasek szukania komponuje zapytanie z pol (daty ISO -> DateYMD)', (
   assert.ok(container.querySelector('[data-search="doDaty"]'), 'pole do daty');
   set('[data-search="osoba"]', 'Bar');
   set('[data-search="temat"]', 'perly');
-  set('[data-search="odDaty"]', '2026-04-01');
+  set('[data-search="odDaty"]', '1999-10-13');
   set('[data-search="doDaty"]', '2026-04-30');
   click(container.querySelector('.arkmail-search-go')!);
   assert.deepEqual(calls, [
@@ -641,7 +641,7 @@ test('render: pasek szukania komponuje zapytanie z pol (daty ISO -> DateYMD)', (
         'odebrane',
         {
           osoba: 'Bar',
-          odDaty: { day: 1, month: 4, year: 2026 },
+          odDaty: { day: 13, month: 10, year: 1999 },
           doDaty: { day: 30, month: 4, year: 2026 },
           temat: 'perly',
         },

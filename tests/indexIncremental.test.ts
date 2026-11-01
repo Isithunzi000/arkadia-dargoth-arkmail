@@ -108,21 +108,21 @@ test('klamra: incrementalny przeczes staje na stronie znanej z archiwum, gone-ma
     // Strona 1 ucieta: 3 wpisy jak w prologu.
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 3. *R* Temat: najstarszy', 'mail');
-    f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
     f.fire(' 2. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
-    await waitRt(() => f.sent.includes('listy odebrane przed 22 XII 2025'), 'faza 1: kotwica');
+    await waitRt(() => f.sent.includes('listy odebrane przed 23 VIII 1999'), 'faza 1: kotwica');
     // Strona 2 kompletna: 3 starsze wpisy (dwa z tego samego dnia).
     f.fire('Listy odebrane:', 'mail');
     f.fire(' 3. *R* Temat: stary', 'mail');
-    f.fire('Nadawca: Baz                          Pn, 10 XI 2025, 08:00:00', 'mail');
+    f.fire('Nadawca: Baz                          Pn, 2 VIII 1999, 08:00:00', 'mail');
     f.fire(' 2. *R* Temat: drugi prastary', 'mail');
-    f.fire('Nadawca: Gronk                        So, 15 XI 2025, 09:00:00', 'mail');
+    f.fire('Nadawca: Fred                        So, 7 VIII 1999, 09:00:00', 'mail');
     f.fire(' 1. *R* Temat: prastary', 'mail');
-    f.fire('Nadawca: Gronk                        So, 15 XI 2025, 10:00:00', 'mail');
+    f.fire('Nadawca: Fred                        So, 7 VIII 1999, 10:00:00', 'mail');
     f.fire('> ', 'prompt');
     await drainEmptyBoxes(h, { nieprzeczytane: 2, wyslane: 1, niewyslane: 1 });
     await waitRt(() => notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'faza 1: toast 4/4');
@@ -143,25 +143,25 @@ test('klamra: incrementalny przeczes staje na stronie znanej z archiwum, gone-ma
     // klamra, petla leci dalej.
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 2. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire(' 1. *R* Temat: swiezak', 'mail');
-    f.fire('Nadawca: Jinx                        Wt, 24 XII 2025, 07:30:00', 'mail');
+    f.fire('Nadawca: Jinx                        Sr, 25 VIII 1999, 07:30:00', 'mail');
     f.fire('> ', 'prompt');
-    await waitRt(() => f.sent.includes('listy odebrane przed 23 XII 2025'), 'faza 2: kotwica 1');
+    await waitRt(() => f.sent.includes('listy odebrane przed 24 VIII 1999'), 'faza 2: kotwica 1');
     // Strona 2 ucieta: W CALOSCI znana z archiwum ('prastary' 15 XI,
     // 'najstarszy' 21 XII), ale nowa dla petli = KLAMRA. Petla staje;
     // kotwica przed 16 XI NIE moze wyjsc.
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 2. *R* Temat: prastary', 'mail');
-    f.fire('Nadawca: Gronk                        So, 15 XI 2025, 10:00:00', 'mail');
+    f.fire('Nadawca: Fred                        So, 7 VIII 1999, 10:00:00', 'mail');
     f.fire(' 1. *R* Temat: najstarszy', 'mail');
-    f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
     f.fire('> ', 'prompt');
     // Poczekaj dluzej niz pacing: stary kod (bez klamry) wyslalby
     // kolejna kotwice; domykamy ja pusta strona, zeby test dojechal
     // asercji (dowod RED przez asercje, nie przez timeout).
     await new Promise((r) => setTimeout(r, 700));
-    if (f.sent.includes('listy odebrane przed 16 XI 2025')) {
+    if (f.sent.includes('listy odebrane przed 8 VIII 1999')) {
       f.fire('Nie znaleziono zadnych takich odebranych listow.', 'mail');
     }
     await drainEmptyBoxes(h, { nieprzeczytane: 3, wyslane: 2, niewyslane: 2 });
@@ -169,7 +169,7 @@ test('klamra: incrementalny przeczes staje na stronie znanej z archiwum, gone-ma
     await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'faza 2: koniec sesji');
 
     assert.ok(
-      !f.sent.includes('listy odebrane przed 16 XI 2025'),
+      !f.sent.includes('listy odebrane przed 8 VIII 1999'),
       'klamra: kotwica ponizej przeciecia nie wyszla',
     );
 

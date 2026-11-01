@@ -114,7 +114,7 @@ test('echo: wysylki composera i "wyslij zwierze" ida z echem, listingi bez', asy
     assert.equal(f.sent[idx], 'wyslij zwierze', 'komenda zwierzecia');
     assert.equal(f.sentEcho[idx], true, 'wyslij zwierze z echem');
     const gagCount = f.gagged.length;
-    f.fire('Wysylasz Kruk na poczte.', 'mail');
+    f.fire('Wysylasz Sroka na poczte.', 'mail');
     assert.equal(f.gagged.length, gagCount, 'linia lotu nie gagowana');
   } finally {
     await stopHarness();

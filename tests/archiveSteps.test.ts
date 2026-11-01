@@ -14,7 +14,7 @@ function archived(body: string[]) {
       forwarded: false,
       party: 'Bar',
       partyKind: 'nadawca',
-      date: { raw: 'Wt, 23 XII 2025, 00:11:12', weekday: 'Wt', day: 23, month: 12, year: 2025, time: '00:11:12' },
+      date: { raw: 'Wt, 24 VIII 1999, 00:11:12', weekday: 'Wt', day: 24, month: 8, year: 1999, time: '00:11:12' },
     }),
     body,
   };

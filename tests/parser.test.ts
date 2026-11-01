@@ -58,24 +58,24 @@ test('naglowek listing: mniej niz 50 wynikow nie jest ucietych', () => {
 });
 
 test('wpis listing: numer, *R*, temat, nadawca/odbiorcy z data', () => {
-  const e1 = parseListingEntry(' 3. *R* Temat: Elementy rozbitego szkielka');
-  assert.deepEqual(e1, { number: 3, isRead: true, subject: 'Elementy rozbitego szkielka', forwarded: false });
-  const e2 = parseListingEntry(' 1. Temat: Opowiesci, zabawa i utracone wspomnienia');
-  assert.deepEqual(e2, { number: 1, isRead: false, subject: 'Opowiesci, zabawa i utracone wspomnienia', forwarded: false });
-  const e3 = parseListingEntry(' 2. Temat: zalakowany pergamin (forwardowany)');
-  assert.deepEqual(e3, { number: 2, isRead: false, subject: 'zalakowany pergamin', forwarded: true });
-  const e4 = parseListingEntry('50. *R* Temat: karteczka');
-  assert.deepEqual(e4, { number: 50, isRead: true, subject: 'karteczka', forwarded: false });
+  const e1 = parseListingEntry(' 3. *R* Temat: liscik');
+  assert.deepEqual(e1, { number: 3, isRead: true, subject: 'liscik', forwarded: false });
+  const e2 = parseListingEntry(' 1. Temat: bilecik 2');
+  assert.deepEqual(e2, { number: 1, isRead: false, subject: 'bilecik 2', forwarded: false });
+  const e3 = parseListingEntry(' 2. Temat: bilecik 6 (forwardowany)');
+  assert.deepEqual(e3, { number: 2, isRead: false, subject: 'bilecik 6', forwarded: true });
+  const e4 = parseListingEntry('50. *R* Temat: liscik 3');
+  assert.deepEqual(e4, { number: 50, isRead: true, subject: 'liscik 3', forwarded: false });
   assert.equal(parseListingEntry('Nadawca: X'), null);
 });
 
 test('listing: date od strony listu oddziela tez jedna spacja', () => {
   assert.deepEqual(
-    parseListingParty('Odbiorcy: Foo, Bar, ... N, 2 III 2026, 03:04:05'),
+    parseListingParty('Odbiorcy: Foo, Bar, ... Pn, 20 IX 1999, 03:04:05'),
     {
       kind: 'odbiorcy',
       names: 'Foo, Bar, ...',
-      date: { raw: 'N, 2 III 2026, 03:04:05', weekday: 'N', day: 2, month: 3, year: 2026, time: '03:04:05' },
+      date: { raw: 'Pn, 20 IX 1999, 03:04:05', weekday: 'Pn', day: 20, month: 9, year: 1999, time: '03:04:05' },
     },
   );
   assert.deepEqual(parseListingParty('Nadawca: Foo'), {
@@ -84,11 +84,11 @@ test('listing: date od strony listu oddziela tez jedna spacja', () => {
 });
 
 test('data listu: pelna z godzina i dniem tygodnia', () => {
-  assert.deepEqual(parseMailDate('N, 21 XII 2025, 01:15:04'), {
-    raw: 'N, 21 XII 2025, 01:15:04', weekday: 'N', day: 21, month: 12, year: 2025, time: '01:15:04',
+  assert.deepEqual(parseMailDate('Nd, 22 VIII 1999, 01:15:04'), {
+    raw: 'Nd, 22 VIII 1999, 01:15:04', weekday: 'Nd', day: 22, month: 8, year: 1999, time: '01:15:04',
   });
-  assert.deepEqual(parseMailDate('Sr, 7 I 2026, 02:07:56'), {
-    raw: 'Sr, 7 I 2026, 02:07:56', weekday: 'Sr', day: 7, month: 1, year: 2026, time: '02:07:56',
+  assert.deepEqual(parseMailDate('Sr, 8 IX 1999, 02:07:56'), {
+    raw: 'Sr, 8 IX 1999, 02:07:56', weekday: 'Sr', day: 8, month: 9, year: 1999, time: '02:07:56',
   });
   assert.equal(parseMailDate('Foo'), null);
 });
@@ -113,7 +113,7 @@ test('listing-nieprzeczytane: wpisy bez *R* = nieprzeczytane', () => {
   const e = parseListingEntry(lines[headerIdx + 1]);
   assert.ok(e);
   assert.equal(e.isRead, false);
-  assert.equal(e.subject, 'Elementy rozbitego szkielka');
+  assert.equal(e.subject, 'liscik');
 });
 
 test('listing-wyslane-50: pelna strona 50 wpisow, truncated=true', () => {
@@ -147,7 +147,7 @@ test('naglowki listu: List/Od/Temat/Do/Data z fixture', () => {
   assert.deepEqual(parseLetterHeaderLine(lines[start + 1]), { field: 'od', value: 'Corge' });
   assert.deepEqual(parseLetterHeaderLine(lines[start + 2]), { field: 'temat', value: '--' });
   assert.deepEqual(parseLetterHeaderLine(lines[start + 3]), { field: 'do', value: 'Gracz i Baz' });
-  assert.deepEqual(parseLetterHeaderLine(lines[start + 4]), { field: 'data', value: 'Wt, 23 XII 2025, 00:11:12' });
+  assert.deepEqual(parseLetterHeaderLine(lines[start + 4]), { field: 'data', value: 'Wt, 24 VIII 1999, 00:11:12' });
 });
 
 // --- pager ----------------------------------------------------------------
@@ -167,7 +167,7 @@ test('aliasy pocztowe: blok z naglowkiem i wpisami tabowanymi', () => {
   assert.ok(start >= 0, 'naglowek aliasow w fixture');
   const aliasy = parseAliasesBlock(lines.slice(start));
   assert.ok(aliasy.length >= 1);
-  assert.ok(aliasy.some((a) => a.name === 'poltorak' && a.targets.includes('Bar')));
+  assert.ok(aliasy.some((a) => a.name === 'foo' && a.targets.includes('Bar')));
 });
 
 // --- powiadomienia --------------------------------------------------------
@@ -176,15 +176,15 @@ test('powiadomienia: nowa poczte (z prefiksem klienta), goniec, wysylasz', () =>
   assert.deepEqual(parseNotification('Masz nowa poczte od Foo.'), { kind: 'nowa-poczte', nadawca: 'Foo' });
   assert.deepEqual(parseNotification(' [ POCZTA ] Masz nowa poczte od Wibble.'), { kind: 'nowa-poczte', nadawca: 'Wibble' });
   assert.deepEqual(parseNotification('Goniec przyniosl nowa partie listow.'), { kind: 'goniec' });
-  assert.deepEqual(parseNotification('Wysylasz Kruk na poczte.'), { kind: 'wysylasz', zwierze: 'Kruk' });
-  assert.deepEqual(parseNotification('Wysylasz Kruka na poczte.'), { kind: 'wysylasz', zwierze: 'Kruka' });
+  assert.deepEqual(parseNotification('Wysylasz Sroka na poczte.'), { kind: 'wysylasz', zwierze: 'Sroka' });
+  assert.deepEqual(parseNotification('Wysylasz Sroki na poczte.'), { kind: 'wysylasz', zwierze: 'Sroki' });
   // Fala 13b: powrot zwierzecia - dwa warianty z logow.
-  assert.deepEqual(parseNotification('Wsrod trzepotu skrzydel Kruk laduje na twoim prawym ramieniu.'), { kind: 'powrot-zwierzecia', zwierze: 'Kruk' });
-  assert.deepEqual(parseNotification('Wsrod trzepotu skrzydel Kruk laduje na twojej rece.'), { kind: 'powrot-zwierzecia', zwierze: 'Kruk' });
+  assert.deepEqual(parseNotification('Wsrod trzepotu skrzydel Sroka laduje na twoim prawym ramieniu.'), { kind: 'powrot-zwierzecia', zwierze: 'Sroka' });
+  assert.deepEqual(parseNotification('Wsrod trzepotu skrzydel Sroka laduje na twojej rece.'), { kind: 'powrot-zwierzecia', zwierze: 'Sroka' });
   // Fala 13c: dostawa przez zwierze poza sesja compose.
   assert.deepEqual(parseNotification('List zostal pomyslnie wyslany.'), { kind: 'list-wyslany' });
   // Fala 13d: generyczny blad parsera serwera (brak zwierzecia = komenda
-  // nie istnieje; log 2025-12-21). Wiring reaguje tylko w waskim oknie.
+  // nie istnieje; log 1999-08-22). Wiring reaguje tylko w waskim oknie.
   assert.deepEqual(parseNotification('Slucham?'), { kind: 'slucham' });
   assert.equal(parseNotification('Poczta jest zamknieta.'), null);
 });

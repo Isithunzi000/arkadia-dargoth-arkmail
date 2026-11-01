@@ -44,8 +44,8 @@ test('mailbox: fetch odebranych zbiera wpisy do promptu', async () => {
   assert.equal(res.entries[0].number, 3);
   assert.equal(res.entries[0].isRead, true);
   assert.equal(res.entries[0].party, 'Foo');
-  assert.equal(res.entries[0].date?.year, 2025);
-  assert.equal(res.entries[0].date?.month, 12);
+  assert.equal(res.entries[0].date?.year, 1999);
+  assert.equal(res.entries[0].date?.month, 8);
 });
 
 test('mailbox: pusta skrzynka', async () => {
@@ -110,7 +110,7 @@ test('pager: przeczytanie listu i wyjscie q', async () => {
   assert.equal(res.letter.number, 1);
   assert.equal(res.letter.from, 'Corge');
   assert.equal(res.letter.to, 'Gracz i Baz');
-  assert.ok(res.letter.body.join('\n').includes('Grazie za wiesci.'));
+  assert.ok(res.letter.body.join('\n').includes('Pisze krotko, bo sprawa pilna.'));
   assert.deepEqual(res.pager, { lo: 1, hi: 3, current: 1 });
   assert.deepEqual(t.sent, ['przeczytaj list 1', 'q']);
 });
@@ -196,7 +196,7 @@ test('editor: compose pipelined - wyslany w urzedzie', async () => {
   const s = new EditorSession(t, OPTS);
   const linie = [
     ' _____________________________________________________________________  ',
-    ' |     Szanowny kolego bracie Zniwiarzu,                            |   ',
+    ' |     Witaj,                                                         |   ',
     '  \\_/_ _______________________________________________________________/ ',
   ];
   const op = s.send({ adresat: 'Garply', temat: 'Perly', linie });
@@ -300,8 +300,8 @@ test('przenosnosc: pager konczy sie idle-flush gdy prompt nie dochodzi', async (
 test('mailbox: strona "Wybrane listy" (paginacja) zbiera wpisy', async () => {
   const t = new MockTransport();
   const s = new MailboxSession(t, OPTS);
-  const op = s.fetch('wyslane', 'listy wyslane przed 19 IV 2026');
-  assert.deepEqual(t.sent, ['listy wyslane przed 19 IV 2026']);
+  const op = s.fetch('wyslane', 'listy wyslane przed 31 X 1999');
+  assert.deepEqual(t.sent, ['listy wyslane przed 31 X 1999']);
   await t.replay(fixture('listing-wyslane-wybrane-przed'));
   const res = await op;
   assert.equal(res.kind, 'lista');
@@ -311,8 +311,8 @@ test('mailbox: strona "Wybrane listy" (paginacja) zbiera wpisy', async () => {
   assert.equal(res.entries.length, 50);
   assert.equal(res.entries[0].number, 50);
   assert.equal(res.entries[0].party, 'Bar');
-  assert.equal(res.entries[0].date?.month, 3);
-  assert.equal(res.entries[49].date?.month, 4);
+  assert.equal(res.entries[0].date?.month, 10);
+  assert.equal(res.entries[49].date?.month, 10);
 });
 
 test('mailbox: linia-blad serwera (zly format daty) przerywa sesje od razu', async () => {

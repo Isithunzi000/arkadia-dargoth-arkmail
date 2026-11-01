@@ -40,8 +40,8 @@ function letter(index: number, subject = `List ${index}`): ArchiveLetter {
     party: 'Foo',
     subject,
     forwarded: false,
-    dateRaw: 'Pn, 2 III 2026, 01:02:03',
-    sortKey: '2026-03-02 01:02:03',
+    dateRaw: 'Pn, 20 IX 1999, 01:02:03',
+    sortKey: '1999-09-20 01:02:03',
     read: false,
     body: [`Tresc ${index}`],
   };

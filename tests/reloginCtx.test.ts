@@ -34,11 +34,11 @@ function replayListingA(h: Harness): void {
   const { f } = h;
   f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
   f.fire(' 3. *R* Temat: najstarszy', 'mail');
-  f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+  f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
   f.fire(' 2. *R* Temat: srodkowy', 'mail');
-  f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+  f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
   f.fire(' 1. *R* Temat: najnowszy', 'mail');
-  f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+  f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire('> ', 'prompt');
 }
 
@@ -47,11 +47,11 @@ function replayListingB(h: Harness): void {
   const { f } = h;
   f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
   f.fire(' 3. *R* Temat: inny', 'mail');
-  f.fire('Nadawca: Grault                         Wt, 23 XII 2025, 01:00:00', 'mail');
+  f.fire('Nadawca: Grault                         Wt, 24 VIII 1999, 01:00:00', 'mail');
   f.fire(' 2. *R* Temat: najnowszy', 'mail');
-  f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+  f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire(' 1. *R* Temat: srodkowy', 'mail');
-  f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+  f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
   f.fire('> ', 'prompt');
 }
 
@@ -61,7 +61,7 @@ function replayLetter(h: Harness, numer: number): void {
   f.fire(`List : ${numer}`, 'mail');
   f.fire('Od   : Corge', 'mail');
   f.fire('Temat: najnowszy', 'mail');
-  f.fire('Data : Wt, 23 XII 2025, 00:11:12', 'mail');
+  f.fire('Data : Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire('', 'mail');
   f.fire('Tresc najnowszego.', 'mail');
   f.fire(`[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: ${numer}) -- `, 'mail');
@@ -77,7 +77,7 @@ async function openAndRefresh(h: Harness): Promise<void> {
   const { f, waitFor, content } = h;
   click(h, '.arkmail-entry'); // najnowszy; prolog konczyl sie pustym listingiem
   await waitFor(
-    () => f.sent.includes('listy odebrane przed 24 XII 2025'),
+    () => f.sent.includes('listy odebrane przed 25 VIII 1999'),
     'setup: re-kotwica po pustym prologu',
   );
   replayListingB(h);
@@ -139,7 +139,7 @@ test('re-login: wznowienie sesji uniewaznia kontekst i odswieza skrzynki', async
     // wybrane."), tylko idzie przez re-kotwice i odczyt dziala.
     click(h, '.arkmail-entry');
     await waitFor(
-      () => f.sent.slice(base).includes('listy odebrane przed 24 XII 2025'),
+      () => f.sent.slice(base).includes('listy odebrane przed 25 VIII 1999'),
       're-kotwica po re-loginie',
     );
     replayListingA(h);
@@ -174,7 +174,7 @@ test('re-login: "Zadne listy nie zostaly wybrane" = re-kotwica i druga szansa', 
     );
     f.fire('Zadne listy nie zostaly wybrane.', 'mail');
     await waitFor(
-      () => f.sent.slice(base).includes('listy odebrane przed 24 XII 2025'),
+      () => f.sent.slice(base).includes('listy odebrane przed 25 VIII 1999'),
       'wymuszona re-kotwica po bledzie',
     );
     replayListingB(h);
@@ -208,7 +208,7 @@ test('re-login: powtorka bledu = toast, dokladnie dwie proby odczytu', async () 
     );
     f.fire('Zadne listy nie zostaly wybrane.', 'mail');
     await waitFor(
-      () => f.sent.slice(base).includes('listy odebrane przed 24 XII 2025'),
+      () => f.sent.slice(base).includes('listy odebrane przed 25 VIII 1999'),
       're-kotwica po pierwszym bledzie',
     );
     replayListingB(h);
@@ -243,7 +243,7 @@ test('re-login: "Zly numer listu" (desynchronizacja) tez dostaje druga szanse', 
     );
     f.fire('Zly numer listu: 1.', 'mail');
     await waitFor(
-      () => f.sent.slice(base).includes('listy odebrane przed 24 XII 2025'),
+      () => f.sent.slice(base).includes('listy odebrane przed 25 VIII 1999'),
       'wymuszona re-kotwica po zlym numerze',
     );
     replayListingB(h);

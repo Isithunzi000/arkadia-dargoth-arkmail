@@ -42,7 +42,7 @@ import {
   type Harness,
 } from './harness';
 
-const DATE_RAW = 'Wt, 23 XII 2025, 00:11:12';
+const DATE_RAW = 'Wt, 24 VIII 1999, 00:11:12';
 
 test('txt: format jak na ekranie - temat, meta, pusta linia, tresc; LF; ANSI zdjete', () => {
   const txt = letterTxt({
@@ -83,7 +83,7 @@ test('txt: rekord archiwum - strona listu po kierunku skrzynki', () => {
       forwarded: false,
       party: 'Corge',
       partyKind: box === 'odebrane' || box === 'nieprzeczytane' ? 'nadawca' : 'odbiorcy',
-      date: { raw: DATE_RAW, weekday: 'Wt', day: 23, month: 12, year: 2025, time: '00:11:12' },
+      date: { raw: DATE_RAW, weekday: 'Wt', day: 24, month: 8, year: 1999, time: '00:11:12' },
     } satisfies MailboxEntry),
     body: ['Tresc.'],
   });
@@ -94,7 +94,7 @@ test('txt: rekord archiwum - strona listu po kierunku skrzynki', () => {
 test('txt: nazwa pliku - sortKey + slugi ASCII, bezpieczna dla systemu plikow', () => {
   assert.equal(
     txtFileName('Corge', 'Re: test !ok?', DATE_RAW),
-    '2025-12-23_00-11-12_corge_re-test-ok.txt',
+    '1999-08-24_00-11-12_corge_re-test-ok.txt',
   );
   assert.equal(txtFileName('Alvin, Bean', '', null), '0000-00-00_00-00-00_alvin-bean_list.txt');
   assert.equal(slugAscii('  ..::  '), 'list', 'pusty slug ma fallback');
@@ -147,7 +147,7 @@ test('eksport archiwum: dedup blizniakow, folder per skrzynka, pomijanie bez tre
     forwarded: false,
     party: 'Corge',
     partyKind: 'nadawca' as const,
-    date: { raw: DATE_RAW, weekday: 'Wt', day: 23, month: 12, year: 2025, time: '00:11:12' },
+    date: { raw: DATE_RAW, weekday: 'Wt', day: 24, month: 8, year: 1999, time: '00:11:12' },
   };
   const twinUnread: ArchiveLetter = {
     ...fromMailboxEntry('nieprzeczytane', { ...base, isRead: false }),
@@ -171,7 +171,7 @@ test('eksport archiwum: dedup blizniakow, folder per skrzynka, pomijanie bez tre
   assert.equal(entries.length, 2, 'blizniak zdeduplikowany, wyslany osobno');
   const names = entries.map((e) => e.name);
   assert.ok(
-    names.some((n) => n.startsWith('odebrane/2025-12-23_00-11-12_corge_najnowszy.txt')),
+    names.some((n) => n.startsWith('odebrane/1999-08-24_00-11-12_corge_najnowszy.txt')),
     'blizniak w kanonicznym folderze odebrane',
   );
   assert.ok(names.some((n) => n.startsWith('wyslane/')), 'wyslany w folderze wyslane');
@@ -190,11 +190,11 @@ function replayListing3(h: Harness): void {
   const { f } = h;
   f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
   f.fire(' 3. *R* Temat: najstarszy', 'mail');
-  f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+  f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
   f.fire(' 2. *R* Temat: srodkowy', 'mail');
-  f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+  f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
   f.fire(' 1. *R* Temat: najnowszy', 'mail');
-  f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+  f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire('> ', 'prompt');
 }
 
@@ -203,7 +203,7 @@ function replayLetter(h: Harness, numer: number, subject: string, body: string):
   f.fire(`List : ${numer}`, 'mail');
   f.fire('Od   : Corge', 'mail');
   f.fire(`Temat: ${subject}`, 'mail');
-  f.fire('Data : Wt, 23 XII 2025, 00:11:12', 'mail');
+  f.fire('Data : Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire('', 'mail');
   f.fire(body, 'mail');
   f.fire(`[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: ${numer}) -- `, 'mail');
@@ -226,10 +226,10 @@ test('widok listu: Zapisz list TXT pobiera plik o tresci jak na ekranie', async 
     assert.ok(row, 'wiersz listingu');
     row.dispatchEvent(new h.window.Event('click'));
     // Fala 9a: otwarcie re-kotwiczy wpis na swiezym listingu.
-    await waitRt(() => f.sent.includes('listy odebrane przed 24 XII 2025'), 're-kotwica');
+    await waitRt(() => f.sent.includes('listy odebrane przed 25 VIII 1999'), 're-kotwica');
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(() => f.sent.includes('przeczytaj list 1'), 'odczyt');
     replayLetter(h, 1, 'najnowszy', 'Tresc pierwszego.');
@@ -238,7 +238,7 @@ test('widok listu: Zapisz list TXT pobiera plik o tresci jak na ekranie', async 
     const base = f.sent.length;
     click(h, '.arkmail-export-letter');
     await waitRt(() => captured.length === 1, 'pobieranie TXT');
-    assert.match(captured[0].name, /^2025-12-23_00-11-12_corge_najnowszy\.txt$/, 'nazwa pliku');
+    assert.match(captured[0].name, /^1999-08-24_00-11-12_corge_najnowszy\.txt$/, 'nazwa pliku');
     const txt = await captured[0].data.text();
     assert.ok(txt.includes('najnowszy'), 'temat w TXT');
     assert.ok(txt.includes('Od: Corge'), 'meta Od w TXT');
@@ -287,15 +287,15 @@ test('archiwum: Zapisz wszystkie (ZIP) pobiera pliki TXT, puste archiwum = toast
     };
     dlBtn().dispatchEvent(new h.window.Event('click'));
     dlBtn().dispatchEvent(new h.window.Event('click'));
-    await waitRt(() => f.sent.includes('listy odebrane przed 24 XII 2025'), 'kotwica 1');
+    await waitRt(() => f.sent.includes('listy odebrane przed 25 VIII 1999'), 'kotwica 1');
     replayListing3(h);
     await waitRt(() => f.sent.includes('przeczytaj list 1'), 'odczyt 1');
     replayLetter(h, 1, 'najnowszy', 'Tresc pierwszego.');
-    await waitRt(() => f.sent.includes('listy odebrane przed 23 XII 2025'), 'kotwica 2');
+    await waitRt(() => f.sent.includes('listy odebrane przed 24 VIII 1999'), 'kotwica 2');
     replayListing3(h);
     await waitRt(() => f.sent.includes('przeczytaj list 2'), 'odczyt 2');
     replayLetter(h, 2, 'srodkowy', 'Tresc drugiego.');
-    await waitRt(() => f.sent.includes('listy odebrane przed 22 XII 2025'), 'kotwica 3');
+    await waitRt(() => f.sent.includes('listy odebrane przed 23 VIII 1999'), 'kotwica 3');
     replayListing3(h);
     await waitRt(() => f.sent.includes('przeczytaj list 3'), 'odczyt 3');
     replayLetter(h, 3, 'najstarszy', 'Tresc trzeciego.');

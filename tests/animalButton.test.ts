@@ -2,9 +2,9 @@
  * Przycisk "Wyslij Zwierze" i maszyna lotu zwierzecia (Fala 13b).
  *
  * Protokol zwierzecia pocztowego (dowody: 576 logow 2025-12/2026-01):
- *  - komenda "wyslij zwierze" (bez argumentow) -> "Wysylasz Kruk na
+ *  - komenda "wyslij zwierze" (bez argumentow) -> "Wysylasz Sroka na
  *    poczte." + flavor o skrzydlach (roundtrip 20-50 s);
- *  - powrot: "Wsrod trzepotu skrzydel Kruk laduje na twoim prawym
+ *  - powrot: "Wsrod trzepotu skrzydel Sroka laduje na twoim prawym
  *    ramieniu." ALBO "...laduje na twojej rece." (dwa warianty);
  *  - przy powrocie serwer sam wypisuje stan nieprzeczytanych - inbox
  *    moze sie zmienic, wiec ladowanie odpala odswiezenie (koalescencja
@@ -71,7 +71,7 @@ test('po wyslaniu przycisk jest nieaktywny do konca lotu', async () => {
     await h.waitFor(() => animalBtn(h)?.disabled === true, 'przycisk nieaktywny w locie');
     assert.ok(textOf(h, '.arkmail-animal-send').includes('w drodze'), 'etykieta lotu');
     // Sprzatniecie lotu: ladowanie.
-    h.f.fire('Wsrod trzepotu skrzydel Kruk laduje na twoim prawym ramieniu.', 'mail');
+    h.f.fire('Wsrod trzepotu skrzydel Sroka laduje na twoim prawym ramieniu.', 'mail');
     await answerEmpty(h, 'odebrane');
     await answerEmpty(h, 'nieprzeczytane');
     // Fala 24f1: powrot odswieza tez niewyslane i wyslane.
@@ -89,7 +89,7 @@ test('linia ladowania konczy lot i odswieza inbox', async () => {
   try {
     click(h, '.arkmail-animal-send');
     await h.waitFor(() => h.f.sent.includes('wyslij zwierze'), 'komenda wyslij zwierze');
-    h.f.fire('Wsrod trzepotu skrzydel Kruk laduje na twoim prawym ramieniu.', 'mail');
+    h.f.fire('Wsrod trzepotu skrzydel Sroka laduje na twoim prawym ramieniu.', 'mail');
     await h.waitFor(() => animalBtn(h)?.disabled === false, 'przycisk aktywny po ladowaniu');
     await answerEmpty(h, 'odebrane');
     await answerEmpty(h, 'nieprzeczytane');
@@ -108,7 +108,7 @@ test('drugi wariant ladowania ("na twojej rece") tez konczy lot', async () => {
   try {
     click(h, '.arkmail-animal-send');
     await h.waitFor(() => h.f.sent.includes('wyslij zwierze'), 'komenda wyslij zwierze');
-    h.f.fire('Wsrod trzepotu skrzydel Kruk laduje na twojej rece.', 'mail');
+    h.f.fire('Wsrod trzepotu skrzydel Sroka laduje na twojej rece.', 'mail');
     await h.waitFor(() => animalBtn(h)?.disabled === false, 'przycisk aktywny po ladowaniu');
     await answerEmpty(h, 'odebrane');
     await answerEmpty(h, 'nieprzeczytane');
@@ -126,9 +126,9 @@ test('reczna komenda gracza (linia Wysylasz) uzbraja lot bez kliku', async () =>
   const h = await startHarness();
   try {
     assert.ok(animalBtn(h)?.disabled === false, 'przycisk aktywny na starcie');
-    h.f.fire('Wysylasz Kruk na poczte.', 'mail');
+    h.f.fire('Wysylasz Sroka na poczte.', 'mail');
     await h.waitFor(() => animalBtn(h)?.disabled === true, 'lot uzbrojony z linii gry');
-    h.f.fire('Wsrod trzepotu skrzydel Kruk laduje na twoim prawym ramieniu.', 'mail');
+    h.f.fire('Wsrod trzepotu skrzydel Sroka laduje na twoim prawym ramieniu.', 'mail');
     await answerEmpty(h, 'odebrane');
     await answerEmpty(h, 'nieprzeczytane');
     // Fala 24f1: powrot odswieza tez niewyslane i wyslane.
@@ -179,7 +179,7 @@ test('klik w trakcie lotu nie wysyla duplikatu', async () => {
       'dokladnie jedna komenda wyslij zwierze',
     );
     // Sprzatniecie lotu.
-    h.f.fire('Wsrod trzepotu skrzydel Kruk laduje na twoim prawym ramieniu.', 'mail');
+    h.f.fire('Wsrod trzepotu skrzydel Sroka laduje na twoim prawym ramieniu.', 'mail');
     await answerEmpty(h, 'odebrane');
     await answerEmpty(h, 'nieprzeczytane');
     // Fala 24f1: powrot odswieza tez niewyslane i wyslane.

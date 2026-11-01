@@ -22,7 +22,7 @@ function replayLetter(h: Harness, n: number): void {
   f.fire(`List : ${n}`, 'mail');
   f.fire('Od   : Corge', 'mail');
   f.fire('Temat: najnowszy', 'mail');
-  f.fire('Data : Wt, 23 XII 2025, 00:11:12', 'mail');
+  f.fire('Data : Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire('', 'mail');
   f.fire('Tresc karteczki.', 'mail');
   f.fire(`[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: ${n}) -- `, 'mail');
@@ -36,11 +36,11 @@ async function loadBoxWithUnread(h: Harness): Promise<void> {
   await waitFor(() => f.sent.includes('listy odebrane'), 'komenda listy odebrane');
   f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
   f.fire(' 3. *R* Temat: najstarszy', 'mail');
-  f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+  f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
   f.fire(' 2. *R* Temat: srodkowy', 'mail');
-  f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+  f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
   f.fire(' 1. Temat: najnowszy', 'mail');
-  f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+  f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire('> ', 'prompt');
   await waitFor(() => f.sent.includes('listy nieprzeczytane'), 'komenda listy nieprzeczytane');
   // Fala 14f: PUSTA odpowiedz tez nadpisuje biezacy listing serwera -
@@ -67,17 +67,17 @@ test('odczyt listu odswieza skrzynke - znacznik R przychodzi z serwera', async (
     // kontekst - najpierw re-kotwica po dacie listu (dzien po).
     click(h, '.arkmail-entry'); // najnowszy (numer 1, stary kontekst)
     await waitFor(
-      () => f.sent.includes('listy odebrane przed 24 XII 2025'),
+      () => f.sent.includes('listy odebrane przed 25 VIII 1999'),
       're-kotwica po pustym listingu nieprzeczytanych',
     );
     // Swiezy listing: "najnowszy" (wciaz nieprzeczytany) ma numer 1.
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 3. *R* Temat: najstarszy', 'mail');
-    f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
     f.fire(' 2. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire(' 1. Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(() => f.sent.includes('przeczytaj list 1'), 'przeczytaj list 1');
     replayLetter(h, 1);
@@ -91,11 +91,11 @@ test('odczyt listu odswieza skrzynke - znacznik R przychodzi z serwera', async (
     // Serwer potwierdza przeczytanie - dopiero TO zmienia widok.
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 3. *R* Temat: najstarszy', 'mail');
-    f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
     f.fire(' 2. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     // Powrot do listingu (waski: 'Zamknij list') - znacznik z serwera.
     click(h, '.arkmail-older');
@@ -126,7 +126,7 @@ test('odczyt w trybie wynikow szukania NIE odswieza (wyniki zostaja)', async () 
     await waitFor(() => f.sent.includes('listy odebrane od corge'), 'komenda szukania');
     f.fire('Wybrane listy odebrane:', 'mail');
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(() => content.querySelectorAll('.arkmail-entry').length === 1, 'wynik w widoku');
 

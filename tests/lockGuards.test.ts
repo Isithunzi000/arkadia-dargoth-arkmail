@@ -33,7 +33,7 @@ test('puste i wypelnione Szukaj podczas petli = odmowa, zero komend', async () =
     // Start petli "Wczytaj wszystkie" - wysyla kotwice i CZEKA
     // (blokada sesji zajeta, petla wisi na odpowiedzi serwera).
     click(h, '.arkmail-older-all');
-    await waitRt(() => f.sent.includes('listy odebrane przed 22 XII 2025'), 'kotwica petli');
+    await waitRt(() => f.sent.includes('listy odebrane przed 23 VIII 1999'), 'kotwica petli');
     const sentBefore = f.sent.length;
 
     // Puste Szukaj odswieza skrzynke, wiec korzysta z tej samej blokady.
@@ -72,7 +72,7 @@ test('Wczytaj wszystkie podczas odczytu listu = odmowa, zero komend', async () =
     // nieprzeczytane, wiec resolveEntry najpierw doswieza listing
     // odebranych - blokada sesji zajeta, komenda WISI bez odpowiedzi.
     click(h, '.arkmail-entry');
-    await waitRt(() => f.sent.includes('listy odebrane przed 24 XII 2025'), 're-kotwica odczytu');
+    await waitRt(() => f.sent.includes('listy odebrane przed 25 VIII 1999'), 're-kotwica odczytu');
     const sentBefore = f.sent.length;
 
     click(h, '.arkmail-older-all');

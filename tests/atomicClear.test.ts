@@ -28,8 +28,8 @@ function letter(id: string): ArchiveLetter {
     party: 'Foo',
     subject: 'Temat',
     forwarded: false,
-    dateRaw: 'Pn, 2 III 2026, 01:02:03',
-    sortKey: '2026-03-02 01:02:03',
+    dateRaw: 'Pn, 20 IX 1999, 01:02:03',
+    sortKey: '1999-09-20 01:02:03',
     read: false,
     body: [],
   };
@@ -41,10 +41,10 @@ test('czyszczenie usuwa listy, indeks i luki atomowo oraz zachowuje ustawienia p
   await seed.loadAll();
   await seed.putLetters('foo', { one: JSON.stringify(letter('one')) });
   await seed.putMany({
-    'arkmail.foo.indeks': JSON.stringify({ odebrane: '2026-01-01T00:00:00Z' }),
-    'arkmail.foo.luki-archiwum': JSON.stringify({ odebrane: ['2025-12-20'] }),
+    'arkmail.foo.indeks': JSON.stringify({ odebrane: '1999-09-02T00:00:00Z' }),
+    'arkmail.foo.luki-archiwum': JSON.stringify({ odebrane: ['1999-08-21'] }),
     'arkmail.foo.powiadomienia': JSON.stringify(false),
-    'arkmail.bar.indeks': JSON.stringify({ odebrane: '2026-01-02T00:00:00Z' }),
+    'arkmail.bar.indeks': JSON.stringify({ odebrane: '1999-09-03T00:00:00Z' }),
   });
   await seed.putLetters('bar', { two: JSON.stringify(letter('two')) });
   await seed.close();
@@ -83,8 +83,8 @@ test('blad trwalego czyszczenia pozostawia poprzedni stan w RAM i nie zglasza su
   const driver = new FailingDriver();
   await driver.putLetters('foo', { one: JSON.stringify(letter('one')) });
   await driver.putMany({
-    'arkmail.foo.indeks': JSON.stringify({ odebrane: '2026-01-01T00:00:00Z' }),
-    'arkmail.foo.luki-archiwum': JSON.stringify({ odebrane: ['2025-12-20'] }),
+    'arkmail.foo.indeks': JSON.stringify({ odebrane: '1999-09-02T00:00:00Z' }),
+    'arkmail.foo.luki-archiwum': JSON.stringify({ odebrane: ['1999-08-21'] }),
     'arkmail.foo.powiadomienia': JSON.stringify(false),
   });
   const storage = await CharStorage.open('Foo', driver, () => {});

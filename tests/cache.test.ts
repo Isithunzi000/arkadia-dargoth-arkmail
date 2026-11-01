@@ -67,22 +67,22 @@ test('cache: otwarcie listu dokleja jego tresc do archiwum (id zgodne z listingi
     };
     firstRow.dispatchEvent(new h.window.Event('click'));
     await waitFor(
-      () => f.sent.includes('listy odebrane przed 24 XII 2025'),
+      () => f.sent.includes('listy odebrane przed 25 VIII 1999'),
       're-kotwica po pustym listingu nieprzeczytanych',
     );
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 3. *R* Temat: najstarszy', 'mail');
-    f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
     f.fire(' 2. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(() => f.sent.includes('przeczytaj list 1'), 'komenda czytania listu');
     f.fire('List : 1', 'mail');
     f.fire('Od   : Corge', 'mail');
     f.fire('Temat: najnowszy', 'mail');
-    f.fire('Data : Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Data : Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('', 'mail');
     f.fire('Unikalna tresc karteczki 4242.', 'mail');
     f.fire('[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ', 'mail');

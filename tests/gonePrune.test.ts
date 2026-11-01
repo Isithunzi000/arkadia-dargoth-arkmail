@@ -92,12 +92,12 @@ test('integracja: pelna indeksacja usuwa z widoku list znikniety z serwera', asy
     );
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 2. *R* Temat: najstarszy', 'mail');
-    f.fire('Nadawca: Foo                        N, 21 XII 2025, 01:15:04', 'mail');
+    f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
     f.fire(' 1. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 22 XII 2025, 02:20:05', 'mail');
+    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(
-      () => f.sent.includes('listy odebrane przed 22 XII 2025'),
+      () => f.sent.includes('listy odebrane przed 23 VIII 1999'),
       'kotwica starszych',
     );
     f.fire('Nie znaleziono zadnych takich odebranych listow.', 'mail');

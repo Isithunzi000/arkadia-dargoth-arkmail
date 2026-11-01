@@ -110,7 +110,7 @@ test('szukajka: Wyczysc w bannerze kasuje tez pola formularza', () => {
 test('archiwum: Wyczysc filtry zeruje wszystkie pola i pokazuje pelna liste', () => {
   const letters: ArchiveLetter[] = [
     { id: 'a', box: 'odebrane', number: 1, party: 'Foo', subject: 'Perly', dateRaw: '', sortKey: '0000-00-00 00:00:00', read: true, body: ['x'] },
-    { id: 'b', box: 'wyslane', number: 2, party: 'Garply', subject: 'Karteczka', dateRaw: '', sortKey: '0000-00-00 00:00:00', read: true, body: [] },
+    { id: 'b', box: 'wyslane', number: 2, party: 'Garply', subject: 'notatka', dateRaw: '', sortKey: '0000-00-00 00:00:00', read: true, body: [] },
   ];
   const s = new MailUiStore({ tab: 'archiwum', archive: letters });
   const { container, off } = mount(s);

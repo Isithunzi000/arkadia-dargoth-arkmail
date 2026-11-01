@@ -39,14 +39,14 @@ async function fullRefresh4Boxes(h: Harness): Promise<void> {
   await waitFor(() => f.sent.includes('listy odebrane'), 'listing odebrane');
   f.fire('Listy odebrane:', 'mail');
   f.fire(' 1. *R* Temat: jedyny', 'mail');
-  f.fire('Nadawca: Foo                        Wt, 23 XII 2025, 00:11:12', 'mail');
+  f.fire('Nadawca: Foo                        Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire('> ', 'prompt');
   await waitFor(() => f.sent.includes('listy nieprzeczytane'), 'listing nieprzeczytane');
   f.fire(EMPTY_LINE.nieprzeczytane, 'mail');
   await waitFor(() => f.sent.includes('listy wyslane'), 'listing wyslane');
   f.fire('Listy wyslane:', 'mail');
   f.fire(' 1. Temat: wyslany', 'mail');
-  f.fire('Odbiorcy: Foo                         Wt, 23 XII 2025, 01:00:00', 'mail');
+  f.fire('Odbiorcy: Foo                         Wt, 24 VIII 1999, 01:00:00', 'mail');
   f.fire('> ', 'prompt');
   await waitFor(() => f.sent.includes('listy niewyslane'), 'listing niewyslane');
   f.fire(EMPTY_LINE.niewyslane, 'mail');
@@ -108,7 +108,7 @@ test('blad 1 (D2): loadOlder do dna stempluje skrzynke i czysci luki', async () 
     await waitFor(() => f.sent.includes('listy odebrane'), 'listing odebrane');
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Foo                        Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Foo                        Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     for (const box of ['nieprzeczytane', 'wyslane', 'niewyslane']) {
       await waitFor(() => f.sent.includes(`listy ${box}`), `listing ${box}`);
@@ -147,7 +147,7 @@ test('blad 1 (D1): uciety listing NIE stempluje skrzynki', async () => {
     await waitFor(() => f.sent.includes('listy odebrane'), 'listing odebrane');
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Foo                        Wt, 23 XII 2025, 00:11:12', 'mail');
+    f.fire('Nadawca: Foo                        Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitFor(() => f.sent.includes('listy nieprzeczytane'), 'listing nieprzeczytane');
     f.fire(EMPTY_LINE.nieprzeczytane, 'mail');

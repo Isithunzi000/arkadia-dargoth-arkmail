@@ -35,7 +35,7 @@ function entry(data: Row): MailboxEntry {
     forwarded: false,
     party: data.party,
     partyKind: 'nadawca',
-    date: parseMailDate('Wt, 23 XII 2025, 00:11:12'),
+    date: parseMailDate('Wt, 24 VIII 1999, 00:11:12'),
   };
 }
 
@@ -47,7 +47,7 @@ function replayListing(h: Harness, entries: Row[]): void {
   h.f.fire('Listy odebrane:', 'mail');
   for (const data of entries) {
     h.f.fire(` ${data.number}. *R* Temat: ${data.subject}`, 'mail');
-    h.f.fire(`Nadawca: ${data.party.padEnd(35)}Wt, 23 XII 2025, 00:11:12`, 'mail');
+    h.f.fire(`Nadawca: ${data.party.padEnd(35)}Wt, 24 VIII 1999, 00:11:12`, 'mail');
   }
   h.f.fire('> ', 'prompt');
 }
@@ -56,7 +56,7 @@ function replayPager(h: Harness, number: number): void {
   h.f.fire(`List : ${number}`, 'mail');
   h.f.fire('Od   : Bar', 'mail');
   h.f.fire('Temat: Temat A', 'mail');
-  h.f.fire('Data : Wt, 23 XII 2025, 00:11:12', 'mail');
+  h.f.fire('Data : Wt, 24 VIII 1999, 00:11:12', 'mail');
   h.f.fire('', 'mail');
   h.f.fire('Tresc.', 'mail');
   h.f.fire(`[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: ${number}) -- `, 'mail');

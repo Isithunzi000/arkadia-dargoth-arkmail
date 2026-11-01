@@ -3,7 +3,7 @@
  *
  * Zwierze pocztowe przy powrocie dostarcza niewyslane listy - serwer
  * wypisuje te linie ~20-25 s po "wyslij zwierze" (dowod: logi
- * 2026-01-04/16, np. +25.2 s). W sesji compose ta sama linia jest
+ * 1999-09-05/16, np. +25.2 s). W sesji compose ta sama linia jest
  * konsumowana przez flote edytora (onSendCompose sam odswieza
  * skrzynki na koncu), wiec wiring reaguje tylko, gdy blokada sesji
  * jest wolna - inaczej kazdy compose dostawialby dodatkowy refresh.

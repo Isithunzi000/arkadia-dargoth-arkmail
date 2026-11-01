@@ -35,7 +35,7 @@ const ENTRY = {
   party: 'Goniec',
   partyKind: 'nadawca' as const,
   date: {
-    raw: 'Wt, 23 XII 2025, 00:11:12',
+    raw: 'Wt, 24 VIII 1999, 00:11:12',
     weekday: 'Wt',
     day: 23,
     month: 12,
