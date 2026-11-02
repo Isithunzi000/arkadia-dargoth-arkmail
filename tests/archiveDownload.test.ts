@@ -57,6 +57,21 @@ function clickArchiveRow(h: Harness, fragment: string): void {
   row.dispatchEvent(new h.window.Event('click'));
 }
 
+/** Klik w wiersz archiwum, gdy sie pojawi (rerender po odswiezeniu). */
+async function clickArchiveRowWhen(h: Harness, fragment: string): Promise<void> {
+  let row: { dispatchEvent(e: unknown): void } | undefined;
+  await waitRt(() => {
+    row = Array.from(
+      h.content.querySelectorAll('.arkmail-arch-entry') as unknown as Iterable<{
+        textContent?: string;
+        dispatchEvent(e: unknown): void;
+      }>,
+    ).find((r) => String(r.textContent ?? '').includes(fragment));
+    return !!row;
+  }, `wiersz archiwum "${fragment}"`);
+  row!.dispatchEvent(new h.window.Event('click'));
+}
+
 /** Widok listu otwarty i pokazuje zadany fragment tresci. */
 const letterBodyShows = (h: Harness, fragment: string): boolean =>
   !!h.content.querySelector('.arkmail-letter-body') &&
@@ -89,6 +104,15 @@ function replayListing3(h: Harness): void {
   f.fire(' 1. *R* Temat: najnowszy', 'mail');
   f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire('> ', 'prompt');
+}
+
+/** Odpowiedz na najblizsze "listy odebrane" pelnym listingiem 3 listow. */
+async function answerListing3(h: Harness): Promise<void> {
+  const { f } = h;
+  const cmd = 'listy odebrane';
+  const n = f.sent.filter((c) => c === cmd).length + 1;
+  await waitRt(() => f.sent.filter((c) => c === cmd).length >= n, `${cmd} (odpowiedz)`);
+  replayListing3(h);
 }
 
 /** Odpowiedz na najblizsze "listy <skrzynka>" pusta skrzynka. */
@@ -228,15 +252,17 @@ test('archiwum: pobieranie przerywa, gdy gracz otworzy poczte w trakcie (Fala 42
       () => downloadBtn(h).textContent === 'Pobierz tresci do archiwum',
       'koniec petli',
     );
-    // Gracz wychodzi z poczty: zaparkowane odswiezenie schodzi.
+    // Gracz wychodzi z poczty: zaparkowane odswiezenie schodzi. Odpowiedz
+    // listingiem zgodnym z archiwum (pusta skrzynka oznaczylaby listy
+    // jako znikniete z serwera).
     f.fire('→ q');
-    await answerEmptyBox(h, 'odebrane');
+    await answerListing3(h);
     await answerEmptyBox(h, 'nieprzeczytane');
     await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji');
     // Tresc pobranego przed przerwaniem listu zostaje w bazie (podglad z
     // pamieci, zero komend).
     const base = f.sent.length;
-    clickArchiveRow(h, 'najnowszy');
+    await clickArchiveRowWhen(h, 'najnowszy');
     await waitRt(() => letterBodyShows(h, 'Tresc pierwszego.'), 'tresc zachowana po przerwaniu');
     assert.equal(f.sent.length, base, 'podglad z cache bez komend');
   } finally {
