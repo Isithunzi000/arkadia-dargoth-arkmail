@@ -181,7 +181,7 @@ test('Indeksuj wszystkie: paginacja kotwicowa, flagi, gone-marking, odblokowanie
     await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksacja: niewyslane');
     f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
     // --- koniec: toast + koniec sesji.
-    await waitRt(() => notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'toast konca indeksacji');
+    await waitRt(() => notifyText(f, 'Zindeksowano skrzynki'), 'toast konca indeksacji');
     await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji indeksacji');
 
     // Archiwum: 3 zywe wiersze (Corge zniknela, prastary doszedl).

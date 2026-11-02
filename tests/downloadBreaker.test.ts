@@ -32,7 +32,7 @@ import {
   type Harness,
 } from './harness';
 
-const BREAKER_MSG = 'Przerwano pobieranie - serwer poczty nie odpowiada';
+const BREAKER_MSG = 'Serwer poczty nie odpowiada';
 const ERROR_LINE = 'Data zostala podana w zlym formacie.';
 
 /** Komendy re-kotwic petli pobierania (listy ... przed <data>). */
@@ -163,7 +163,7 @@ test('breaker: sukces resetuje licznik - petla konczy sie zwyklym podsumowaniem'
     await answerError(h, 5); // odebrane 21 XII
 
     await waitRt(
-      () => notifyText(f, 'Pobrano tresci (1 z 5; nieudane: 4)'),
+      () => notifyText(f, 'Pobrano tresci 1 z 5; nieudane: 4'),
       'zwykle podsumowanie po resecie',
     );
     assert.ok(!notifyText(f, BREAKER_MSG), 'breaker nie strzelil po resecie');
@@ -195,7 +195,7 @@ test('breaker: znikniety list (missing) resetuje licznik bledow', async () => {
     await answerError(h, 8); // odebrane 22 VIII
 
     await waitRt(
-      () => notifyText(f, 'Pobrano tresci (0 z 5; nieudane: 4; nie ma juz w skrzynce: 1)'),
+      () => notifyText(f, 'Pobrano tresci 0 z 5; nieudane: 4; nie ma juz w skrzynce: 1'),
       'podsumowanie ze zniknietym i bez breakera',
     );
     assert.ok(!notifyText(f, BREAKER_MSG), 'missing nie jest bledem breakera');

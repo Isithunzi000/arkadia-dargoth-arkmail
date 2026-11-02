@@ -125,7 +125,7 @@ test('klamra: incrementalny przeczes staje na stronie znanej z archiwum, gone-ma
     f.fire('Nadawca: Fred                        So, 7 VIII 1999, 10:00:00', 'mail');
     f.fire('> ', 'prompt');
     await drainEmptyBoxes(h, { nieprzeczytane: 2, wyslane: 1, niewyslane: 1 });
-    await waitRt(() => notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'faza 1: toast 4/4');
+    await waitRt(() => notifyText(f, 'Zindeksowano skrzynki'), 'faza 1: toast 4/4');
     await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'faza 1: koniec sesji');
 
     // --- Zmiany na serwerze: doszedl 'swiezak' (24 XII), 'najnowszy'
@@ -165,7 +165,7 @@ test('klamra: incrementalny przeczes staje na stronie znanej z archiwum, gone-ma
       f.fire('Nie znaleziono zadnych takich odebranych listow.', 'mail');
     }
     await drainEmptyBoxes(h, { nieprzeczytane: 3, wyslane: 2, niewyslane: 2 });
-    await waitRt(() => notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'faza 2: toast 4/4');
+    await waitRt(() => notifyText(f, 'Zindeksowano skrzynki'), 'faza 2: toast 4/4');
     await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'faza 2: koniec sesji');
 
     assert.ok(

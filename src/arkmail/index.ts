@@ -276,7 +276,7 @@ export async function init(api: PluginApi) {
   };
 
   const activateCharacter = async (character: string): Promise<boolean> => {
-    const storage = await openCharStorage(character, () => notify(api, STORAGE_WRITE_ERROR));
+    const storage = await openCharStorage(character, () => notify(api, STORAGE_WRITE_ERROR, { level: "error" }));
     if (
       lifecycleDestroyed ||
       character.trim().toLowerCase() !== requestedName?.trim().toLowerCase()
@@ -844,7 +844,7 @@ export async function init(api: PluginApi) {
       return entry;
     }
     if (!entry.date) {
-      notify(api, "Nie moge znalezc tego listu - odswiez skrzynke.");
+      notify(api, "Nie moge znalezc tego listu - odswiez skrzynke.", { level: "warning" });
       return null;
     }
     const generation = connectionGeneration;
@@ -897,7 +897,7 @@ export async function init(api: PluginApi) {
     } finally {
       offCancel();
     }
-    notify(api, "Nie ma tego listu na liscie - odswiez skrzynke.");
+    notify(api, "Nie ma tego listu na liscie - odswiez skrzynke.", { level: "warning" });
     return null;
   };
 
@@ -910,7 +910,7 @@ export async function init(api: PluginApi) {
         const view = ui.state.boxes[box];
         const oldest = oldestEntry(view?.entries ?? []);
         if (!oldest?.date) {
-          notify(api, "Nie mozna wczytac starszych - najpierw pobierz skrzynke.");
+          notify(api, "Nie mozna wczytac starszych - najpierw pobierz skrzynke.", { level: "warning" });
           return;
         }
         const scan = await scanMailboxPages({
@@ -947,15 +947,24 @@ export async function init(api: PluginApi) {
         } else if (scan.end === "incomplete") {
           notify(
             api,
-            `Wczytano dostepne listy: ${ui.state.boxes[box]?.entries.length ?? 0} w widoku (dodano do widoku: ${scan.addedToView}). ${scan.skipWhy ?? "Sprobuj ponownie za chwile"}.`,
+            `W widoku: ${ui.state.boxes[box]?.entries.length ?? 0} (dodano: ${scan.addedToView}). ${scan.skipWhy ?? "Sprobuj ponownie za chwile"}.`,
+            { title: "Wczytano dostepne listy", level: "warning" },
           );
         } else {
-          notify(api, `Wczytano starsze listy: ${ui.state.boxes[box]?.entries.length ?? 0} w widoku (dodano do widoku: ${scan.addedToView}).`);
+          notify(
+            api,
+            `W widoku: ${ui.state.boxes[box]?.entries.length ?? 0} (dodano: ${scan.addedToView}).`,
+            { title: "Wczytano starsze listy", level: "success" },
+          );
         }
       })
       .catch((err: unknown) => {
         if (!isOperationCancelled(err)) {
-          notify(api, `Blad wczytywania starszych: ${humanizeMailError(err instanceof Error ? err.message : String(err))}`);
+          notify(
+            api,
+            humanizeMailError(err instanceof Error ? err.message : String(err)),
+            { title: "Blad wczytywania starszych", level: "error" },
+          );
         }
       })
       .finally(() => {
@@ -983,7 +992,7 @@ export async function init(api: PluginApi) {
       return;
     }
     if (lock.locked) {
-      notify(api, SESSION_BUSY_MSG);
+      notify(api, SESSION_BUSY_MSG, { level: "warning" });
       return;
     }
     const flag = { cancelled: false };
@@ -1017,7 +1026,11 @@ export async function init(api: PluginApi) {
             },
           });
           if (scan.end === "cancelled") {
-            notify(api, `Przerwano (dodano do widoku: ${scan.addedToView}).`);
+            notify(
+              api,
+              `Dodano do widoku: ${scan.addedToView}.`,
+              { title: "Przerwano wczytywanie", level: "warning" },
+            );
             return;
           }
           if (scan.end === "complete") {
@@ -1033,11 +1046,16 @@ export async function init(api: PluginApi) {
               ui.setIndexMeta({ ...ui.state.indexMeta, [box]: new Date().toISOString() });
               persistIndexMeta();
             }
-            notify(api, `Wczytano wszystkie: ${ui.state.boxes[box]?.entries.length ?? 0} list (dodano do widoku: ${scan.addedToView}).`);
+            notify(
+              api,
+              `W widoku: ${ui.state.boxes[box]?.entries.length ?? 0} (dodano: ${scan.addedToView}).`,
+              { title: "Wczytano wszystkie", level: "success" },
+            );
           } else {
             notify(
               api,
-              `Wczytano dostepne listy: ${ui.state.boxes[box]?.entries.length ?? 0} w widoku (dodano do widoku: ${scan.addedToView}). ${scan.skipWhy ?? "Sprobuj ponownie za chwile"}.`,
+              `W widoku: ${ui.state.boxes[box]?.entries.length ?? 0} (dodano: ${scan.addedToView}). ${scan.skipWhy ?? "Sprobuj ponownie za chwile"}.`,
+              { title: "Wczytano dostepne listy", level: "warning" },
             );
           }
         } finally {
@@ -1048,7 +1066,11 @@ export async function init(api: PluginApi) {
       })
       .catch((err: unknown) => {
         if (!isOperationCancelled(err)) {
-          notify(api, `Blad wczytywania: ${humanizeMailError(err instanceof Error ? err.message : String(err))}`);
+          notify(
+            api,
+            humanizeMailError(err instanceof Error ? err.message : String(err)),
+            { title: "Blad wczytywania", level: "error" },
+          );
         }
       })
       .finally(() => {
@@ -1067,7 +1089,7 @@ export async function init(api: PluginApi) {
       return;
     }
     if (lock.locked) {
-      notify(api, SESSION_BUSY_MSG);
+      notify(api, SESSION_BUSY_MSG, { level: "warning" });
       return;
     }
     const flag = { cancelled: false };
@@ -1189,20 +1211,22 @@ export async function init(api: PluginApi) {
           if (flag.cancelled) {
             notify(
               api,
-              `Przerwano indeksowanie (zapisane skrzynki: ${done} z ${INDEX_BOXES.length}).`,
+              `Zapisane skrzynki: ${done} z ${INDEX_BOXES.length}.`,
+              { title: "Przerwano indeksowanie", level: "warning" },
             );
           } else if (skipped.length === 0) {
             rebuildContacts();
             notify(
               api,
-              `Zindeksowano wszystkie skrzynki (${formatListCount(totalLive(ui.state.archive))} w bazie).`,
+              `${formatListCount(totalLive(ui.state.archive))} w bazie.`,
+              { title: "Zindeksowano skrzynki", level: "success" },
             );
           } else {
             rebuildContacts();
             notify(
               api,
-              `Indeksowanie niekompletne - pominiete: ${skipped.join(", ")}. ` +
-                `Pozostale skrzynki zapisane.`,
+              `Pominiete: ${skipped.join(", ")}. Pozostale skrzynki zapisane.`,
+              { title: "Indeksowanie niekompletne", level: "warning" },
             );
           }
         } finally {
@@ -1214,7 +1238,11 @@ export async function init(api: PluginApi) {
       })
       .catch((err: unknown) => {
         if (!isOperationCancelled(err)) {
-          notify(api, `Blad indeksowania: ${humanizeMailError(err instanceof Error ? err.message : String(err))}`);
+          notify(
+            api,
+            humanizeMailError(err instanceof Error ? err.message : String(err)),
+            { title: "Blad indeksowania", level: "error" },
+          );
         }
       });
   };
@@ -1429,7 +1457,7 @@ export async function init(api: PluginApi) {
       return;
     }
     if (lock.locked) {
-      notify(api, SESSION_BUSY_MSG);
+      notify(api, SESSION_BUSY_MSG, { level: "warning" });
       return;
     }
     // Kandydat: rekord z pusta trescia. Musi miec prawidlowa date, bo
@@ -1446,6 +1474,7 @@ export async function init(api: PluginApi) {
           : noBody.length > 0
             ? `Nie mozna pobrac tresci - listy bez prawidlowej daty: ${noBody.length}.`
             : "Wszystkie listy w bazie maja tresci.",
+        { level: "warning" },
       );
       return;
     }
@@ -1545,18 +1574,26 @@ export async function init(api: PluginApi) {
           if (breakerTripped) {
             notify(
               api,
-              "Przerwano pobieranie - serwer poczty nie odpowiada. " +
-                "Pobrane tresci sa zapisane. Sprobuj ponownie pozniej.",
+              "Serwer poczty nie odpowiada. Pobrane tresci sa zapisane - sprobuj ponownie pozniej.",
+              { title: "Przerwano pobieranie", level: "warning" },
             );
           } else if (flag.cancelled) {
-            notify(api, `Przerwano pobieranie tresci (pobrano: ${done} z ${total}).`);
+            notify(
+              api,
+              `Pobrano: ${done} z ${total}.`,
+              { title: "Przerwano pobieranie", level: "warning" },
+            );
           } else if (failed === 0 && missing === 0) {
-            notify(api, `Pobrano tresci do archiwum (${formatListCount(done)}).`);
+            notify(api, `Pobrano tresci do archiwum (${formatListCount(done)}).`, { level: "success" });
           } else {
             const parts: string[] = [];
             if (failed > 0) parts.push(`nieudane: ${failed}`);
             if (missing > 0) parts.push(`nie ma juz w skrzynce: ${missing}`);
-            notify(api, `Pobrano tresci (${done} z ${total}; ${parts.join("; ")}).`);
+            notify(
+            api,
+            `${done} z ${total}; ${parts.join("; ")}.`,
+            { title: "Pobrano tresci", level: "success" },
+          );
           }
         } finally {
           if (generation !== connectionGeneration) return;
@@ -1566,7 +1603,7 @@ export async function init(api: PluginApi) {
         }
       })
       .catch((err: unknown) => {
-        if (!isOperationCancelled(err)) notify(api, "Blad pobierania tresci do archiwum.");
+        if (!isOperationCancelled(err)) notify(api, "Blad pobierania tresci do archiwum.", { level: "error" });
       });
   };
 
@@ -1582,6 +1619,7 @@ export async function init(api: PluginApi) {
         ui.state.archive.length === 0
           ? "Skrzynki sa puste - nie ma czego zapisywac."
           : "Brak listow z trescia w archiwum - najpierw pobierz tresci.",
+        { level: "warning" },
       );
       return;
     }
@@ -1601,6 +1639,7 @@ export async function init(api: PluginApi) {
             (skipped > 0 ? `; pominietych bez tresci: ${skipped}` : "") +
             "."
         : "Nie udalo sie zapisac pliku - klient nie obsluguje pobierania.",
+      { title: "Zapis do ZIP", level: ok ? "success" : "error" },
     );
   };
 
@@ -1609,7 +1648,7 @@ export async function init(api: PluginApi) {
 
   const searchForDeletion = (box: MailBox, command: string): void => {
     if (lock.locked) {
-      notify(api, SESSION_BUSY_MSG);
+      notify(api, SESSION_BUSY_MSG, { level: "warning" });
       return;
     }
     if (ui.state.tab !== "usuwanie") return;
@@ -1644,7 +1683,7 @@ export async function init(api: PluginApi) {
 
   const deleteSelectedLetters = (): void => {
     if (lock.locked) {
-      notify(api, SESSION_BUSY_MSG);
+      notify(api, SESSION_BUSY_MSG, { level: "warning" });
       return;
     }
     const current = ui.state.deletion;
@@ -1746,7 +1785,7 @@ export async function init(api: PluginApi) {
    */
   const openArchiveFromServer = (letter: ArchiveLetter): void => {
     if (lock.locked) {
-      notify(api, SESSION_BUSY_MSG);
+      notify(api, SESSION_BUSY_MSG, { level: "warning" });
       return;
     }
     ui.setBusy(`Czytam list: ${letter.subject}...`);
@@ -1754,7 +1793,7 @@ export async function init(api: PluginApi) {
     const generation = connectionGeneration;
     void runExclusive(() => openWithResolve(letter.box, pseudo))
       .catch((err: unknown) => {
-        if (!isOperationCancelled(err)) notify(api, "Nie udalo sie odczytac listu.");
+        if (!isOperationCancelled(err)) notify(api, "Nie udalo sie odczytac listu.", { level: "error" });
       })
       .finally(() => {
         if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
@@ -1765,7 +1804,7 @@ export async function init(api: PluginApi) {
     onDeletionSearch: (box, query) => {
       const validationError = validateListingSearch(query);
       if (validationError) {
-        notify(api, validationError);
+        notify(api, validationError, { level: "error" });
         return;
       }
       searchForDeletion(box, searchListingCommand(box, query));
@@ -1774,11 +1813,11 @@ export async function init(api: PluginApi) {
     onSendAnimal: () => {
       // Jak przy innych operacjach (Fala 12a): zero cichego kolejkowania.
       if (lock.locked) {
-        notify(api, SESSION_BUSY_MSG);
+        notify(api, SESSION_BUSY_MSG, { level: "warning" });
         return;
       }
       if (animalFlight) {
-        notify(api, "Zwierze jest juz w drodze - poczekaj na jego powrot.");
+        notify(api, "Zwierze jest juz w drodze - poczekaj na jego powrot.", { level: "warning" });
         return;
       }
       startAnimalFlight();
@@ -1793,14 +1832,14 @@ export async function init(api: PluginApi) {
       // operacji kolejna komenda odczytu wpadalaby w sierocy pager
       // ("Nie ma takiej komendy", log 2026-10-18). Komunikat zamiast kolejki.
       if (lock.locked) {
-        notify(api, SESSION_BUSY_MSG);
+        notify(api, SESSION_BUSY_MSG, { level: "warning" });
         return;
       }
       ui.setBusy(`Czytam list: ${entry.subject}...`);
       const generation = connectionGeneration;
       void runExclusive(() => openWithResolve(box, entry))
         .catch((err: unknown) => {
-          if (!isOperationCancelled(err)) notify(api, "Nie udalo sie odczytac listu.");
+          if (!isOperationCancelled(err)) notify(api, "Nie udalo sie odczytac listu.", { level: "error" });
         })
         .finally(() => {
           if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
@@ -1852,6 +1891,7 @@ export async function init(api: PluginApi) {
         ok
           ? "Zapisano list do pliku TXT."
           : "Nie udalo sie zapisac pliku - klient nie obsluguje pobierania.",
+        { level: ok ? "success" : "error" },
       );
     },
     onExportArchive: () => {
@@ -1861,12 +1901,12 @@ export async function init(api: PluginApi) {
     onSendCompose: (input) => {
       const validationError = validateCompose(input);
       if (validationError) {
-        notify(api, validationError);
+        notify(api, validationError, { level: "error" });
         return;
       }
       // Fala 12a: jak przy odczycie - zero cichego kolejkowania sesji.
       if (lock.locked) {
-        notify(api, SESSION_BUSY_MSG);
+        notify(api, SESSION_BUSY_MSG, { level: "warning" });
         return;
       }
       ui.setBusy("Wysylam list...");
@@ -1885,7 +1925,7 @@ export async function init(api: PluginApi) {
               linie: input.linie,
             });
             if (out.result === "wyslany") {
-              notify(api, "List zostal wyslany.");
+              notify(api, "List zostal wyslany.", { level: "success" });
               // Fala 28: wczesniej refreshowala sie tylko skrzynka
               // "wyslane" - rekord szkicu w "niewyslane" zostawal zywy
               // w bazie obok wyslanej kopii i totalne liczniki sie
@@ -1896,12 +1936,12 @@ export async function init(api: PluginApi) {
               ui.clearCompose();
             } else if (out.result === "gotowy") {
               // Fala 16e: "zapisany", nie "odlozony" (zgloszenie pkt 1).
-              notify(api, "List zapisany w niewyslanych.");
+              notify(api, "List zapisany w niewyslanych.", { level: "success" });
               refreshBoxes(["niewyslane"]);
               flashUnsent();
               ui.clearCompose();
             } else {
-              notify(api, "Blad wysylki - sprawdz adresata.");
+              notify(api, "Blad wysylki - sprawdz adresata.", { level: "error" });
             }
           } finally {
             composeVisible = false;
@@ -1909,7 +1949,7 @@ export async function init(api: PluginApi) {
           }
         })
         .catch((err: unknown) => {
-          if (!isOperationCancelled(err)) notify(api, "Blad wysylki listu.");
+          if (!isOperationCancelled(err)) notify(api, "Blad wysylki listu.", { level: "error" });
         })
         .finally(() => {
           if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
@@ -1922,14 +1962,14 @@ export async function init(api: PluginApi) {
     // zero cichego kolejkowania komend (audyt race 2026-10-21).
     onRefreshBox: (box) => {
       if (lock.locked) {
-        notify(api, SESSION_BUSY_MSG);
+        notify(api, SESSION_BUSY_MSG, { level: "warning" });
         return;
       }
       refreshBoxes([box]);
     },
     onLoadOlder: (box) => {
       if (lock.locked) {
-        notify(api, SESSION_BUSY_MSG);
+        notify(api, SESSION_BUSY_MSG, { level: "warning" });
         return;
       }
       loadOlder(box);
@@ -1938,11 +1978,11 @@ export async function init(api: PluginApi) {
     onSearch: (box, query) => {
       const validationError = validateListingSearch(query);
       if (validationError) {
-        notify(api, validationError);
+        notify(api, validationError, { level: "error" });
         return;
       }
       if (lock.locked) {
-        notify(api, SESSION_BUSY_MSG);
+        notify(api, SESSION_BUSY_MSG, { level: "warning" });
         return;
       }
       ui.setBusy(`Szukam w skrzynce ${box}...`);
@@ -1964,14 +2004,18 @@ export async function init(api: PluginApi) {
             ui.setArchive(merged.letters);
             stampEntries(box, res.entries, merged.resolvedIds);
             persistArchive();
-            notify(api, `Wyniki szukania (${formatListCount(res.entries.length)}).`);
+            notify(api, `Wyniki szukania (${formatListCount(res.entries.length)}).`, { level: "success" });
           } else {
             notify(api, "Brak pasujacych listow.");
           }
         })
         .catch((err: unknown) => {
           if (!isOperationCancelled(err)) {
-            notify(api, `Blad szukania: ${humanizeMailError(err instanceof Error ? err.message : String(err))}`);
+            notify(
+          api,
+          humanizeMailError(err instanceof Error ? err.message : String(err)),
+          { title: "Blad szukania", level: "error" },
+        );
           }
         })
         .finally(() => {
@@ -1985,7 +2029,7 @@ export async function init(api: PluginApi) {
     // sa cache, tylko preferencje.
     onClearCache: () => {
       if (lock.locked) {
-        notify(api, SESSION_BUSY_MSG);
+        notify(api, SESSION_BUSY_MSG, { level: "warning" });
         return;
       }
       const generation = connectionGeneration;
@@ -1994,11 +2038,11 @@ export async function init(api: PluginApi) {
         await storage.clearMailData([INDEX_KEY, ARCHIVE_GAPS_KEY]);
         if (generation !== connectionGeneration) return;
         ui.clearCacheData();
-        notify(api, "Zapisane dane wyczyszczone.");
+        notify(api, "Zapisane dane wyczyszczone.", { level: "success" });
       })
         .catch((err: unknown) => {
           if (!isOperationCancelled(err)) {
-            notify(api, "Nie udalo sie wyczyscic zapisanych danych.");
+            notify(api, "Nie udalo sie wyczyscic zapisanych danych.", { level: "error" });
           }
         })
         .finally(() => {
@@ -2008,7 +2052,7 @@ export async function init(api: PluginApi) {
     onDeleteLetter: (box, entry) => {
       // Fala 12a: zero cichego kolejkowania sesji modalnych.
       if (lock.locked) {
-        notify(api, SESSION_BUSY_MSG);
+        notify(api, SESSION_BUSY_MSG, { level: "warning" });
         return;
       }
       ui.setBusy(`Usuwam list: ${entry.subject}...`);
@@ -2022,21 +2066,21 @@ export async function init(api: PluginApi) {
             if (res.deleted) {
               // Fala 14e: sesja pagera (d N -> q) kasuje list FAKTYCZNIE
               // przy wyjsciu ("Kasuje: N.") - toast mowi o skutku.
-              notify(api, "List zostal usuniety.");
+              notify(api, "List zostal usuniety.", { level: "success" });
               ui.closeLetter();
               // Replace (Fala 12b): skasowany list ma byc ukryty
               // natychmiast, nawet gdy listing jest uciety (sync bez
               // pelnego listingu nie usuwa wpisow).
               refreshBoxes([box], "replace");
             } else {
-              notify(api, "Nie udalo sie skasowac listu.");
+              notify(api, "Nie udalo sie skasowac listu.", { level: "error" });
             }
           } finally {
             transport!.endModal();
           }
         })
         .catch((err: unknown) => {
-          if (!isOperationCancelled(err)) notify(api, "Blad kasowania listu.");
+          if (!isOperationCancelled(err)) notify(api, "Blad kasowania listu.", { level: "error" });
         })
         .finally(() => {
           if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
@@ -2045,7 +2089,7 @@ export async function init(api: PluginApi) {
     onForwardLetter: (box, entry, adresat) => {
       // Fala 12a: zero cichego kolejkowania sesji modalnych.
       if (lock.locked) {
-        notify(api, SESSION_BUSY_MSG);
+        notify(api, SESSION_BUSY_MSG, { level: "warning" });
         return;
       }
       ui.setBusy(`Przekazuje list: ${entry.subject}...`);
@@ -2057,18 +2101,18 @@ export async function init(api: PluginApi) {
           try {
             const res = await pager.forwardLetter(fresh.number, adresat);
             if (res.queued) {
-              notify(api, "List przekazany - czeka w niewyslanych.");
+              notify(api, "List przekazany - czeka w niewyslanych.", { level: "success" });
               refreshBoxes(["niewyslane"]);
               flashUnsent();
             } else {
-              notify(api, "Blad przekazania - sprawdz adresata.");
+              notify(api, "Blad przekazania - sprawdz adresata.", { level: "error" });
             }
           } finally {
             transport!.endModal();
           }
         })
         .catch((err: unknown) => {
-          if (!isOperationCancelled(err)) notify(api, "Blad przekazania listu.");
+          if (!isOperationCancelled(err)) notify(api, "Blad przekazania listu.", { level: "error" });
         })
         .finally(() => {
           if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
@@ -2149,7 +2193,7 @@ export async function init(api: PluginApi) {
       if (sluchamArmed) {
         disarmSlucham();
         endAnimalFlight();
-        notify(api, "Zwierze nie odpowiada - sprawdz, czy masz zwierze pocztowe.");
+        notify(api, "Zwierze nie odpowiada - sprawdz, czy masz zwierze pocztowe.", { level: "warning" });
       }
     } else if (n.kind === "powrot-zwierzecia") {
       // Fala 13b: powrot zwierzecia konczy lot; serwer przy ladowaniu

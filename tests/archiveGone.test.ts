@@ -79,7 +79,7 @@ test('kompletny listing: znikniety list znika z widoku archiwum i kontaktow', as
     f.fire('Nie masz zadnych wyslanych listow.', 'mail');
     await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksacja: niewyslane');
     f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
-    await waitRt(() => notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'koniec indeksacji');
+    await waitRt(() => notifyText(f, 'Zindeksowano skrzynki'), 'koniec indeksacji');
 
     // Kontakty: Corge (nadawca zniknietego) odpada z licznikow.
     click(h, '[data-tab="kontakty"]');

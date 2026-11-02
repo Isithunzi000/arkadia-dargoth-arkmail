@@ -75,7 +75,7 @@ test('indeksacja Fala 41: blizniaki = dwa osobne rekordy i dwa osobne listy w li
       odebrane: ['Listy odebrane:', ...TWIN_LINES, ' 1. *R* Temat: Inny',
         'Nadawca: Corge                       Wt, 24 VIII 1999, 11:00:00'],
     });
-    await waitRt(() => notifyText(h.f, 'Zindeksowano wszystkie skrzynki'), 'koniec indeksacji');
+    await waitRt(() => notifyText(h.f, 'Zindeksowano skrzynki'), 'koniec indeksacji');
 
     click(h, '[data-tab="archiwum"]');
     await h.waitFor(() => !!h.content.querySelector('.arkmail-arch-counts'), 'pasek licznikow');

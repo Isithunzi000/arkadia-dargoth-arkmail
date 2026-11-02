@@ -357,7 +357,7 @@ test('archiwum: luka podczas re-kotwicy jest bledem, nie zniknieciem listu', asy
     await waitRt(() => f.sent.includes('przeczytaj list 3'), 'odczyt najstarszego');
     replayLetter(h, 3, 'najstarszy', 'Tresc najstarszego.');
 
-    await waitRt(() => notifyText(f, 'Pobrano tresci (2 z 3;'), 'podsumowanie po luce');
+    await waitRt(() => notifyText(f, 'Pobrano tresci 2 z 3;'), 'podsumowanie po luce');
     assert.ok(notifyText(f, 'nieudane: 1'), 'luka jest nieudana lokalizacja');
     assert.ok(!notifyText(f, 'nie ma juz w skrzynce'), 'luka nie jest dowodem znikniecia');
     assert.equal(archiveRows(h, 'najnowszy').length, 1, 'list pozostaje widoczny w Archiwum');

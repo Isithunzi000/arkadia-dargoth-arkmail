@@ -47,10 +47,8 @@ const animalDisabled = (h: Harness): boolean | null =>
   (h.content.querySelector('.arkmail-animal-send') as { disabled: boolean } | null)?.disabled ?? null;
 
 const sluchamToast = (h: Harness): boolean =>
-  h.f.emitted.some(
-    (e) =>
-      e.event === 'notify' &&
-      String((e.args[0] as { text?: string })?.text ?? '').includes('Zwierze nie odpowiada'),
+  h.f.shown.some((o) =>
+    String((o as { text?: string })?.text ?? '').includes('Zwierze nie odpowiada'),
   );
 
 test('"Slucham?" w oknie po wyslaniu konczy lot i daje tost o braku zwierzecia', async () => {

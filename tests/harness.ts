@@ -19,6 +19,7 @@ export class FakeApi {
   sent: string[] = [];
   triggerCb: TriggerCb | null = null;
   emitted: { event: string; args: unknown[] }[] = [];
+  shown: unknown[] = [];
   popupConfig: { createContent: () => Promise<unknown> } | null = null;
   popupCloseCallback: (() => void) | null = null;
 
@@ -70,6 +71,12 @@ export class FakeApi {
       onChange: (listener: (name: string | null) => void) => {
         this.characterListeners.add(listener);
         return () => this.characterListeners.delete(listener);
+      },
+    },
+    notifications: {
+      show: (options: unknown) => {
+        this.shown.push(options);
+        return { dismiss: () => {}, update: () => {}, repeat: () => {} };
       },
     },
     events: {
@@ -283,11 +290,10 @@ export async function waitRt(pred: () => boolean, what: string): Promise<void> {
 }
 
 export const notifyText = (f: FakeApi, fragment: string): boolean =>
-  f.emitted.some(
-    (e) =>
-      e.event === 'notify' &&
-      String((e.args[0] as { text?: string })?.text ?? '').includes(fragment),
-  );
+  f.shown.some((o) => {
+    const n = o as { text?: string; title?: string };
+    return `${n.title ?? ''} ${n.text ?? ''}`.includes(fragment);
+  });
 
 /** Tekst elementu (happy-dom) albo ''. */
 export const textOf = (h: Harness, selector: string): string =>

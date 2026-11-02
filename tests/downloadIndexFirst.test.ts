@@ -52,7 +52,7 @@ test('pobieranie tresci: bez automatycznej indeksacji, z re-kotwicami dostepnych
       f.fire(ERROR_LINE, 'mail');
     }
     await waitRt(
-      () => notifyText(f, 'Przerwano pobieranie - serwer poczty nie odpowiada'),
+      () => notifyText(f, 'Serwer poczty nie odpowiada'),
       'breaker domyka petle',
     );
   } finally {

@@ -66,7 +66,7 @@ test('pusta skrzynka wariantem "Nie znaleziono..." tez dostaje flage (4/4)', asy
     // niewyslane: puste wariantem bazowym
     await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksacja: niewyslane');
     f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
-    await waitRt(() => notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'toast 4/4');
+    await waitRt(() => notifyText(f, 'Zindeksowano skrzynki'), 'toast 4/4');
     await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji');
     // Kontakty odblokowane (wszystkie 4 flagi).
     click(h, '[data-tab="kontakty"]');
@@ -106,7 +106,7 @@ test('pusta strona kotwicowa (reason "filtr") domyka skrzynke z flaga', async ()
     f.fire('Nie masz zadnych wyslanych listow.', 'mail');
     await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksacja: niewyslane');
     f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
-    await waitRt(() => notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'toast 4/4');
+    await waitRt(() => notifyText(f, 'Zindeksowano skrzynki'), 'toast 4/4');
   } finally {
     await stopHarness();
   }
@@ -184,7 +184,7 @@ test('skrzynka z mieleniem kotwicy: 3 proby z klepnieciem + sonda wykluczajaca d
     // nadal zamknieta (3/4 flagi). Fala 20c: powod PO LUDZKU, zero
     // zargonu ("kotwica", "postep") w komunikatach dla gracza.
     await waitRt(
-      () => notifyText(f, 'pominiete: wyslane (serwer chwilowo odpowiada wolno - sprobuj ponownie za chwile)'),
+      () => notifyText(f, 'Pominiete: wyslane (serwer chwilowo odpowiada wolno - sprobuj ponownie za chwile)'),
       'raport z powodem pomieciecia',
     );
     assert.ok(
@@ -263,7 +263,7 @@ test('tempo stron w indeksacji: 400 ms miedzy stronami (Fala 24d)', async () => 
     f.fire('Nie masz zadnych wyslanych listow.', 'mail');
     await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksacja: niewyslane');
     f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
-    await waitRt(() => notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'toast 4/4');
+    await waitRt(() => notifyText(f, 'Zindeksowano skrzynki'), 'toast 4/4');
   } finally {
     await stopHarness();
   }
@@ -339,7 +339,7 @@ test('incydentalny duplikat strony kotwicowej: klepniecie + retry ratuja skrzynk
     // niewyslane: puste - pelne 4/4 mimo incydentu na wyslanych.
     await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksacja: niewyslane');
     f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
-    await waitRt(() => notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'toast 4/4');
+    await waitRt(() => notifyText(f, 'Zindeksowano skrzynki'), 'toast 4/4');
     await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji');
   } finally {
     await stopHarness();
@@ -418,7 +418,7 @@ test('ponad 50 listow jednego dnia: starsze dni sa pobierane, a luka jest zapisa
     // Starsze dni sa dostepne, ale czesc dnia granicznego pozostaje nieznana.
     await waitRt(() => notifyText(f, 'Indeksowanie niekompletne'), 'uczciwy raport');
     assert.ok(notifyText(f, 'ponad 50 listow z dnia 1999-08-21'), 'raport wskazuje luke');
-    assert.ok(!notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'brak falszywego kompletu');
+    assert.ok(!notifyText(f, 'Zindeksowano skrzynki'), 'brak falszywego kompletu');
     assert.ok(!notifyText(f, 'odpowiada wolno'), 'bez falszywego komunikatu o wolnym serwerze');
     // Opozniony retry skrzynki odbiorczej z prologu (test > 10 s).
     await waitRt(
@@ -508,7 +508,7 @@ test('ponad 50 listow jednego dnia bez starszych wpisow: luka, nie komplet', asy
     f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
     await waitRt(() => notifyText(f, 'Indeksowanie niekompletne'), 'uczciwy raport');
     assert.ok(notifyText(f, 'ponad 50 listow z dnia 1999-08-21'), 'raport wskazuje luke');
-    assert.ok(!notifyText(f, 'Zindeksowano wszystkie skrzynki'), 'brak falszywego kompletu');
+    assert.ok(!notifyText(f, 'Zindeksowano skrzynki'), 'brak falszywego kompletu');
     assert.ok(!notifyText(f, 'odpowiada wolno'), 'bez falszywego komunikatu o wolnym serwerze');
     click(h, '[data-tab="kontakty"]');
     await waitRt(() => !!h.content.querySelector('.arkmail-index-gaps'), 'zapisana luka w widoku');

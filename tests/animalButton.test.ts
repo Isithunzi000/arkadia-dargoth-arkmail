@@ -148,7 +148,7 @@ test('klik pod lockiem sesji nie wysyla komendy (komunikat zamiast kolejki)', as
     h.f.fire(' [ POCZTA ] Masz nowa poczte od Foo.');
     await h.waitFor(() => h.f.sent.includes('listy odebrane'), 'refresh trzyma lock');
     click(h, '.arkmail-animal-send');
-    await waitRt(() => h.f.emitted.some((e) => e.event === 'notify'), 'tost o zajetej sesji');
+    await waitRt(() => h.f.shown.length > 0, 'tost o zajetej sesji');
     assert.ok(!h.f.sent.includes('wyslij zwierze'), 'zero komendy pod lockiem');
     // Sprzatniecie.
     await answerEmpty(h, 'odebrane');
@@ -168,8 +168,8 @@ test('klik w trakcie lotu nie wysyla duplikatu', async () => {
     click(h, '.arkmail-animal-send');
     await waitRt(
       () =>
-        h.f.emitted.some(
-          (e) => e.event === 'notify' && String((e.args[0] as { text?: string })?.text ?? '').includes('w drodze'),
+        h.f.shown.some((o) =>
+          String((o as { text?: string })?.text ?? '').includes('w drodze'),
         ),
       'tost o locie w toku',
     );

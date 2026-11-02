@@ -112,7 +112,7 @@ test('integracja: blad szukania pokazuje ludzki komunikat, nie debug-string', as
     // Jednoznaczny mismatch (straznik Fali 14d) - serwer odpowiada
     // za inna skrzynke.
     f.fire('Nie masz zadnych wyslanych listow.', 'mail');
-    await waitRt(() => notifyText(f, 'Blad szukania:'), 'toast bledu szukania');
+    await waitRt(() => notifyText(f, 'Blad szukania'), 'toast bledu szukania');
     assert.ok(
       notifyText(f, 'Serwer odpowiedzial za inna skrzynke (wyslane zamiast odebrane)'),
       'ludzki komunikat zamiast debug-stringa',
