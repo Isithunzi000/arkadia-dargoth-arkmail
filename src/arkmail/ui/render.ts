@@ -488,7 +488,7 @@ export function mountMailUi(
     controls.appendChild(search);
 
     const clearFilters = doc.createElement('button');
-    clearFilters.className = 'arkmail-deletion-clear-filters arkmail-btn-reset';
+    clearFilters.className = 'arkmail-deletion-clear-filters arkmail-btn-danger';
     clearFilters.textContent = 'Wyczysc filtry';
     clearFilters.addEventListener('click', () => {
       for (const key of ['osoba', 'temat', 'tresc', 'odDaty', 'doDaty'] as const) {
@@ -708,7 +708,7 @@ export function mountMailUi(
     // potwierdzeniem (uzbrojenie wygasa po 3 s). Stan uzbrojenia lokalny
     // dla przycisku - kazdy rerender wraca do stanu poczatkowego.
     const clearBtn = doc.createElement('button');
-    clearBtn.className = 'arkmail-cache-clear arkmail-btn-reset';
+    clearBtn.className = 'arkmail-cache-clear arkmail-btn-danger';
     clearBtn.textContent = 'Wyczysc zapisane dane';
     // Fala 24h (zgloszenie 2026-10-21): zakres czyszczenia w tooltipie
     // przycisku zamiast stalego napisu pod paskiem operacji (napis
@@ -856,7 +856,7 @@ export function mountMailUi(
       banner.className = 'arkmail-search-banner';
       banner.appendChild(doc.createTextNode(`Wyniki szukania: ${searchMode.label}`));
       const clear = doc.createElement('button');
-      clear.className = 'arkmail-search-clear arkmail-btn-reset';
+      clear.className = 'arkmail-search-clear arkmail-btn-danger';
       clear.textContent = 'Wyczysc';
       clear.addEventListener('click', () => {
         // Fala 16g: Wyczysc kasuje tez pola szukajki (zgloszenie pkt 11)
@@ -1337,7 +1337,7 @@ export function mountMailUi(
     // to ustawienia, zostaja. Stan uzbrojenia lokalny - kazdy rerender
     // wraca do stanu poczatkowego.
     const clearCompose = doc.createElement('button');
-    clearCompose.className = 'arkmail-compose-clear arkmail-btn-reset';
+    clearCompose.className = 'arkmail-compose-clear arkmail-btn-danger';
     clearCompose.textContent = 'Wyczysc';
     let clearArmed = false;
     let clearTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1621,7 +1621,7 @@ export function mountMailUi(
     // Fala 16g: czyszczenie wszystkich filtrow archiwum jednym klikiem
     // (zgloszenie pkt 11). Niedestrukcyjne (dane zostaja) - bez dwukliku.
     const clearFilters = doc.createElement('button');
-    clearFilters.className = 'arkmail-arch-clear arkmail-btn-reset';
+    clearFilters.className = 'arkmail-arch-clear arkmail-btn-danger';
     clearFilters.textContent = 'Wyczysc filtry';
     clearFilters.addEventListener('click', () => {
       for (const key of ['osoba', 'temat', 'tresc', 'odDaty', 'doDaty'] as const) {
