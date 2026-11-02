@@ -25,7 +25,7 @@ jobs:
         run: |
           set -euo pipefail
           TAG="${{ github.event.inputs.tag }}"
-          ZIP="releases/arkmail_${TAG#v}.zip"
-          ZIP="${ZIP//./_}"
+          VER="${TAG#v}"
+          ZIP="releases/arkmail_${VER//./_}.zip"
           test -f "$ZIP"
           gh release upload "$TAG" "$ZIP" --clobber
