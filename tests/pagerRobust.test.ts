@@ -71,6 +71,49 @@ test('odczyt bez widocznego promptu pagera: idle-completion domyka sesje (q + re
   );
 });
 
+/** Naglowki listu jak w FRAMED_LETTER, bez ramki. */
+const PLAIN_HEADERS: ProtoLine[] = [
+  { cls: 'mail', text: 'List : 1' },
+  { cls: 'mail', text: 'Od   : Gracz' },
+  { cls: 'mail', text: 'Temat: dluga notatka' },
+  { cls: 'mail', text: 'Do   : Waldo' },
+  { cls: 'mail', text: 'Data : Pt, 21 VIII 2026, 18:25:34' },
+];
+
+test('odczyt listu stronicowanego: cisza po stronie = advance, pelna tresc bez obciecia', async () => {
+  const t = new MockTransport();
+  const s = new PagerSession(t, OPTS);
+  const op = settle(s.readLetter(1));
+  const page1 = Array.from({ length: 40 }, (_, i) => ({
+    cls: 'mail',
+    text: `linia ${String(i + 1).padStart(2, '0')}`,
+  })) as ProtoLine[];
+  const page2 = Array.from({ length: 25 }, (_, i) => ({
+    cls: 'mail',
+    text: `linia ${String(i + 41).padStart(2, '0')}`,
+  })) as ProtoLine[];
+  await t.replay([...PLAIN_HEADERS, ...page1]);
+  // Cisza po pierwszej stronie = serwer czeka na more-prompt. Plugin
+  // ma wyslac advance (pusty Enter), a nie domykac "q" (obciecie).
+  await sleep(200); // > idleMs
+  assert.ok(
+    t.sent.filter((c) => c === '').length >= 1,
+    'po ciszy wyslano advance zamiast od razu zamykac pager',
+  );
+  await t.replay([
+    ...page2,
+    { cls: 'mail', text: '[1-1 adefFhHmnqrsRux.!?-+] (aktualny: 1) -- ' },
+  ]);
+  const out = await op;
+  assert.ok(out.ok, 'odczyt rozwiazany po przejsciu obu stron');
+  if (!out.ok) return;
+  assert.equal(out.value.letter.body.length, 65, 'pelna tresc: obie strony w body');
+  assert.ok(
+    out.value.letter.body.some((l) => l.includes('linia 65')),
+    'ostatnia linia listu w body',
+  );
+});
+
 test('sklejona linia prompt+odrzucenie: wykrycie, q i ponowienie odczytu', async () => {
   const t = new MockTransport();
   const s = new PagerSession(t, OPTS);
