@@ -10,9 +10,12 @@
  *    Wyslij, Zapisz ZIP);
  *  - action: dlugie flow (Indeksuj, Pobierz, Wyslij zwierze,
  *    Wczytaj starsze/wszystkie);
- *  - danger: WY LacZNIE destrukcja nieodwracalna (Usun);
- *  - reset: czyszczenie formularzy/filtrow/cache (Wyczysc filtry,
- *    Wyczysc [compose], Wyczysc zapisane dane) - z czerwieni do dim.
+ *  - danger: kazde kasowanie/usuwanie danych - nieodwracalne (Usun)
+ *    i odwracalne pobraniem od nowa (Wyczysc zapisane dane, Wyczysc
+ *    filtry, Wyczysc [compose]) - jedna czerwona klasa, decyzja
+ *    2026-11-02: szary reset zlewal sie z panelem i bylo niewidoczne;
+ *  - reset: klasa pozostaje w styles.ts dla kompatybilnosci, zaden
+ *    przycisk jej juz nie uzywa.
  *
  * Ten plik to dowod RED: klasy poziomow nie istnieja.
  */
@@ -96,19 +99,19 @@ const TIERS: Array<{ tab: string; selector: string; tier: string }> = [
   { tab: 'listy', selector: '.arkmail-animal-send', tier: 'arkmail-btn-action' },
   { tab: 'listy', selector: '.arkmail-older-all', tier: 'arkmail-btn-action' },
   { tab: 'listy-full', selector: '.arkmail-older', tier: 'arkmail-btn-action' },
-  { tab: 'listy', selector: '.arkmail-cache-clear', tier: 'arkmail-btn-reset' },
-  { tab: 'listy', selector: '.arkmail-search-clear', tier: 'arkmail-btn-reset' },
+  { tab: 'listy', selector: '.arkmail-cache-clear', tier: 'arkmail-btn-danger' },
+  { tab: 'listy', selector: '.arkmail-search-clear', tier: 'arkmail-btn-danger' },
   { tab: 'list', selector: '.arkmail-del', tier: 'arkmail-btn-danger' },
   { tab: 'napisz', selector: '.arkmail-send', tier: 'arkmail-btn-primary' },
-  { tab: 'napisz', selector: '.arkmail-compose-clear', tier: 'arkmail-btn-reset' },
+  { tab: 'napisz', selector: '.arkmail-compose-clear', tier: 'arkmail-btn-danger' },
   { tab: 'kontakty', selector: '.arkmail-index-all', tier: 'arkmail-btn-action' },
   { tab: 'archiwum', selector: '.arkmail-index-all', tier: 'arkmail-btn-action' },
   { tab: 'archiwum', selector: '.arkmail-arch-download', tier: 'arkmail-btn-action' },
   { tab: 'archiwum', selector: '.arkmail-arch-export', tier: 'arkmail-btn-primary' },
-  { tab: 'archiwum', selector: '.arkmail-arch-clear', tier: 'arkmail-btn-reset' },
+  { tab: 'archiwum', selector: '.arkmail-arch-clear', tier: 'arkmail-btn-danger' },
   { tab: 'usuwanie', selector: '.arkmail-deletion-search', tier: 'arkmail-btn-primary' },
   { tab: 'usuwanie', selector: '.arkmail-deletion-delete', tier: 'arkmail-btn-danger' },
-  { tab: 'usuwanie', selector: '.arkmail-deletion-clear-filters', tier: 'arkmail-btn-reset' },
+  { tab: 'usuwanie', selector: '.arkmail-deletion-clear-filters', tier: 'arkmail-btn-danger' },
 ];
 
 function mountedTabs(): Record<string, { querySelector(s: string): unknown; querySelectorAll(s: string): unknown }> {
@@ -151,18 +154,20 @@ test('tiers: primary max 2 na zakladke - wyroznienie nie zlewa sie', () => {
   }
 });
 
-test('tiers: wszystkie Wyczysc filtry dziela jeden poziom reset', () => {
+test('tiers: wszystkie przyciski czyszczenia dziela poziom danger z Usun', () => {
   const tabs = mountedTabs();
   for (const [tab, selector] of [
+    ['listy', '.arkmail-cache-clear'],
     ['listy', '.arkmail-search-clear'],
+    ['napisz', '.arkmail-compose-clear'],
     ['archiwum', '.arkmail-arch-clear'],
     ['usuwanie', '.arkmail-deletion-clear-filters'],
   ] as const) {
     const el = tabs[tab]!.querySelector(selector) as { className: string } | null;
     assert.ok(el, `${tab} ${selector} istnieje`);
     assert.ok(
-      el.className.split(' ').includes('arkmail-btn-reset'),
-      `${tab} ${selector} ma poziom reset`,
+      el.className.split(' ').includes('arkmail-btn-danger'),
+      `${tab} ${selector} ma poziom danger`,
     );
   }
 });
