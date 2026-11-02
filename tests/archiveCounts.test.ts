@@ -74,6 +74,25 @@ test('archiwum: agregat liczy listy po deduplikacji (purge Fala 28 juz usunal sk
   }
 });
 
+test('archiwum: total liczy kazdy rekord skrzynki (blizniaki w skrzynce osobno)', () => {
+  // Dwa fizycznie rozne listy o identycznych metadanych w TEJ SAMEJ
+  // skrzynce: Fala 41 = kazdy rekord osobno. Krotka replika miedzy
+  // skrzynkami liczy sie raz (MAX po skrzynkach w grupie klucza).
+  const twin1 = archived('odebrane', 'Raport');
+  const twin2 = { ...archived('odebrane', 'Raport'), id: 'inny-rekord' };
+  const { container, off } = mount([twin1, twin2]);
+  try {
+    const text = countsText(container);
+    assert.equal(
+      text,
+      'Listow w bazie: 2 listy (odebrane: 2 listy).',
+      `agregat: ${text}`,
+    );
+  } finally {
+    off();
+  }
+});
+
 test('archiwum: pusta baza = brak paska', () => {
   const { container, off } = mount([]);
   try {
