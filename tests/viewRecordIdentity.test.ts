@@ -3,17 +3,18 @@
  *
  * Zgloszenie 2026-11-02: przy masie listow o identycznych metadanych
  * (ten sam autor, temat, minuta) dedup appendMailboxPage po kluczu
- * tresci pożeral prawdziwe listy. Scenariusz: 3 listy o jednym kluczu
- * rozdzielone 1+2 na dwie strony - strona nowsza daje 1 wiersz,
- * strona starsza 2 wpisy. Wpis trafiony po kluczu dostaje ID ISTNIEJACEGO
- * rekordu (mergeListingPage), nadmiarowy ID NOWEGO. Widok pokazuje
- * tyle wierszy, ile jest rekordow - a nie tyle, ile jest kluczy.
+ * tresci zachowywal sie inaczej niz baza: wpis rozwiazany na NOWY
+ * rekord (nadmiarowy blizniak) dostawal wiersz w archiwum, ale zero
+ * wierszy w widoku, bo klucz tresci byl juz widoczny. Rozjazd
+ * widok vs archiwum rosl o 1 na kazdy taki przypadek.
  *
- * Kontrakt po zmianie:
+ * Kontrakt po zmianie (dedup po archiveId, klucz tresci tylko dla
+ * wpisow legacy bez archiveId):
  *  - wpis z archiveId juz widocznym w widoku = powtorka (sonda) -> 0;
- *  - wpis z NOWYM archiveId = osobny list -> osobny wiersz, nawet przy
- *    identycznym kluczu tresci;
- *  - wpis bez archiveId (zapis legacy) = stare zachowanie po kluczu.
+ *  - wpis z NOWYM archiveId = osobny wiersz, nawet przy identycznym
+ *    kluczu tresci - wierszy widoku przybywa tyle samo co rekordow
+ *    archiwum (zero rozjazdu);
+ *  - liczba wierszy widoku = liczba rekordow archiwum skrzynki.
  *
  * Ten plik to dowod RED: testy padaja na dedupie po kluczu tresci.
  */
@@ -57,20 +58,26 @@ function lista(entries: MailboxEntry[]): MailboxResult {
   };
 }
 
-// Trzy fizycznie rozne listy (inne numery) o identycznych metadanych.
+// Trzy fizycznie rozne listy (inne numery) o identycznych metadanych;
+// w archiwum dwa rekordy: rec-1 (list nowszy + jego blizniak
+// dopasowany po kluczu) i rec-2 (nadmiarowy blizniak).
 const PAGE1 = { ...entry({ number: 7 }), archiveId: 'rec-1' };
 const PAGE2_A = { ...entry({ number: 8 }), archiveId: 'rec-1' };
 const PAGE2_B = { ...entry({ number: 9 }), archiveId: 'rec-2' };
 
-test('widok: 3 listy o identycznym kluczu 1+2 na stronach = 3 wiersze', () => {
+test('widok: nadmiarowy blizniak (nowy rekord) dostaje wlasny wiersz', () => {
   const s = new MailUiStore();
   s.applyMailbox('odebrane', lista([PAGE1]));
+  // Starsza strona: blizniak rozwiazany na stary rekord + blizniak
+  // rozwiazany na NOWY rekord.
   const added = s.appendMailboxPage('odebrane', [PAGE2_A, PAGE2_B], false);
-  assert.equal(added, 2, 'dwa rozne rekordy = dwa wiersze, blizniaki nietkniete');
-  assert.equal(
-    s.state.boxes['odebrane']?.entries.length,
-    3,
-    '3 fizyczne listy = 3 wiersze w widoku',
+  assert.equal(added, 1, 'tylko nowy rekord = nowy wiersz');
+  const rows = s.state.boxes['odebrane']?.entries ?? [];
+  assert.equal(rows.length, 2, 'wierszy widoku = rekordow archiwum');
+  assert.deepEqual(
+    [...rows.map((r) => r.archiveId)].sort(),
+    ['rec-1', 'rec-2'],
+    'widok pokrywa oba rekordy',
   );
 });
 
@@ -82,5 +89,13 @@ test('widok: powtorka tego samego rekordu (sonda paginacji) = 0 wierszy', () => 
   const probe = { ...entry({ number: 40 }), archiveId: 'rec-1' };
   const added = s.appendMailboxPage('odebrane', [probe], true);
   assert.equal(added, 0, 'ten sam rekord = bez drugiego wiersza');
+  assert.equal(s.state.boxes['odebrane']?.entries.length, 1);
+});
+
+test('widok: wpis legacy bez archiveId = dedup po kluczu tresci (sonda)', () => {
+  const s = new MailUiStore();
+  s.applyMailbox('odebrane', lista([entry({ number: 7 })]));
+  const added = s.appendMailboxPage('odebrane', [entry({ number: 40 })], true);
+  assert.equal(added, 0, 'bez archiveId klucz tresci pilnuje powtorki');
   assert.equal(s.state.boxes['odebrane']?.entries.length, 1);
 });

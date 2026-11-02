@@ -257,17 +257,28 @@ export class MailUiStore {
    * Dokleja strone starszych listow (paginacja "Wybrane listy") PRZED
    * istniejace wpisy - widok trzyma kolejnosc serwera (najstarszy
    * pierwszy). Fala 34: w obrebie strony NIC nie deduplikujemy;
-   * filtrem klucza tresci zdejmujemy jedynie wpisy juz widoczne
-   * (sonda sciany paginacji odpytuje ponownie dzien graniczny - to
-   * te same fizyczne listy; blizniaki z innego dnia nie koliduja).
-   * truncated=false oznacza koniec starszych (przycisk znika).
+   * zdejmujemy jedynie wpisy juz widoczne (sonda sciany paginacji
+   * odpytuje ponownie dzien graniczny - to te same fizyczne listy).
+   * Tozsamosc wpisu = archiveId rekordu archiwum (Fala 41): blizniak
+   * o identycznych metadanych ma WLASNE archiveId i zostaje wlasnym
+   * wierszem, nawet gdy drugi blizniak juz jest widoczny. Klucz
+   * tresci zostaje filtrem WYLACZNIE dla wpisow bez archiveId (zapisy
+   * legacy sprzed stemplowania). truncated=false oznacza koniec
+   * starszych (przycisk znika).
    */
   /** Dokleja strone starszych wpisow; zwraca liczbe NOWYCH wierszy. */
   appendMailboxPage(box: MailBox, entries: MailboxEntry[], truncated: boolean): number {
     const view = this.current.boxes[box];
     if (!view) return 0;
-    const known = new Set(view.entries.map(contentKeyOfEntry));
-    const fresh = entries.filter((e) => !known.has(contentKeyOfEntry(e)));
+    const knownIds = new Set<string>();
+    const knownKeys = new Set<string>();
+    for (const e of view.entries) {
+      if (e.archiveId !== undefined) knownIds.add(e.archiveId);
+      else knownKeys.add(contentKeyOfEntry(e));
+    }
+    const fresh = entries.filter((e) =>
+      e.archiveId !== undefined ? !knownIds.has(e.archiveId) : !knownKeys.has(contentKeyOfEntry(e)),
+    );
     const next: BoxView = {
       entries: [...fresh, ...view.entries],
       truncated,
