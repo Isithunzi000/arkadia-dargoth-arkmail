@@ -5,10 +5,10 @@ import { fromMailboxEntry } from '../src/arkmail/core/archive';
 import { setDownloadImpl } from '../src/arkmail/ui/download';
 import { click, notifyText, startHarness, stopHarness, waitRt, type Harness } from './harness';
 
-function archived(body: string[]) {
+function archived(body: string[], number = 1) {
   return {
     ...fromMailboxEntry('odebrane', {
-      number: 1,
+      number,
       isRead: true,
       subject: 'Test',
       forwarded: false,
@@ -43,6 +43,24 @@ test('archiwum: pokazuje trzy kroki i niekompletny indeks', async () => {
     assert.match(labels[0], /Czesciowo: 1 z 4 skrzynek/);
     assert.match(labels[1], /Gotowe: 1 list z trescia/);
     assert.match(labels[2], /Gotowe: 1 list do zapisu/);
+  } finally {
+    await stopHarness();
+  }
+});
+
+test('archiwum: krok 2 liczy rekordy bez tresci, nie grupy kluczy', async () => {
+  const h = await startHarness({
+    archive: [archived([], 1), archived([], 2)],
+    indexMeta: { odebrane: '2026-10-29' },
+  });
+  try {
+    await openArchive(h);
+    const steps = h.content.querySelectorAll('.arkmail-archive-step');
+    const labels = Array.from(steps).map((step) =>
+      String((step as { textContent?: string }).textContent ?? ''),
+    );
+    assert.match(labels[1], /2\. Pobranie tresci/);
+    assert.match(labels[1], /Do pobrania: 2/);
   } finally {
     await stopHarness();
   }
