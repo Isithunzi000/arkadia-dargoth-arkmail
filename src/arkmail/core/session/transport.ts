@@ -7,6 +7,8 @@
 export interface ProtoLine {
   cls: string;
   text: string;
+  /** Echo wlasnej komendy pluginu (oznacza transport, Fala 42). */
+  own?: boolean;
 }
 
 export interface Transport {

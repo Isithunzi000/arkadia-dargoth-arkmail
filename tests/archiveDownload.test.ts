@@ -91,6 +91,19 @@ function replayListing3(h: Harness): void {
   f.fire('> ', 'prompt');
 }
 
+/** Odpowiedz na najblizsze "listy <skrzynka>" pusta skrzynka. */
+async function answerEmptyBox(h: Harness, box: string): Promise<void> {
+  const { f } = h;
+  const cmd = `listy ${box}`;
+  const n = f.sent.filter((c) => c === cmd).length + 1;
+  await waitRt(() => f.sent.filter((c) => c === cmd).length >= n, `${cmd} (odpowiedz)`);
+  const EMPTY: Record<string, string> = {
+    odebrane: 'Nie masz zadnych odebranych listow.',
+    nieprzeczytane: 'Nie masz zadnych nieprzeczytanych listow.',
+  };
+  f.fire(EMPTY[box] ?? 'Nie masz zadnych listow.', 'mail');
+}
+
 /** Pager: naglowki + body + prompt pagera i gry. */
 function replayLetter(h: Harness, numer: number, subject: string, body: string): void {
   const { f } = h;
@@ -163,6 +176,69 @@ test('archiwum: pobieranie tresci - uzbrojenie, petla, podsumowanie, cache', asy
       anchorsBefore,
       'bez re-kotwic pobierania, gdy nie ma czego pobrac',
     );
+  } finally {
+    await stopHarness();
+  }
+});
+
+test('archiwum: start pobierania odmowny, gdy gracz ma otwarta poczte w grze (Fala 42)', async () => {
+  const h = await startHarness();
+  const { f } = h;
+  try {
+    await loadTruncatedBox(h);
+    click(h, '[data-tab="archiwum"]');
+    // Gracz recznie wchodzi w poczte.
+    f.fire('→ listy');
+    clickDownload(h); // uzbrojenie
+    clickDownload(h); // start
+    await waitRt(() => notifyText(f, 'zamknij'), 'toast o zamknieciu poczty');
+    assert.ok(
+      !f.sent.some((c) => / przed \d+ [IVX]+ \d{4}$/.test(c)),
+      'zero re-kotwic pobierania przy otwartej poczcie gracza',
+    );
+    // Gracz wychodzi z poczty: zaparkowane odswiezenie schodzi.
+    f.fire('→ q');
+    await answerEmptyBox(h, 'odebrane');
+    await answerEmptyBox(h, 'nieprzeczytane');
+    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji');
+  } finally {
+    await stopHarness();
+  }
+});
+
+test('archiwum: pobieranie przerywa, gdy gracz otworzy poczte w trakcie (Fala 42)', async () => {
+  const h = await startHarness();
+  const { f } = h;
+  try {
+    await loadTruncatedBox(h);
+    click(h, '[data-tab="archiwum"]');
+    clickDownload(h); // uzbrojenie
+    clickDownload(h); // start
+    await waitRt(() => f.sent.includes('listy odebrane przed 25 VIII 1999'), 're-kotwica pierwszego');
+    // Gracz otwiera poczte recznie, gdy blokada pobierania stoi.
+    f.fire('→ listy');
+    replayListing3(h);
+    await waitRt(() => f.sent.includes('przeczytaj list 1'), 'odczyt pierwszego (biezacy sie domyka)');
+    replayLetter(h, 1, 'najnowszy', 'Tresc pierwszego.');
+    // Po domknieciu biezacego listu petla staje: zadna kolejna komenda.
+    await waitRt(() => notifyText(f, 'Przerwano pobieranie'), 'toast przerwania');
+    assert.ok(notifyText(f, 'Pobrano: 1 z 3'), 'podsumowanie z liczba pobranych');
+    assert.ok(!f.sent.includes('przeczytaj list 2'), 'brak odczytu drugiego listu');
+    await waitRt(
+      () => downloadBtn(h).textContent === 'Pobierz tresci do archiwum',
+      'koniec petli',
+    );
+    // Gracz wychodzi z poczty: zaparkowane odswiezenie schodzi.
+    f.fire('→ q');
+    await answerEmptyBox(h, 'odebrane');
+    await answerEmptyBox(h, 'nieprzeczytane');
+    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji');
+    // Tresc pobranego przed przerwaniem listu zostaje w bazie (podglad z
+    // pamieci, zero komend).
+    const base = f.sent.length;
+    clickArchiveRow(h, 'najnowszy');
+    await waitRt(() => letterBodyShows(h, 'Tresc pierwszego.'), 'tresc zachowana po przerwaniu');
+    assert.equal(f.sent.length, base, 'podglad z cache bez komend');
   } finally {
     await stopHarness();
   }

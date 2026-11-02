@@ -180,6 +180,41 @@ test('adapter: modal-guard tlumi komendy gracza, przepuszcza wlasne', async () =
   assert.equal(t.modalQueueLength, 0);
 });
 
+test('adapter: echo wlasnej wysylki (echo=true) oznaczane own; echo gracza nie', async () => {
+  const f = new FakeApi();
+  const t = armedTransport(f);
+  const seen: ProtoLine[] = [];
+  t.subscribe((l) => seen.push(l));
+  // Wysylka pluginu Z echem (compose, "wyslij zwierze"): jej echo w
+  // strumieniu musi byc rozpoznane jako wlasne (hook wejscia w poczte
+  // gracza nie wolno odpalic na wlasnym echu).
+  t.send('napisz list', true);
+  await new Promise((r) => setImmediate(r));
+  f.fireLine('→ napisz list', 'info');
+  // Wysylka bez echa NIE rejestruje oczekujacego echa: identyczny
+  // tekst wpisany recznie przez gracza nie wolno dostac own.
+  t.send('listy odebrane');
+  await new Promise((r) => setImmediate(r));
+  f.fireLine('→ listy odebrane', 'info');
+  assert.equal(seen.length, 2);
+  assert.equal(seen[0]!.own, true, 'echo wlasnej komendy oznaczone own');
+  assert.equal(seen[1]!.own, undefined, 'echo gracza bez own');
+});
+
+test('adapter: modal-guard odtwarza komendy gracza z echem', async () => {
+  const f = new FakeApi();
+  const t = armedTransport(f);
+  t.beginModal();
+  f.hookCb!('listy');
+  t.endModal();
+  await new Promise((r) => setImmediate(r));
+  // Echo przy odtworzeniu: straznik wejscia w poczte gracza musi widziec
+  // odzyskane komendy tak jak wpisane recznie (inaczej znika w ciszy).
+  assert.deepEqual(f.sent, [
+    { command: 'listy', echo: true, options: { preserveCase: true } },
+  ]);
+});
+
 test('adapter: modal-guard - poczatek/koniec idempotentne', () => {
   const f = new FakeApi();
   const t = new DargothTransport(f.api);

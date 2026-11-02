@@ -90,6 +90,36 @@ test('tryb poczty gracza parkuje odswiezenia, wyjscie "q" odpala drenaz (Fala 24
   }
 });
 
+test('komenda gracza pod blokada sesji tez wlacza tryb poczty (Fala 42)', async () => {
+  answered.clear();
+  const h = await startHarness();
+  const { f } = h;
+  try {
+    // Powiadomienie startuje indeksacje - blokada sesji stoi.
+    f.fire(' [ POCZTA ] Masz nowa poczte od Foo.', 'mail');
+    await h.waitFor(() => f.sent.includes('listy odebrane'), 'start indeksacji');
+    // Gracz otwiera poczte recznie W TRAKCIE naszej operacji.
+    f.fire('→ listy');
+    f.fire('Nie masz zadnych odebranych listow.', 'mail');
+    await h.waitFor(() => f.sent.includes('listy nieprzeczytane'), 'druga skrzynka indeksu');
+    f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
+    await waitIdle(h);
+    // W trybie gracza (wlaczonym pod blokada) kolejne powiadomienie
+    // NIE wysyla komend - odswiezenie parkuje do jego wyjscia.
+    const base = f.sent.length;
+    f.fire(' [ POCZTA ] Masz nowa poczte od Foo.', 'mail');
+    await sleep(300);
+    assert.equal(f.sent.length, base, 'zero komend pluginu w trybie gracza');
+    // Wyjscie "q": zaparkowane odswiezenie + obowiazkowy refresh inboxa.
+    f.fire('→ q');
+    await answerEmpty(h, 'odebrane');
+    await answerEmpty(h, 'nieprzeczytane');
+    await waitIdle(h);
+  } finally {
+    await stopHarness();
+  }
+});
+
 test('kasowanie w trybie poczty gracza parkuje, po wyjsciu drenaz 4 skrzynek (Fala 24f3)', async () => {
   answered.clear();
   const h = await startHarness();
