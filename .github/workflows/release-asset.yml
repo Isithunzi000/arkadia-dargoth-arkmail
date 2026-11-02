@@ -1,0 +1,31 @@
+name: Release asset
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag wydania (np. v1.23.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  asset:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag }}
+
+      - name: Dolacz paczke zip do wydania
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.inputs.tag }}"
+          ZIP="releases/arkmail_${TAG#v}.zip"
+          ZIP="${ZIP//./_}"
+          test -f "$ZIP"
+          gh release upload "$TAG" "$ZIP" --clobber
