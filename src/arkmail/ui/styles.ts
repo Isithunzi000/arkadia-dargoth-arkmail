@@ -27,7 +27,7 @@ const ACCENT_DEEPER = '#2f4f94'; // hover btn-primary (bialy 7.87)
 const ACCENT_FG = '#ffffff';
 const DANGER = '#b04a42'; // tlo btn-danger (bialy 5.38)
 const DANGER_TEXT = '#d4736c'; // tekst bledow na panelu (4.58)
-const BG_UNREAD = '#2f3542'; // tlo wiersza nieprzeczytanego
+const BG_UNREAD = '#313a4e'; // tlo wiersza nieprzeczytanego
 
 export const STYLES = `
 .arkmail-root {
@@ -76,7 +76,7 @@ export const STYLES = `
   justify-content: center;
   min-height: 26px;
 }
-.arkmail-root button:hover { background: #3b3d47; }
+.arkmail-root button:hover { background: #454a58; }
 
 /* --- Fala 30: cztery poziomy przyciskow (jeden jezyk calego UI) --- */
 .arkmail-root .arkmail-btn-primary {
@@ -90,7 +90,7 @@ export const STYLES = `
   border: 1px solid ${ACCENT};
   color: ${ACCENT_SOFT};
 }
-.arkmail-root .arkmail-btn-action:hover { background: #31333c; border-color: #6b93ea; color: #6b93ea; }
+.arkmail-root .arkmail-btn-action:hover { background: #454a58; border-color: #6b93ea; color: #6b93ea; }
 .arkmail-root .arkmail-btn-danger {
   background: ${DANGER};
   border-color: ${DANGER};
