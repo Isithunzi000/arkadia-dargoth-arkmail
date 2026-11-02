@@ -1672,15 +1672,20 @@ export function mountMailUi(
     // na serwerze w bazie nie ma wcale (fizyczny purge), wiec zywosc
     // nie jest sprawdzana.
     const archiveGroups = liveArchiveGroups(state.archive);
+    // Liczniki kroku 2 licza REKORDY, nie grupy kluczy: dwa wpisy tej
+    // samej strony listingu bez tresci to dwa listy do pobrania, a
+    // pobieranie (runArchiveDownload) kandyduje rekordami. Definicje
+    // identyczne z tamta petla: z trescia / bez tresci z data /
+    // bez tresci bez daty.
     let withBody = 0;
     let pendingBody = 0;
     let undatedBody = 0;
-    for (const group of archiveGroups) {
-      if (group.some((letter) => letter.body.length > 0)) {
+    for (const letter of state.archive) {
+      if (letter.body.length > 0) {
         withBody += 1;
         continue;
       }
-      const dateRaw = group[0]!.dateRaw;
+      const dateRaw = letter.dateRaw;
       if (dateRaw !== null && parseMailDate(dateRaw) !== null) pendingBody += 1;
       else undatedBody += 1;
     }

@@ -142,7 +142,7 @@ test('eksport: kazdy rekord liczony osobno, wynik jest deterministyczny', () => 
   assert.deepEqual(second, first, 'kolejnosc rekordow nie zmienia eksportu');
 });
 
-test('statusy: liczniki pobierania i ZIP uwzgledniaja grupy oraz niedostepne daty', async () => {
+test('statusy: liczniki pobierania i ZIP uwzgledniaja rekordy oraz niedostepne daty', async () => {
   const badDate = archived('Bledna data', {
     dateRaw: 'niepoprawna-data',
     sortKey: '0000-00-00 00:00:00',
@@ -155,7 +155,9 @@ test('statusy: liczniki pobierania i ZIP uwzgledniaja grupy oraz niedostepne dat
     // Fala 28: legacy-zombie jest purgowany przy ladowaniu - nie jest
     // liczony ani w kolumnie pobierania, ani w ZIP. Fala 41: kazdy
     // rekord bez tresci liczy sie osobno (blizniak nie pozycza tresci).
-    assert.match(steps[1], /Gotowe: 1 list z trescia \(1 bez daty\)\./);
+    // Liczniki kroku 2 ida per rekord: blizniak bez tresci w drugiej
+    // skrzynce to realny kandydat do pobrania, nie "grupa z trescia".
+    assert.match(steps[1], /Czesciowo: 1 list z trescia\. Do pobrania: 1 \(1 bez daty\)\./);
     assert.match(steps[2], /Gotowe: 1 list do zapisu \(2 bez tresci\)\./);
   } finally {
     await stopHarness();

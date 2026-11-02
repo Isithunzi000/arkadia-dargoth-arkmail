@@ -15,7 +15,7 @@ function archived(body: string[], number = 1) {
       party: 'Bar',
       partyKind: 'nadawca',
       date: { raw: 'Wt, 24 VIII 1999, 00:11:12', weekday: 'Wt', day: 24, month: 8, year: 1999, time: '00:11:12' },
-    }),
+    }, 'strona-1', number),
     body,
   };
 }
