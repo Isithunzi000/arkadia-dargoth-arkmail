@@ -23,6 +23,7 @@ class FakeApi {
   hookCb: HookCb | null = null;
   hookPriority: number | null = null;
   emitted: { event: string; args: unknown[] }[] = [];
+  shown: unknown[] = [];
 
   readonly api = {
     command: {
@@ -51,6 +52,12 @@ class FakeApi {
         if (id !== 'hook-1') return false;
         this.hookCb = null;
         return true;
+      },
+    },
+    notifications: {
+      show: (options: unknown) => {
+        this.shown.push(options);
+        return { dismiss: () => {}, update: () => {}, repeat: () => {} };
       },
     },
     events: {
@@ -243,14 +250,23 @@ test('storage: uszkodzony JSON nie wywraca odczytu', async () => {
 
 // --- notify -------------------------------------------------------------------
 
-test('notify: kazdy tost trwa 8000 ms, chyba ze czas jest podany', () => {
+/**
+ * Fala C: tosty ida przez centrum powiadomien klienta (api.notifications.
+ * show), a nie przez surowe zdarzenie 'notify' - wtedy toast dostaje
+ * tytul, poziom i spina sie ladnie zamiast lamac dlugi tekst w karcie
+ * 352 px. Kontrakt: {text, level=info, time=8000} + title gdy podane.
+ */
+test('notify: idzie przez notifications.show z poziomem i czasem', () => {
   const f = new FakeApi();
   notify(f.api, 'Nowy list od Foo');
-  notify(f.api, 'Pilne', { time: 12000 });
-  assert.deepEqual(f.emitted, [
-    { event: 'notify', args: [{ text: 'Nowy list od Foo', time: 8000 }] },
-    { event: 'notify', args: [{ text: 'Pilne', time: 12000 }] },
+  notify(f.api, 'Pobrano tresci', { title: 'ArkMail', level: 'success' });
+  notify(f.api, 'Pilne', { time: 12000, level: 'warning' });
+  assert.deepEqual(f.shown, [
+    { text: 'Nowy list od Foo', level: 'info', time: 8000 },
+    { text: 'Pobrano tresci', title: 'ArkMail', level: 'success', time: 8000 },
+    { text: 'Pilne', level: 'warning', time: 12000 },
   ]);
+  assert.deepEqual(f.emitted, [], 'zaden tost nie leci juz przez events.emit');
 });
 
 test('adapter: linia brana z originalLine (4. arg) gdy inny trigger ja zmodyfikowal', () => {
