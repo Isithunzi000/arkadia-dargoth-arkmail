@@ -56,7 +56,13 @@ test('odczyt bez widocznego promptu pagera: idle-completion domyka sesje (q + re
   const op = settle(s.readLetter(1));
   await t.replay(FRAMED_LETTER);
   // Prompt pagera nigdy nie dociera (linia bez \n trzymana przez klienta).
-  await sleep(400); // > idleMs: idle-completion powinno zamknac pager
+  // Najpierw 3 proby advance (cisza = more-prompt moze czekac), dopiero
+  // potem dawne idle-completion domyka pager "q".
+  await sleep(650); // > 3x idleMs (advance) + idleMs (close)
+  assert.ok(
+    t.sent.filter((c) => c === '').length >= 3,
+    'przed domknieciem wyczerpane proby advance',
+  );
   assert.ok(t.sent.includes('q'), 'po ciszy wyslano q mimo braku promptu pagera');
   await t.replay([{ cls: 'prompt', text: '> ' }]);
   const out = await op;

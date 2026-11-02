@@ -104,6 +104,13 @@ const PAGER_REJECTION_RE = /Nie ma takiej komendy\./;
 
 /** Szkielet transakcji pagerowej; handler akcji podpiety miedzy
  *  otwarciem a zamknieciem. */
+
+/** Liczba kolejnych prob advance (pusty Enter na more-prompt) po ciszy
+ *  w stanie 'letter'. Wyczerpanie = dawne zachowanie: domkniecie "q".
+ *  More-prompt na ekranie to samotne ">", nierozroznialne od innych
+ *  linii, wiec strone wykrywamy po MILCZENIU serwera po burstcie tresci. */
+const ADVANCE_MAX_TRIES = 3;
+
 export class PagerSession {
   constructor(
     private readonly transport: Transport,
@@ -265,6 +272,9 @@ export class PagerSession {
       let loadRetried = false;
       let loadRetryTimer: ReturnType<typeof setTimeout> | null = null;
       let done = false;
+      /** Kolejne proby advance po ciszy; zeruje kazda linia body albo
+       *  prompt pagera (serwer odpowiada = strona nie czeka). */
+      let advances = 0;
       const idleMs = this.opts.idleMs ?? 600;
       let idleTimer: ReturnType<typeof setTimeout> | null = null;
       let quietTimer: ReturnType<typeof setTimeout> | null = null;
@@ -337,6 +347,22 @@ export class PagerSession {
         checkAbort(); // Fala 17a: cisza po Przerwij tez domyka sesje
         if (done || aborted) return;
         if (state === 'letter' && headersDone) {
+          if (advances < ADVANCE_MAX_TRIES) {
+            // Cisza po burstcie tresci: serwer moze stronicowac list i
+            // czekac na more-prompt (samotne ">" na ekranie, niewidoczne
+            // w triggerach). Wysylamy advance i czekamy dalej; kazda
+            // odpowiedz serwera zeruje licznik. Po wyczerpaniu prob
+            // wracamy do dawnego zachowania (Fala 12a): cisza = body
+            // kompletne.
+            advances++;
+            try {
+              this.transport.send('');
+            } catch {
+              /* transport martwy - cisza i tak domknie sesje */
+            }
+            armQuiet();
+            return;
+          }
           state = 'pager';
           pagerFired = true;
           idleOpened = true;
@@ -477,6 +503,7 @@ export class PagerSession {
         // z inna trescia w jednej linii (isPagerPrompt bylby slepy).
         const pp = extractPagerPrompt(line.text);
         if (pp) {
+          advances = 0; // prompt pagera = serwer odpowiedzial
           if (quietTimer) clearTimeout(quietTimer);
           pager = pp;
           state = 'pager';
@@ -519,6 +546,7 @@ export class PagerSession {
 
         if (state === 'letter') {
           letter.body.push(line.text);
+          advances = 0; // serwer odpowiada = strona nie czeka na advance
           armQuiet(); // kazda linia body odracza idle-completion
           return;
         }
