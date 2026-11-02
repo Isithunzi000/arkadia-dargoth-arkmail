@@ -170,7 +170,7 @@ test('stringi klasa B: poprawione, naturalne polskie (ASCII)', () => {
   // Nowe wersje obecne (21b):
   assert.ok(render.includes("(przekazany)"), 'przekazany po polsku');
   assert.ok(render.includes('Wyczysc zapisane dane'), 'czyszczenie bez zargonu');
-  assert.ok(render.includes('Kasuje listy i kontakty. Ustawienia zostaja.'), 'dim czyszczenia');
+  assert.ok(render.includes('Kasuje lokalnie listy, archiwum, kontakty i indeksy.'), 'dim czyszczenia');
   assert.ok(render.includes('Podglad wysylanego listu'), 'nowy podglad (21b)');
   assert.ok(render.includes('Zapisz w niewyslanych'), 'spojne ze skrzynka niewyslane');
   assert.ok(render.includes('Kontakty powstaja z listow zebranych ze wszystkich skrzynek'), 'brama 21b');

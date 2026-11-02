@@ -713,7 +713,7 @@ export function mountMailUi(
     // Fala 24h (zgloszenie 2026-10-21): zakres czyszczenia w tooltipie
     // przycisku zamiast stalego napisu pod paskiem operacji (napis
     // wisualnie zasmiecal kazda skrzynke).
-    const clearTitle = 'Kasuje listy i kontakty. Ustawienia zostaja.';
+    const clearTitle = 'Kasuje lokalnie listy, archiwum, kontakty i indeksy. Na serwerze Arkadii nic nie znika - skrzynki pobierzesz od nowa. Ustawienia zostaja.';
     clearBtn.setAttribute('title', clearTitle);
     let clearArmed = false;
     let clearTimer: ReturnType<typeof setTimeout> | null = null;
