@@ -109,7 +109,7 @@ test('ui: zakres czyszczenia jako tooltip przycisku, nie staly napis (Fala 24h)'
   // nie stalym napisem pod paskiem operacji skrzynki.
   assert.equal(
     btn!.getAttribute('title'),
-    'Kasuje listy i kontakty. Ustawienia zostaja.',
+    'Kasuje lokalnie listy, archiwum, kontakty i indeksy. Na serwerze Arkadii nic nie znika - skrzynki pobierzesz od nowa. Ustawienia zostaja.',
     'zakres czyszczenia w tooltipie przycisku',
   );
   const pane = q(container, '.arkmail-pane');
@@ -120,7 +120,7 @@ test('ui: zakres czyszczenia jako tooltip przycisku, nie staly napis (Fala 24h)'
     ),
   ) as HTMLElement[];
   assert.ok(
-    !dims.some((d) => (d.textContent ?? '').includes('Kasuje listy i kontakty')),
+    !dims.some((d) => (d.textContent ?? '').includes('Kasuje lokalnie listy')),
     'brak stalego napisu o zakresie czyszczenia w panelu',
   );
 });
