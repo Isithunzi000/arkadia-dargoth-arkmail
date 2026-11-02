@@ -168,13 +168,14 @@ test('adapter: modal-guard tlumi komendy gracza, przepuszcza wlasne', async () =
     { command: 'q', echo: false, options: { preserveCase: true } },
   ]);
 
-  // koniec modalu: kolejka gracza odtworzona do gry, hook zdjety
+  // koniec modalu: kolejka gracza odtworzona do gry Z echem (Fala 42:
+  // odzyskane komendy widzi straznik wejscia w poczte), hook zdjety
   t.endModal();
   assert.equal(f.hookCb, null, 'hook wyrejestrowany po endModal');
   await new Promise((r) => setImmediate(r));
   assert.deepEqual(f.sent[1], {
     command: 'atakuj goblina',
-    echo: undefined,
+    echo: true,
     options: { preserveCase: true },
   });
   assert.equal(t.modalQueueLength, 0);

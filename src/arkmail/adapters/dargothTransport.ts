@@ -19,6 +19,9 @@ import type { ProtoLine, Transport } from '../core/session/transport.js';
 /** Priorytet hooka modalnego: wysoko, zanim aliasy/inne wtyczki. */
 const MODAL_HOOK_PRIORITY = 100;
 
+/** Fala 42: pamiec ostatnich wysylek z echem oczekujacych na linie-echo. */
+const PENDING_ECHO_CAP = 10;
+
 export class DargothTransport implements Transport {
   private readonly subscribers = new Set<(line: ProtoLine) => void>();
   private triggerArmed = false;
@@ -28,6 +31,11 @@ export class DargothTransport implements Transport {
   private commandQueue: Promise<void> = Promise.resolve();
   private connectionGeneration = 0;
   private sendingOwn = false;
+  /** Fala 42: teksty wysylek z echem (echo=true) czekajacych na
+   *  linie-echo w strumieniu. FIFO z limitem. Wysylka bez echa NIE
+   *  rejestruje sie - identyczny tekst wpisany recznie przez gracza
+   *  nigdy nie dostanie znacznika own. */
+  private pendingEchoSends: string[] = [];
   // Fala 25 (blad 3): transport startuje ROZBROJONY. Brama otwiera
   // wylacznie sygnal obecnosci w grze (gmcp.char.info / char.name /
   // mail.state / room.long albo proxy.session z faktycznym wznowieniem
@@ -61,6 +69,12 @@ export class DargothTransport implements Transport {
     const task = this.commandQueue.then(async () => {
       if (!this.online || generation !== this.connectionGeneration) return;
       let pending: Promise<void>;
+      if (echo) {
+        // Fala 42: wysylka z echem zadeklaruje oczekiwanie; dopasowanie
+        // FIFO oznaczy jej linie-echo jako own (hook wejscia w poczte).
+        this.pendingEchoSends.push(line);
+        if (this.pendingEchoSends.length > PENDING_ECHO_CAP) this.pendingEchoSends.shift();
+      }
       // Hook jest wywolywany synchronicznie przez api.command.send. Flaga
       // rozroznia wysylke pluginu od komendy gracza takze przy tym samym tekscie.
       this.sendingOwn = true;
@@ -108,7 +122,9 @@ export class DargothTransport implements Transport {
     const pending = this.queue.splice(0);
     if (!this.online) return;
     for (const command of pending) {
-      void this.enqueue(command, undefined).catch(() => {});
+      // Fala 42: odtworzenie Z echem - to komenda gracza, wiec straznik
+      // wejscia w poczte musi ja zobaczyc tak jak wpisana recznie.
+      void this.enqueue(command, true).catch(() => {});
     }
   }
 
@@ -118,6 +134,7 @@ export class DargothTransport implements Transport {
     if (online) return;
     this.connectionGeneration++;
     this.commandQueue = Promise.resolve();
+    this.pendingEchoSends = [];
     if (this.hookId !== null) {
       this.api.commandHooks.unregister(this.hookId);
       this.hookId = null;
@@ -135,6 +152,7 @@ export class DargothTransport implements Transport {
     }
     this.subscribers.clear();
     this.queue = [];
+    this.pendingEchoSends = [];
     this.connectionGeneration++;
     this.commandQueue = Promise.resolve();
   }
@@ -151,6 +169,24 @@ export class DargothTransport implements Transport {
       // (Fala 8a, dowod: Triggers.ts TriggerCallback + newMail.ts).
       (line: AnsiAwareBuffer, _matches: RegExpMatchArray, type: string, originalLine?: string) => {
         const proto: ProtoLine = { text: originalLine ?? line.text, cls: type ?? '' };
+        // Fala 42: echo wlasnej komendy (wysylka z echem) oznaczamy own
+        // po dopasowaniu FIFO do zarejestrowanego tekstu - hook wejscia
+        // w poczte gracza rozroznia wtedy gracza od pluginu takze pod
+        // blokada sesji.
+        if (this.pendingEchoSends.length > 0) {
+          const echoed = proto.text.startsWith('→ ')
+            ? proto.text.slice(2)
+            : proto.cls === 'command'
+              ? proto.text
+              : null;
+          if (echoed !== null) {
+            const i = this.pendingEchoSends.indexOf(echoed);
+            if (i >= 0) {
+              this.pendingEchoSends.splice(i, 1);
+              proto.own = true;
+            }
+          }
+        }
         for (const cb of [...this.subscribers]) cb(proto);
         // Fala 16j: subskrybenci (parser) dostaja linie ZAWSZE; zwrot
         // null tlumi tylko wyswietlanie w glownym oknie gry, i to

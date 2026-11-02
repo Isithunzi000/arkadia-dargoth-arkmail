@@ -1460,6 +1460,17 @@ export async function init(api: PluginApi) {
       notify(api, SESSION_BUSY_MSG, { level: "warning" });
       return;
     }
+    // Fala 42: gracz ma otwarta poczte recznie - nasze komendy zjadlyby
+    // jego sesje (pager konsumuje wszystko do "q"). Czekamy na jej
+    // zamkniecie; start odmowny z jasnym powodem.
+    if (playerMailMode) {
+      notify(
+        api,
+        "Przed pobieraniem tresci zamknij poczte otwarta w grze (komenda q).",
+        { level: "warning" },
+      );
+      return;
+    }
     // Kandydat: rekord z pusta trescia. Musi miec prawidlowa date, bo
     // bez niej nie mozna odnalezc listu na serwerze.
     const noBody = ui.state.archive.filter((l) => l.body.length === 0);
@@ -1500,6 +1511,10 @@ export async function init(api: PluginApi) {
         // polaczenie zyje.
         let consecutiveErrors = 0;
         let breakerTripped = false;
+        // Fala 42: gracz otworzyl poczte recznie w trakcie petli -
+        // po domknieciu biezacego listu stajemy, pobrane do tej pory
+        // zostaja w bazie.
+        let playerEntry = false;
         const reportProgress = (): void => {
           const processed = done + failed + missing;
           const now = Date.now();
@@ -1516,6 +1531,12 @@ export async function init(api: PluginApi) {
         try {
           for (const record of candidates) {
             if (flag.cancelled || breakerTripped) break;
+            // Fala 42: sesja pocztowa gracza ma pierwszenstwo - stajemy
+            // przed wyslaniem jakiejkolwiek kolejnej komendy.
+            if (playerMailMode) {
+              playerEntry = true;
+              break;
+            }
             // Kolejnosc prob: najpierw skrzynka rekordu, potem pozostale
             // w kolejnosci kanonicznej (replica "nieprzeczytane"
             // odczytuje sie przez "odebrane", bo nieprzeczytany wiersz
@@ -1524,8 +1545,10 @@ export async function init(api: PluginApi) {
               [record.box, "odebrane", "nieprzeczytane", "wyslane", "niewyslane"] as MailBox[]
             ).filter((b, i, arr) => arr.indexOf(b) === i);
             let result: FetchBodyResult = { kind: "error" };
+            let attempted = false;
             for (const box of order) {
-              if (flag.cancelled) break;
+              if (flag.cancelled || playerMailMode) break;
+              attempted = true;
               // Fala 17a: Przerwij domyka tez pager w toku (shouldAbort).
               result = await fetchArchiveBody(record, {
                 shouldAbort: () => flag.cancelled,
@@ -1540,6 +1563,17 @@ export async function init(api: PluginApi) {
               // czterokrotniloby komendy do zera.
               if (result.kind === "error") break;
             }
+            // Fala 42: tryb gracza wlaczyl sie zanim rekord dostal
+            // jakakolwiek probe - nietkniety, bez liczenia porazki.
+            if (playerMailMode && !attempted) {
+              playerEntry = true;
+              break;
+            }
+            // Fala 42: tryb gracza wlaczyl sie miedzy skrzynkami albo
+            // w trakcie proby - ta probe domykamy i liczymy normalnie
+            // (jej komendy juz wyszly, wynik jest prawda), po niej
+            // stajemy cale.
+            if (playerMailMode) playerEntry = true;
             if (result.kind === "ok") {
               done += 1;
               consecutiveErrors = 0;
@@ -1569,9 +1603,16 @@ export async function init(api: PluginApi) {
             reportProgress();
             if (breakerTripped) break;
             if (flag.cancelled) break;
+            if (playerEntry) break;
             await sleepOrCancel(LOAD_ALL_PACE_MS, flag);
           }
-          if (breakerTripped) {
+          if (playerEntry) {
+            notify(
+              api,
+              `Poczta zostala otwarta w grze. Pobrano: ${done} z ${total}.`,
+              { title: "Przerwano pobieranie", level: "warning" },
+            );
+          } else if (breakerTripped) {
             notify(
               api,
               "Serwer poczty nie odpowiada. Pobrane tresci sa zapisane - sprobuj ponownie pozniej.",
@@ -2147,11 +2188,12 @@ export async function init(api: PluginApi) {
       const cmd = isEchoLine(line.text) ? line.text.replace(/^→\s*/, "") : line.text;
       if (MAIL_ENTRY_CMD_RE.test(cmd)) {
         clearPagerOrphan();
-        // Fala 24f2: gracz wchodzi w poczte recznie - jego pager jest
-        // legalny, plugin parkuje odswiezenia do wyjscia z trybu.
-        // Pod blokada to nasza wlasna komenda - nie tryb gracza.
-        if (!lock.locked) enterPlayerMailMode();
-      } else if (playerMailMode && !lock.locked && /^(?:q|x)$/i.test(cmd.trim())) {
+        // Fala 42: echo NIE wlasne = gracz wchodzi w poczte recznie -
+        // rowniez POD blokada (dluga operacja nie odbiera graczowi
+        // prawa do jego sesji; echo pluginu ma znacznik own z transportu
+        // i trybu nie wlacza).
+        if (!line.own) enterPlayerMailMode();
+      } else if (playerMailMode && !line.own && /^(?:q|x)$/i.test(cmd.trim())) {
         // Fala 24f2: q/x konczy reczny tryb poczty gracza.
         exitPlayerMailMode();
       }
