@@ -83,6 +83,9 @@ function makeMockApi(capture) {
         return () => { capture.characterListener = null; };
       },
     },
+    notifications: {
+      show: () => ({ dismiss: () => {}, update: () => {}, repeat: () => {} }),
+    },
     events: {
       // Klient dopuszcza wiele nasluchow na jedno zdarzenie (Fala 25:
       // np. "gmcp.mail.state" ma osobno brame gry i reakcje na stan) -
