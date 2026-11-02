@@ -1707,9 +1707,11 @@ export function mountMailUi(
           ? `Gotowe: ${formatListCount(exportable.entries.length)} do zapisu (${exportable.skipped} bez tresci).`
           : `Gotowe: ${formatListCount(exportable.entries.length)} do zapisu.`;
     // Fala 31d/28: agregat nad lista - globalny (nie zalezy od filtra),
-    // po deduplikacji blizniakow (core/archiveStats); skrzynki z zerem
-    // pomijane. Kazdy rekord jest zywy (fizyczny purge Fala 28), wiec
-    // zywosc nie jest sprawdzana.
+    // Agregat = totalLive (suma MAX na klucz tresci w kazdej skrzynce),
+    // a nie liczba grup kluczy: dwa rekordy tej samej skrzynki o
+    // identycznym kluczu to dwa listy i agregat ma je liczyc osobno.
+    // Skrzynki z zerem pomijane. Kazdy rekord jest zywy (fizyczny purge
+    // Fala 28), wiec zywosc nie jest sprawdzana.
     const boxCounts = perBoxCounts(state.archive);
     let countsStrip: HTMLElement | null = null;
     if (archiveGroups.length > 0) {
@@ -1720,7 +1722,7 @@ export function mountMailUi(
       }
       countsStrip = doc.createElement('p');
       countsStrip.className = 'arkmail-dim arkmail-arch-counts';
-      countsStrip.textContent = `Listow w bazie: ${formatListCount(archiveGroups.length)}${parts.length > 0 ? ` (${parts.join(', ')})` : ''}.`;
+      countsStrip.textContent = `Listow w bazie: ${formatListCount(totalLive(state.archive))}${parts.length > 0 ? ` (${parts.join(', ')})` : ''}.`;
     }
     const indexStep = makeStep('1. Indeksacja', indexStatus, state.indexRun ? 'active' : allBoxesIndexed(state.indexMeta) ? (gapCount > 0 ? 'warning' : 'done') : indexedCount > 0 || gapCount > 0 ? 'incomplete' : 'idle');
     const downloadStep = makeStep('2. Pobranie tresci', downloadStatus, state.archiveDownload ? 'active' : pendingBody > 0 ? 'incomplete' : bodyWarnings.length > 0 ? 'warning' : withBody > 0 ? 'done' : 'idle');
