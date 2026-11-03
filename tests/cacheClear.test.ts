@@ -111,7 +111,7 @@ test('ui: zakres czyszczenia jako tooltip przycisku, nie staly napis (Fala 24h)'
   // osoby i aliasy przetrwaja czyszczenie (osobne klucze storage).
   assert.equal(
     btn!.getAttribute('title'),
-    'Kasuje lokalnie listy, archiwum, kontakty i indeksy. Na serwerze Arkadii nic nie znika - skrzynki pobierzesz od nowa. Ustawienia zostaja. Grupy, zaimportowane osoby i aliasy zostaja.',
+    'Kasuje lokalnie listy, archiwum, kontakty i indeksy. Na serwerze Arkadii nic nie znika - skrzynki pobierzesz od nowa. Ustawienia, grupy i ksiazka adresowa zostaja. Aliasy pobierzesz z gry ponownie.',
     'zakres czyszczenia w tooltipie przycisku',
   );
   const pane = q(container, '.arkmail-pane');

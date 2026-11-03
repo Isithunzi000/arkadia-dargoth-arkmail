@@ -32,6 +32,7 @@ import {
   parseAddressBookExport,
   type AddressBookExport,
   type ContactGroup,
+  type ImportMode,
 } from '../core/addressBook.js';
 import { downloadBlob } from './download.js';
 import {
@@ -129,12 +130,20 @@ export interface MailUiHandlers {
    */
   onSaveGroups?(groups: ContactGroup[]): void;
   /**
+   * Zapis plaskiej ksiazki imion (Fala UI-2 krok 3): wywolywany po
+   * kazdej mutacji CRUD (dodanie, usuniecie pojedyncze, usuniecie
+   * zaznaczonych). Jak onSaveGroups - storage + stan UI w jednym
+   * przebiegu. Opcjonalny: starsze montaze testowe go nie podaja.
+   */
+  onSavePeople?(people: string[]): void;
+  /**
    * Import ksiazki adresowej z pliku JSON (Fala UI-2 krok 3): dane
-   * zwalidowane i wyczyszczone (kolizje nazw dostaly suffix).
-   * Grupy dolaczane do istniejacych; pule importu podmieniane.
+   * zwalidowane i wyczyszczone, bez suffixow (kolizje grup scala
+   * mergeAddressBook albo tryb zastap). Tryb dolacz domyslny.
+   * Aliasy sa lustrem z gry - import pliku ich nie rusza.
    * Opcjonalny: starsze montaze testowe go nie podaja.
    */
-  onImportAddressBook?(data: AddressBookExport): void;
+  onImportAddressBook?(data: AddressBookExport, mode?: ImportMode): void;
   /** Reczne wyszukanie jednej strony w zakladce usuwania. */
   onDeletionSearch?(box: MailBox, query: ListingSearch): void;
   /** Zbiorcze usuniecie po potwierdzeniu w interfejsie. */
@@ -191,11 +200,20 @@ export function mountMailUi(
   /** Filtr archiwum: lokalny (poza store) - input zachowuje fokus. */
   const archFilter: ArchiveFilter = {};
   /** Filtr i sort kontaktow: lokalne (poza store) - ten sam powod co wyzej. */
-  const contactView: { filter: string; sort: ContactSort; sub: 'osoby' | 'grupy' } = {
+  const contactView: { filter: string; sort: ContactSort; sub: 'osoby' | 'ksiazka' | 'grupy' } = {
     filter: '',
     sort: 'nazwa',
     sub: 'osoby',
   };
+  /** Tryb importu pliku ksiazki (Fala UI-2 krok 3): lokalny jak
+   *  contactView - domyslnie dolacz; "zastap" podmienia imiona i grupy. */
+  let bookImportMode: ImportMode = 'dolacz';
+  /** Zaznaczenie w widoku ksiazki adresowej (Fala UI-2 krok 3): lokalne
+   *  (jak filtry). Zerowane przy kazdej zmianie listy imion - porownanie
+   *  referencji tablicy w store, wiec importy/dodanie/usuniecie kasuja
+   *  zaznaczenie deterministycznie. */
+  const bookSelection = new Set<string>();
+  let bookPeopleRef: readonly string[] | null = null;
   /** Pelnoekranowy podglad compose (Fala 12d): czysto prezentacyjny stan,
    *  lokalny jak contactView; tresc listu zyje w composeDraft (nic nie ginie). */
   let previewFull = false;
@@ -767,7 +785,7 @@ export function mountMailUi(
     // Fala 24h (zgloszenie 2026-10-21): zakres czyszczenia w tooltipie
     // przycisku zamiast stalego napisu pod paskiem operacji (napis
     // wisualnie zasmiecal kazda skrzynke).
-    const clearTitle = 'Kasuje lokalnie listy, archiwum, kontakty i indeksy. Na serwerze Arkadii nic nie znika - skrzynki pobierzesz od nowa. Ustawienia zostaja. Grupy, zaimportowane osoby i aliasy zostaja.';
+    const clearTitle = 'Kasuje lokalnie listy, archiwum, kontakty i indeksy. Na serwerze Arkadii nic nie znika - skrzynki pobierzesz od nowa. Ustawienia, grupy i ksiazka adresowa zostaja. Aliasy pobierzesz z gry ponownie.';
     clearBtn.setAttribute('title', clearTitle);
     let clearArmed = false;
     let clearTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1627,13 +1645,48 @@ export function mountMailUi(
     const impLabel = doc.createElement('label');
     impLabel.className = 'arkmail-btn-action';
     impLabel.textContent = 'Importuj ksiazke ';
+    // Fala UI-2 krok 3: tryb importu pliku. "dolacz" scala grupy o tej
+    // samej nazwie i dopisuje imiona; "zastap" podmienia imiona i
+    // grupy zawartoscia pliku. Aliasy (lustro z gry) zaden tryb nie
+    // rusza. Stan lokalny (jak filtry): domyslnie dolacz.
+    const modeRow = doc.createElement('div');
+    modeRow.className = 'arkmail-boxes arkmail-subpills';
+    modeRow.setAttribute('data-book-import-mode', '');
+    const MODES: Array<[ImportMode, string, string]> = [
+      [
+        'dolacz',
+        'Dolacz do ksiazki',
+        'Nowe grupy z pliku dolacza. Gdy grupa o tej samej nazwie juz jest, scala jej czlonkow. Imiona z pliku dolacza do ksiazki adresowej.',
+      ],
+      [
+        'zastap',
+        'Zastap cala ksiazke',
+        'Kasuje obecne imiona i grupy, a na ich miejsce wczytuje zawartosc pliku. Aliasy zostaja bez zmian.',
+      ],
+    ];
+    for (const [mode, label, title] of MODES) {
+      const lab = doc.createElement('label');
+      const radio = doc.createElement('input');
+      radio.setAttribute('type', 'radio');
+      radio.setAttribute('name', 'arkmail-import-mode');
+      radio.setAttribute('title', title);
+      radio.checked = bookImportMode === mode;
+      // 'click' zamiast 'change': aktywacja radia (mysz lub klawiatura)
+      // zawsze daje click; happy-dom nie wysyla 'change' przy click().
+      radio.addEventListener('click', () => {
+        bookImportMode = mode;
+      });
+      lab.appendChild(radio);
+      lab.appendChild(doc.createTextNode(label));
+      modeRow.appendChild(lab);
+    }
     const impInput = doc.createElement('input');
     impInput.setAttribute('type', 'file');
     impInput.setAttribute('data-book-import', '');
     impInput.setAttribute('accept', '.json,application/json');
     impInput.setAttribute(
       'title',
-      'Wczytuje imiona i grupy z pliku JSON i dolacza je do ksiazki adresowej. Aliasy pobierasz z gry.',
+      'Wczytuje imiona i grupy z pliku JSON. Sposob zalezy od trybu: dolacz albo zastap. Aliasy pobierasz z gry.',
     );
     impInput.addEventListener('change', () => {
       const file = impInput.files?.[0];
@@ -1646,7 +1699,7 @@ export function mountMailUi(
             showError('Niepoprawny plik ksiazki adresowej.');
             return;
           }
-          handlers.onImportAddressBook?.(parsed);
+          handlers.onImportAddressBook?.(parsed, bookImportMode);
         })
         .catch(() => showError('Nie udalo sie odczytac pliku.'));
     });
@@ -1654,7 +1707,156 @@ export function mountMailUi(
     ops.appendChild(delAll);
     ops.appendChild(expBtn);
     ops.appendChild(impLabel);
+    ops.appendChild(modeRow);
     pane.appendChild(ops);
+    fillButtonTitles(pane);
+  };
+
+  const renderKsiazka = (state: MailUiState, pane: HTMLElement): void => {
+    // Reset zaznaczenia przy kazdej zmianie listy imion (import z gry,
+    // import pliku, dodanie, usuniecie): setPeople zawsze daje nowa
+    // tablice, wiec porownanie referencji zeruje zaznaczenie zawsze
+    // gdy dane sie zmienily, i tylko wtedy.
+    if (bookPeopleRef !== state.people) {
+      bookPeopleRef = state.people;
+      bookSelection.clear();
+    }
+    const save = (people: string[]): void => handlers.onSavePeople?.(people);
+
+    // --- dodawanie imienia
+    const addRow = doc.createElement('div');
+    addRow.className = 'arkmail-book-add';
+    const addInput = doc.createElement('input');
+    addInput.setAttribute('data-book-new', '');
+    addInput.setAttribute('placeholder', 'Imie nowej osoby');
+    const addBtn = doc.createElement('button');
+    addBtn.className = 'arkmail-btn-action';
+    addBtn.textContent = 'Dodaj';
+    addBtn.setAttribute('data-book-add', '');
+    addBtn.setAttribute('title', 'Dodaje imie do ksiazki adresowej.');
+    const addErr = doc.createElement('span');
+    addErr.className = 'arkmail-group-error';
+    const showAddError = (msg: string): void => {
+      addErr.textContent = msg;
+      addErr.setAttribute('data-book-error', '');
+    };
+    const clearAddError = (): void => {
+      addErr.textContent = '';
+      addErr.removeAttribute('data-book-error');
+    };
+    const tryAdd = (): void => {
+      const name = addInput.value.trim();
+      if (!name) {
+        showAddError('Podaj imie.');
+        return;
+      }
+      if (!/^[A-Za-z]+$/.test(name)) {
+        showAddError('Imie: tylko litery.');
+        return;
+      }
+      if (state.people.some((p) => p.toLowerCase() === name.toLowerCase())) {
+        showAddError('To imie juz jest w ksiazce.');
+        return;
+      }
+      clearAddError();
+      addInput.value = '';
+      // Dopisanie na koniec; deduplikacje robi savePeople w index.ts.
+      save([...state.people, name]);
+    };
+    addBtn.addEventListener('click', tryAdd);
+    addInput.addEventListener('keydown', (ev) => {
+      if ((ev as KeyboardEvent).key === 'Enter') tryAdd();
+    });
+    addRow.appendChild(addInput);
+    addRow.appendChild(addBtn);
+    addRow.appendChild(addErr);
+    pane.appendChild(addRow);
+
+    // --- usuwanie zaznaczonych (uzbrojony dwuklik, jak w Grupy)
+    const bulk = doc.createElement('button');
+    bulk.className = 'arkmail-btn-action';
+    bulk.textContent = 'Usun zaznaczone imiona';
+    bulk.setAttribute('data-book-delete-checked', '');
+    bulk.setAttribute(
+      'title',
+      'Dwuklik: pierwszy klik pyta o potwierdzenie, drugi kasuje zaznaczone imiona.',
+    );
+    if (bookSelection.size === 0) bulk.setAttribute('disabled', '1');
+    bulk.addEventListener('click', () => {
+      if (bookSelection.size === 0) return;
+      if (bulk.getAttribute('data-armed') !== '1') {
+        bulk.setAttribute('data-armed', '1');
+        bulk.textContent = `Na pewno usunac zaznaczone (${bookSelection.size})?`;
+        return;
+      }
+      save(state.people.filter((p) => !bookSelection.has(p)));
+    });
+    pane.appendChild(bulk);
+
+    // --- lista imion A-Z (bez wielkosci liter, stabilnie)
+    const sorted = [...state.people].sort((a, b) => {
+      const la = a.toLowerCase();
+      const lb = b.toLowerCase();
+      if (la === lb) return 0;
+      return la < lb ? -1 : 1;
+    });
+    const listWrap = doc.createElement('div');
+    if (sorted.length === 0) {
+      listWrap.appendChild(
+        dim('Ksiazka adresowa jest pusta - zaimportuj osoby z gry albo dodaj recznie.'),
+      );
+    }
+    for (const name of sorted) {
+      const row = doc.createElement('div');
+      row.className = 'arkmail-book-row';
+      row.setAttribute('data-book-row', '');
+      const check = doc.createElement('input');
+      check.setAttribute('type', 'checkbox');
+      check.checked = bookSelection.has(name);
+      check.addEventListener('change', () => {
+        if (check.checked) bookSelection.add(name);
+        else bookSelection.delete(name);
+        // Pełny repaint odświeża stan przycisku zbiorczego; zaznaczenie
+        // żyje w stanie modułowym, więc przetrwa repaint.
+        store.refresh();
+      });
+      const nameEl = doc.createElement('span');
+      nameEl.className = 'arkmail-book-name';
+      nameEl.setAttribute('data-book-name', '');
+      nameEl.textContent = name;
+      const remove = doc.createElement('button');
+      remove.className = 'arkmail-book-remove';
+      remove.setAttribute('data-book-remove', '');
+      remove.textContent = 'x';
+      remove.setAttribute('title', `Usuwa ${name} z ksiazki adresowej.`);
+      remove.addEventListener('click', () => save(state.people.filter((p) => p !== name)));
+      row.appendChild(check);
+      row.appendChild(nameEl);
+      row.appendChild(remove);
+      listWrap.appendChild(row);
+    }
+    pane.appendChild(listWrap);
+
+    // --- aliasy pocztowe: lustro z gry, tylko odczyt
+    const aliasSec = doc.createElement('div');
+    aliasSec.className = 'arkmail-book-aliases';
+    aliasSec.setAttribute('data-book-aliases', '');
+    const aliasNote = doc.createElement('div');
+    aliasNote.className = 'arkmail-dim';
+    aliasNote.textContent =
+      'Aliasy pocztowe z gry - tylko odczyt, nie sa zapisywane do pliku. Alias usuwasz w grze.';
+    aliasSec.appendChild(aliasNote);
+    if (state.importedAliases.length === 0) {
+      aliasSec.appendChild(dim('Brak aliasow - aliasy pobiera sie z gry.'));
+    } else {
+      for (const alias of state.importedAliases) {
+        const row = doc.createElement('div');
+        row.className = 'arkmail-book-alias';
+        row.textContent = `${alias.name} -> ${alias.targets.join(', ')}`;
+        aliasSec.appendChild(row);
+      }
+    }
+    pane.appendChild(aliasSec);
     fillButtonTitles(pane);
   };
 
@@ -1662,13 +1864,15 @@ export function mountMailUi(
     const pane = doc.createElement('div');
     pane.className = 'arkmail-pane';
     pane.setAttribute('data-pane-key', 'kontakty');
-    // Fala UI-2 krok 3: sub-pigulki Osoby/Grupy. Klasy .arkmail-boxes
-    // (zero nowych kolorow); stan lokalny jak filtr/sort - repaint
-    // renderuje tylko wybrany podpanel.
+    // Fala UI-2 krok 3: sub-pigulki Osoby/Ksiazka adresowa/Grupy.
+    // Klasy .arkmail-boxes (zero nowych kolorow); stan lokalny jak
+    // filtr/sort - repaint renderuje tylko wybrany podpanel. Pigulka
+    // "Osoby" (kontakty z archiwum) znika w kroku 4 razem z indeksem.
     const subRow = doc.createElement('div');
     subRow.className = 'arkmail-boxes arkmail-subpills';
-    const SUBPILLS: Array<['osoby' | 'grupy', string]> = [
+    const SUBPILLS: Array<['osoby' | 'ksiazka' | 'grupy', string]> = [
       ['osoby', 'Osoby'],
+      ['ksiazka', 'Ksiazka adresowa'],
       ['grupy', 'Grupy'],
     ];
     for (const [sub, label] of SUBPILLS) {
@@ -1685,6 +1889,10 @@ export function mountMailUi(
     pane.appendChild(subRow);
     if (contactView.sub === 'grupy') {
       renderGrupy(state, pane);
+      return pane;
+    }
+    if (contactView.sub === 'ksiazka') {
+      renderKsiazka(state, pane);
       return pane;
     }
     const foot = doc.createElement('div');

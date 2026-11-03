@@ -232,6 +232,34 @@ export function mergeAddressBook(
   };
 }
 
+/** Tryb importu pliku: dolacz (merge) albo zastap (calosc z pliku). */
+export type ImportMode = "dolacz" | "zastap";
+
+/**
+ * Zastosowanie importu pliku w wybranym trybie. "dolacz" to zwykly
+ * mergeAddressBook. "zastap" zastepuje imiona i grupy zawartoscia pliku
+ * (po oczyszczeniu), a niezmiennik kompletnosci i tak dopisuje czlonkow
+ * grup do ksiazki. Aliasy sa lustrem z gry - zaden tryb ich nie rusza.
+ */
+export function applyBookImport(
+  existing: AddressBookData,
+  incoming: AddressBookData,
+  mode: ImportMode = "dolacz",
+): { data: AddressBookData; stats: MergeStats } {
+  if (mode === "dolacz") return mergeAddressBook(existing, incoming);
+  const groups = cleanGroups(incoming.groups);
+  const before = cleanBookNames(existing.people);
+  const people = withGroupMembers(cleanBookNames(incoming.people), groups);
+  return {
+    data: { people, groups },
+    stats: {
+      addedGroups: groups.length,
+      mergedGroups: 0,
+      addedPeople: Math.max(0, people.length - before.length),
+    },
+  };
+}
+
 export function loadImportedAliases(io: AddressBookIO): ImportedAlias[] {
   return cleanAliases(io.getJSON(ALIASES_KEY));
 }

@@ -47,9 +47,10 @@ import {
   saveImportedAliases,
   savePeople,
   migratePeople,
-  mergeAddressBook,
+  applyBookImport,
   unionPeople,
   type AddressBookExport,
+  type ImportMode,
 } from "./core/addressBook";
 import { ImportSession, type PeopleImportKind } from "./core/session/importer";
 import {
@@ -2042,21 +2043,33 @@ export async function init(api: PluginApi) {
       saveGroups(storage, groups);
       ui.setGroups(groups);
     },
+    // Fala UI-2 krok 3: zapis plaskiej ksiazki imion po mutacji CRUD
+    // (dodanie, usuniecie pojedyncze, usuniecie zaznaczonych) - storage
+    // + stan UI w jednym przebiegu (jak onSaveGroups).
+    onSavePeople: (people) => {
+      savePeople(storage, people);
+      ui.setPeople(people);
+      rebuildContacts();
+    },
     // Fala UI-2 krok 3: import ksiazki z pliku JSON (format v2; v1
-    // czytany wstecz). Tryb domyslny "dolacz": mergeAddressBook scala
-    // grupy o tej samej nazwie i uzupelnia ksiazke o czlonkow grup.
-    // Aliasy sa lustrem z gry - import pliku ich nie rusza.
-    onImportAddressBook: (data: AddressBookExport) => {
-      const { data: merged, stats } = mergeAddressBook(
+    // czytany wstecz). Tryb "dolacz" scala grupy o tej samej nazwie i
+    // uzupelnia ksiazke o czlonkow grup; "zastap" podmienia imiona i
+    // grupy zawartoscia pliku (niezmiennik kompletnosci czlonkow i tak
+    // obowiazuje). Aliasy sa lustrem z gry - import pliku ich nie rusza.
+    onImportAddressBook: (data: AddressBookExport, mode: ImportMode = "dolacz") => {
+      const { data: merged, stats } = applyBookImport(
         { people: ui.state.people, groups: ui.state.groups },
         data,
+        mode,
       );
       saveGroups(storage, merged.groups);
       savePeople(storage, merged.people);
       ui.setGroups(merged.groups);
       ui.setPeople(merged.people);
       rebuildContacts();
-      notify(api, `Dolaczono. Grup: ${data.groups.length} (nowe: ${stats.addedGroups}, scalone: ${stats.mergedGroups}). Imion: ${merged.people.length} (nowe: ${stats.addedPeople}).`, { level: "success" });
+      notify(api, mode === "zastap"
+        ? `Ksiazka adresowa zastapiona. Grup: ${merged.groups.length}, imion: ${merged.people.length}.`
+        : `Dolaczono. Grup: ${data.groups.length} (nowe: ${stats.addedGroups}, scalone: ${stats.mergedGroups}). Imion: ${merged.people.length} (nowe: ${stats.addedPeople}).`, { level: "success" });
     },
     // Fala 17g: eksporty TXT/ZIP - operacje czysto lokalne (dane
     // z cache), bez locka i bez komend do serwera.
