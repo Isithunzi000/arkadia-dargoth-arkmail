@@ -768,7 +768,7 @@ export function mountMailUi(
     // Fala 24h (zgloszenie 2026-10-21): zakres czyszczenia w tooltipie
     // przycisku zamiast stalego napisu pod paskiem operacji (napis
     // wisualnie zasmiecal kazda skrzynke).
-    const clearTitle = 'Kasuje lokalnie listy, archiwum, kontakty i indeksy. Na serwerze Arkadii nic nie znika - skrzynki pobierzesz od nowa. Ustawienia zostaja.';
+    const clearTitle = 'Kasuje lokalnie listy, archiwum, kontakty i indeksy. Na serwerze Arkadii nic nie znika - skrzynki pobierzesz od nowa. Ustawienia zostaja. Grupy, zaimportowane osoby i aliasy zostaja.';
     clearBtn.setAttribute('title', clearTitle);
     let clearArmed = false;
     let clearTimer: ReturnType<typeof setTimeout> | null = null;
@@ -1519,7 +1519,7 @@ export function mountMailUi(
       const del = doc.createElement('button');
       del.textContent = 'Usun grupe';
       del.setAttribute('data-group-delete', '');
-      del.setAttribute('title', 'Dwuklik: najpierw uzbraja, potem kasuje grupe.');
+      del.setAttribute('title', 'Dwuklik: pierwszy klik pyta o potwierdzenie, drugi kasuje grupe.');
       del.addEventListener('click', () => {
         if (del.getAttribute('data-armed') !== '1') {
           del.setAttribute('data-armed', '1');
@@ -1597,7 +1597,7 @@ export function mountMailUi(
     const delAll = doc.createElement('button');
     delAll.textContent = 'Usun wszystkie grupy';
     delAll.setAttribute('data-groups-delete-all', '');
-    delAll.setAttribute('title', 'Dwuklik: najpierw uzbraja, potem kasuje wszystkie grupy.');
+    delAll.setAttribute('title', 'Dwuklik: pierwszy klik pyta o potwierdzenie, drugi kasuje wszystkie grupy.');
     if (state.groups.length === 0) delAll.setAttribute('disabled', '1');
     delAll.addEventListener('click', () => {
       if (delAll.getAttribute('data-armed') !== '1') {

@@ -107,9 +107,11 @@ test('ui: zakres czyszczenia jako tooltip przycisku, nie staly napis (Fala 24h)'
   // Fala 24h (zgloszenie 2026-10-21): informacja "Kasuje listy
   // i kontakty. Ustawienia zostaja." ma byc tooltipem przycisku,
   // nie stalym napisem pod paskiem operacji skrzynki.
+  // Fala UI-2 krok 6: tooltip dopowiada, ze grupy, zaimportowane
+  // osoby i aliasy przetrwaja czyszczenie (osobne klucze storage).
   assert.equal(
     btn!.getAttribute('title'),
-    'Kasuje lokalnie listy, archiwum, kontakty i indeksy. Na serwerze Arkadii nic nie znika - skrzynki pobierzesz od nowa. Ustawienia zostaja.',
+    'Kasuje lokalnie listy, archiwum, kontakty i indeksy. Na serwerze Arkadii nic nie znika - skrzynki pobierzesz od nowa. Ustawienia zostaja. Grupy, zaimportowane osoby i aliasy zostaja.',
     'zakres czyszczenia w tooltipie przycisku',
   );
   const pane = q(container, '.arkmail-pane');
