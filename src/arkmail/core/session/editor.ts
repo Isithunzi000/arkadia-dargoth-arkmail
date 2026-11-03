@@ -29,7 +29,7 @@ export interface ComposeInput {
 }
 
 export type ComposeOutcome =
-  | { result: 'wyslany' | 'gotowy' }
+  | { result: 'wyslany' | 'gotowy' | 'zaniechany' }
   | { result: 'blad'; error: MailError | { kind: 'timeout' } };
 
 type Stage = 'adresat' | 'temat' | 'dw' | 'tresc' | 'tresc-wyslana';
@@ -107,6 +107,14 @@ export class EditorSession {
         // Echo wlasnych komend: po klasie albo po samej tresci
         // (przenosnosc: zywy PluginApi nie daje klas gmcp_msgs).
         if (done || line.cls === 'command' || isEchoLine(line.text)) return;
+
+        // Fala UI-2 krok 5: gracz przerywa compose w grze klawiszem ~q -
+        // serwer odpowiada "Zaniechane.". Konczymy od razu, bez czekania
+        // na watchdog-timeout i bez ogolnego bledu wysylki.
+        if (line.text === 'Zaniechane.') {
+          finish({ result: 'zaniechany' });
+          return;
+        }
 
         // Blad (np. adresata) - w kazdym stanie przerywa compose.
         const err = parseMailError(line.text);

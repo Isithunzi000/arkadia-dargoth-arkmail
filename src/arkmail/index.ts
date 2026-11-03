@@ -30,7 +30,7 @@ import {
   validateListingSearch,
 } from "./core/protocol/commands";
 import type { LetterTemplate } from "./core/letterRender";
-import { validateCompose } from "./core/composeValidation";
+import { unknownRecipients, validateCompose } from "./core/composeValidation";
 import {
   ANCHOR_RETRY_WAITS_MS,
   PAGE_PACE_MS,
@@ -170,6 +170,33 @@ const NOTIFY_KEY = "powiadomienia";
 const COMPOSE_KEY = "compose";
 const INDEX_KEY = "indeks";
 const ARCHIVE_GAPS_KEY = "luki-archiwum";
+
+/**
+ * Baza osob do advisory guarda wysylki (Fala UI-2 krok 5): kontakty
+ * (ze zrodla 'alias' wlacznie) + zaimportowane osoby + aliasy pocztowe
+ * + czlonkowie grup ksiazki adresowej. Porownanie case-insensitive.
+ */
+const knownRecipientNames = (state: {
+  contacts: { name: string; mailAlias?: string }[];
+  importedPeople: { zapamietani: string[]; przedstawieni: string[] };
+  importedAliases: { name: string }[];
+  groups: { members: string[] }[];
+}): Set<string> => {
+  const known = new Set<string>();
+  const add = (name: string): void => {
+    const key = name.trim().toLowerCase();
+    if (key) known.add(key);
+  };
+  for (const c of state.contacts) {
+    add(c.name);
+    if (c.mailAlias) add(c.mailAlias);
+  }
+  for (const name of state.importedPeople.zapamietani) add(name);
+  for (const name of state.importedPeople.przedstawieni) add(name);
+  for (const alias of state.importedAliases) add(alias.name);
+  for (const group of state.groups) for (const member of group.members) add(member);
+  return known;
+};
 
 let apiRef: PluginApi | null = null;
 let storageRef: CharStorage | null = null;
@@ -2056,6 +2083,13 @@ export async function init(api: PluginApi) {
         notify(api, SESSION_BUSY_MSG, { level: "warning" });
         return;
       }
+      // Fala UI-2 krok 5: advisory guard - imiona spoza bazy osob
+      // wypisane w ostrzezeniu, wysylka NIE jest blokowana (serwer
+      // i tak ostatecznie zweryfikuje adresatow).
+      const unknown = unknownRecipients(input, knownRecipientNames(ui.state));
+      if (unknown.length > 0) {
+        notify(api, `Poza baza osob: ${unknown.join(", ")}.`, { level: "warning" });
+      }
       ui.setBusy("Wysylam list...");
       const generation = connectionGeneration;
       void runExclusive(async () => {
@@ -2087,6 +2121,16 @@ export async function init(api: PluginApi) {
               refreshBoxes(["niewyslane"]);
               flashUnsent();
               ui.clearCompose();
+            } else if (out.result === "zaniechany") {
+              // Fala UI-2 krok 5: gracz przerwal compose w grze (~q).
+              // Formularz ZOSTAJE - poprawka i ponowna wysylka mozliwa.
+              notify(api, "Przerwano wysylke listu.", { level: "info" });
+            } else if (out.result === "blad" && out.error.kind === "brak-adresata") {
+              // Fala UI-2 krok 5: serwer wskazal sprawce - toast ma go
+              // wymieniac z imienia, nie ogolnikiem o "sprawdzeniu".
+              notify(api, `Nie ma takiego adresata: ${out.error.adresat}.`, {
+                level: "error",
+              });
             } else {
               notify(api, "Blad wysylki - sprawdz adresata.", { level: "error" });
             }

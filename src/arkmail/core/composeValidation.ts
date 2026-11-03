@@ -39,3 +39,32 @@ export function validateCompose(input: ComposeValidationInput): string | null {
   }
   return null;
 }
+
+/** Rozbija pole odbiorcow na imiona (przecinki, odstepy obojetne). */
+export function splitRecipients(value: string): string[] {
+  return value
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
+
+/**
+ * Imiona spoza bazy osob (advisory guard, Fala UI-2 krok 5).
+ * Porownanie case-insensitive, wynik deduplikowany w oryginalnej
+ * pisowni z formularza. NIGDY nie blokuje wysylki - tylko informuje,
+ * ze serwer moze odrzucic te imiona ("Nie ma takiego adresata...").
+ */
+export function unknownRecipients(
+  input: { adresat: string; dw: string },
+  known: ReadonlySet<string>,
+): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const name of [...splitRecipients(input.adresat), ...splitRecipients(input.dw)]) {
+    const key = name.toLowerCase();
+    if (known.has(key) || seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+  }
+  return out;
+}
