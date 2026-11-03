@@ -50,21 +50,23 @@ jobs:
       - name: Diag bookView G2 (dodaj/usun pojedyncze)
         run: node --test --test-name-pattern='krzyzyk usuwa|dodanie imienia|walidacja' out-test/tests/bookView.test.js
 
-      - name: Diag bookView G3 (zaznaczanie i refresh)
-        run: node --test --test-name-pattern='usuwanie zaznaczonych|zaznaczenie znika' out-test/tests/bookView.test.js
-
-      # Diagnostyka 2026-11-04: G3 zawislo na 1. tescie ('usuwanie
-      # zaznaczonych'), lokalnie nie do odtworzenia (Node 20/24.22.1/
-      # 24.22.2, 30x petla, limit pamieci). Dwie sondy:
-      # - probe: replika krokow testu z punktami kontrolnymi na stderr;
-      # - G3b: ten sam test z --test-timeout=15000 - gdy timeout zadziala,
-      #   to wisiaca obietnica; gdy agenta zabije mimo timeoutu, to
-      #   petla synchroniczna (timeout nie przerywa zablokowanego watku).
+      # Diagnostyka 2026-11-04: G3 zabilo agenta w 42 s (petla albo
+      # wisiaca obietnica; lokalnie brak reprodukcji na Node 20/24.22.1/
+      # 24.22.2). Kroki zabitego procesu uniemozliwiaja dalsze kroki,
+      # wiec najpierw sondy, potwierdzenie na koncu:
+      # - probe: replika krokow testu z punktami kontrolnymi na stderr
+      #   (wskaze dokladny krok, w ktorym proces sie zapetla);
+      # - G3b: ten sam test z --test-timeout=15000 - dzialajacy timeout
+      #   = wisiaca obietnica; zabity agent mimo timeoutu = petla
+      #   synchroniczna (timeout nie przerywa zablokowanego watku).
       - name: Diag bookView probe (replika testu z checkpointami)
         run: node diag/probe-book-hang.mjs
 
       - name: Diag bookView G3b (timeout 15s)
         run: node --test --test-timeout=15000 --test-name-pattern='usuwanie zaznaczonych' out-test/tests/bookView.test.js
+
+      - name: Diag bookView G3 (zaznaczanie i refresh)
+        run: node --test --test-name-pattern='usuwanie zaznaczonych|zaznaczenie znika' out-test/tests/bookView.test.js
 
       - name: Tests
         timeout-minutes: 30
