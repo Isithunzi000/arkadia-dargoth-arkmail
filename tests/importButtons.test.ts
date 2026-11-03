@@ -77,9 +77,9 @@ test('import: klik wywoluje handler z rodzajem importu', () => {
   assert.deepEqual(calls, ['people:zapamietani', 'people:przedstawieni', 'aliases']);
 });
 
-test('import: osoby importowane podpowiadaja w polu adresata', () => {
+test('import: imiona z ksiazki podpowiadaja w polu adresata', () => {
   const s = new MailUiStore({ tab: 'napisz' });
-  s.setImportedPeople({ zapamietani: ['Fred'], przedstawieni: ['Grault'] });
+  s.setPeople(['Fred', 'Grault']);
   const { container } = mount(s);
   const el = q(container, '[data-field="adresat"]') as HTMLInputElement;
   el.value = 'fr';
@@ -107,10 +107,10 @@ test('import: alias pocztowy podpowiada jako jeden token', () => {
 
 test('import: wyczysc cache nie usuwa ksiazki adresowej w UI', () => {
   const s = new MailUiStore();
-  s.setImportedPeople({ zapamietani: ['Fred'], przedstawieni: [] });
+  s.setPeople(['Fred']);
   s.setImportedAliases([{ name: 'zgromadzenie', targets: ['Fred'] }]);
   s.clearCacheData();
-  assert.deepEqual(s.state.importedPeople, { zapamietani: ['Fred'], przedstawieni: [] });
+  assert.deepEqual(s.state.people, ['Fred']);
   assert.deepEqual(s.state.importedAliases, [{ name: 'zgromadzenie', targets: ['Fred'] }]);
 });
 

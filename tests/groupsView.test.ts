@@ -3,8 +3,9 @@
  * Sub-pigulki Osoby/Grupy (klasy .arkmail-boxes, zero nowych kolorow),
  * pelny CRUD grup (zmiana nazwy z walidacja kolizji, usuwanie czlonka,
   * dokladanie czlonka z ghosta, uzbrojone usuwanie), eksport/import
- * JSON ksiazki adresowej. Kolizja nazw grup przy imporcie dostaje
- * suffix " (import)"; pule importu sa podmieniane. Imiona syntetyczne.
+ * JSON ksiazki adresowej. Format v2 (imiona + grupy, bez aliasow);
+ * pliki v1 czytane wstecz (suma pul). Kolizja nazw grup NIE dostaje
+ * suffixu - scalanie robi mergeAddressBook. Imiona syntetyczne.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -72,49 +73,39 @@ const type = (el: unknown, value: string): void => {
 
 // --- eksport/import JSON ----------------------------------------------------
 
-test('ksiazka: eksport/import JSON 1:1', () => {
+test('ksiazka: eksport/import JSON v2 1:1', () => {
   const data = {
     format: 'arkmail-addressbook',
-    version: 1,
+    version: 2,
+    people: ['Corge'],
     groups: [{ name: 'Gildia', members: ['Fred', 'Grault'] }],
-    importedPeople: { zapamietani: ['Corge'], przedstawieni: [] },
-    importedAliases: [{ name: 'zgromadzenie', targets: ['Fred'] }],
   };
-  assert.deepEqual(parseAddressBookExport(JSON.stringify(data), []), {
+  assert.deepEqual(parseAddressBookExport(JSON.stringify(data)), {
+    people: ['Corge'],
     groups: data.groups,
-    importedPeople: data.importedPeople,
-    importedAliases: data.importedAliases,
   });
 });
 
 test('ksiazka: zly format albo uszkodzony JSON odrzucane', () => {
-  assert.equal(parseAddressBookExport('{"format":"inny"}', []), null);
-  assert.equal(parseAddressBookExport('nie-json', []), null);
-  assert.equal(parseAddressBookExport('{"format":"arkmail-addressbook"}', []), null, 'brak wersji odrzucony');
+  assert.equal(parseAddressBookExport('{"format":"inny","version":2}'), null);
+  assert.equal(parseAddressBookExport('nie-json'), null);
+  assert.equal(parseAddressBookExport('{"format":"arkmail-addressbook"}'), null, 'brak wersji odrzucony');
 });
 
-test('ksiazka: import domyslny uzupelnia brakujace pule pustymi', () => {
-  const parsed = parseAddressBookExport(
-    JSON.stringify({ format: 'arkmail-addressbook', version: 1 }),
-    [],
-  );
-  assert.deepEqual(parsed, {
-    groups: [],
-    importedPeople: { zapamietani: [], przedstawieni: [] },
-    importedAliases: [],
-  });
-});
-
-test('ksiazka: kolizja nazw grup dostaje suffix " (import)"', () => {
+test('ksiazka: plik v1 czytany wstecz - suma pul, aliasy ignorowane', () => {
   const parsed = parseAddressBookExport(
     JSON.stringify({
       format: 'arkmail-addressbook',
       version: 1,
       groups: [{ name: 'Gildia', members: ['Fred'] }],
+      importedPeople: { zapamietani: ['Corge'], przedstawieni: ['Waldo'] },
+      importedAliases: [{ name: 'zgromadzenie', targets: ['Fred'] }],
     }),
-    ['Gildia', 'Gildia (import)'],
   );
-  assert.deepEqual(parsed!.groups, [{ name: 'Gildia (import) (import)', members: ['Fred'] }]);
+  assert.deepEqual(parsed, {
+    people: ['Corge', 'Waldo'],
+    groups: [{ name: 'Gildia', members: ['Fred'] }],
+  });
 });
 
 // --- store -------------------------------------------------------------------
@@ -188,7 +179,7 @@ test('grupy: usuniecie czlonka i dodanie z ghosta', () => {
   const s = new MailUiStore({
     tab: 'kontakty',
     groups: [{ name: 'Gildia', members: ['Fred', 'Grault'] }],
-    importedPeople: { zapamietani: ['Corge'], przedstawieni: [] },
+    people: ['Corge'],
   });
   const { container, calls } = mount(s);
   switchToGrupy(container);
@@ -243,6 +234,8 @@ test('grupy: eksport JSON przez pobieranie pliku', async () => {
     assert.match(downloads[0][0], /arkmail-adresy/i);
     const parsed = JSON.parse(downloads[0][1]);
     assert.equal(parsed.format, 'arkmail-addressbook');
+    assert.equal(parsed.version, 2);
+    assert.deepEqual(parsed.people, []);
     assert.deepEqual(parsed.groups, [{ name: 'Gildia', members: ['Fred'] }]);
   } finally {
     setDownloadImpl(null);
@@ -259,16 +252,17 @@ test('grupy: import JSON wywoluje handler z danymi', () => {
   const fileInput = q(container, '[data-book-import]') as HTMLInputElement;
   const payload = JSON.stringify({
     format: 'arkmail-addressbook',
-    version: 1,
+    version: 2,
+    people: ['Corge'],
     groups: [{ name: 'Gildia', members: ['Grault'] }],
-    importedPeople: { zapamietani: ['Corge'], przedstawieni: [] },
   });
   const file = new window.File([payload], 'adresy.json', { type: 'application/json' });
   Object.defineProperty(fileInput, 'files', { value: [file], configurable: true });
   fileInput.dispatchEvent(new window.Event('change') as unknown as Event);
   return new Promise((resolve) => setImmediate(resolve)).then(() => {
     assert.equal(calls.imports.length, 1, 'handler wywolany');
-    const data = calls.imports[0] as { groups: Array<{ name: string }> };
-    assert.equal(data.groups[0].name, 'Gildia (import)', 'kolizja dostaje suffix');
+    const data = calls.imports[0] as { groups: Array<{ name: string }>; people: string[] };
+    assert.equal(data.groups[0].name, 'Gildia', 'bez suffixu - kolizje scala mergeAddressBook');
+    assert.deepEqual(data.people, ['Corge']);
   });
 });
