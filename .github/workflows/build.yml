@@ -39,8 +39,16 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Diagnostyka 2026-11-03: runnery GitHub padaly w tym repo zawsze
+      # w punkcie bookView.test.js pelnego suite (4/4 proby). Solo-run
+      # rozstrzyga, czy wystarczy sam plik, czy to interakcja z
+      # poprzedzajacymi plikami w sekwencji.
+      - name: Diagnostyka bookView (solo)
+        run: npx tsc -p tsconfig.test.json && node --test out-test/tests/bookView.test.js
+
       - name: Tests
-        run: npm test
+        timeout-minutes: 30
+        run: npm test -- --test-timeout=120000
 
       - name: Build plugins
         run: node scripts/build.js
