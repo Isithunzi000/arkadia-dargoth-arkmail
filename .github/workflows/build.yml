@@ -62,15 +62,20 @@ jobs:
       - name: Diag bookView probe (replika testu z checkpointami)
         run: node diag/probe-book-hang.mjs
 
-      # G3b: instrumentowany test z checkpointami [bv6] na stderr.
-      # timeout -s KILL 20 odcina zabity proces po 20 s, zanim platforma
-      # zdrowia zabije calego agenta (progiem ok. 30-40 s spinu), wiec
-      # log z checkpointami i kolejne kroki zostaja zachowane.
-      - name: Diag bookView G3b (instrumentowany, timeout 20s)
+      # G3b: instrumentowany test z checkpointami [bv6], 6 powtorzen.
+      # Zawieszenie jest losowe (1 przebieg na zielono mimo 6 wczesniejszych
+      # zabitych agentow), wiec petla lapie je statystycznie. timeout -s KILL
+      # 20 odcina zawieszony proces przed progiem zdrowia agenta (ok. 30-40 s
+      # spinu), wiec log z checkpointami i kolejne kroki zostaja zachowane.
+      - name: Diag bookView G3b (instrumentowany, 6x timeout 20s)
         continue-on-error: true
         run: |
-          timeout -s KILL 20 node --test --test-name-pattern='usuwanie zaznaczonych' out-test/tests/bookView.test.js
-          echo "g3b-exit=$?"
+          node -e "const o=require('os');console.log('cpus',o.cpus().length,'memGB',(o.totalmem()/2**30).toFixed(1))"
+          for i in 1 2 3 4 5 6; do
+            echo "=== g3b iter $i ==="
+            timeout -s KILL 20 node --test --test-name-pattern='usuwanie zaznaczonych' out-test/tests/bookView.test.js
+            echo "g3b-iter-$i-exit=$?"
+          done
 
       - name: Tests
         timeout-minutes: 30
