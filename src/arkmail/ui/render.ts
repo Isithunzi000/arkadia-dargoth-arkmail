@@ -321,6 +321,16 @@ export function mountMailUi(
     for (const alias of store.state.importedAliases) push(alias.name);
     return out;
   };
+  // Fala UI-2 krok 4: zrodlo pol wieloodbiorczych (adresat/DW) - baza
+  // osob + grupy. Grupa podpowiada po nazwie, ale akceptacja wstawia
+  // ROZWINIETA liste czlonkow (Arkadia nie zna grup pluginu - w polu
+  // musza stanac imiona), nigdy samej nazwy grupy.
+  const adresatSource: GhostSource = () => [
+    ...personSource(),
+    ...store.state.groups
+      .filter((g) => g.members.length > 0)
+      .map((g) => ({ text: g.name, expand: g.members.join(', ') })),
+  ];
   // Pola tematu: tematy z archiwum (archiwum jest najnowsze->najstarsze).
   const subjectSource: GhostSource = () => {
     const seen = new Set<string>();
@@ -1271,9 +1281,10 @@ export function mountMailUi(
         composeDraft[field as 'adresat' | 'temat' | 'dw'] = input.value;
       });
       pane.appendChild(input);
-      // Ghost (Fala 9g): adresat/DW -> kontakty+aliasy, temat -> archiwum.
+      // Ghost (Fala 9g): adresat/DW -> kontakty+aliasy+grupy (tryb
+      // segmentu po przecinku, Fala UI-2 krok 4), temat -> archiwum.
       if (field === 'temat') attachGhost(doc, input, subjectSource);
-      else attachGhost(doc, input, personSource);
+      else attachGhost(doc, input, adresatSource, { segment: true });
     }
 
     // Szablon ramki + szerokosc linii (trzymane w store, trwale).
