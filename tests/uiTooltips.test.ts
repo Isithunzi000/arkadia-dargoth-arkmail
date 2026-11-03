@@ -92,13 +92,13 @@ test('tooltipy: kazdy przycisk w kazdym widoku ma niepusty tooltip', () => {
   );
 });
 
-test('tooltipy: czyszczenie danych mowi, ze grupy i importy zostaja', () => {
+test('tooltipy: czyszczenie danych mowi, ze grupy i ksiazka zostaja', () => {
   const { titles } = collectTitles();
   const wipe = titles.find((t) => t.includes('Kasuje lokalnie'));
   assert.ok(wipe, 'tooltip czyszczenia istnieje');
   assert.ok(
-    wipe.includes('Grupy, zaimportowane osoby i aliasy zostaja.'),
-    `tooltip czyszczenia zawiera zdanie o grupach/importach: ${wipe}`,
+    wipe.includes('Ustawienia, grupy i ksiazka adresowa zostaja. Aliasy pobierzesz z gry ponownie.'),
+    `tooltip czyszczenia zawiera zdanie o grupach/ksiazce: ${wipe}`,
   );
 });
 

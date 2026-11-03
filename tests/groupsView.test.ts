@@ -1,9 +1,10 @@
 /**
  * Fala UI-2 krok 3: widok Grupy w zakladce Kontakty.
- * Sub-pigulki Osoby/Grupy (klasy .arkmail-boxes, zero nowych kolorow),
- * pelny CRUD grup (zmiana nazwy z walidacja kolizji, usuwanie czlonka,
-  * dokladanie czlonka z ghosta, uzbrojone usuwanie), eksport/import
- * JSON ksiazki adresowej. Format v2 (imiona + grupy, bez aliasow);
+ * Sub-pigulki Osoby/Ksiazka adresowa/Grupy (klasy .arkmail-boxes,
+ * zero nowych kolorow), pelny CRUD grup (zmiana nazwy z walidacja
+ * kolizji, usuwanie czlonka, dokladanie czlonka z ghosta, uzbrojone
+ * usuwanie), eksport/import JSON z trybem dolacz/zastap.
+ * Format v2 (imiona + grupy, bez aliasow);
  * pliki v1 czytane wstecz (suma pul). Kolizja nazw grup NIE dostaje
  * suffixu - scalanie robi mergeAddressBook. Imiona syntetyczne.
  */
@@ -44,7 +45,7 @@ function mount(store: MailUiStore) {
       calls.groups.push(groups.map((g) => `${g.name}=${g.members.join('+')}`));
       store.setGroups(groups);
     },
-    onImportAddressBook: (data) => calls.imports.push(data),
+    onImportAddressBook: (data, mode) => calls.imports.push({ data, mode }),
   });
   return { container, calls };
 }
@@ -62,7 +63,7 @@ const text = (el: unknown): string => (el as { textContent?: string })?.textCont
 const click = (el: unknown): void => (el as { click(): void }).click();
 
 const switchToGrupy = (container: unknown): void => {
-  click(qa(container, '.arkmail-subpill')[1]);
+  click(qa(container, '.arkmail-subpill')[2]);
 };
 
 const type = (el: unknown, value: string): void => {
@@ -120,11 +121,11 @@ test('grupy: stan grup w store, wipe ich nie tyka', () => {
 
 // --- widok -------------------------------------------------------------------
 
-test('grupy: sub-pigulki Osoby/Grupy w zakladce Kontakty', () => {
+test('grupy: trzy sub-pigulki Osoby/Ksiazka adresowa/Grupy', () => {
   const s = new MailUiStore({ tab: 'kontakty' });
   const { container } = mount(s);
   const pills = qa(container, '.arkmail-subpill');
-  assert.deepEqual(pills.map(text), ['Osoby', 'Grupy']);
+  assert.deepEqual(pills.map(text), ['Osoby', 'Ksiazka adresowa', 'Grupy']);
   assert.ok(q(container, '[data-import]'), 'domyslnie Osoby: przyciski importu widoczne');
   assert.ok(!q(container, '[data-group-add]'), 'domyslnie Grupy: formularz ukryty');
 });
@@ -132,7 +133,10 @@ test('grupy: sub-pigulki Osoby/Grupy w zakladce Kontakty', () => {
 test('grupy: przełączanie sub-pigulek', () => {
   const s = new MailUiStore({ tab: 'kontakty' });
   const { container } = mount(s);
-  const grupy = qa(container, '.arkmail-subpill')[1];
+  const ksiazka = qa(container, '.arkmail-subpill')[1];
+  click(ksiazka);
+  assert.ok(q(container, '[data-book-new]'), 'po kliku Ksiazka adresowa: formularz dodawania widoczny');
+  const grupy = qa(container, '.arkmail-subpill')[2];
   click(grupy);
   assert.ok(q(container, '[data-group-add]'), 'po kliku Grupy: formularz widoczny');
   const osoby = qa(container, '.arkmail-subpill')[0];
@@ -261,8 +265,77 @@ test('grupy: import JSON wywoluje handler z danymi', () => {
   fileInput.dispatchEvent(new window.Event('change') as unknown as Event);
   return new Promise((resolve) => setImmediate(resolve)).then(() => {
     assert.equal(calls.imports.length, 1, 'handler wywolany');
-    const data = calls.imports[0] as { groups: Array<{ name: string }>; people: string[] };
-    assert.equal(data.groups[0].name, 'Gildia', 'bez suffixu - kolizje scala mergeAddressBook');
-    assert.deepEqual(data.people, ['Corge']);
+    const call = calls.imports[0] as {
+      data: { groups: Array<{ name: string }>; people: string[] };
+      mode: string;
+    };
+    assert.equal(call.data.groups[0]!.name, 'Gildia', 'bez suffixu - kolizje scala mergeAddressBook');
+    assert.deepEqual(call.data.people, ['Corge']);
+    assert.equal(call.mode, 'dolacz', 'domyslny tryb to dolacz');
   });
+});
+
+// --- tryb importu: dolacz / zastap -------------------------------------------
+
+test('ksiazka: tryb importu - domyslnie dolacz, przełacznik zastap', () => {
+  const s = new MailUiStore({ tab: 'kontakty' });
+  const { container } = mount(s);
+  switchToGrupy(container);
+  const radios = qa(container, '[data-book-import-mode] input[type=radio]');
+  assert.equal(radios.length, 2, 'dwa tryby');
+  assert.deepEqual(
+    qa(container, '[data-book-import-mode] label').map(text),
+    ['Dolacz do ksiazki', 'Zastap cala ksiazke'],
+  );
+  const dolacz = radios[0] as HTMLInputElement;
+  const zastap = radios[1] as HTMLInputElement;
+  assert.equal(dolacz.checked, true, 'dolacz domyslnie');
+  assert.equal(zastap.checked, false);
+  (zastap as HTMLInputElement).click();
+  assert.equal(zastap.checked, true, 'zastap zaznaczony');
+  assert.equal(dolacz.checked, false, 'radio - jeden aktywny');
+});
+
+const importFile = (container: unknown, payload: string): Promise<void> =>
+  new Promise((resolve) => {
+    const fileInput = q(container, '[data-book-import]') as HTMLInputElement;
+    const file = new window.File([payload], 'adresy.json', { type: 'application/json' });
+    Object.defineProperty(fileInput, 'files', { value: [file], configurable: true });
+    fileInput.dispatchEvent(new window.Event('change') as unknown as Event);
+    setImmediate(resolve);
+  });
+
+test('ksiazka: import w trybie zastap przekazuje mode zastap', async () => {
+  const s = new MailUiStore({
+    tab: 'kontakty',
+    people: ['Fred'],
+    groups: [{ name: 'Stara', members: ['Fred'] }],
+  });
+  const { container, calls } = mount(s);
+  switchToGrupy(container);
+  (qa(container, '[data-book-import-mode] input[type=radio]')[1] as HTMLInputElement).click();
+  await importFile(
+    container,
+    JSON.stringify({
+      format: 'arkmail-addressbook',
+      version: 2,
+      people: ['Corge'],
+      groups: [{ name: 'Gildia', members: ['Corge', 'Waldo'] }],
+    }),
+  );
+  assert.equal(calls.imports.length, 1);
+  const call = calls.imports[0] as { mode: string; data: { people: string[] } };
+  assert.equal(call.mode, 'zastap', 'tryb zastap przekazany do handlera');
+  assert.deepEqual(call.data.people, ['Corge']);
+});
+
+test('ksiazka: tooltip importu mowi o trybie, nie wspomina suffixow', () => {
+  const s = new MailUiStore({ tab: 'kontakty' });
+  const { container } = mount(s);
+  switchToGrupy(container);
+  const impInput = q(container, '[data-book-import]') as HTMLElement;
+  assert.equal(
+    impInput.getAttribute('title'),
+    'Wczytuje imiona i grupy z pliku JSON. Sposob zalezy od trybu: dolacz albo zastap. Aliasy pobierasz z gry.',
+  );
 });

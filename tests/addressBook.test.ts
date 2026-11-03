@@ -23,6 +23,7 @@ import {
   savePeople,
   migratePeople,
   mergeAddressBook,
+  applyBookImport,
   withGroupMembers,
   unionPeople,
   parseAddressBookExport,
@@ -303,4 +304,55 @@ test('format: bez suffixow import - kolizja nazw zostaje do scalenia', () => {
     }),
   );
   assert.deepEqual(parsed!.groups, [{ name: 'Gildia', members: ['Fred'] }], 'nazwa 1:1 z pliku');
+});
+
+// --- applyBookImport: tryby dolacz / zastap ----------------------------------
+
+test('applyBookImport: dolacz = mergeAddressBook (grupy scalone, imiona dopisane)', () => {
+  const existing = {
+    people: ['Fred', 'Grault'],
+    groups: [{ name: 'Gildia', members: ['Fred'] }],
+  };
+  const incoming = {
+    people: ['Corge'],
+    groups: [{ name: 'gildia', members: ['Corge'] }],
+  };
+  const merged = applyBookImport(existing, incoming, 'dolacz');
+  assert.deepEqual(merged.data.groups, [
+    { name: 'Gildia', members: ['Fred', 'Corge'] },
+  ], 'grupa scalona bez wielkosci liter, kanoniczna nazwa zostaje');
+  assert.deepEqual(merged.data.people, ['Fred', 'Grault', 'Corge']);
+  assert.deepEqual(merged.stats, { addedGroups: 0, mergedGroups: 1, addedPeople: 1 });
+});
+
+test('applyBookImport: zastap zastepuje imiona i grupy, uzupelnia o czlonkow', () => {
+  const existing = {
+    people: ['Fred', 'Grault', 'Stary'],
+    groups: [{ name: 'Stara', members: ['Stary'] }],
+  };
+  const incoming = {
+    people: ['Corge'],
+    groups: [{ name: 'Gildia', members: ['Corge', 'Waldo'] }],
+  };
+  const merged = applyBookImport(existing, incoming, 'zastap');
+  assert.deepEqual(merged.data.groups, [{ name: 'Gildia', members: ['Corge', 'Waldo'] }], 'stare grupy znikaja');
+  assert.deepEqual(merged.data.people, ['Corge', 'Waldo'], 'niezbednik: czlonkowie grupy w ksiazce');
+  assert.equal(merged.stats.mergedGroups, 0, 'zastap nie scala');
+  assert.equal(merged.stats.addedGroups, 1);
+});
+
+test('applyBookImport: zastap pustym plikiem czysci ksiazke', () => {
+  const existing = {
+    people: ['Fred'],
+    groups: [{ name: 'Gildia', members: ['Fred'] }],
+  };
+  const merged = applyBookImport(existing, { people: [], groups: [] }, 'zastap');
+  assert.deepEqual(merged.data, { people: [], groups: [] });
+});
+
+test('applyBookImport: tryb domyslny to dolacz', () => {
+  const existing = { people: ['Fred'], groups: [] };
+  const incoming = { people: ['Grault'], groups: [] };
+  const merged = applyBookImport(existing, incoming);
+  assert.deepEqual(merged.data.people, ['Fred', 'Grault']);
 });
