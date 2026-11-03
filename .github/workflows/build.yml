@@ -62,11 +62,15 @@ jobs:
       - name: Diag bookView probe (replika testu z checkpointami)
         run: node diag/probe-book-hang.mjs
 
-      - name: Diag bookView G3b (timeout 15s)
-        run: node --test --test-timeout=15000 --test-name-pattern='usuwanie zaznaczonych' out-test/tests/bookView.test.js
-
-      - name: Diag bookView G3 (zaznaczanie i refresh)
-        run: node --test --test-name-pattern='usuwanie zaznaczonych|zaznaczenie znika' out-test/tests/bookView.test.js
+      # G3b: instrumentowany test z checkpointami [bv6] na stderr.
+      # timeout -s KILL 20 odcina zabity proces po 20 s, zanim platforma
+      # zdrowia zabije calego agenta (progiem ok. 30-40 s spinu), wiec
+      # log z checkpointami i kolejne kroki zostaja zachowane.
+      - name: Diag bookView G3b (instrumentowany, timeout 20s)
+        continue-on-error: true
+        run: |
+          timeout -s KILL 20 node --test --test-name-pattern='usuwanie zaznaczonych' out-test/tests/bookView.test.js
+          echo "g3b-exit=$?"
 
       - name: Tests
         timeout-minutes: 30

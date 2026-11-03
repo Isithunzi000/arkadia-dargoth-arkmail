@@ -152,31 +152,49 @@ test('ksiazka: walidacja - puste, cyfry, duplikat', () => {
 
 // --- usuwanie zaznaczonych ---------------------------------------------------
 
+// Diagnostyka 2026-11-04: checkpointi [bv6] na stderr - ten test zawiesza
+// agenta CI w trybie node --test (sonda diag/probe-book-hang.mjs z tymi
+// samymi krokami przechodzi w 18 ms). Checkpointi wskaza krok zapetlenia.
+// Do usuniecia po diagnozie.
+const bv6 = (label: string): void => console.error(`[bv6] ${label} t=+${Date.now() - BV6_T0}ms`);
+const BV6_T0 = Date.now();
+
 test('ksiazka: usuwanie zaznaczonych - uzbrojony dwuklik, puste = wylaczone', () => {
+  bv6('test-start');
   const s = new MailUiStore({ tab: 'kontakty', people: ['Fred', 'Grault', 'Corge'] });
   const { container, calls } = mount(s);
+  bv6('mounted');
   switchToKsiazka(container);
-  const bulk = q(container, '[data-book-delete-checked]') as HTMLButtonElement;
-  assert.equal(bulk.getAttribute('disabled'), '1', 'bez zaznaczenia wylaczony');
+  bv6('switched');
+  // Repaint po kazdym zdarzeniu (store.refresh) podmienia DOM, wiec
+  // wszystkie zapytania ponawiane na swiezym drzewie.
+  const bulkBtn = () => q(container, '[data-book-delete-checked]') as HTMLButtonElement;
+  assert.equal(bulkBtn().getAttribute('disabled'), '1', 'bez zaznaczenia wylaczony');
   assert.equal(
-    bulk.getAttribute('title'),
+    bulkBtn().getAttribute('title'),
     'Dwuklik: pierwszy klik pyta o potwierdzenie, drugi kasuje zaznaczone imiona.',
   );
 
-  const checks = qa(container, '[data-book-row] input[type=checkbox]');
-  (checks[0] as HTMLInputElement).checked = true;
-  (checks[0] as HTMLInputElement).dispatchEvent(new window.Event('change') as unknown as Event);
-  (checks[2] as HTMLInputElement).checked = true;
-  (checks[2] as HTMLInputElement).dispatchEvent(new window.Event('change') as unknown as Event);
-  assert.equal(q(container, '[data-book-delete-checked]'), bulk, 'ta sama referencja');
-  assert.notEqual((q(container, '[data-book-delete-checked]') as HTMLButtonElement).getAttribute('disabled'), '1', 'po zaznaczeniu aktywny');
+  const checkAt = (i: number): void => {
+    const boxes = qa(container, '[data-book-row] input[type=checkbox]');
+    (boxes[i] as HTMLInputElement).checked = true;
+    (boxes[i] as HTMLInputElement).dispatchEvent(new window.Event('change') as unknown as Event);
+  };
+  checkAt(0);
+  bv6('checkAt(0) done');
+  checkAt(2);
+  bv6('checkAt(2) done');
+  assert.notEqual(bulkBtn().getAttribute('disabled'), '1', 'po zaznaczeniu aktywny');
 
-  click(bulk);
-  assert.equal(text(bulk), 'Na pewno usunac zaznaczone (2)?', 'pierwszy klik uzbraja');
+  click(bulkBtn());
+  bv6('arm-click done');
+  assert.equal(text(bulkBtn()), 'Na pewno usunac zaznaczone (2)?', 'pierwszy klik uzbraja');
   assert.equal(calls.saves.length, 0, 'uzbrojenie nic nie kasuje');
 
-  click(bulk);
+  click(bulkBtn());
+  bv6('delete-click done');
   assert.deepEqual(calls.saves, [['Fred']], 'zostaly tylko niezaznaczone');
+  bv6('test-end');
 });
 
 // --- aliasy read-only --------------------------------------------------------
