@@ -38,19 +38,17 @@ export const STYLES = `
      .arkmail-pane); root nie rosnie poza popup i nie scrolluje calosci. */
   overflow: hidden;
   box-sizing: border-box;
-  padding: 10px;
-  gap: 8px;
+  padding: calc(10px * var(--window-font-scale, 1));
+  gap: calc(8px * var(--window-font-scale, 1));
   background: ${BG};
   color: ${FG};
   color-scheme: dark;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  font-size: 13px;
   line-height: 1.45;
 }
 .arkmail-version-footer {
   flex: 0 0 auto;
   color: ${FG_DIM};
-  font-size: 11px;
+  font-size: calc(11px * var(--window-font-scale, 1));
   line-height: 1.3;
   text-align: right;
 }
@@ -62,9 +60,9 @@ export const STYLES = `
 .arkmail-root button {
   background: ${BG_RAISED};
   color: ${FG};
-  border: 1px solid ${BORDER};
-  border-radius: 6px;
-  padding: 4px 12px;
+  border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
+  border-radius: calc(6px * var(--window-font-scale, 1));
+  padding: calc(4px * var(--window-font-scale, 1)) calc(12px * var(--window-font-scale, 1));
   font: inherit;
   cursor: pointer;
   /* Fala 16k: etykiety przyciskow nie lamia sie w waskim popupie. */
@@ -74,7 +72,7 @@ export const STYLES = `
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 26px;
+  min-height: calc(26px * var(--window-font-scale, 1));
 }
 .arkmail-root button:hover { background: #454a58; }
 
@@ -87,7 +85,7 @@ export const STYLES = `
 .arkmail-root .arkmail-btn-primary:hover { background: ${ACCENT_DEEPER}; border-color: ${ACCENT_DEEPER}; }
 .arkmail-root .arkmail-btn-action {
   background: ${BG_RAISED};
-  border: 1px solid ${ACCENT};
+  border: calc(1px * var(--window-font-scale, 1)) solid ${ACCENT};
   color: ${ACCENT_SOFT};
 }
 .arkmail-root .arkmail-btn-action:hover { background: #454a58; border-color: #6b93ea; color: #6b93ea; }
@@ -106,9 +104,9 @@ export const STYLES = `
 .arkmail-root input, .arkmail-root textarea, .arkmail-root select {
   background: ${BG_INPUT};
   color: ${FG};
-  border: 1px solid ${BORDER};
-  border-radius: 6px;
-  padding: 5px 8px;
+  border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
+  border-radius: calc(6px * var(--window-font-scale, 1));
+  padding: calc(5px * var(--window-font-scale, 1)) calc(8px * var(--window-font-scale, 1));
   font: inherit;
 }
 .arkmail-root input:focus, .arkmail-root textarea:focus, .arkmail-root select:focus {
@@ -118,26 +116,26 @@ export const STYLES = `
 .arkmail-root input[type='checkbox'] { accent-color: ${ACCENT}; }
 .arkmail-root input::placeholder, .arkmail-root textarea::placeholder {
   color: ${FG_DIM};
-  font-size: 12px;
+  font-size: calc(12px * var(--window-font-scale, 1));
   opacity: 1;
 }
 
 /* --- zakladki: segmentowana belka --- */
 .arkmail-tabs {
   display: flex;
-  gap: 2px;
+  gap: calc(2px * var(--window-font-scale, 1));
   flex-wrap: wrap;
   background: ${BG_PANEL};
-  border: 1px solid ${BORDER};
-  border-radius: 8px;
-  padding: 3px;
+  border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
+  border-radius: calc(8px * var(--window-font-scale, 1));
+  padding: calc(3px * var(--window-font-scale, 1));
 }
 .arkmail-root .arkmail-tab {
-  border: 1px solid ${BG_PANEL};
-  border-radius: 6px;
+  border: calc(1px * var(--window-font-scale, 1)) solid ${BG_PANEL};
+  border-radius: calc(6px * var(--window-font-scale, 1));
   background: ${BG_PANEL};
   color: ${FG_DIM};
-  padding: 4px 12px;
+  padding: calc(4px * var(--window-font-scale, 1)) calc(12px * var(--window-font-scale, 1));
 }
 .arkmail-root .arkmail-tab:hover { color: ${FG}; background: ${BG_RAISED}; }
 .arkmail-root .arkmail-tab-active {
@@ -150,13 +148,13 @@ export const STYLES = `
 
 /* --- pasek operacji --- */
 .arkmail-busy {
-  padding: 5px 10px;
-  border: 1px solid ${BORDER};
-  border-left: 3px solid ${ACCENT};
-  border-radius: 6px;
+  padding: calc(5px * var(--window-font-scale, 1)) calc(10px * var(--window-font-scale, 1));
+  border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
+  border-left: calc(3px * var(--window-font-scale, 1)) solid ${ACCENT};
+  border-radius: calc(6px * var(--window-font-scale, 1));
   background: ${BG_PANEL};
   color: ${FG_DIM};
-  font-size: 12px;
+  font-size: calc(12px * var(--window-font-scale, 1));
   white-space: normal;
   overflow-wrap: anywhere;
 }
@@ -168,22 +166,22 @@ export const STYLES = `
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  gap: 8px;
+  gap: calc(8px * var(--window-font-scale, 1));
 }
 .arkmail-status .arkmail-busy { flex: 1 1 auto; min-width: 0; }
 .arkmail-busy-empty { visibility: hidden; }
 /* Fala 18d (zgloszenie pkt 2): pasek postepu pod tekstem busy przy
    masowym pobieraniu tresci (jedyna petla ze znanym total). */
 .arkmail-busy-track {
-  margin-top: 4px;
-  height: 6px;
-  border-radius: 3px;
+  margin-top: calc(4px * var(--window-font-scale, 1));
+  height: calc(6px * var(--window-font-scale, 1));
+  border-radius: calc(3px * var(--window-font-scale, 1));
   background: ${BG};
   overflow: hidden;
 }
 .arkmail-busy-bar {
   height: 100%;
-  border-radius: 3px;
+  border-radius: calc(3px * var(--window-font-scale, 1));
   background: ${ACCENT};
   transition: width 200ms ease-out;
 }
@@ -194,9 +192,9 @@ export const STYLES = `
   overflow: auto;
   min-height: 0;
   background: ${BG_PANEL};
-  border: 1px solid ${BORDER};
-  border-radius: 8px;
-  padding: 8px;
+  border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
+  border-radius: calc(8px * var(--window-font-scale, 1));
+  padding: calc(8px * var(--window-font-scale, 1));
 }
 /* Fala UI-1 (zgloszenie 2026-11-03): zakladka Listy - panel kolumnowy,
    scrolluje sie wylacznie .arkmail-list-scroll; naglowek (skrzynki,
@@ -212,18 +210,18 @@ export const STYLES = `
   overflow: auto;
 }
 .arkmail-pane::-webkit-scrollbar,
-.arkmail-list-scroll::-webkit-scrollbar { width: 8px; }
+.arkmail-list-scroll::-webkit-scrollbar { width: calc(8px * var(--window-font-scale, 1)); }
 .arkmail-pane::-webkit-scrollbar-thumb,
-.arkmail-list-scroll::-webkit-scrollbar-thumb { background: ${BORDER}; border-radius: 4px; }
+.arkmail-list-scroll::-webkit-scrollbar-thumb { background: ${BORDER}; border-radius: calc(4px * var(--window-font-scale, 1)); }
 
 /* --- skrzynki: pigulki --- */
-.arkmail-boxes { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
+.arkmail-boxes { display: flex; gap: calc(4px * var(--window-font-scale, 1)); margin-bottom: calc(8px * var(--window-font-scale, 1)); flex-wrap: wrap; }
 .arkmail-root .arkmail-box {
-  border-radius: 999px;
-  padding: 3px 12px;
+  border-radius: calc(999px * var(--window-font-scale, 1));
+  padding: calc(3px * var(--window-font-scale, 1)) calc(12px * var(--window-font-scale, 1));
   background: ${BG};
   color: ${FG_DIM};
-  border: 1px solid ${BORDER};
+  border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
 }
 .arkmail-root .arkmail-box:hover { color: ${FG}; background: ${BG_RAISED}; }
 .arkmail-root .arkmail-box-active {
@@ -241,8 +239,8 @@ export const STYLES = `
 }
 
 /* Fala 11e: zbiorcze operacje na aktywnej skrzynce (zamiast ↻ per box). */
-.arkmail-box-ops { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-.arkmail-box-ops button { flex: 1 1 140px; }
+.arkmail-box-ops { display: flex; flex-wrap: wrap; gap: calc(6px * var(--window-font-scale, 1)); margin-bottom: calc(8px * var(--window-font-scale, 1)); }
+.arkmail-box-ops button { flex: 1 1 calc(140px * var(--window-font-scale, 1)); }
 .arkmail-root button:disabled { opacity: 0.45; cursor: default; }
 .arkmail-root button:disabled:hover { background: ${BG_RAISED}; }
 
@@ -250,17 +248,17 @@ export const STYLES = `
 .arkmail-entry {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  border-bottom: 1px solid ${BG};
+  gap: calc(8px * var(--window-font-scale, 1));
+  padding: calc(6px * var(--window-font-scale, 1)) calc(8px * var(--window-font-scale, 1));
+  border-radius: calc(6px * var(--window-font-scale, 1));
+  border-bottom: calc(1px * var(--window-font-scale, 1)) solid ${BG};
   cursor: pointer;
 }
 .arkmail-entry:hover { background: ${BG_RAISED}; }
-.arkmail-entry-num { color: ${FG_DIM}; font-size: 11px; min-width: 26px; text-align: right; }
+.arkmail-entry-num { color: ${FG_DIM}; font-size: calc(11px * var(--window-font-scale, 1)); min-width: calc(26px * var(--window-font-scale, 1)); text-align: right; }
 .arkmail-entry-party {
-  min-width: 110px;
-  max-width: 180px;
+  min-width: calc(110px * var(--window-font-scale, 1));
+  max-width: calc(180px * var(--window-font-scale, 1));
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -273,11 +271,11 @@ export const STYLES = `
   white-space: nowrap;
   color: ${FG_DIM};
 }
-.arkmail-entry-date { color: ${FG_DIM}; font-size: 11px; white-space: nowrap; }
+.arkmail-entry-date { color: ${FG_DIM}; font-size: calc(11px * var(--window-font-scale, 1)); white-space: nowrap; }
 /* Fala 16f: nieprzeczytany wiersz dodatkowo JAŚNIEJSZY (pkt 8: kropka +
    pogrubienie + rozjasnienie; po odczyciu listing daje *R* i wiersz
    wraca do normalnego). */
-.arkmail-unread { background: ${BG_UNREAD}; box-shadow: inset 3px 0 0 ${ACCENT}; }
+.arkmail-unread { background: ${BG_UNREAD}; box-shadow: inset calc(3px * var(--window-font-scale, 1)) 0 0 ${ACCENT}; }
 .arkmail-unread .arkmail-entry-party, .arkmail-unread .arkmail-entry-subject {
   color: ${FG};
   font-weight: 700;
@@ -285,22 +283,22 @@ export const STYLES = `
 .arkmail-unread::before {
   content: '';
   align-self: center;
-  width: 7px;
-  height: 7px;
+  width: calc(7px * var(--window-font-scale, 1));
+  height: calc(7px * var(--window-font-scale, 1));
   border-radius: 50%;
   background: ${ACCENT};
   flex: none;
 }
 
-.arkmail-root .arkmail-older { margin-top: 8px; width: 100%; }
-.arkmail-older-row { display: flex; gap: 6px; margin-top: 8px; }
+.arkmail-root .arkmail-older { margin-top: calc(8px * var(--window-font-scale, 1)); width: 100%; }
+.arkmail-older-row { display: flex; gap: calc(6px * var(--window-font-scale, 1)); margin-top: calc(8px * var(--window-font-scale, 1)); }
 /* Fala 11a: szukajka stosowo (2 kolumny), nie 5 w linii - w waskiej
    kolumnie splitu pola tekstowe zachowuja sensowna szerokosc. */
 .arkmail-search-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin: 8px 0;
+  gap: calc(6px * var(--window-font-scale, 1));
+  margin: calc(8px * var(--window-font-scale, 1)) 0;
   align-items: center;
 }
 .arkmail-search-row .arkmail-search-go { grid-column: 1 / -1; }
@@ -309,27 +307,27 @@ export const STYLES = `
 .arkmail-search-row .arkmail-search-wide { grid-column: 1 / -1; }
 .arkmail-search-row input[type='date'] { color-scheme: dark; }
 /* Pole daty z widoczna etykieta (placeholder na date nie dziala). */
-.arkmail-date-field { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.arkmail-date-field { display: flex; flex-direction: column; gap: calc(2px * var(--window-font-scale, 1)); min-width: 0; }
 .arkmail-date-field input { width: 100%; box-sizing: border-box; }
-.arkmail-date-label { color: ${FG_DIM}; font-size: 11px; }
-.arkmail-dates-error { color: ${DANGER_TEXT}; font-size: 12px; margin-bottom: 6px; }
+.arkmail-date-label { color: ${FG_DIM}; font-size: calc(11px * var(--window-font-scale, 1)); }
+.arkmail-dates-error { color: ${DANGER_TEXT}; font-size: calc(12px * var(--window-font-scale, 1)); margin-bottom: calc(6px * var(--window-font-scale, 1)); }
 .arkmail-search-banner {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: calc(8px * var(--window-font-scale, 1));
   background: ${BG_RAISED};
-  border: 1px solid ${ACCENT};
-  border-radius: 8px;
-  padding: 6px 10px;
-  margin-bottom: 8px;
+  border: calc(1px * var(--window-font-scale, 1)) solid ${ACCENT};
+  border-radius: calc(8px * var(--window-font-scale, 1));
+  padding: calc(6px * var(--window-font-scale, 1)) calc(10px * var(--window-font-scale, 1));
+  margin-bottom: calc(8px * var(--window-font-scale, 1));
   color: ${FG};
-  font-size: 12px;
+  font-size: calc(12px * var(--window-font-scale, 1));
 }
-.arkmail-root .arkmail-search-clear { flex: none; padding: 2px 10px; }
+.arkmail-root .arkmail-search-clear { flex: none; padding: calc(2px * var(--window-font-scale, 1)) calc(10px * var(--window-font-scale, 1)); }
 .arkmail-older-row .arkmail-older { margin-top: 0; flex: 1; }
 .arkmail-root .arkmail-older-all { flex: 1; }
-.arkmail-root button.arkmail-older-all { margin-top: 8px; width: 100%; }
+.arkmail-root button.arkmail-older-all { margin-top: calc(8px * var(--window-font-scale, 1)); width: 100%; }
 .arkmail-older-row button.arkmail-older-all { margin-top: 0; width: auto; }
 /* Fala 17e: "Wczytaj wszystkie" w box-ops - regula paginacji wyzej
  * (margin-top: 8px; width: 100%) lapala go specyficznoscia 0,2,1 i
@@ -340,24 +338,24 @@ export const STYLES = `
 .arkmail-letter-head {
   position: relative;
   background: ${BG};
-  border: 1px solid ${BORDER};
-  border-radius: 8px;
-  padding: 8px 12px;
-  margin-bottom: 8px;
+  border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
+  border-radius: calc(8px * var(--window-font-scale, 1));
+  padding: calc(8px * var(--window-font-scale, 1)) calc(12px * var(--window-font-scale, 1));
+  margin-bottom: calc(8px * var(--window-font-scale, 1));
 }
-.arkmail-letter-subject { font-size: 15px; font-weight: 700; color: ${FG}; }
-.arkmail-letter-meta { color: ${FG_DIM}; font-size: 12px; margin-top: 2px; }
+.arkmail-letter-subject { font-size: calc(15px * var(--window-font-scale, 1)); font-weight: 700; color: ${FG}; }
+.arkmail-letter-meta { color: ${FG_DIM}; font-size: calc(12px * var(--window-font-scale, 1)); margin-top: calc(2px * var(--window-font-scale, 1)); }
 .arkmail-letter-body {
   white-space: pre-wrap;
-  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
+  font-family: var(--output-font-family, 'IBM Plex Mono', ui-monospace, monospace);
+  font-size: var(--output-font-size, calc(12px * var(--window-font-scale, 1)));
   background: ${BG};
-  border: 1px solid ${BORDER};
-  border-radius: 8px;
-  padding: 10px 12px;
+  border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
+  border-radius: calc(8px * var(--window-font-scale, 1));
+  padding: calc(10px * var(--window-font-scale, 1)) calc(12px * var(--window-font-scale, 1));
   color: ${FG};
 }
-.arkmail-letter-ops { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; align-items: center; }
+.arkmail-letter-ops { display: flex; flex-wrap: wrap; gap: calc(6px * var(--window-font-scale, 1)); margin-top: calc(8px * var(--window-font-scale, 1)); align-items: center; }
 .arkmail-letter-ops input { flex: 1; }
 .arkmail-root .arkmail-del {
   background: ${DANGER};
@@ -368,23 +366,23 @@ export const STYLES = `
 .arkmail-fwd { flex: none; }
 
 /* --- formularz compose --- */
-.arkmail-form label { display: block; margin: 6px 0 3px; color: ${FG_DIM}; font-size: 12px; }
+.arkmail-form label { display: block; margin: calc(6px * var(--window-font-scale, 1)) 0 calc(3px * var(--window-font-scale, 1)); color: ${FG_DIM}; font-size: calc(12px * var(--window-font-scale, 1)); }
 .arkmail-form input, .arkmail-form textarea, .arkmail-form select {
   width: 100%;
 }
-.arkmail-form textarea { min-height: 120px; resize: vertical; }
+.arkmail-form textarea { min-height: calc(120px * var(--window-font-scale, 1)); resize: vertical; }
 .arkmail-preview {
   margin: 0;
-  padding: 8px 10px;
+  padding: calc(8px * var(--window-font-scale, 1)) calc(10px * var(--window-font-scale, 1));
   background: ${BG_INPUT};
   color: ${FG_DIM};
-  border: 1px solid ${BORDER};
-  border-radius: 6px;
-  font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 12px;
+  border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
+  border-radius: calc(6px * var(--window-font-scale, 1));
+  font-family: var(--output-font-family, 'IBM Plex Mono', ui-monospace, monospace);
+  font-size: var(--output-font-size, calc(12px * var(--window-font-scale, 1)));
   white-space: pre;
   overflow: auto;
-  max-height: 220px;
+  max-height: calc(220px * var(--window-font-scale, 1));
 }
 /* Fala 12d: podglad compose bez obcinania. W split (wide) pre rozciaga
    sie na pelna wysokosc prawego panelu; tryb "Pelne okno" to ten sam
@@ -393,8 +391,8 @@ export const STYLES = `
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
+  gap: calc(8px * var(--window-font-scale, 1));
+  margin-bottom: calc(4px * var(--window-font-scale, 1));
 }
 .arkmail-preview-bar label { margin: 0; }
 .arkmail-split-compose .arkmail-pane { display: flex; flex-direction: column; }
@@ -402,8 +400,8 @@ export const STYLES = `
 .arkmail-preview-full-pane { display: flex; flex-direction: column; }
 .arkmail-preview-full-pane .arkmail-preview { flex: 1; max-height: none; }
 .arkmail-root .arkmail-send {
-  margin-top: 10px;
-  padding: 6px 18px;
+  margin-top: calc(10px * var(--window-font-scale, 1));
+  padding: calc(6px * var(--window-font-scale, 1)) calc(18px * var(--window-font-scale, 1));
   background: ${ACCENT};
   border-color: ${ACCENT};
   color: ${ACCENT_FG};
@@ -413,34 +411,34 @@ export const STYLES = `
 
 /* --- usuwanie listow --- */
 .arkmail-deletion-intro, .arkmail-deletion-message, .arkmail-deletion-summary,
-.arkmail-deletion-limit, .arkmail-deletion-selected { margin: 0 0 8px; }
+.arkmail-deletion-limit, .arkmail-deletion-selected { margin: 0 0 calc(8px * var(--window-font-scale, 1)); }
 .arkmail-deletion-intro, .arkmail-deletion-limit { color: ${FG_DIM}; }
 .arkmail-deletion-controls, .arkmail-deletion-selection-ops {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 8px;
+  gap: calc(6px * var(--window-font-scale, 1));
+  margin-bottom: calc(8px * var(--window-font-scale, 1));
 }
-.arkmail-root .arkmail-deletion-box { flex: 1 1 140px; min-width: 0; }
+.arkmail-root .arkmail-deletion-box { flex: 1 1 calc(140px * var(--window-font-scale, 1)); min-width: 0; }
 .arkmail-deletion-filters {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 6px;
-  margin-bottom: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(calc(150px * var(--window-font-scale, 1)), 1fr));
+  gap: calc(6px * var(--window-font-scale, 1));
+  margin-bottom: calc(10px * var(--window-font-scale, 1));
 }
-.arkmail-deletion-filter { min-width: 0; color: ${FG_DIM}; font-size: 12px; }
-.arkmail-deletion-filter span { display: block; margin-bottom: 2px; }
+.arkmail-deletion-filter { min-width: 0; color: ${FG_DIM}; font-size: calc(12px * var(--window-font-scale, 1)); }
+.arkmail-deletion-filter span { display: block; margin-bottom: calc(2px * var(--window-font-scale, 1)); }
 .arkmail-root .arkmail-deletion-filter input { width: 100%; min-width: 0; }
-.arkmail-deletion-results { border-top: 1px solid ${BORDER}; }
+.arkmail-deletion-results { border-top: calc(1px * var(--window-font-scale, 1)) solid ${BORDER}; }
 .arkmail-deletion-entry {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  padding: 7px 4px;
-  border-bottom: 1px solid ${BORDER};
+  gap: calc(8px * var(--window-font-scale, 1));
+  padding: calc(7px * var(--window-font-scale, 1)) calc(4px * var(--window-font-scale, 1));
+  border-bottom: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
   cursor: pointer;
 }
-.arkmail-deletion-entry input { flex: none; margin-top: 3px; }
+.arkmail-deletion-entry input { flex: none; margin-top: calc(3px * var(--window-font-scale, 1)); }
 .arkmail-deletion-entry span { min-width: 0; overflow-wrap: anywhere; }
 .arkmail-root .arkmail-deletion-delete {
   background: ${DANGER};
@@ -452,23 +450,23 @@ export const STYLES = `
 /* --- kontakty i archiwum --- */
 .arkmail-contact, .arkmail-arch-entry {
   display: flex;
-  gap: 8px;
-  padding: 5px 8px;
-  border-radius: 6px;
-  border-bottom: 1px solid ${BG};
+  gap: calc(8px * var(--window-font-scale, 1));
+  padding: calc(5px * var(--window-font-scale, 1)) calc(8px * var(--window-font-scale, 1));
+  border-radius: calc(6px * var(--window-font-scale, 1));
+  border-bottom: calc(1px * var(--window-font-scale, 1)) solid ${BG};
 }
 /* Fala 12c: klikalne jest IMIE (kierunek domyslny) + przyciski kierunku. */
 .arkmail-contact:hover, .arkmail-arch-entry:hover { background: ${BG_RAISED}; }
 .arkmail-contact-name { color: ${FG}; font-weight: 600; cursor: pointer; }
 .arkmail-contact-name:hover { text-decoration: underline; }
-.arkmail-contact-dirs { margin-left: auto; display: flex; gap: 4px; }
+.arkmail-contact-dirs { margin-left: auto; display: flex; gap: calc(4px * var(--window-font-scale, 1)); }
 .arkmail-root .arkmail-contact-dir {
   background: ${BG_RAISED};
   color: ${FG};
-  border: 1px solid ${BORDER};
-  border-radius: 4px;
-  padding: 1px 8px;
-  font-size: 11px;
+  border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
+  border-radius: calc(4px * var(--window-font-scale, 1));
+  padding: calc(1px * var(--window-font-scale, 1)) calc(8px * var(--window-font-scale, 1));
+  font-size: calc(11px * var(--window-font-scale, 1));
   cursor: pointer;
 }
 .arkmail-root .arkmail-contact-dir:hover { border-color: ${FG_DIM}; }
@@ -476,38 +474,38 @@ export const STYLES = `
   opacity: 0.4;
   cursor: default;
 }
-.arkmail-contact-stats, .arkmail-arch-meta { color: ${FG_DIM}; font-size: 12px; }
-.arkmail-arch-expand { margin-left: 8px; }
-.arkmail-arch-occ-list { margin: 2px 0 6px 18px; }
-.arkmail-arch-occ { color: ${FG_DIM}; font-size: 12px; cursor: pointer; }
+.arkmail-contact-stats, .arkmail-arch-meta { color: ${FG_DIM}; font-size: calc(12px * var(--window-font-scale, 1)); }
+.arkmail-arch-expand { margin-left: calc(8px * var(--window-font-scale, 1)); }
+.arkmail-arch-occ-list { margin: calc(2px * var(--window-font-scale, 1)) 0 calc(6px * var(--window-font-scale, 1)) calc(18px * var(--window-font-scale, 1)); }
+.arkmail-arch-occ { color: ${FG_DIM}; font-size: calc(12px * var(--window-font-scale, 1)); cursor: pointer; }
 .arkmail-arch-occ:hover { color: ${FG}; }
 .arkmail-contact-controls {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 8px;
+  gap: calc(6px * var(--window-font-scale, 1));
+  margin-bottom: calc(8px * var(--window-font-scale, 1));
 }
 .arkmail-archive-steps {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 18px;
-  margin: 10px 0 12px;
+  grid-template-columns: repeat(auto-fit, minmax(calc(220px * var(--window-font-scale, 1)), 1fr));
+  gap: calc(18px * var(--window-font-scale, 1));
+  margin: calc(10px * var(--window-font-scale, 1)) 0 calc(12px * var(--window-font-scale, 1));
 }
 .arkmail-archive-step {
   position: relative;
   min-width: 0;
-  padding: 10px;
-  border: 1px solid ${BORDER};
-  border-left: 4px solid ${FG_DIM};
-  border-radius: 6px;
+  padding: calc(10px * var(--window-font-scale, 1));
+  border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
+  border-left: calc(4px * var(--window-font-scale, 1)) solid ${FG_DIM};
+  border-radius: calc(6px * var(--window-font-scale, 1));
   background: ${BG_RAISED};
 }
-.arkmail-archive-step-title { font-weight: 700; margin-bottom: 5px; }
+.arkmail-archive-step-title { font-weight: 700; margin-bottom: calc(5px * var(--window-font-scale, 1)); }
 .arkmail-archive-step-status {
-  min-height: 34px;
-  margin-bottom: 9px;
+  min-height: calc(34px * var(--window-font-scale, 1));
+  margin-bottom: calc(9px * var(--window-font-scale, 1));
   color: ${FG_DIM};
-  font-size: 12px;
+  font-size: calc(12px * var(--window-font-scale, 1));
   line-height: 1.4;
 }
 .arkmail-archive-step button { width: 100%; margin: 0; }
@@ -517,28 +515,28 @@ export const STYLES = `
 .arkmail-arch-controls {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin-bottom: 8px;
+  gap: calc(6px * var(--window-font-scale, 1));
+  margin-bottom: calc(8px * var(--window-font-scale, 1));
 }
 .arkmail-arch-controls .arkmail-arch-clear { grid-column: 1 / -1; }
 .arkmail-arch-controls input[type='date'] { color-scheme: dark; }
-.arkmail-root .arkmail-contact-filter { flex: 1 1 140px; min-width: 0; }
+.arkmail-root .arkmail-contact-filter { flex: 1 1 calc(140px * var(--window-font-scale, 1)); min-width: 0; }
 .arkmail-root .arkmail-contact-sort { max-width: 100%; }
-.arkmail-contact-last { color: ${FG_DIM}; font-size: 11px; white-space: nowrap; }
+.arkmail-contact-last { color: ${FG_DIM}; font-size: calc(11px * var(--window-font-scale, 1)); white-space: nowrap; }
 
-.arkmail-notify-toggle { margin-right: 4px; }
+.arkmail-notify-toggle { margin-right: calc(4px * var(--window-font-scale, 1)); }
 .arkmail-dim { color: ${FG_DIM}; }
 
 /* --- ghost-podpowiedzi (Fala 9g): wyszarzona sugestia za kursorem --- */
 .arkmail-root .arkmail-ghost-wrap { position: relative; display: block; min-width: 0; }
 .arkmail-root .arkmail-ghost-wrap > input { width: 100%; box-sizing: border-box; }
 /* Pole przekazania moze zmniejszyc szerokosc albo przejsc do nowego rzedu. */
-.arkmail-root .arkmail-letter-ops .arkmail-ghost-wrap { flex: 1 1 180px; min-width: 0; }
+.arkmail-root .arkmail-letter-ops .arkmail-ghost-wrap { flex: 1 1 calc(180px * var(--window-font-scale, 1)); min-width: 0; }
 .arkmail-root .arkmail-ghost {
   position: absolute;
   inset: 0;
   /* padding inputu (5px 8px) + jego border (1px) = tekst 1:1 nad polem */
-  padding: 6px 9px;
+  padding: calc(6px * var(--window-font-scale, 1)) calc(9px * var(--window-font-scale, 1));
   overflow: hidden;
   pointer-events: none;
   white-space: pre;
@@ -551,20 +549,20 @@ export const STYLES = `
    prog 900px) - zero @container, jedno zrodlo prawdy, testowalne. */
 .arkmail-wide .arkmail-split {
   display: grid;
-  grid-template-columns: minmax(280px, 2fr) minmax(0, 3fr);
-  gap: 10px;
+  grid-template-columns: minmax(calc(280px * var(--window-font-scale, 1)), 2fr) minmax(0, 3fr);
+  gap: calc(10px * var(--window-font-scale, 1));
   flex: 1;
   min-height: 0;
 }
 /* Fala 11d: compose - formularz szerszy, podglad wezszy. */
 .arkmail-wide .arkmail-split-compose {
-  grid-template-columns: minmax(0, 3fr) minmax(280px, 2fr);
+  grid-template-columns: minmax(0, 3fr) minmax(calc(280px * var(--window-font-scale, 1)), 2fr);
 }
 .arkmail-root .arkmail-letter-close {
   position: absolute;
-  top: 6px;
-  right: 10px;
-  padding: 2px 10px;
+  top: calc(6px * var(--window-font-scale, 1));
+  right: calc(10px * var(--window-font-scale, 1));
+  padding: calc(2px * var(--window-font-scale, 1)) calc(10px * var(--window-font-scale, 1));
 }
 
 /* Fala 14b: pulsowanie Listy/Niewyslane po odlozeniu listu w kolejce.

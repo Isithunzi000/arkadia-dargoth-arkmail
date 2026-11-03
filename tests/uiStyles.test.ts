@@ -85,7 +85,7 @@ test('style: przyciski nie lamia etykiet (nowrap w catch-all)', () => {
 test('style: pasek operacji zawija caly tekst bez ucinania', () => {
   const body = ruleBody(/\.arkmail-busy\b/);
   assert.ok(body, 'regula .arkmail-busy istnieje');
-  assert.match(body!, /font-size:\s*12px/, 'czcionka 12px');
+  assert.match(body!, /font-size:\s*calc\(12px \* var\(--window-font-scale, 1\)\)/, 'czcionka 12px skalowana');
   assert.match(body!, /white-space:\s*normal/, 'tekst moze przejsc do kolejnej linii');
   assert.match(body!, /overflow-wrap:\s*anywhere/, 'dlugi fragment nie wyjdzie poza pasek');
   assert.doesNotMatch(body!, /text-overflow:\s*ellipsis/, 'status nie jest ucinany');
@@ -99,7 +99,7 @@ test('style: operacje skrzynki i listu zawijaja sie, pole przekazania jest elast
   }
   const forward = ruleBody(/\.arkmail-root\s+\.arkmail-letter-ops\s+\.arkmail-ghost-wrap\s*/);
   assert.ok(forward, 'regula pola przekazania istnieje');
-  assert.match(forward!, /flex:\s*1\s+1\s+\d+px/, 'pole ma elastyczna podstawe szerokosci');
+  assert.match(forward!, /flex:\s*1\s+1\s+calc\(\d+px \* var\(--window-font-scale, 1\)\)/, 'pole ma elastyczna podstawe szerokosci');
   assert.match(forward!, /min-width:\s*0/, 'pole moze zmniejszyc sie bez przepelnienia');
 });
 
@@ -110,7 +110,7 @@ test('style: filtr i sortowanie kontaktow mieszcza sie w waskim panelu', () => {
 
   const filter = ruleBody(/\.arkmail-root\s+\.arkmail-contact-filter\s*/);
   assert.ok(filter, 'regula filtra kontaktow istnieje');
-  assert.match(filter!, /flex:\s*1\s+1\s+\d+px/, 'filtr ma elastyczna podstawe szerokosci');
+  assert.match(filter!, /flex:\s*1\s+1\s+calc\(\d+px \* var\(--window-font-scale, 1\)\)/, 'filtr ma elastyczna podstawe szerokosci');
   assert.match(filter!, /min-width:\s*0/, 'filtr moze zmniejszyc sie bez przepelnienia');
 
   const sort = ruleBody(/\.arkmail-root\s+\.arkmail-contact-sort\s*/);
@@ -121,7 +121,7 @@ test('style: filtr i sortowanie kontaktow mieszcza sie w waskim panelu', () => {
 test('style: placeholdery sa czytelne i mniejsze od wpisywanego tekstu', () => {
   const body = ruleBody(/\.arkmail-root\s+input::placeholder\s*,\s*\.arkmail-root\s+textarea::placeholder\s*/);
   assert.ok(body, 'wspolna regula placeholderow istnieje');
-  assert.match(body!, /font-size:\s*12px/);
+  assert.match(body!, /font-size:\s*calc\(12px \* var\(--window-font-scale, 1\)\)/);
   assert.match(body!, /opacity:\s*1/);
   assert.match(body!, new RegExp(`color:\\s*${HEX}`));
 });
@@ -138,7 +138,7 @@ test('style: przyciski spojne wysokoscia; box-ops wolny od margin-top paginacji'
   assert.match(all!, /display:\s*inline-flex/, 'catch-all: inline-flex');
   assert.match(all!, /align-items:\s*center/, 'pionowe centrowanie etykiety');
   assert.match(all!, /justify-content:\s*center/, 'poziome centrowanie etykiety');
-  assert.match(all!, /min-height:\s*26px/, 'jednolita minimalna wysokosc');
+  assert.match(all!, /min-height:\s*calc\(26px \* var\(--window-font-scale, 1\)\)/, 'jednolita minimalna wysokosc skalowana');
 
   const boxOps = ruleBody(/\.arkmail-box-ops\s+button\.arkmail-older-all\b/);
   assert.ok(boxOps, 'regula box-ops dla Wczytaj-wszystkie istnieje');
