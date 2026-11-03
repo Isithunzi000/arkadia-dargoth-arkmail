@@ -10,6 +10,7 @@ import type { MailBox } from '../core/protocol/types.js';
 import type { MailboxEntry, MailboxResult } from '../core/session/mailbox.js';
 import type { LetterContent } from '../core/session/pager.js';
 import type { Contact } from '../core/contacts.js';
+import type { ImportedAlias, ImportedPeople } from '../core/addressBook.js';
 import type { ArchiveLetter } from '../core/archive.js';
 import { letterId } from '../core/archive.js';
 import type { LetterTemplate } from '../core/letterRender.js';
@@ -116,6 +117,13 @@ export interface MailUiState {
   search: { box: MailBox; label: string } | null;
   letter: OpenLetter | null;
   contacts: Contact[];
+  /**
+   * Ksiazka adresowa (Fala UI-2): osoby importowane z gry
+   * (zapamietani/przedstawieni) i aliasy pocztowe. NIE jest cache -
+   * "Wyczysc zapisane dane" jej nie tyka (izolacja pinowana testem).
+   */
+  importedPeople: ImportedPeople;
+  importedAliases: ImportedAlias[];
   archive: ArchiveLetter[];
   notifyEnabled: boolean;
   /** Lot zwierzecia pocztowego w toku (Fala 13b): przycisk nieaktywny. */
@@ -174,6 +182,8 @@ const DEFAULT_STATE: MailUiState = {
   search: null,
   letter: null,
   contacts: [],
+  importedPeople: { zapamietani: [], przedstawieni: [] },
+  importedAliases: [],
   archive: [],
   notifyEnabled: true,
   animalFlying: false,
@@ -693,6 +703,16 @@ export class MailUiStore {
 
   setContacts(contacts: Contact[]): void {
     this.update({ contacts });
+  }
+
+  /** Ksiazka adresowa (Fala UI-2): podmiana puli osob importowanych. */
+  setImportedPeople(importedPeople: ImportedPeople): void {
+    this.update({ importedPeople });
+  }
+
+  /** Ksiazka adresowa (Fala UI-2): podmiana puli aliasow importowanych. */
+  setImportedAliases(importedAliases: ImportedAlias[]): void {
+    this.update({ importedAliases });
   }
 
   setArchive(archive: ArchiveLetter[]): void {

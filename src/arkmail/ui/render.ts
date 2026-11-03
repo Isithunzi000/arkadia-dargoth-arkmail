@@ -103,6 +103,18 @@ export interface MailUiHandlers {
    * Opcjonalny: starsze montaze testowe go nie podaja.
    */
   onIndexAll?(): void;
+  /**
+   * Import osob z gry (Fala UI-2): zapamietani lub przedstawieni.
+   * Zapisuje PULE (podmianka), nie tworzy grup - z bazy gracz sklada
+   * grupy recznie. Opcjonalny: starsze montaze testowe go nie podaja.
+   */
+  onImportPeople?(kind: 'zapamietani' | 'przedstawieni'): void;
+  /**
+   * Import aliasow pocztowych z gry (Fala UI-2): tylko odczyt;
+   * rozstrzyga je serwer przy wysylce, czlonkowie aliasow dolaczaja
+   * do bazy osob. Opcjonalny: starsze montaze testowe go nie podaja.
+   */
+  onImportAliases?(): void;
   /** Reczne wyszukanie jednej strony w zakladce usuwania. */
   onDeletionSearch?(box: MailBox, query: ListingSearch): void;
   /** Zbiorcze usuniecie po potwierdzeniu w interfejsie. */
@@ -279,6 +291,10 @@ export function mountMailUi(
       push(c.name);
       push(c.mailAlias);
     }
+    // Fala UI-2: baza osob importowanych z gry + aliasy jako tokeny.
+    for (const name of store.state.importedPeople.zapamietani) push(name);
+    for (const name of store.state.importedPeople.przedstawieni) push(name);
+    for (const alias of store.state.importedAliases) push(alias.name);
     return out;
   };
   // Pola tematu: tematy z archiwum (archiwum jest najnowsze->najstarsze).
@@ -1440,6 +1456,40 @@ export function mountMailUi(
       gate.addEventListener('click', () => handlers.onIndexAll?.());
       pane.appendChild(gate);
     }
+    // Fala UI-2: import bazy osob z gry. Import ZAMIENIA pule (refresh),
+    // nie tworzy grup - z bazy gracz sklada grupy recznie (widok Grupy).
+    const importRow = doc.createElement('div');
+    importRow.className = 'arkmail-import-row';
+    const IMPORT_BTNS: Array<[string, string, string]> = [
+      [
+        'zapamietani',
+        'Importuj zapamietanych',
+        'Pobiera z gry osoby zapamietane na stale i zapisuje je jako baze osob. Grup nie tworzy.',
+      ],
+      [
+        'przedstawieni',
+        'Importuj przedstawionych',
+        'Pobiera z gry osoby, ktore zostaly ci ostatnio przedstawione, i zapisuje je jako baze osob. Grup nie tworzy.',
+      ],
+      [
+        'aliasy',
+        'Importuj aliasy pocztowe',
+        'Pobiera z gry aliasy pocztowe. Nie da sie ich edytowac - rozwija je serwer przy wysylce. Osoby z aliasow dolaczaja do bazy osob.',
+      ],
+    ];
+    for (const [kind, label, title] of IMPORT_BTNS) {
+      const btn = doc.createElement('button');
+      btn.className = 'arkmail-import-btn';
+      btn.setAttribute('data-import', kind);
+      btn.textContent = label;
+      btn.setAttribute('title', title);
+      btn.addEventListener('click', () => {
+        if (kind === 'aliasy') handlers.onImportAliases?.();
+        else handlers.onImportPeople?.(kind as 'zapamietani' | 'przedstawieni');
+      });
+      importRow.appendChild(btn);
+    }
+    pane.appendChild(importRow);
     // Filtr i sort sa lokalne (poza store, jak filtr archiwum):
     // repaint dotyczy tylko listy, input nie traci fokusu przy pisaniu.
     const controls = doc.createElement('div');

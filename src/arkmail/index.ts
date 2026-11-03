@@ -38,7 +38,14 @@ import {
   oldestEntry,
   scanMailboxPages,
 } from "./core/pagination";
-import { contactsFromArchive } from "./core/contacts";
+import { contactsFromArchiveWithAliases } from "./core/contacts";
+import {
+  loadImportedAliases,
+  loadImportedPeople,
+  saveImportedAliases,
+  saveImportedPeople,
+} from "./core/addressBook";
+import { ImportSession, type PeopleImportKind } from "./core/session/importer";
 import {
   fromMailboxEntry,
   fromOpenedLetter,
@@ -330,11 +337,15 @@ export async function init(api: PluginApi) {
     // Fala 18c: flagi kompletnej indeksacji skrzynek (brama Kontaktow).
     indexMeta: storage.getJSON<Partial<Record<MailBox, string>>>(INDEX_KEY) ?? {},
     archiveGaps: storage.getJSON<Partial<Record<MailBox, string[]>>>(ARCHIVE_GAPS_KEY) ?? {},
+    // Fala UI-2: ksiazka adresowa (osobne klucze; wipe jej nie tyka).
+    importedPeople: loadImportedPeople(storage),
+    importedAliases: loadImportedAliases(storage),
   });
   const ui = store;
   const mailbox = new MailboxSession(transport, sessionOpts);
   const pager = new PagerSession(transport, sessionOpts);
   const editor = new EditorSession(transport, sessionOpts);
+  const importer = new ImportSession(transport, sessionOpts);
 
   /**
    * Kontakty WYLACZNIE z korespondencji (nadawcy/adresaci) - bez
@@ -347,7 +358,74 @@ export async function init(api: PluginApi) {
    * pobrany listing i przetrwa refresh oraz restart.
    */
   const rebuildContacts = (): void => {
-    ui.setContacts(contactsFromArchive(ui.state.archive));
+    // Fala UI-2: czlonkowie zaimportowanych aliasow dolaczaja do bazy
+    // ze zrodlem 'alias' (mergeContacts); aliasow nie edytujemy.
+    ui.setContacts(
+      contactsFromArchiveWithAliases(ui.state.archive, ui.state.importedAliases),
+    );
+  };
+
+  /**
+   * Import osob z gry (Fala UI-2): komenda "zapamietani"/
+   * "przedstawieni", wynik ZAMIENIA pule (refresh). Pula jest baza,
+   * z ktorej gracz sklada grupy recznie - import NIE tworzy grup.
+   */
+  const importPeople = (kind: PeopleImportKind): void => {
+    if (lock.locked) {
+      notify(api, SESSION_BUSY_MSG, { level: "warning" });
+      return;
+    }
+    const label = kind === "zapamietani" ? "zapamietanych" : "przedstawionych";
+    const generation = connectionGeneration;
+    ui.setBusy(`Importuje ${label}...`);
+    void runExclusive(async () => {
+      const names = await importer.fetchPeople(kind);
+      if (generation !== connectionGeneration) return;
+      const pool = kind === "zapamietani"
+        ? { zapamietani: names, przedstawieni: ui.state.importedPeople.przedstawieni }
+        : { zapamietani: ui.state.importedPeople.zapamietani, przedstawieni: names };
+      saveImportedPeople(storage, pool);
+      ui.setImportedPeople(pool);
+      notify(api, `Zaimportowano ${names.length} ${label} do bazy osob.`, { level: "success" });
+    })
+      .catch((err: unknown) => {
+        if (!isOperationCancelled(err)) {
+          notify(api, "Nie udalo sie zaimportowac osob z gry.", { level: "error" });
+        }
+      })
+      .finally(() => {
+        if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
+      });
+  };
+
+  /**
+   * Import aliasow pocztowych z gry (Fala UI-2): tylko odczyt -
+   * aliasow nie edytujemy, rozstrzyga je serwer przy wysylce.
+   * Czlonkowie aliasow dolaczaja do bazy osob ze zrodlem 'alias'.
+   */
+  const importAliases = (): void => {
+    if (lock.locked) {
+      notify(api, SESSION_BUSY_MSG, { level: "warning" });
+      return;
+    }
+    const generation = connectionGeneration;
+    ui.setBusy("Importuje aliasy pocztowe...");
+    void runExclusive(async () => {
+      const aliases = await importer.fetchAliases();
+      if (generation !== connectionGeneration) return;
+      saveImportedAliases(storage, aliases);
+      ui.setImportedAliases(aliases);
+      rebuildContacts();
+      notify(api, `Zaimportowano ${aliases.length} aliasow pocztowych.`, { level: "success" });
+    })
+      .catch((err: unknown) => {
+        if (!isOperationCancelled(err)) {
+          notify(api, "Nie udalo sie zaimportowac aliasow z gry.", { level: "error" });
+        }
+      })
+      .finally(() => {
+        if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
+      });
   };
 
   /**
@@ -1909,6 +1987,10 @@ export async function init(api: PluginApi) {
     onDownloadArchiveBodies: () => runArchiveDownload(),
     // Indeksacja wszystkich skrzynek jako osobna operacja.
     onIndexAll: () => indexAllBoxes(),
+    // Fala UI-2: import bazy osob i aliasow z gry (pule ksiazki
+    // adresowej; wipe "Wyczysc zapisane dane" ich nie tyka).
+    onImportPeople: (kind) => importPeople(kind),
+    onImportAliases: () => importAliases(),
     // Fala 17g: eksporty TXT/ZIP - operacje czysto lokalne (dane
     // z cache), bez locka i bez komend do serwera.
     onExportLetter: () => {

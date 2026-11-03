@@ -200,6 +200,19 @@ export function contactsFromBoxes(
  * (fizyczny purge), wiec zywosc nie jest sprawdzana.
  */
 export function contactsFromArchive(letters: readonly ArchiveLetter[]): Contact[] {
+  return contactsFromArchiveWithAliases(letters, []);
+}
+
+/**
+ * Kontakty z archiwum + aliasy pocztowe zaimportowane z gry
+ * (Fala UI-2): czlonkowie aliasow dolaczaja do bazy ze zrodlem
+ * 'alias' (i ich pierwszym aliasem w mailAlias), zeby gracz widzial
+ * przynaleznosc. Aliasow samych nie edytujemy - rozstrzyga je serwer.
+ */
+export function contactsFromArchiveWithAliases(
+  letters: readonly ArchiveLetter[],
+  aliases: readonly { name: string; targets: string[] }[],
+): Contact[] {
   return mergeContacts({
     people: [],
     // Fala 18b: szkice (niewyslane) to nie wyslana korespondencja.
@@ -211,7 +224,7 @@ export function contactsFromArchive(letters: readonly ArchiveLetter[]): Contact[
         // domyslna 1 - runtime nie polega juz na tym polu.
         .map((l) => ({ ...archiveToLetterLike(l), count: l.occurrences ?? 1 })),
     ),
-    aliasy: [],
+    aliasy: aliases.map((a) => ({ name: a.name, targets: [...a.targets] })),
   });
 }
 
