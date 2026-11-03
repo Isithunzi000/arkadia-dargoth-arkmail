@@ -42,10 +42,13 @@ import { contactsFromArchiveWithAliases } from "./core/contacts";
 import {
   loadGroups,
   loadImportedAliases,
-  loadImportedPeople,
+  loadPeople,
   saveGroups,
   saveImportedAliases,
-  saveImportedPeople,
+  savePeople,
+  migratePeople,
+  mergeAddressBook,
+  unionPeople,
   type AddressBookExport,
 } from "./core/addressBook";
 import { ImportSession, type PeopleImportKind } from "./core/session/importer";
@@ -173,12 +176,13 @@ const ARCHIVE_GAPS_KEY = "luki-archiwum";
 
 /**
  * Baza osob do advisory guarda wysylki (Fala UI-2 krok 5): kontakty
- * (ze zrodla 'alias' wlacznie) + zaimportowane osoby + aliasy pocztowe
- * + czlonkowie grup ksiazki adresowej. Porownanie case-insensitive.
+ * (ze zrodla 'alias' wlacznie) + ksiazka adresowa imion + aliasy
+ * pocztowe + czlonkowie grup ksiazki adresowej. Porownanie
+ * case-insensitive.
  */
 const knownRecipientNames = (state: {
   contacts: { name: string; mailAlias?: string }[];
-  importedPeople: { zapamietani: string[]; przedstawieni: string[] };
+  people: string[];
   importedAliases: { name: string }[];
   groups: { members: string[] }[];
 }): Set<string> => {
@@ -191,8 +195,7 @@ const knownRecipientNames = (state: {
     add(c.name);
     if (c.mailAlias) add(c.mailAlias);
   }
-  for (const name of state.importedPeople.zapamietani) add(name);
-  for (const name of state.importedPeople.przedstawieni) add(name);
+  for (const name of state.people) add(name);
   for (const alias of state.importedAliases) add(alias.name);
   for (const group of state.groups) for (const member of group.members) add(member);
   return known;
@@ -368,7 +371,9 @@ export async function init(api: PluginApi) {
     indexMeta: storage.getJSON<Partial<Record<MailBox, string>>>(INDEX_KEY) ?? {},
     archiveGaps: storage.getJSON<Partial<Record<MailBox, string[]>>>(ARCHIVE_GAPS_KEY) ?? {},
     // Fala UI-2: ksiazka adresowa (osobne klucze; wipe jej nie tyka).
-    importedPeople: loadImportedPeople(storage),
+    // Imiona: migracja ze starego klucza pul jest jednorazowa i
+    // zostawia stary klucz nietkniety (bezpieczny rollback).
+    people: migratePeople(storage),
     importedAliases: loadImportedAliases(storage),
     groups: loadGroups(storage),
   });
@@ -398,8 +403,10 @@ export async function init(api: PluginApi) {
 
   /**
    * Import osob z gry (Fala UI-2): komenda "zapamietani"/
-   * "przedstawieni", wynik ZAMIENIA pule (refresh). Pula jest baza,
-   * z ktorej gracz sklada grupy recznie - import NIE tworzy grup.
+   * "przedstawieni". Import DOLACZA imiona do ksiazki adresowej
+   * (dedup bez wielkosci liter), nigdy niczego nie kasuje.
+   * Ksiazka jest baza, z ktorej gracz sklada grupy recznie -
+   * import NIE tworzy grup.
    */
   const importPeople = (kind: PeopleImportKind): void => {
     if (lock.locked) {
@@ -412,12 +419,11 @@ export async function init(api: PluginApi) {
     void runExclusive(async () => {
       const names = await importer.fetchPeople(kind);
       if (generation !== connectionGeneration) return;
-      const pool = kind === "zapamietani"
-        ? { zapamietani: names, przedstawieni: ui.state.importedPeople.przedstawieni }
-        : { zapamietani: ui.state.importedPeople.zapamietani, przedstawieni: names };
-      saveImportedPeople(storage, pool);
-      ui.setImportedPeople(pool);
-      notify(api, `Zaimportowano ${names.length} ${label} do bazy osob.`, { level: "success" });
+      const before = ui.state.people.length;
+      const people = unionPeople(ui.state.people, names);
+      savePeople(storage, people);
+      ui.setPeople(people);
+      notify(api, `Osob pobranych z gry: ${names.length}. Nowych w ksiazce: ${people.length - before}.`, { level: "success" });
     })
       .catch((err: unknown) => {
         if (!isOperationCancelled(err)) {
@@ -431,8 +437,9 @@ export async function init(api: PluginApi) {
 
   /**
    * Import aliasow pocztowych z gry (Fala UI-2): tylko odczyt -
-   * aliasow nie edytujemy, rozstrzyga je serwer przy wysylce.
-   * Czlonkowie aliasow dolaczaja do bazy osob ze zrodlem 'alias'.
+   * aliasow nie edytujemy, rozstrzyga je serwer przy wysylce,
+   * nie wchodza do eksportu/importu pliku. Adresaci aliasow
+   * dolaczaja do ksiazki adresowej (dedup).
    */
   const importAliases = (): void => {
     if (lock.locked) {
@@ -446,8 +453,15 @@ export async function init(api: PluginApi) {
       if (generation !== connectionGeneration) return;
       saveImportedAliases(storage, aliases);
       ui.setImportedAliases(aliases);
+      const before = ui.state.people.length;
+      const people = unionPeople(
+        ui.state.people,
+        aliases.flatMap((a) => a.targets),
+      );
+      savePeople(storage, people);
+      ui.setPeople(people);
       rebuildContacts();
-      notify(api, `Zaimportowano ${aliases.length} aliasow pocztowych.`, { level: "success" });
+      notify(api, `Aliasow pocztowych: ${aliases.length}. Osob dolaczonych do ksiazki: ${people.length - before}.`, { level: "success" });
     })
       .catch((err: unknown) => {
         if (!isOperationCancelled(err)) {
@@ -2028,19 +2042,21 @@ export async function init(api: PluginApi) {
       saveGroups(storage, groups);
       ui.setGroups(groups);
     },
-    // Fala UI-2 krok 3: import ksiazki z pliku JSON. Grupy dolaczane
-    // (kolizje nazw dostaly dopisek juz przy parsowaniu w UI), pule
-    // importu podmieniane - tak samo jak import z gry.
+    // Fala UI-2 krok 3: import ksiazki z pliku JSON (format v2; v1
+    // czytany wstecz). Tryb domyslny "dolacz": mergeAddressBook scala
+    // grupy o tej samej nazwie i uzupelnia ksiazke o czlonkow grup.
+    // Aliasy sa lustrem z gry - import pliku ich nie rusza.
     onImportAddressBook: (data: AddressBookExport) => {
-      const groups = [...ui.state.groups, ...data.groups];
-      saveGroups(storage, groups);
-      saveImportedPeople(storage, data.importedPeople);
-      saveImportedAliases(storage, data.importedAliases);
-      ui.setGroups(groups);
-      ui.setImportedPeople(data.importedPeople);
-      ui.setImportedAliases(data.importedAliases);
+      const { data: merged, stats } = mergeAddressBook(
+        { people: ui.state.people, groups: ui.state.groups },
+        data,
+      );
+      saveGroups(storage, merged.groups);
+      savePeople(storage, merged.people);
+      ui.setGroups(merged.groups);
+      ui.setPeople(merged.people);
       rebuildContacts();
-      notify(api, `Zaimportowano ksiazke: ${data.groups.length} grup, ${data.importedPeople.zapamietani.length + data.importedPeople.przedstawieni.length} osob, ${data.importedAliases.length} aliasow.`, { level: "success" });
+      notify(api, `Dolaczono. Grup: ${data.groups.length} (nowe: ${stats.addedGroups}, scalone: ${stats.mergedGroups}). Imion: ${merged.people.length} (nowe: ${stats.addedPeople}).`, { level: "success" });
     },
     // Fala 17g: eksporty TXT/ZIP - operacje czysto lokalne (dane
     // z cache), bez locka i bez komend do serwera.

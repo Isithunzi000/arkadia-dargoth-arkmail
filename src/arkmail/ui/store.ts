@@ -10,7 +10,7 @@ import type { MailBox } from '../core/protocol/types.js';
 import type { MailboxEntry, MailboxResult } from '../core/session/mailbox.js';
 import type { LetterContent } from '../core/session/pager.js';
 import type { Contact } from '../core/contacts.js';
-import type { ContactGroup, ImportedAlias, ImportedPeople } from '../core/addressBook.js';
+import type { ContactGroup, ImportedAlias } from '../core/addressBook.js';
 import type { ArchiveLetter } from '../core/archive.js';
 import { letterId } from '../core/archive.js';
 import type { LetterTemplate } from '../core/letterRender.js';
@@ -118,11 +118,13 @@ export interface MailUiState {
   letter: OpenLetter | null;
   contacts: Contact[];
   /**
-   * Ksiazka adresowa (Fala UI-2): osoby importowane z gry
-   * (zapamietani/przedstawieni) i aliasy pocztowe. NIE jest cache -
-   * "Wyczysc zapisane dane" jej nie tyka (izolacja pinowana testem).
+   * Ksiazka adresowa (Fala UI-2): plaska lista imion (import z gry,
+   * reczne wpisanie, czlonkowie grup, adresaci aliasow - bez
+   * rozrozniania pochodzenia) i aliasy pocztowe z gry. NIE jest
+   * cache - "Wyczysc zapisane dane" jej nie tyka (izolacja pinowana
+   * testem).
    */
-  importedPeople: ImportedPeople;
+  people: string[];
   importedAliases: ImportedAlias[];
   /** Grupy reczne ksiazki adresowej (Fala UI-2): nazwa + czlonkowie. */
   groups: ContactGroup[];
@@ -184,7 +186,7 @@ const DEFAULT_STATE: MailUiState = {
   search: null,
   letter: null,
   contacts: [],
-  importedPeople: { zapamietani: [], przedstawieni: [] },
+  people: [],
   importedAliases: [],
   groups: [],
   archive: [],
@@ -709,8 +711,8 @@ export class MailUiStore {
   }
 
   /** Ksiazka adresowa (Fala UI-2): podmiana puli osob importowanych. */
-  setImportedPeople(importedPeople: ImportedPeople): void {
-    this.update({ importedPeople });
+  setPeople(people: string[]): void {
+    this.update({ people });
   }
 
   /** Ksiazka adresowa (Fala UI-2): podmiana puli aliasow importowanych. */

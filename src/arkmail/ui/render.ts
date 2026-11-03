@@ -315,9 +315,8 @@ export function mountMailUi(
       push(c.name);
       push(c.mailAlias);
     }
-    // Fala UI-2: baza osob importowanych z gry + aliasy jako tokeny.
-    for (const name of store.state.importedPeople.zapamietani) push(name);
-    for (const name of store.state.importedPeople.przedstawieni) push(name);
+    // Fala UI-2: ksiazka adresowa imion + aliasy jako tokeny.
+    for (const name of store.state.people) push(name);
     for (const alias of store.state.importedAliases) push(alias.name);
     return out;
   };
@@ -1610,16 +1609,15 @@ export function mountMailUi(
     const expBtn = doc.createElement('button');
     expBtn.textContent = 'Eksportuj ksiazke';
     expBtn.setAttribute('data-book-export', '');
-    expBtn.setAttribute('title', 'Pobiera plik JSON z grupami, osobami importowanymi i aliasami.');
+    expBtn.setAttribute('title', 'Pobiera plik JSON: imiona i grupy. Aliasy pocztowe nie wchodza do pliku - pobierasz je z gry.');
     expBtn.addEventListener('click', () => {
       downloadBlob(
         'arkmail-adresy.json',
         new Blob(
           [
             buildAddressBookExport({
+              people: state.people,
               groups: state.groups,
-              importedPeople: state.importedPeople,
-              importedAliases: state.importedAliases,
             }),
           ],
           { type: 'application/json' },
@@ -1635,7 +1633,7 @@ export function mountMailUi(
     impInput.setAttribute('accept', '.json,application/json');
     impInput.setAttribute(
       'title',
-      'Wczytuje ksiazke adresowa z pliku JSON. Grupy dolacza (kolizje dostaja dopisek), pule importu podmienia.',
+      'Wczytuje imiona i grupy z pliku JSON i dolacza je do ksiazki adresowej. Aliasy pobierasz z gry.',
     );
     impInput.addEventListener('change', () => {
       const file = impInput.files?.[0];
@@ -1643,10 +1641,7 @@ export function mountMailUi(
       void file
         .text()
         .then((content: string) => {
-          const parsed = parseAddressBookExport(
-            content,
-            state.groups.map((g) => g.name),
-          );
+          const parsed = parseAddressBookExport(content);
           if (!parsed) {
             showError('Niepoprawny plik ksiazki adresowej.');
             return;

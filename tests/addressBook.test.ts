@@ -207,10 +207,10 @@ test('scal: nowe grupy dolaczane, kolizja nazw scala czlonkow', () => {
     { name: 'Gildia', members: ['Fred', 'Grault'] },
     { name: 'Patrol', members: ['Corge'] },
   ], 'kolizja bez wielkosci liter scala, kanoniczna nazwa pierwsza');
-  assert.deepEqual(data.people, ['Fred', 'Grault'], 'imiona z pliku dolaczone');
+  assert.deepEqual(data.people, ['Fred', 'Grault', 'Corge'], 'imiona z pliku + kompletnosc czlonkow');
   assert.equal(stats.addedGroups, 1, 'Patrol nowa');
   assert.equal(stats.mergedGroups, 1, 'Gildia scalona');
-  assert.equal(stats.addedPeople, 1, 'tylko Grault nowy');
+  assert.equal(stats.addedPeople, 2, 'Grault z pliku + Corge z kompletnosci');
 });
 
 test('scal: czlonkowie grup uzupelniaja ksiazke (kompletnosc)', () => {

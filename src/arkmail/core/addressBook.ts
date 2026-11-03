@@ -1,13 +1,26 @@
 /**
- * Fala UI-2 krok 1: ksiazka adresowa jako osobne klucze magazynu.
- * Trzy pule trzymaja sie z dala od cache listow:
- *  - grupy reczne (skladane przez gracza z bazy osob),
- *  - osoby importowane (zapamietani / przedstawieni z gry),
- *  - aliasy pocztowe zaimportowane z gry (tylko odczyt; rozstrzyga
- *    je serwer przy wysylce).
- * Czyszczenie zapisanych danych kasuje wylacznie klucze cache
- * (indeks, luki archiwum) - te klucze zostaja. Imiona w testach
- * syntetyczne.
+ * Plaska ksiazka adresowa: jedna lista imion pod kluczem "osoby",
+ * grupy reczne pod "grupy-kontaktow" i aliasy pocztowe z gry (tylko
+ * odczyt) pod "aliasy-importowane". Te klucze zostaja z dala od cache
+ * listow: "Wyczysc zapisane dane" kasuje wylacznie indeks i luki
+ * archiwum.
+ *
+ * Pochodzenie imion (import z gry, reczne wpisanie, czlonkowie grup,
+ * adresaci aliasow) nie jest rozrozniane - ksiazka to jedna pula.
+ * Dedup bez wielkosci liter; kanoniczna pisownia = pierwsza dodana.
+ *
+ * Migracja ze starego klucza "osoby-importowane" (pule zapamietani/
+ * przedstawieni) sumuje obie listy do nowej ksiazki. Stary klucz
+ * ZOSTAJE w magazynie - starsza wersja pluginu po rollbacku nadal
+ * widzi swoje dane. Migracja odpala sie wylacznie, gdy nowy klucz
+ * nie istnieje, wiec powtorny przebieg jest no-op.
+ *
+ * Eksport/import: format v2 (people + groups, bez aliasow - aliasy
+ * zawsze pobiera sie z gry). Pliki v1 czytane wstecz: imiona = suma
+ * pul, aliasy z pliku ignorowane. Kolizje nazw grup przy imporcie
+ * NIE dostaja suffixu - tryb dolacz scala czlonkow przez
+ * mergeAddressBook. Niezmiennik: po imporcie kazdy czlonek kazdej
+ * grupy istnieje w ksiazce. Imiona w testach syntetyczne.
  */
 
 /** Minimalny interfejs magazynu (CharStorage go spelnia). */
@@ -17,19 +30,15 @@ export interface AddressBookIO {
 }
 
 export const GROUPS_KEY = "grupy-kontaktow";
-export const PEOPLE_KEY = "osoby-importowane";
+export const PEOPLE_KEY = "osoby";
+/** Stary klucz pul - wylacznie do odczytu przy migracji, nigdy kasowany. */
+export const LEGACY_PEOPLE_KEY = "osoby-importowane";
 export const ALIASES_KEY = "aliasy-importowane";
 
 /** Grupa reczna: nazwa i czlonkowie (imiona gry, nie aliasy). */
 export interface ContactGroup {
   name: string;
   members: string[];
-}
-
-/** Pule importowane z gry; zrodlem sa komendy, nie edycja reczna. */
-export interface ImportedPeople {
-  zapamietani: string[];
-  przedstawieni: string[];
 }
 
 /** Alias pocztowy z gry: nazwa i adresaci rozwijani przez serwer. */
@@ -45,6 +54,23 @@ function cleanNames(value: unknown): string[] {
     if (typeof item !== "string") continue;
     const name = item.trim();
     if (name && !out.includes(name)) out.push(name);
+  }
+  return out;
+}
+
+/** Imiona ksiazki: trim, puste odrzucane, dedup bez wielkosci liter. */
+function cleanBookNames(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    if (typeof item !== "string") continue;
+    const name = item.trim();
+    if (!name) continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
   }
   return out;
 }
@@ -105,29 +131,105 @@ export function saveGroups(io: AddressBookIO, groups: readonly ContactGroup[]): 
   io.setJSON(GROUPS_KEY, cleanGroups(groups));
 }
 
-function cleanPeople(value: unknown): ImportedPeople {
-  if (typeof value !== "object" || value === null) {
-    return { zapamietani: [], przedstawieni: [] };
+// --- ksiazka imion -------------------------------------------------------------
+
+export function loadPeople(io: AddressBookIO): string[] {
+  return cleanBookNames(io.getJSON(PEOPLE_KEY));
+}
+
+export function savePeople(io: AddressBookIO, people: readonly string[]): void {
+  io.setJSON(PEOPLE_KEY, cleanBookNames(people));
+}
+
+/** Suma dwoch list imion, dedup bez wielkosci liter, pierwsza pisownia wygrywa. */
+export function unionPeople(existing: readonly string[], incoming: readonly string[]): string[] {
+  return cleanBookNames([...existing, ...incoming]);
+}
+
+/**
+ * Jednorazowa migracja ze starego klucza pul do plaskiej ksiazki.
+ * Odpala sie WYLACZNIE, gdy nowy klucz nie istnieje - istniejaca
+ * ksiazka blokuje remigracje. Stary klucz pozostaje nietkniety
+ * (bezpieczny rollback do starszej wersji pluginu).
+ */
+export function migratePeople(io: AddressBookIO): string[] {
+  const current = io.getJSON<unknown>(PEOPLE_KEY);
+  if (current !== null) return cleanBookNames(current);
+  const legacy = io.getJSON<{ zapamietani?: unknown; przedstawieni?: unknown } | null>(
+    LEGACY_PEOPLE_KEY,
+  );
+  const names = cleanBookNames([
+    ...(legacy && typeof legacy === "object" ? cleanNames(legacy.zapamietani) : []),
+    ...(legacy && typeof legacy === "object" ? cleanNames(legacy.przedstawieni) : []),
+  ]);
+  savePeople(io, names);
+  return names;
+}
+
+/**
+ * Niezmiennik kompletnosci: kazdy czlonek kazdej grupy istnieje
+ * w ksiazce. Uzywane tez przez tryb "zastap" (ksiazka = imiona
+ * z pliku + czlonkowie grup z pliku).
+ */
+export function withGroupMembers(
+  people: readonly string[],
+  groups: readonly ContactGroup[],
+): string[] {
+  return unionPeople(people, groups.flatMap((g) => g.members));
+}
+
+export interface AddressBookData {
+  people: string[];
+  groups: ContactGroup[];
+}
+
+export interface MergeStats {
+  addedGroups: number;
+  mergedGroups: number;
+  addedPeople: number;
+}
+
+/**
+ * Tryb "dolacz": grupy z incoming dolaczane do istniejacych - grupa
+ * o tej samej nazwie (bez wzgledu na wielkosc liter) scala czlonkow,
+ * kanoniczna nazwa i pisownia czlonkow z istniejacej. Imiona
+ * dolaczane z deduplikacja. Na koniec ksiazka uzupelniana o czlonkow
+ * grup (niezmiennik kompletnosci).
+ */
+export function mergeAddressBook(
+  existing: AddressBookData,
+  incoming: AddressBookData,
+): { data: AddressBookData; stats: MergeStats } {
+  const groups: ContactGroup[] = cleanGroups(existing.groups).map((g) => ({
+    ...g,
+    members: [...g.members],
+  }));
+  let addedGroups = 0;
+  let mergedGroups = 0;
+  for (const group of cleanGroups(incoming.groups)) {
+    const found = groups.find((g) => g.name.toLowerCase() === group.name.toLowerCase());
+    if (found) {
+      mergedGroups += 1;
+      for (const member of group.members) {
+        if (!found.members.some((m) => m.toLowerCase() === member.toLowerCase())) {
+          found.members.push(member);
+        }
+      }
+    } else {
+      addedGroups += 1;
+      groups.push(group);
+    }
   }
-  const candidate = value as Record<string, unknown>;
+  const before = cleanBookNames(existing.people);
+  const people = withGroupMembers(unionPeople(before, incoming.people), groups);
   return {
-    zapamietani: cleanNames(candidate.zapamietani),
-    przedstawieni: cleanNames(candidate.przedstawieni),
+    data: { people, groups },
+    stats: {
+      addedGroups,
+      mergedGroups,
+      addedPeople: Math.max(0, people.length - before.length),
+    },
   };
-}
-
-export function loadImportedPeople(io: AddressBookIO): ImportedPeople {
-  return cleanPeople(io.getJSON(PEOPLE_KEY));
-}
-
-export function saveImportedPeople(
-  io: AddressBookIO,
-  people: ImportedPeople,
-): void {
-  io.setJSON(PEOPLE_KEY, {
-    zapamietani: cleanNames(people.zapamietani),
-    przedstawieni: cleanNames(people.przedstawieni),
-  });
 }
 
 export function loadImportedAliases(io: AddressBookIO): ImportedAlias[] {
@@ -141,27 +243,25 @@ export function saveImportedAliases(
   io.setJSON(ALIASES_KEY, cleanAliases(aliases));
 }
 
-// --- eksport/import JSON (Fala UI-2 krok 3) -------------------------------------
+// --- eksport/import JSON --------------------------------------------------------
 
 export const ADDRESSBOOK_FORMAT = "arkmail-addressbook";
-export const ADDRESSBOOK_VERSION = 1;
+export const ADDRESSBOOK_VERSION = 2;
 
-/** Zawartosc pliku eksportu ksiazki adresowej. */
+/** Zawartosc pliku eksportu ksiazki adresowej (v2). */
 export interface AddressBookExport {
+  people: string[];
   groups: ContactGroup[];
-  importedPeople: ImportedPeople;
-  importedAliases: ImportedAlias[];
 }
 
 /**
- * Waliduje i czysci plik importu. Grupy kolidujace z istniejacymi
- * nazwami dostaja suffix " (import)" (w petli, az wolna nazwa).
+ * Waliduje i czysci plik importu. Wersja 2: pola people + groups.
+ * Wersja 1 (stare wydania): imiona = suma pul zapamietani/przedstawieni,
+ * aliasy z pliku ignorowane (aliasy zawsze pobiera sie z gry).
  * Zly format, brak wersji lub uszkodzony JSON odrzucane (null).
+ * Kolizji nazw grup NIE rozstrzyga - robi to mergeAddressBook.
  */
-export function parseAddressBookExport(
-  json: string,
-  existingGroupNames: readonly string[],
-): AddressBookExport | null {
+export function parseAddressBookExport(json: string): AddressBookExport | null {
   let raw: unknown;
   try {
     raw = JSON.parse(json);
@@ -173,29 +273,33 @@ export function parseAddressBookExport(
   if (candidate.format !== ADDRESSBOOK_FORMAT) return null;
   if (typeof candidate.version !== "number") return null;
 
-  const taken = new Set(existingGroupNames.map((n) => n.trim().toLowerCase()));
-  const groups = cleanGroups(candidate.groups).map((g) => {
-    let name = g.name;
-    while (taken.has(name.toLowerCase())) name = `${name} (import)`;
-    taken.add(name.toLowerCase());
-    return { name, members: g.members };
-  });
+  if (candidate.version === 1) {
+    const pools =
+      typeof candidate.importedPeople === "object" && candidate.importedPeople !== null
+        ? (candidate.importedPeople as Record<string, unknown>)
+        : {};
+    return {
+      people: cleanBookNames([
+        ...cleanNames(pools.zapamietani),
+        ...cleanNames(pools.przedstawieni),
+      ]),
+      groups: cleanGroups(candidate.groups),
+    };
+  }
   return {
-    groups,
-    importedPeople: cleanPeople(candidate.importedPeople),
-    importedAliases: cleanAliases(candidate.importedAliases),
+    people: cleanBookNames(candidate.people),
+    groups: cleanGroups(candidate.groups),
   };
 }
 
-/** Serializuje ksiazke adresowa do pliku eksportu. */
+/** Serializuje ksiazke adresowa do pliku eksportu (v2, bez aliasow). */
 export function buildAddressBookExport(book: AddressBookExport): string {
   return JSON.stringify(
     {
       format: ADDRESSBOOK_FORMAT,
       version: ADDRESSBOOK_VERSION,
-      groups: book.groups,
-      importedPeople: book.importedPeople,
-      importedAliases: book.importedAliases,
+      people: cleanBookNames(book.people),
+      groups: cleanGroups(book.groups),
     },
     null,
     2,
