@@ -10,7 +10,7 @@ import type { MailBox } from '../core/protocol/types.js';
 import type { MailboxEntry, MailboxResult } from '../core/session/mailbox.js';
 import type { LetterContent } from '../core/session/pager.js';
 import type { Contact } from '../core/contacts.js';
-import type { ImportedAlias, ImportedPeople } from '../core/addressBook.js';
+import type { ContactGroup, ImportedAlias, ImportedPeople } from '../core/addressBook.js';
 import type { ArchiveLetter } from '../core/archive.js';
 import { letterId } from '../core/archive.js';
 import type { LetterTemplate } from '../core/letterRender.js';
@@ -124,6 +124,8 @@ export interface MailUiState {
    */
   importedPeople: ImportedPeople;
   importedAliases: ImportedAlias[];
+  /** Grupy reczne ksiazki adresowej (Fala UI-2): nazwa + czlonkowie. */
+  groups: ContactGroup[];
   archive: ArchiveLetter[];
   notifyEnabled: boolean;
   /** Lot zwierzecia pocztowego w toku (Fala 13b): przycisk nieaktywny. */
@@ -184,6 +186,7 @@ const DEFAULT_STATE: MailUiState = {
   contacts: [],
   importedPeople: { zapamietani: [], przedstawieni: [] },
   importedAliases: [],
+  groups: [],
   archive: [],
   notifyEnabled: true,
   animalFlying: false,
@@ -715,6 +718,11 @@ export class MailUiStore {
     this.update({ importedAliases });
   }
 
+  /** Ksiazka adresowa (Fala UI-2): podmiana listy grup recznych. */
+  setGroups(groups: ContactGroup[]): void {
+    this.update({ groups });
+  }
+
   setArchive(archive: ArchiveLetter[]): void {
     this.update({ archive });
   }
@@ -742,6 +750,11 @@ export class MailUiStore {
    *  wyslaniu (render zeruje draft przy najblizszym renderze). */
   clearCompose(): void {
     this.update({ composeClearSeq: this.current.composeClearSeq + 1 });
+  }
+
+  /** Render-on-demand bez zmiany stanu (np. pod-pigulki Kontaktow). */
+  refresh(): void {
+    this.update({});
   }
 
   private update(patch: Partial<MailUiState>): void {

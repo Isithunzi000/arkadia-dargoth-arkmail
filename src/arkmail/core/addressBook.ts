@@ -105,16 +105,19 @@ export function saveGroups(io: AddressBookIO, groups: readonly ContactGroup[]): 
   io.setJSON(GROUPS_KEY, cleanGroups(groups));
 }
 
-export function loadImportedPeople(io: AddressBookIO): ImportedPeople {
-  const raw = io.getJSON<ImportedPeople>(PEOPLE_KEY);
-  if (typeof raw !== "object" || raw === null) {
+function cleanPeople(value: unknown): ImportedPeople {
+  if (typeof value !== "object" || value === null) {
     return { zapamietani: [], przedstawieni: [] };
   }
-  const candidate = raw as unknown as Record<string, unknown>;
+  const candidate = value as Record<string, unknown>;
   return {
     zapamietani: cleanNames(candidate.zapamietani),
     przedstawieni: cleanNames(candidate.przedstawieni),
   };
+}
+
+export function loadImportedPeople(io: AddressBookIO): ImportedPeople {
+  return cleanPeople(io.getJSON(PEOPLE_KEY));
 }
 
 export function saveImportedPeople(
@@ -136,4 +139,65 @@ export function saveImportedAliases(
   aliases: readonly ImportedAlias[],
 ): void {
   io.setJSON(ALIASES_KEY, cleanAliases(aliases));
+}
+
+// --- eksport/import JSON (Fala UI-2 krok 3) -------------------------------------
+
+export const ADDRESSBOOK_FORMAT = "arkmail-addressbook";
+export const ADDRESSBOOK_VERSION = 1;
+
+/** Zawartosc pliku eksportu ksiazki adresowej. */
+export interface AddressBookExport {
+  groups: ContactGroup[];
+  importedPeople: ImportedPeople;
+  importedAliases: ImportedAlias[];
+}
+
+/**
+ * Waliduje i czysci plik importu. Grupy kolidujace z istniejacymi
+ * nazwami dostaja suffix " (import)" (w petli, az wolna nazwa).
+ * Zly format, brak wersji lub uszkodzony JSON odrzucane (null).
+ */
+export function parseAddressBookExport(
+  json: string,
+  existingGroupNames: readonly string[],
+): AddressBookExport | null {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(json);
+  } catch {
+    return null;
+  }
+  if (typeof raw !== "object" || raw === null) return null;
+  const candidate = raw as Record<string, unknown>;
+  if (candidate.format !== ADDRESSBOOK_FORMAT) return null;
+  if (typeof candidate.version !== "number") return null;
+
+  const taken = new Set(existingGroupNames.map((n) => n.trim().toLowerCase()));
+  const groups = cleanGroups(candidate.groups).map((g) => {
+    let name = g.name;
+    while (taken.has(name.toLowerCase())) name = `${name} (import)`;
+    taken.add(name.toLowerCase());
+    return { name, members: g.members };
+  });
+  return {
+    groups,
+    importedPeople: cleanPeople(candidate.importedPeople),
+    importedAliases: cleanAliases(candidate.importedAliases),
+  };
+}
+
+/** Serializuje ksiazke adresowa do pliku eksportu. */
+export function buildAddressBookExport(book: AddressBookExport): string {
+  return JSON.stringify(
+    {
+      format: ADDRESSBOOK_FORMAT,
+      version: ADDRESSBOOK_VERSION,
+      groups: book.groups,
+      importedPeople: book.importedPeople,
+      importedAliases: book.importedAliases,
+    },
+    null,
+    2,
+  );
 }

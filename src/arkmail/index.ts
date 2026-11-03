@@ -40,10 +40,13 @@ import {
 } from "./core/pagination";
 import { contactsFromArchiveWithAliases } from "./core/contacts";
 import {
+  loadGroups,
   loadImportedAliases,
   loadImportedPeople,
+  saveGroups,
   saveImportedAliases,
   saveImportedPeople,
+  type AddressBookExport,
 } from "./core/addressBook";
 import { ImportSession, type PeopleImportKind } from "./core/session/importer";
 import {
@@ -340,6 +343,7 @@ export async function init(api: PluginApi) {
     // Fala UI-2: ksiazka adresowa (osobne klucze; wipe jej nie tyka).
     importedPeople: loadImportedPeople(storage),
     importedAliases: loadImportedAliases(storage),
+    groups: loadGroups(storage),
   });
   const ui = store;
   const mailbox = new MailboxSession(transport, sessionOpts);
@@ -1991,6 +1995,26 @@ export async function init(api: PluginApi) {
     // adresowej; wipe "Wyczysc zapisane dane" ich nie tyka).
     onImportPeople: (kind) => importPeople(kind),
     onImportAliases: () => importAliases(),
+    // Fala UI-2 krok 3: CRUD grup recznych - kazda mutacja zapisu
+    // trwa w tym samym przebiegu (storage + stan UI).
+    onSaveGroups: (groups) => {
+      saveGroups(storage, groups);
+      ui.setGroups(groups);
+    },
+    // Fala UI-2 krok 3: import ksiazki z pliku JSON. Grupy dolaczane
+    // (kolizje nazw dostaly dopisek juz przy parsowaniu w UI), pule
+    // importu podmieniane - tak samo jak import z gry.
+    onImportAddressBook: (data: AddressBookExport) => {
+      const groups = [...ui.state.groups, ...data.groups];
+      saveGroups(storage, groups);
+      saveImportedPeople(storage, data.importedPeople);
+      saveImportedAliases(storage, data.importedAliases);
+      ui.setGroups(groups);
+      ui.setImportedPeople(data.importedPeople);
+      ui.setImportedAliases(data.importedAliases);
+      rebuildContacts();
+      notify(api, `Zaimportowano ksiazke: ${data.groups.length} grup, ${data.importedPeople.zapamietani.length + data.importedPeople.przedstawieni.length} osob, ${data.importedAliases.length} aliasow.`, { level: "success" });
+    },
     // Fala 17g: eksporty TXT/ZIP - operacje czysto lokalne (dane
     // z cache), bez locka i bez komend do serwera.
     onExportLetter: () => {

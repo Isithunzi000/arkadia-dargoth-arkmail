@@ -28,6 +28,13 @@ import { parseMailDate } from '../core/protocol/parser.js';
 import { archiveExportEntries } from '../core/exportTxt.js';
 import { viewContacts, type ContactSort } from '../core/contacts.js';
 import {
+  buildAddressBookExport,
+  parseAddressBookExport,
+  type AddressBookExport,
+  type ContactGroup,
+} from '../core/addressBook.js';
+import { downloadBlob } from './download.js';
+import {
   clampLineWidth,
   renderLetter,
   type LetterTemplate,
@@ -115,6 +122,19 @@ export interface MailUiHandlers {
    * do bazy osob. Opcjonalny: starsze montaze testowe go nie podaja.
    */
   onImportAliases?(): void;
+  /**
+   * Zapis listy grup recznych (Fala UI-2 krok 3): wywolywany po kazdej
+   * mutacji CRUD (utworzenie, zmiana nazwy, czlonkowie, usuniecie).
+   * Opcjonalny: starsze montaze testowe go nie podaja.
+   */
+  onSaveGroups?(groups: ContactGroup[]): void;
+  /**
+   * Import ksiazki adresowej z pliku JSON (Fala UI-2 krok 3): dane
+   * zwalidowane i wyczyszczone (kolizje nazw dostaly suffix).
+   * Grupy dolaczane do istniejacych; pule importu podmieniane.
+   * Opcjonalny: starsze montaze testowe go nie podaja.
+   */
+  onImportAddressBook?(data: AddressBookExport): void;
   /** Reczne wyszukanie jednej strony w zakladce usuwania. */
   onDeletionSearch?(box: MailBox, query: ListingSearch): void;
   /** Zbiorcze usuniecie po potwierdzeniu w interfejsie. */
@@ -171,7 +191,11 @@ export function mountMailUi(
   /** Filtr archiwum: lokalny (poza store) - input zachowuje fokus. */
   const archFilter: ArchiveFilter = {};
   /** Filtr i sort kontaktow: lokalne (poza store) - ten sam powod co wyzej. */
-  const contactView: { filter: string; sort: ContactSort } = { filter: '', sort: 'nazwa' };
+  const contactView: { filter: string; sort: ContactSort; sub: 'osoby' | 'grupy' } = {
+    filter: '',
+    sort: 'nazwa',
+    sub: 'osoby',
+  };
   /** Pelnoekranowy podglad compose (Fala 12d): czysto prezentacyjny stan,
    *  lokalny jak contactView; tresc listu zyje w composeDraft (nic nie ginie). */
   let previewFull = false;
@@ -1399,10 +1423,264 @@ export function mountMailUi(
     return pane;
   };
 
+  /**
+   * Podpanel Grupy (Fala UI-2 krok 3): pelny CRUD grup recznych.
+   * Grupa skladana z bazy osob (kontakty + importy); nazwa unikalna
+   * bez wzgledu na wielkosc liter. Usuwanie uzbrojone - pierwszy
+   * klik uzbraja, drugi kasuje (przelaczenie sub-pigulki rozbraja,
+   * bo render buduje przyciski od nowa).
+   */
+  const renderGrupy = (state: MailUiState, pane: HTMLElement): void => {
+    const error = doc.createElement('div');
+    error.className = 'arkmail-dim arkmail-group-error';
+    error.setAttribute('data-group-error', '');
+    const showError = (msg: string): void => {
+      error.textContent = msg;
+    };
+    const save = (groups: ContactGroup[]): void => {
+      showError('');
+      handlers.onSaveGroups?.(groups);
+    };
+    // Nazwa niepusta i unikalna (poza opcjonalnie ignorowana grupa
+    // przy zmianie nazwy) - bez wzgledu na wielkosc liter.
+    const nameTaken = (name: string, ignore?: string): boolean =>
+      state.groups.some(
+        (g) => g.name !== ignore && g.name.toLowerCase() === name.toLowerCase(),
+      );
+
+    // --- dodawanie grupy
+    const addRow = doc.createElement('div');
+    addRow.className = 'arkmail-group-add';
+    const addInput = doc.createElement('input');
+    addInput.setAttribute('data-group-add', '');
+    addInput.setAttribute('placeholder', 'Nazwa nowej grupy');
+    const addBtn = doc.createElement('button');
+    addBtn.textContent = 'Utworz grupe';
+    addBtn.setAttribute('data-group-create', '');
+    addBtn.setAttribute('title', 'Tworzy pusta grupe. Czlonkow dolaczysz po utworzeniu.');
+    addBtn.addEventListener('click', () => {
+      const name = addInput.value.trim();
+      if (!name) {
+        showError('Podaj nazwe grupy.');
+        return;
+      }
+      if (nameTaken(name)) {
+        showError(`Grupa "${name}" juz istnieje.`);
+        return;
+      }
+      addInput.value = '';
+      save([...state.groups, { name, members: [] }]);
+    });
+    addRow.appendChild(addInput);
+    addRow.appendChild(addBtn);
+    pane.appendChild(addRow);
+    pane.appendChild(error);
+
+    // --- lista grup
+    const list = doc.createElement('div');
+    pane.appendChild(list);
+    for (const group of state.groups) {
+      const row = doc.createElement('div');
+      row.className = 'arkmail-group';
+
+      const head = doc.createElement('div');
+      head.className = 'arkmail-group-head';
+      const rename = doc.createElement('input');
+      rename.setAttribute('data-group-rename', '');
+      rename.value = group.name;
+      rename.setAttribute('title', 'Nazwa grupy - zapisz obok.');
+      const renameOk = doc.createElement('button');
+      renameOk.textContent = 'Zapisz nazwe';
+      renameOk.setAttribute('data-group-rename-ok', '');
+      renameOk.setAttribute('title', 'Zapisuje nowa nazwe grupy.');
+      renameOk.addEventListener('click', () => {
+        const name = rename.value.trim();
+        if (!name) {
+          showError('Podaj nazwe grupy.');
+          return;
+        }
+        if (nameTaken(name, group.name)) {
+          showError(`Grupa "${name}" juz istnieje.`);
+          return;
+        }
+        save(state.groups.map((g) => (g.name === group.name ? { ...g, name } : g)));
+      });
+      const del = doc.createElement('button');
+      del.textContent = 'Usun grupe';
+      del.setAttribute('data-group-delete', '');
+      del.setAttribute('title', 'Dwuklik: najpierw uzbraja, potem kasuje grupe.');
+      del.addEventListener('click', () => {
+        if (del.getAttribute('data-armed') !== '1') {
+          del.setAttribute('data-armed', '1');
+          del.textContent = 'Na pewno usunac?';
+          return;
+        }
+        save(state.groups.filter((g) => g.name !== group.name));
+      });
+      head.appendChild(rename);
+      head.appendChild(renameOk);
+      head.appendChild(del);
+      row.appendChild(head);
+
+      const members = doc.createElement('div');
+      members.className = 'arkmail-group-members';
+      for (const member of group.members) {
+        const chip = doc.createElement('span');
+        chip.className = 'arkmail-group-member';
+        chip.textContent = member;
+        const x = doc.createElement('button');
+        x.textContent = 'x';
+        x.setAttribute('data-member-remove', '');
+        x.setAttribute('title', `Usuwa ${member} z grupy.`);
+        x.addEventListener('click', () =>
+          save(
+            state.groups.map((g) =>
+              g.name === group.name
+                ? { ...g, members: g.members.filter((m) => m !== member) }
+                : g,
+            ),
+          ),
+        );
+        chip.appendChild(x);
+        members.appendChild(chip);
+      }
+      // Dokladanie czlonka z bazy osob (ghost: strzalka w prawo
+      // wpisuje kanoniczna forme z kontaktow i importow).
+      const addMember = doc.createElement('input');
+      addMember.setAttribute('data-member-add', '');
+      addMember.setAttribute('placeholder', 'Dodaj osobe');
+      attachGhost(doc, addMember, personSource);
+      const addMemberOk = doc.createElement('button');
+      addMemberOk.textContent = 'Dodaj';
+      addMemberOk.setAttribute('data-member-add-ok', '');
+      addMemberOk.setAttribute('title', 'Dodaje osobe do grupy (podpowiedz: strzalka w prawo).');
+      addMemberOk.addEventListener('click', () => {
+        const name = addMember.value.trim();
+        if (!name) return;
+        if (group.members.some((m) => m.toLowerCase() === name.toLowerCase())) {
+          showError(`${name} juz jest w tej grupie.`);
+          return;
+        }
+        save(
+          state.groups.map((g) =>
+            g.name === group.name ? { ...g, members: [...g.members, name] } : g,
+          ),
+        );
+      });
+      members.appendChild(addMember);
+      members.appendChild(addMemberOk);
+      row.appendChild(members);
+      list.appendChild(row);
+    }
+
+    if (state.groups.length === 0) {
+      const empty = doc.createElement('div');
+      empty.className = 'arkmail-dim';
+      empty.textContent = 'Brak grup - utworz pierwsza grupe.';
+      pane.appendChild(empty);
+    }
+
+    // --- operacje zbiorcze + eksport/import ksiazki adresowej
+    const ops = doc.createElement('div');
+    ops.className = 'arkmail-box-ops';
+    const delAll = doc.createElement('button');
+    delAll.textContent = 'Usun wszystkie grupy';
+    delAll.setAttribute('data-groups-delete-all', '');
+    delAll.setAttribute('title', 'Dwuklik: najpierw uzbraja, potem kasuje wszystkie grupy.');
+    if (state.groups.length === 0) delAll.setAttribute('disabled', '1');
+    delAll.addEventListener('click', () => {
+      if (delAll.getAttribute('data-armed') !== '1') {
+        delAll.setAttribute('data-armed', '1');
+        delAll.textContent = 'Na pewno usunac wszystkie?';
+        return;
+      }
+      save([]);
+    });
+    const expBtn = doc.createElement('button');
+    expBtn.textContent = 'Eksportuj ksiazke';
+    expBtn.setAttribute('data-book-export', '');
+    expBtn.setAttribute('title', 'Pobiera plik JSON z grupami, osobami importowanymi i aliasami.');
+    expBtn.addEventListener('click', () => {
+      downloadBlob(
+        'arkmail-adresy.json',
+        new Blob(
+          [
+            buildAddressBookExport({
+              groups: state.groups,
+              importedPeople: state.importedPeople,
+              importedAliases: state.importedAliases,
+            }),
+          ],
+          { type: 'application/json' },
+        ),
+      );
+    });
+    const impLabel = doc.createElement('label');
+    impLabel.className = 'arkmail-btn-action';
+    impLabel.textContent = 'Importuj ksiazke ';
+    const impInput = doc.createElement('input');
+    impInput.setAttribute('type', 'file');
+    impInput.setAttribute('data-book-import', '');
+    impInput.setAttribute('accept', '.json,application/json');
+    impInput.setAttribute(
+      'title',
+      'Wczytuje ksiazke adresowa z pliku JSON. Grupy dolacza (kolizje dostaja dopisek), pule importu podmienia.',
+    );
+    impInput.addEventListener('change', () => {
+      const file = impInput.files?.[0];
+      if (!file) return;
+      void file
+        .text()
+        .then((content: string) => {
+          const parsed = parseAddressBookExport(
+            content,
+            state.groups.map((g) => g.name),
+          );
+          if (!parsed) {
+            showError('Niepoprawny plik ksiazki adresowej.');
+            return;
+          }
+          handlers.onImportAddressBook?.(parsed);
+        })
+        .catch(() => showError('Nie udalo sie odczytac pliku.'));
+    });
+    impLabel.appendChild(impInput);
+    ops.appendChild(delAll);
+    ops.appendChild(expBtn);
+    ops.appendChild(impLabel);
+    pane.appendChild(ops);
+    fillButtonTitles(pane);
+  };
+
   const renderKontakty = (state: MailUiState): HTMLElement => {
     const pane = doc.createElement('div');
     pane.className = 'arkmail-pane';
     pane.setAttribute('data-pane-key', 'kontakty');
+    // Fala UI-2 krok 3: sub-pigulki Osoby/Grupy. Klasy .arkmail-boxes
+    // (zero nowych kolorow); stan lokalny jak filtr/sort - repaint
+    // renderuje tylko wybrany podpanel.
+    const subRow = doc.createElement('div');
+    subRow.className = 'arkmail-boxes arkmail-subpills';
+    const SUBPILLS: Array<['osoby' | 'grupy', string]> = [
+      ['osoby', 'Osoby'],
+      ['grupy', 'Grupy'],
+    ];
+    for (const [sub, label] of SUBPILLS) {
+      const pill = doc.createElement('button');
+      pill.className =
+        'arkmail-box arkmail-subpill' + (contactView.sub === sub ? ' arkmail-box-active' : '');
+      pill.textContent = label;
+      pill.addEventListener('click', () => {
+        contactView.sub = sub;
+        store.refresh();
+      });
+      subRow.appendChild(pill);
+    }
+    pane.appendChild(subRow);
+    if (contactView.sub === 'grupy') {
+      renderGrupy(state, pane);
+      return pane;
+    }
     const foot = doc.createElement('div');
     foot.className = 'arkmail-dim arkmail-index-foot';
     const dates = INDEX_BOXES.map((b) => state.indexMeta[b])
