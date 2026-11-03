@@ -197,6 +197,34 @@ export function parseAliasesBlock(lines: string[]): MailAliasDef[] {
   return out;
 }
 
+// --- import osob (Fala UI-2, formaty zweryfikowane na zywo 2026-11-03) ------------
+
+const IMPORT_PREFIX_RE = /^\[\d+\]\s*/;
+
+/** Rozbija liste imion z outputu gry: "A, B i C". */
+function splitImportedNames(raw: string): string[] {
+  return raw
+    .split(/\s*,\s*|\s+i\s+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/** "[NN] Zapamietane przez ciebie imiona to A, B i C." -> imiona lub null. */
+export function parseRememberedLine(text: string): string[] | null {
+  const t = text.replace(IMPORT_PREFIX_RE, '').trim();
+  const m = t.match(/^Zapamietane przez ciebie imiona to (.+)\.$/);
+  if (!m) return null;
+  return splitImportedNames(m[1]);
+}
+
+/** "[NN] Osoby, ktore zostaly ci ostatnio przedstawione, to A, B i C." -> imiona lub null. */
+export function parseIntroducedLine(text: string): string[] | null {
+  const t = text.replace(IMPORT_PREFIX_RE, '').trim();
+  const m = t.match(/^Osoby, ktore zostaly ci ostatnio przedstawione, to (.+)\.$/);
+  if (!m) return null;
+  return splitImportedNames(m[1]);
+}
+
 // --- powiadomienia ----------------------------------------------------------------
 
 export function parseNotification(text: string): MailNotification | null {
