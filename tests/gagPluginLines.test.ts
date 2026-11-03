@@ -64,7 +64,7 @@ test('gag: listing pluginowy stlumiony, reczny listing i prompt widoczne', async
     );
 
     // Koniec operacji: kolejne linie pocztowe znowu widoczne.
-    await waitFor(() => !content.querySelector('.arkmail-busy'), 'koniec sesji prologu');
+    await waitFor(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji prologu');
     const gagCount = f.gagged.length;
     f.fire('Listy wyslane:', 'mail');
     assert.equal(f.gagged.length, gagCount, 'po operacji linie pocztowe widoczne');
@@ -111,7 +111,7 @@ test('gag: odczyt listu stumliony w calosci, prompt gry widoczny', async () => {
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
     f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
-    await waitFor(() => !content.querySelector('.arkmail-busy'), 'koniec refreshu');
+    await waitFor(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec refreshu');
 
     // Po wszystkim: reczny listing gracza znowu widoczny.
     const gagCount = f.gagged.length;

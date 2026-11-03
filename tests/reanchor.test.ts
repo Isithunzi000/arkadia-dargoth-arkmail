@@ -110,7 +110,7 @@ test('re-kotwiczenie: wpis z biezacego kontekstu otwiera sie bez dodatkowego fet
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
     f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
-    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec refreshu');
+    await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec refreshu');
     const sentBefore = f.sent.length;
     click(h, '.arkmail-entry'); // najnowszy - biezacy kontekst po refreshu
     await waitFor(() => f.sent.includes('przeczytaj list 1'), 'przeczytaj list 1');
@@ -185,7 +185,7 @@ test('re-kotwiczenie: kasowanie po zmianie kontekstu uzywa swiezego numeru', asy
       'refresh nieprzeczytanych',
     );
     f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
-    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec refreshu');
+    await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec refreshu');
 
     // Usun: zrodlowy wpis listu ma stary kontekst -> re-kotwica.
     // Fala 14e: dwuklik (pierwszy klik tylko uzbraja przycisk).

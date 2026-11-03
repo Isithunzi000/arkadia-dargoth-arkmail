@@ -56,7 +56,7 @@ test('ui: busy "Wczytuje wszystkie" ma wielokropek (operacja w toku)', async () 
     assert.match(textOf(h, '.arkmail-busy'), /Wczytuje wszystkie \(odebrane\): strona 1\.\.\./);
     // Przerwij petle, zeby test nie wisial na kolejnych stronach.
     click(h, '.arkmail-older-all');
-    await waitRt(() => !content.querySelector('.arkmail-busy'), 'koniec petli');
+    await waitRt(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec petli');
   } finally {
     await stopHarness();
   }

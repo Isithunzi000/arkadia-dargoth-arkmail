@@ -204,7 +204,7 @@ test('klik skrzynki po wczytaniu starszych: sync zachowuje 5 wierszy i aktualizu
     click(h, '[data-box="wyslane"]');
     await waitFor(() => f.sent.includes('listy wyslane'), 'pobranie wyslanych');
     f.fire('Nie masz zadnych wyslanych listow.', 'mail');
-    await waitFor(() => !content.querySelector('.arkmail-busy'), 'koniec pobierania wyslanych');
+    await waitFor(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec pobierania wyslanych');
     click(h, '[data-box="odebrane"]');
     await waitFor(
       () => f.sent.filter((c) => c === 'listy odebrane').length === 2,
@@ -402,7 +402,7 @@ test('integracja: puste Szukaj odswieza pelna skrzynke i usuwa skasowany nowszy 
     assert.ok(subjects.includes('srodkowy'), 'dzien graniczny zostaje');
     assert.ok(subjects.includes('najstarszy'), 'starszy niz granica zostaje');
     await waitFor(
-      () => !content.querySelector('.arkmail-busy'),
+      () => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '',
       'koniec sesji refreshu',
     );
 

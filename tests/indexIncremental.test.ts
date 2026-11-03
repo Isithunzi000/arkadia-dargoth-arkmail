@@ -126,7 +126,7 @@ test('klamra: incrementalny przeczes staje na stronie znanej z archiwum, gone-ma
     f.fire('> ', 'prompt');
     await drainEmptyBoxes(h, { nieprzeczytane: 2, wyslane: 1, niewyslane: 1 });
     await waitRt(() => notifyText(f, 'Zindeksowano skrzynki'), 'faza 1: toast 4/4');
-    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'faza 1: koniec sesji');
+    await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'faza 1: koniec sesji');
 
     // --- Zmiany na serwerze: doszedl 'swiezak' (24 XII), 'najnowszy'
     // (23 XII) skasowany. Archiwum ma: najstarszy, srodkowy, najnowszy,
@@ -166,7 +166,7 @@ test('klamra: incrementalny przeczes staje na stronie znanej z archiwum, gone-ma
     }
     await drainEmptyBoxes(h, { nieprzeczytane: 3, wyslane: 2, niewyslane: 2 });
     await waitRt(() => notifyText(f, 'Zindeksowano skrzynki'), 'faza 2: toast 4/4');
-    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'faza 2: koniec sesji');
+    await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'faza 2: koniec sesji');
 
     assert.ok(
       !f.sent.includes('listy odebrane przed 8 VIII 1999'),

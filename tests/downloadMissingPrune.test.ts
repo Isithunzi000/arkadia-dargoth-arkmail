@@ -123,7 +123,7 @@ test('missing przy pobieraniu: grupa wypada z archiwum I wiersz znika z widoku',
     f.fire('[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ', 'mail');
     f.fire('> ', 'prompt');
 
-    await waitRt(() => !content.querySelector('.arkmail-busy'), 'koniec pobierania');
+    await waitRt(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec pobierania');
     assert.ok(
       notifyText(f, 'nie ma juz w skrzynce: 1'),
       'komunikat o missing jednej grupy',

@@ -143,7 +143,7 @@ test('harness: stopka pokazuje (u/n) i podswietlenie dla niewyslanych', async ()
     h.f.fire(' 1. Temat: drugi', 'mail');
     h.f.fire('Odbiorcy: Corge, Garply                 Wt, 24 VIII 1999, 11:00:00', 'mail');
     h.f.fire('> ', 'prompt');
-    await h.waitFor(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji niewyslanych');
+    await h.waitFor(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji niewyslanych');
     await h.waitFor(
       () => h.f.footerUpdates.some((u) => u.label === 'ArkMail (0/2)'),
       'stopka ArkMail (0/2)',

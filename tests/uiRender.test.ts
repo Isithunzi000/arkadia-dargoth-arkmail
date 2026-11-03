@@ -114,14 +114,26 @@ test('render: klik zakladki zmienia stan, aktywna ma klase', () => {
   off();
 });
 
-test('render: pasek operacji tylko gdy busy', () => {
+test('render: pasek operacji zawsze zamontowany, pusty poza praca', () => {
+  // Fala UI-1 (zgloszenie 2026-11-03): staly pasek statusu - element
+  // zyje zawsze (brak przeskoku layoutu), tekst pojawia sie tylko
+  // w trakcie (kontrakt: tests/busyStrip.test.ts).
   const s = new MailUiStore();
   const { container, off } = mount(s);
-  assert.equal(container.querySelector('.arkmail-busy'), null);
+  assert.ok(container.querySelector('.arkmail-busy'), 'pasek istnieje na idle');
+  assert.equal(
+    container.querySelector('.arkmail-busy')!.textContent,
+    '',
+    'pusty tekst na idle',
+  );
   s.setBusy('Czytam list 3...');
   assert.ok(container.querySelector('.arkmail-busy')?.textContent?.includes('Czytam list 3'));
   s.setBusy(null);
-  assert.equal(container.querySelector('.arkmail-busy'), null);
+  assert.equal(
+    container.querySelector('.arkmail-busy')!.textContent,
+    '',
+    'po zakonczeniu pasek pusty, nadal zamontowany',
+  );
   off();
 });
 

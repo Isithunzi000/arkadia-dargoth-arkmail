@@ -149,7 +149,7 @@ async function loadBox4(h: import('./harness').Harness): Promise<void> {
   await h.waitFor(() => f.sent.includes('listy nieprzeczytane'), 'komenda listy nieprzeczytane');
   f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
   await h.waitFor(() => !!h.content.querySelector('.arkmail-older'), 'przycisk Wczytaj starsze');
-  await h.waitFor(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji prologu');
+  await h.waitFor(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji prologu');
 }
 
 function replayListing4(h: import('./harness').Harness): void {
@@ -228,7 +228,7 @@ test('pobieranie tresci: pasek rosnie w trakcie, ETA po 3 ukonczonych', async ()
     await waitRt(() => f.sent.includes('przeczytaj list 4'), 'odczyt 4');
     replayLetterAt(h, 4, 'czwarty', 'So, 21 VIII 1999, 09:00:00');
     await waitRt(() => notifyText(f, 'Pobrano tresci do archiwum'), 'koniec pobierania');
-    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'pasek busy zgaszony');
+    await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'pasek busy zgaszony');
   } finally {
     await stopHarness();
   }

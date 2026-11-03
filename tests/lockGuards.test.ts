@@ -55,7 +55,7 @@ test('puste i wypelnione Szukaj podczas petli = odmowa, zero komend', async () =
     // PRZED guardem - mechanizm zachowany), pusta kotwica konczy petle.
     click(h, '.arkmail-older-all');
     f.fire('Nie znaleziono zadnych takich odebranych listow.', 'mail');
-    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji');
+    await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji');
     // Po zwolnieniu blokady NIC nie dochodzi (odmowy nie kolejkowaly).
     assert.equal(f.sent.length, sentBefore, 'zero odroczonych komend po zwolnieniu blokady');
   } finally {
@@ -87,7 +87,7 @@ test('Wczytaj wszystkie podczas odczytu listu = odmowa, zero komend', async () =
     // Domkniecie: pusta odpowiedz re-kotwicy (wpis "nie znaleziony")
     // zamyka sesje odczytu bez otwierania listu.
     f.fire('Nie znaleziono zadnych takich odebranych listow.', 'mail');
-    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji');
+    await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji');
     assert.equal(f.sent.length, sentBefore, 'po sesji zadnej petli ani odroczonych komend');
   } finally {
     await stopHarness();

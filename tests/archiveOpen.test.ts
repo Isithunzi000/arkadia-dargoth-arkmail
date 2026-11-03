@@ -80,7 +80,7 @@ test('archiwum: wpis z trescia otwiera sie z cache, zero komend', async () => {
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
     f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
-    await waitFor(() => !content.querySelector('.arkmail-busy'), 'koniec refreshu');
+    await waitFor(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec refreshu');
 
     // Archiwum: klik w wpis z trescia = podglad z pamieci, zero komend.
     click(h, '[data-tab="archiwum"]');
@@ -241,7 +241,7 @@ test('archiwum: wpis bez tresci i bez daty = toast, zadna komenda nie wylatuje',
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
     f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
-    await waitFor(() => !content.querySelector('.arkmail-busy'), 'koniec refreshu');
+    await waitFor(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec refreshu');
 
     click(h, '[data-tab="archiwum"]');
     const base = f.sent.length;

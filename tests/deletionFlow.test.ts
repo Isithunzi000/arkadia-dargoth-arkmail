@@ -218,7 +218,7 @@ test('usuwanie: wyjscie, zamkniecie okna i reconnect czyszcza oraz odrzucaja sta
     await h.waitFor(() => f.sent.filter((command) => command === 'listy odebrane').length === 2, 'druga proba');
     f.closePopup();
     replayListing(h, [rows.a, rows.b]);
-    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec starej odpowiedzi');
+    await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec starej odpowiedzi');
     assert.equal(h.content.querySelectorAll('.arkmail-deletion-entry').length, 0, 'stara odpowiedz odrzucona');
 
     await search(h, [rows.a]);

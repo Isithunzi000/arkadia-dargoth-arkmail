@@ -47,7 +47,7 @@ test('kompletny listing: znikniety list znika z widoku archiwum i kontaktow', as
       'komenda odswiezenia',
     );
     replayCompleteListing2(h);
-    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec odswiezania');
+    await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec odswiezania');
 
     // Widok archiwum: 2 wiersze, zaden z "najnowszy".
     click(h, '[data-tab="archiwum"]');

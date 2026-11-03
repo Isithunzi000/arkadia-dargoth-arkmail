@@ -295,10 +295,41 @@ export function mountMailUi(
     return out;
   };
 
-  const renderVersionFooter = (): HTMLElement => {
+  /**
+   * Fala UI-1 (zgloszenie 2026-11-03): pasek statusu na DOLE okna,
+   * ZAWSZE zamontowany - pojawienie sie i zakonczenie statusu nie
+   * przesuwa reszty UI (kontrakt: busy istnieje z pustym tekstem na
+   * idle, test tests/busyStrip.test.ts). Na idle pole busy ma
+   * visibility:hidden (zajmuje miejsce, nie zasmieca okna pustym
+   * obramowaniem).
+   */
+  const renderStatusFooter = (state: MailUiState): HTMLElement => {
     const footer = doc.createElement('footer');
-    footer.className = 'arkmail-version-footer';
-    footer.textContent = `v${PLUGIN_VERSION} | ${PLUGIN_BUILD_DATE}`;
+    footer.className = 'arkmail-status';
+    const busyEl = doc.createElement('div');
+    busyEl.className = 'arkmail-busy' + (state.busy !== null ? '' : ' arkmail-busy-empty');
+    const label = doc.createElement('span');
+    // Fala 18d: ETA przy petli pobierania tresci (od 3 ukonczonych).
+    const dl = state.archiveDownload;
+    label.textContent =
+      `${state.busy ?? ''}` +
+      (dl !== null && dl.etaMs !== null ? ` (${formatEta(dl.etaMs)})` : '');
+    busyEl.appendChild(label);
+    if (dl !== null && dl.total > 0) {
+      const track = doc.createElement('div');
+      track.className = 'arkmail-busy-track';
+      const bar = doc.createElement('div');
+      bar.className = 'arkmail-busy-bar';
+      const pct = Math.min(100, Math.round((dl.done / dl.total) * 100));
+      bar.style.width = `${pct}%`;
+      track.appendChild(bar);
+      busyEl.appendChild(track);
+    }
+    footer.appendChild(busyEl);
+    const version = doc.createElement('span');
+    version.className = 'arkmail-version-footer';
+    version.textContent = `v${PLUGIN_VERSION} | ${PLUGIN_BUILD_DATE}`;
+    footer.appendChild(version);
     return footer;
   };
 
@@ -310,7 +341,6 @@ export function mountMailUi(
     // zakladki zamyka overlay (powrot do napisz = formularz).
     if (state.tab !== 'napisz') previewFull = false;
     const nodes: Node[] = [renderTabs(state)];
-    if (state.busy !== null) nodes.push(renderBusy(state));
     if (state.tab === 'napisz' && previewFull) {
       // Fala 12d: podglad na cale okno popupu (oba tryby szerokosci).
       nodes.push(renderPreviewFull());
@@ -333,7 +363,7 @@ export function mountMailUi(
     } else {
       nodes.push(renderPane(state));
     }
-    nodes.push(renderVersionFooter());
+    nodes.push(renderStatusFooter(state));
     root.replaceChildren(...nodes);
     fillButtonTitles(root);
     restoreView(snap);
@@ -365,32 +395,6 @@ export function mountMailUi(
     ms < 45_000
       ? `zostalo ok. ${Math.max(1, Math.round(ms / 1000))} s`
       : `zostalo ok. ${Math.max(1, Math.round(ms / 60000))} min`;
-
-  const renderBusy = (state: MailUiState): HTMLElement => {
-    const el = doc.createElement('div');
-    el.className = 'arkmail-busy';
-    const label = doc.createElement('span');
-    // Fala 18d (zgloszenie pkt 2): przy petli pobierania tresci ETA
-    // doklejane do opisu (od 3 ukonczonych) + pasek procentowy pod
-    // tekstem. Petle bez znanego total (Wczytaj wszystkie, indeksacja)
-    // zostaja przy samym liczniku.
-    const dl = state.archiveDownload;
-    label.textContent =
-      `${state.busy ?? ''}` +
-      (dl !== null && dl.etaMs !== null ? ` (${formatEta(dl.etaMs)})` : '');
-    el.appendChild(label);
-    if (dl !== null && dl.total > 0) {
-      const track = doc.createElement('div');
-      track.className = 'arkmail-busy-track';
-      const bar = doc.createElement('div');
-      bar.className = 'arkmail-busy-bar';
-      const pct = Math.min(100, Math.round((dl.done / dl.total) * 100));
-      bar.style.width = `${pct}%`;
-      track.appendChild(bar);
-      el.appendChild(track);
-    }
-    return el;
-  };
 
   const renderPane = (state: MailUiState): HTMLElement => {
     switch (state.tab) {

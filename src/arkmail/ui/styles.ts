@@ -160,6 +160,18 @@ export const STYLES = `
   white-space: normal;
   overflow-wrap: anywhere;
 }
+/* Fala UI-1: wspolny pasek na dole okna - status (lewo) + wersja
+   (prawo). Zawsze zamontowany: wysokosc layoutu stala niezaleznie
+   od tego, czy status jest pokazany. */
+.arkmail-status {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 8px;
+}
+.arkmail-status .arkmail-busy { flex: 1 1 auto; min-width: 0; }
+.arkmail-busy-empty { visibility: hidden; }
 /* Fala 18d (zgloszenie pkt 2): pasek postepu pod tekstem busy przy
    masowym pobieraniu tresci (jedyna petla ze znanym total). */
 .arkmail-busy-track {

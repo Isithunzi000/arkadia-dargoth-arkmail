@@ -116,7 +116,7 @@ test('integracja: pelna indeksacja usuwa z widoku list znikniety z serwera', asy
     await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksacja niewyslanych');
     f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
     f.fire('> ', 'prompt');
-    await waitRt(() => !content.querySelector('.arkmail-busy'), 'koniec indeksacji');
+    await waitRt(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec indeksacji');
 
     // Widok skrzynki: znikniety list usuniety, zywe zostaly.
     click(h, '[data-tab="listy"]');

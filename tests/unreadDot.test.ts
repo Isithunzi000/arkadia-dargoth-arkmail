@@ -100,7 +100,7 @@ test('harness: listing wyslanych bez *R* nie dostaje niebieskich kropek', async 
     h.f.fire(' 1. Temat: do Corge', 'mail');
     h.f.fire('Odbiorca: Corge                      Wt, 24 VIII 1999, 11:00:00', 'mail');
     h.f.fire('> ', 'prompt');
-    await h.waitFor(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji wyslanych');
+    await h.waitFor(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji wyslanych');
     await h.waitFor(
       () => h.content.querySelectorAll('.arkmail-entry').length === 2,
       'dwa wiersze wyslanych',

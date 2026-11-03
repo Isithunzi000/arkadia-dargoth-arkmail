@@ -211,7 +211,7 @@ test('klik w list w trakcie innej operacji: komunikat zamiast cichej kolejki', a
     );
     // Grzeczne domkniecie petli loadAll (strona pusta -> koniec).
     f.fire('Nie znaleziono zadnych takich odebranych listow.', 'mail');
-    await waitFor(() => !content.querySelector('.arkmail-busy'), 'koniec loadAll');
+    await waitFor(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec loadAll');
   } finally {
     await stopHarness();
   }

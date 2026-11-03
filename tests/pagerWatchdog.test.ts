@@ -103,7 +103,7 @@ test('straznik: prompt pagera pod blokada (legalny odczyt) bez dodatkowego q', a
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
     f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
-    await waitFor(() => !content.querySelector('.arkmail-busy'), 'koniec refreshu');
+    await waitFor(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec refreshu');
     await new Promise((r) => setTimeout(r, 300));
     // Dokladnie jedno q - z legalnej sesji; straznik nie dorzucil swojego.
     assert.equal(f.sent.filter((c) => c === 'q').length, 1, 'tylko q z sesji odczytu');

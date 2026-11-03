@@ -40,7 +40,7 @@ async function finishIndexAll(h: Harness): Promise<void> {
     f.fire(EMPTY_LINE[box], 'mail');
     f.fire('> ', 'prompt');
   }
-  await waitFor(() => !content.querySelector('.arkmail-busy'), 'koniec indeksacji');
+  await waitFor(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec indeksacji');
 }
 
 test('blad 2 (D3): kontakty pokazuja "Indeksowanie w toku" podczas pedzla (zgodnie z archiwum)', async () => {

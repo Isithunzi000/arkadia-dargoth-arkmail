@@ -93,7 +93,7 @@ async function openAndRefresh(h: Harness): Promise<void> {
     'setup: refresh po odczycie',
   );
   replayListingA(h); // najnowszy = 1, swiezy kontekst
-  await waitFor(() => !content.querySelector('.arkmail-busy'), 'setup: koniec refreshu');
+  await waitFor(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'setup: koniec refreshu');
 }
 
 test('re-login: wznowienie sesji uniewaznia kontekst i odswieza skrzynki', async () => {
@@ -130,7 +130,7 @@ test('re-login: wznowienie sesji uniewaznia kontekst i odswieza skrzynki', async
     );
     f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
     await waitFor(
-      () => !content.querySelector('.arkmail-busy'),
+      () => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '',
       'koniec refreshu po connect',
     );
 

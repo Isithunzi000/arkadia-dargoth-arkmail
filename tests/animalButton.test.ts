@@ -44,7 +44,7 @@ const answerEmpty = async (h: Harness, box: MailBox): Promise<void> => {
 };
 
 const waitIdle = (h: Harness): Promise<void> =>
-  h.waitFor(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji');
+  h.waitFor(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji');
 
 const animalBtn = (h: Harness): { disabled: boolean } | null =>
   h.content.querySelector('.arkmail-animal-send') as { disabled: boolean } | null;

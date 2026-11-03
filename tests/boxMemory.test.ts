@@ -97,7 +97,7 @@ test('zakladki: powrot na skrzynke odswieza najnowsza strone (sync zachowuje wcz
     click(h, '[data-box="wyslane"]');
     await waitFor(() => f.sent.includes('listy wyslane'), 'pobranie wyslanych');
     f.fire('Nie masz zadnych wyslanych listow.', 'mail');
-    await waitFor(() => !content.querySelector('.arkmail-busy'), 'koniec pobierania');
+    await waitFor(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec pobierania');
     click(h, '[data-box="odebrane"]');
     await waitFor(
       () => f.sent.filter((c) => c === 'listy odebrane').length === listingsBefore + 1,

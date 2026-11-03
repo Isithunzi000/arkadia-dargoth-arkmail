@@ -60,7 +60,7 @@ async function loadWyslane(h: Harness): Promise<void> {
   f.fire(' 1. Temat: wyjsciowy', 'mail');
   f.fire('Odbiorcy: Bar                           Cz, 26 VIII 1999, 11:00:00', 'mail');
   f.fire('> ', 'prompt');
-  await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji wyslanych');
+  await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji wyslanych');
 }
 
 /** Uzbraja i startuje petle pobierania z zakladki Archiwum. */

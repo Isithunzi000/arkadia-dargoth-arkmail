@@ -182,7 +182,7 @@ test('Indeksuj wszystkie: paginacja kotwicowa, flagi, gone-marking, odblokowanie
     f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
     // --- koniec: toast + koniec sesji.
     await waitRt(() => notifyText(f, 'Zindeksowano skrzynki'), 'toast konca indeksacji');
-    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji indeksacji');
+    await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji indeksacji');
 
     // Archiwum: 3 zywe wiersze (Corge zniknela, prastary doszedl).
     await waitRt(
@@ -266,7 +266,7 @@ test('pobieranie tresci przy kompletnej bazie: jasny toast zamiast martwego', as
     f.fire('> ', 'prompt');
     await waitRt(() => f.sent.includes('listy nieprzeczytane'), 'prolog: nieprzeczytane');
     f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
-    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec prologu');
+    await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec prologu');
     // Otwarcie listu z re-kotwica (Fala 9a).
     const row = Array.from(
       h.content.querySelectorAll('.arkmail-entry') as unknown as Iterable<{
@@ -299,7 +299,7 @@ test('pobieranie tresci przy kompletnej bazie: jasny toast zamiast martwego', as
     f.fire(' 1. *R* Temat: jedyny', 'mail');
     f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
-    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec odczytu');
+    await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec odczytu');
     // Archiwum ma 1 list i ma juz tresc -> pobieranie konczy sie
     // jasnym toastem bez ponownej indeksacji.
     click(h, '[data-tab="archiwum"]');

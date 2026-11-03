@@ -180,7 +180,7 @@ test('archiwum: pobieranie tresci - uzbrojenie, petla, podsumowanie, cache', asy
       () => downloadBtn(h).textContent === 'Pobierz tresci do archiwum',
       'przycisk wrocil do etykiety bazowej',
     );
-    assert.ok(!content.querySelector('.arkmail-busy'), 'pasek busy zgaszony');
+    assert.ok(((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'pasek busy zgaszony');
 
     // Tresc w cache: klik w wiersz = podglad z pamieci, zero komend.
     const base2 = f.sent.length;
@@ -224,7 +224,7 @@ test('archiwum: start pobierania odmowny, gdy gracz ma otwarta poczte w grze (Fa
     f.fire('→ q');
     await answerEmptyBox(h, 'odebrane');
     await answerEmptyBox(h, 'nieprzeczytane');
-    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji');
+    await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji');
   } finally {
     await stopHarness();
   }
@@ -258,7 +258,7 @@ test('archiwum: pobieranie przerywa, gdy gracz otworzy poczte w trakcie (Fala 42
     f.fire('→ q');
     await answerListing3(h);
     await answerEmptyBox(h, 'nieprzeczytane');
-    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji');
+    await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji');
     // Tresc pobranego przed przerwaniem listu zostaje w bazie (podglad z
     // pamieci, zero komend).
     const base = f.sent.length;

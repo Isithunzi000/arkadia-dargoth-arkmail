@@ -38,7 +38,7 @@ async function finishOtherBoxes(h: Harness): Promise<void> {
   f.fire('Nie masz zadnych wyslanych listow.', 'mail');
   await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksacja niewyslanych');
   f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
-  await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec indeksacji');
+  await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec indeksacji');
 }
 
 test('indeksacja odswieza skrzynke i kontakty po stronach oraz zachowuje starsze wpisy', async () => {

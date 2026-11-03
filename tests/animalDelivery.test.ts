@@ -35,7 +35,7 @@ const answerEmpty = async (h: Harness, box: MailBox): Promise<void> => {
 };
 
 const waitIdle = (h: Harness): Promise<void> =>
-  h.waitFor(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji');
+  h.waitFor(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji');
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 

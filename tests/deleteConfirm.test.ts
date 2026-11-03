@@ -164,7 +164,7 @@ test('harness: Usun wymaga dwukliku; toast "List zostal usuniety."', async () =>
       'refresh po odczycie (11f)',
     );
     replayFreshListing(h);
-    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec refreshu');
+    await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec refreshu');
 
     // Pierwszy klik: tylko uzbrojenie - ZERO komend do serwera.
     const sentBefore = f.sent.length;

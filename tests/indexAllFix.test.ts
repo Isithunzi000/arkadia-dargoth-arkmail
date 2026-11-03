@@ -67,7 +67,7 @@ test('pusta skrzynka wariantem "Nie znaleziono..." tez dostaje flage (4/4)', asy
     await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksacja: niewyslane');
     f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
     await waitRt(() => notifyText(f, 'Zindeksowano skrzynki'), 'toast 4/4');
-    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji');
+    await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji');
     // Kontakty odblokowane (wszystkie 4 flagi).
     click(h, '[data-tab="kontakty"]');
     await waitRt(() => !!h.content.querySelector('.arkmail-contact'), 'kontakty po 4/4');
@@ -209,7 +209,7 @@ test('skrzynka z mieleniem kotwicy: 3 proby z klepnieciem + sonda wykluczajaca d
       'opozniony retry: nieprzeczytane',
     );
     f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
-    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji');
+    await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji');
     click(h, '[data-tab="kontakty"]');
     await waitRt(() => !!h.content.querySelector('.arkmail-index-all'), 'brama nadal obecna');
     // Fala 24a: kontakty sa widoczne ZAWSZE (brama = wskazowka nad
@@ -340,7 +340,7 @@ test('incydentalny duplikat strony kotwicowej: klepniecie + retry ratuja skrzynk
     await waitRt(() => f.sent.includes('listy niewyslane'), 'indeksacja: niewyslane');
     f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
     await waitRt(() => notifyText(f, 'Zindeksowano skrzynki'), 'toast 4/4');
-    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji');
+    await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji');
   } finally {
     await stopHarness();
   }
@@ -434,7 +434,7 @@ test('ponad 50 listow jednego dnia: starsze dni sa pobierane, a luka jest zapisa
       'opozniony retry: nieprzeczytane',
     );
     f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
-    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji');
+    await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji');
     click(h, '[data-tab="kontakty"]');
     await waitRt(() => !!h.content.querySelector('.arkmail-index-gaps'), 'zapisana luka w widoku');
     assert.ok(textOf(h, '.arkmail-index-gaps').includes('wyslane: 1999-08-21'), 'dzien i skrzynka luki');
@@ -527,7 +527,7 @@ test('ponad 50 listow jednego dnia bez starszych wpisow: luka, nie komplet', asy
       'opozniony retry: nieprzeczytane',
     );
     f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
-    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji');
+    await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji');
   } finally {
     await stopHarness();
   }

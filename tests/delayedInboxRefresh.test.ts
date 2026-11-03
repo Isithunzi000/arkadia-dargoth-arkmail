@@ -56,7 +56,7 @@ test('harness: po nowej poczcie leci refresh natychmiast i opozniony retry', asy
     f.fire('> ', 'prompt');
     await waitFor(() => f.sent.includes('listy nieprzeczytane'), 'refresh nieprzeczytanych');
     f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
-    await waitFor(() => !h.content.querySelector('.arkmail-busy'), 'koniec sesji refreshu');
+    await waitFor(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji refreshu');
 
     // Retry po lagu serwera (~10 s) - na starym kodzie nie wylatuje.
     await waitLong(

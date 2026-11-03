@@ -50,7 +50,7 @@ async function fullRefresh4Boxes(h: Harness): Promise<void> {
   f.fire('> ', 'prompt');
   await waitFor(() => f.sent.includes('listy niewyslane'), 'listing niewyslane');
   f.fire(EMPTY_LINE.niewyslane, 'mail');
-  await waitFor(() => !content.querySelector('.arkmail-busy'), 'koniec refreshu');
+  await waitFor(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec refreshu');
 }
 
 const paneText = (h: Harness): string =>
@@ -86,7 +86,7 @@ test('blad 1 (D1): same puste skrzynki w refreshu tez stempluja indeksacje', asy
       await waitFor(() => f.sent.includes(`listy ${box}`), `listing ${box}`);
       f.fire(EMPTY_LINE[box], 'mail');
     }
-    await waitFor(() => !content.querySelector('.arkmail-busy'), 'koniec refreshu');
+    await waitFor(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec refreshu');
     click(h, '[data-tab="kontakty"]');
     assert.match(
       paneText(h),
@@ -114,7 +114,7 @@ test('blad 1 (D2): loadOlder do dna stempluje skrzynke i czysci luki', async () 
       await waitFor(() => f.sent.includes(`listy ${box}`), `listing ${box}`);
       f.fire(EMPTY_LINE[box], 'mail');
     }
-    await waitFor(() => !content.querySelector('.arkmail-busy'), 'koniec refreshu');
+    await waitFor(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec refreshu');
     click(h, '[data-tab="archiwum"]');
     assert.match(paneText(h), /Czesciowo: 3 z 4 skrzynek/, 'ucieta skrzynka bez stempla');
 
@@ -127,7 +127,7 @@ test('blad 1 (D2): loadOlder do dna stempluje skrzynke i czysci luki', async () 
     );
     f.fire(EMPTY_LINE.odebrane, 'mail');
     f.fire('> ', 'prompt');
-    await waitFor(() => !content.querySelector('.arkmail-busy'), 'koniec paginacji');
+    await waitFor(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec paginacji');
     click(h, '[data-tab="archiwum"]');
     assert.match(
       paneText(h),
@@ -151,7 +151,7 @@ test('blad 1 (D1): uciety listing NIE stempluje skrzynki', async () => {
     f.fire('> ', 'prompt');
     await waitFor(() => f.sent.includes('listy nieprzeczytane'), 'listing nieprzeczytane');
     f.fire(EMPTY_LINE.nieprzeczytane, 'mail');
-    await waitFor(() => !content.querySelector('.arkmail-busy'), 'koniec refreshu');
+    await waitFor(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec refreshu');
     click(h, '[data-tab="archiwum"]');
     assert.match(
       paneText(h),

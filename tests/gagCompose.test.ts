@@ -53,7 +53,7 @@ test('gag: compose widoczny w oknie gry (prompty i wynik nie gagowane)', async (
     await waitFor(() => f.sent.includes('listy niewyslane'), 'refresh po compose');
     f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
     f.fire('> ', 'prompt');
-    await waitRt(() => !content.querySelector('.arkmail-busy'), 'koniec compose');
+    await waitRt(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec compose');
     assert.ok(
       f.gagged.includes('Nie masz zadnych niewyslanych listow.'),
       'listingowy spam po compose dalej gagowany',
@@ -74,7 +74,7 @@ test('echo: wysylki composera i "wyslij zwierze" ida z echem, listingi bez', asy
     assert.equal(echoOf('listy odebrane'), false, 'listing bez echa');
     f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
     f.fire('> ', 'prompt');
-    await waitRt(() => !content.querySelector('.arkmail-busy'), 'koniec prologu');
+    await waitRt(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec prologu');
 
     const setField = (name: string, value: string) => {
       const el = content.querySelector(`[data-field="${name}"]`) as unknown as {
@@ -103,7 +103,7 @@ test('echo: wysylki composera i "wyslij zwierze" ida z echem, listingi bez', asy
     await waitFor(() => f.sent.includes('listy niewyslane'), 'refresh po compose');
     f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
     f.fire('> ', 'prompt');
-    await waitRt(() => !content.querySelector('.arkmail-busy'), 'koniec compose');
+    await waitRt(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec compose');
 
     // Zwierze z przycisku (zakladka Listy): echo + linie lotu widoczne.
     click(h, '[data-tab="listy"]');

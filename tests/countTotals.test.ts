@@ -189,7 +189,7 @@ test('total: wysylka szkicu odswieza wyslane INIEWYSLANE - szkic znika z bazy', 
     await waitFor(() => f.sent.includes('listy nieprzeczytane'), 'listing nieprzeczytanych');
     f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
     f.fire('> ', 'prompt');
-    await waitRt(() => !content.querySelector('.arkmail-busy'), 'koniec prologu');
+    await waitRt(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec prologu');
 
     // Szkic w niewyslanych (klik w skrzynke = replace-refresh).
     click(h, '[data-box="niewyslane"]');
@@ -198,7 +198,7 @@ test('total: wysylka szkicu odswieza wyslane INIEWYSLANE - szkic znika z bazy', 
     h.f.fire(' 1. Temat: szkic', 'mail');
     h.f.fire('Odbiorca: Corge                         Wt, 24 VIII 1999, 10:00:00', 'mail');
     h.f.fire('> ', 'prompt');
-    await waitRt(() => !content.querySelector('.arkmail-busy'), 'koniec listingu niewyslanych');
+    await waitRt(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec listingu niewyslanych');
 
     // Compose: wysylka listu do Corge.
     const setField = (name: string, value: string) => {
@@ -234,7 +234,7 @@ test('total: wysylka szkicu odswieza wyslane INIEWYSLANE - szkic znika z bazy', 
     );
     f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
     f.fire('> ', 'prompt');
-    await waitRt(() => !content.querySelector('.arkmail-busy'), 'koniec odswiezania');
+    await waitRt(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec odswiezania');
 
     // Agregat: wyslana kopia JEDNA, szkic fizycznie z bazy zniknal.
     click(h, '[data-tab="archiwum"]');

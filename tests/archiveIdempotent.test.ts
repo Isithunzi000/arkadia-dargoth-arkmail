@@ -149,7 +149,7 @@ test('archiwum: blizniak nieprzeczytane/odebrane - per rekord, kazdy z wlasna tr
     f.fire(' 1. Temat: najnowszy', 'mail');
     f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
-    await waitRt(() => !h.content.querySelector('.arkmail-busy'), 'koniec listingu');
+    await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec listingu');
 
     click(h, '[data-tab="archiwum"]');
     // Widok per rekord (Fala 41): replica nieprzeczytana to OSOBNY

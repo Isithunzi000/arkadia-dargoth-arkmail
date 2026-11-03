@@ -235,7 +235,7 @@ export async function loadTruncatedBox(h: Harness): Promise<void> {
   // juz po listingu odebranych (przed koncem fetchu nieprzeczytanych),
   // wiec czekamy tez na znikniecie paska busy - inaczej test łapal
   // chwile, gdy blokada sesji jeszcze stoi (wyscig mikrozadan).
-  await waitFor(() => !content.querySelector('.arkmail-busy'), 'koniec sesji prologu');
+  await waitFor(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji prologu');
 }
 
 export const click = (h: Harness, selector: string): void =>

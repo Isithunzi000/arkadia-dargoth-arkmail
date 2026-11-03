@@ -96,7 +96,7 @@ test('kontakty z archiwum: pusta skrzynka (kompletna prawda) zdejmuje liczniki',
     );
     f.fire('Nie masz zadnych odebranych listow.', 'mail');
     f.fire('> ', 'prompt');
-    await waitFor(() => !content.querySelector('.arkmail-busy'), 'koniec refreshu');
+    await waitFor(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec refreshu');
 
     click(h, '[data-tab="kontakty"]');
     await waitFor(
