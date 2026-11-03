@@ -648,9 +648,10 @@ export function mountMailUi(
 
   const renderListy = (state: MailUiState): HTMLElement => {
     const pane = doc.createElement('div');
-    pane.className = 'arkmail-pane';
-    // Klucz panelu dla migawki scrolla (Fala 11c).
-    pane.setAttribute('data-pane-key', `listy:${state.activeBox}`);
+    // Fala UI-1 (zgloszenie 2026-11-03): panel w trybie kolumnowym -
+    // naglowek (skrzynki, operacje, szukajka) stoi na stale, scrolluje
+    // sie tylko lista w .arkmail-list-scroll (sugestia 3 z Discorda).
+    pane.className = 'arkmail-pane arkmail-listy';
     const boxes = doc.createElement('div');
     boxes.className = 'arkmail-boxes';
     for (const [box, label] of BOXES) {
@@ -852,6 +853,13 @@ export function mountMailUi(
     // dlatego nie podpowiada zapisanych form w mianowniku.
     attachGhost(doc, sTemat as HTMLInputElement, subjectSource);
 
+    // Kontener scrollujacy: wiersze listow i ich stany puste. Klucz
+    // migawki scrolla (Fala 11c) mieszka na nim, nie na panelu.
+    const scroll = doc.createElement('div');
+    scroll.className = 'arkmail-list-scroll';
+    scroll.setAttribute('data-pane-key', `listy:${state.activeBox}`);
+    pane.appendChild(scroll);
+
     // Tryb wynikow: banner z opisem zapytania + Wyczysc (restore pelnego
     // widoku z pamieci, bez strzalu do serwera).
     const searchMode = state.search && state.search.box === state.activeBox ? state.search : null;
@@ -870,16 +878,16 @@ export function mountMailUi(
         handlers.onClearSearch(state.activeBox);
       });
       banner.appendChild(clear);
-      pane.appendChild(banner);
+      scroll.appendChild(banner);
     }
 
     const view = state.boxes[state.activeBox];
     if (!view) {
-      pane.appendChild(dim('Skrzynka nie zaladowana - kliknij jej nazwe, aby pobrac.'));
+      scroll.appendChild(dim('Skrzynka nie zaladowana - kliknij jej nazwe, aby pobrac.'));
       return pane;
     }
     if (view.empty !== null) {
-      pane.appendChild(dim(view.empty === 'puste' ? 'Skrzynka pusta.' : 'Brak pasujacych listow.'));
+      scroll.appendChild(dim(view.empty === 'puste' ? 'Skrzynka pusta.' : 'Brak pasujacych listow.'));
       return pane;
     }
     // Serwer podaje najstarszy->najnowszy; wyswietlamy najnowszy->najstarszy.
@@ -919,7 +927,7 @@ export function mountMailUi(
       date.textContent = e.date ? e.date.raw : '';
       row.appendChild(date);
       row.addEventListener('click', () => handlers.onOpenLetter(state.activeBox, e));
-      pane.appendChild(row);
+      scroll.appendChild(row);
     }
     if (searchMode) {
       // Wyniki szukania sa renumerowane wewnatrz selekcji - paginacja
@@ -932,7 +940,7 @@ export function mountMailUi(
       btn.className = 'arkmail-older arkmail-btn-action';
       btn.textContent = 'Wczytaj starsze';
       btn.addEventListener('click', () => handlers.onLoadOlder(state.activeBox));
-      pane.appendChild(btn);
+      scroll.appendChild(btn);
     }
     return pane;
   };

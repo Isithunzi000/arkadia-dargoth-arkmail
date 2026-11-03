@@ -198,8 +198,23 @@ export const STYLES = `
   border-radius: 8px;
   padding: 8px;
 }
-.arkmail-pane::-webkit-scrollbar { width: 8px; }
-.arkmail-pane::-webkit-scrollbar-thumb { background: ${BORDER}; border-radius: 4px; }
+/* Fala UI-1 (zgloszenie 2026-11-03): zakladka Listy - panel kolumnowy,
+   scrolluje sie wylacznie .arkmail-list-scroll; naglowek (skrzynki,
+   operacje, szukajka) widoczny zawsze (sugestia 3 z Discorda). */
+.arkmail-listy {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.arkmail-list-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+.arkmail-pane::-webkit-scrollbar,
+.arkmail-list-scroll::-webkit-scrollbar { width: 8px; }
+.arkmail-pane::-webkit-scrollbar-thumb,
+.arkmail-list-scroll::-webkit-scrollbar-thumb { background: ${BORDER}; border-radius: 4px; }
 
 /* --- skrzynki: pigulki --- */
 .arkmail-boxes { display: flex; gap: 4px; margin-bottom: 8px; flex-wrap: wrap; }
