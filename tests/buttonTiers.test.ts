@@ -104,7 +104,8 @@ const TIERS: Array<{ tab: string; selector: string; tier: string }> = [
   { tab: 'list', selector: '.arkmail-del', tier: 'arkmail-btn-danger' },
   { tab: 'napisz', selector: '.arkmail-send', tier: 'arkmail-btn-primary' },
   { tab: 'napisz', selector: '.arkmail-compose-clear', tier: 'arkmail-btn-danger' },
-  { tab: 'kontakty', selector: '.arkmail-index-all', tier: 'arkmail-btn-action' },
+  // Fala UI-2 krok 4: przycisk indeksacji z bramy Kontaktow przeniesiony
+  // do panelu Osoby w Archiwum - poziom ten sam, zakrywa wpis archiwum.
   { tab: 'archiwum', selector: '.arkmail-index-all', tier: 'arkmail-btn-action' },
   { tab: 'archiwum', selector: '.arkmail-arch-download', tier: 'arkmail-btn-action' },
   { tab: 'archiwum', selector: '.arkmail-arch-export', tier: 'arkmail-btn-primary' },

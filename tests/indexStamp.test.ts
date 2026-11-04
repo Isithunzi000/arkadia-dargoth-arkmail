@@ -60,16 +60,12 @@ test('blad 1 (D1): pelny refresh 4 skrzynek = kompletna indeksacja w kontaktach 
   const h = await startHarness();
   try {
     await fullRefresh4Boxes(h);
-    click(h, '[data-tab="kontakty"]');
-    assert.match(
-      paneText(h),
-      /Kompletna indeksacja od: \d{4}-\d{2}-\d{2}/,
-      'kontakty widza kompletny stan po refreshu',
-    );
+    // Fala UI-2 krok 4: jedno zrodlo statusu - krok 1 w Archiwum
+    // (stopka Kontaktow zniknela z sub-pigulka Osoby).
     click(h, '[data-tab="archiwum"]');
     assert.match(
       paneText(h),
-      /Gotowe: wszystkie skrzynki zapisane\./,
+      /Gotowe od \d{4}-\d{2}-\d{2}: wszystkie skrzynki zapisane\./,
       'archiwum widzi kompletny stan po refreshu',
     );
   } finally {
@@ -87,10 +83,11 @@ test('blad 1 (D1): same puste skrzynki w refreshu tez stempluja indeksacje', asy
       f.fire(EMPTY_LINE[box], 'mail');
     }
     await waitFor(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec refreshu');
-    click(h, '[data-tab="kontakty"]');
+    // Fala UI-2 krok 4: jedno zrodlo statusu - krok 1 w Archiwum.
+    click(h, '[data-tab="archiwum"]');
     assert.match(
       paneText(h),
-      /Kompletna indeksacja od: \d{4}-\d{2}-\d{2}/,
+      /Gotowe od \d{4}-\d{2}-\d{2}: wszystkie skrzynki zapisane\./,
       'same puste skrzynki = kompletna wiedza o skrzynkach',
     );
   } finally {

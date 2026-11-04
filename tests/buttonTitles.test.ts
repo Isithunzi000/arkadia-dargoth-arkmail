@@ -101,7 +101,9 @@ test('podpowiedzi: kazdy przycisk ma title we wszystkich zakladkach', () => {
     new MailUiStore({ tab: 'archiwum' }),
     new MailUiStore({ tab: 'usuwanie' }),
   ];
-  stores[3].setContacts([contact()]);
+  // Fala UI-2 krok 4: wiersze kontaktow stoja w panelu Archiwum -
+  // to tam audytujemy ich przyciski (Do ksiazki, kierunki).
+  stores[4].setContacts([contact()]);
   for (const store of stores) missing.push(...missingTitles(mount(store)));
   assert.deepEqual(missing, [], 'kazdy przycisk ma niepusta podpowiedz');
 });
@@ -160,7 +162,8 @@ test('podpowiedzi: dynamiczne stany i ponownie utworzone przyciski zachowuja tit
   assert.ok(title(listy, '.arkmail-animal-send').includes('drodze'));
   assert.ok(title(listy, '.arkmail-older-all').includes('Przerwij'));
 
-  const contactsStore = new MailUiStore({ tab: 'kontakty' });
+  // Fala UI-2 krok 4: filtr kontaktow mieszka w panelu Archiwum.
+  const contactsStore = new MailUiStore({ tab: 'archiwum' });
   contactsStore.setContacts([contact()]);
   const contacts = mount(contactsStore);
   const filter = (contacts as { querySelector(s: string): unknown }).querySelector('[data-filter="kontakty"]') as {

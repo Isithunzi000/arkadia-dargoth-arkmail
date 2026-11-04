@@ -564,8 +564,9 @@ test('render: naglowek listu z wyroznionym tematem i wierszem meta', () => {
 
 test('render: kontakty - filtr i sort lokalne (bez store), wiersz z data', () => {
   // Fala 18c: kontakty za brama pelnego indeksu - kompletne flagi.
+  // Fala UI-2 krok 4: panel Osoby mieszka w zakladce Archiwum.
   const s = new MailUiStore({
-    tab: 'kontakty',
+    tab: 'archiwum',
     indexMeta: {
       odebrane: '2026-10-20T00:00:00.000Z',
       nieprzeczytane: '2026-10-20T00:00:00.000Z',

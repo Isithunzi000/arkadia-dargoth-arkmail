@@ -40,7 +40,7 @@ const HANDLERS = {
   onForwardLetter: () => {},
 } as unknown as MailUiHandlers;
 
-test('brama Kontaktow: bez indeksu przycisk indeksacji zamiast licznikow', () => {
+test('brama panelu Osoby: bez indeksu przycisk indeksacji zamiast licznikow', () => {
   const window = new Window();
   (globalThis as { document?: unknown }).document = window.document;
   try {
@@ -48,7 +48,8 @@ test('brama Kontaktow: bez indeksu przycisk indeksacji zamiast licznikow', () =>
     const container = window.document.createElement('div');
     const off = mountMailUi(container as unknown as HTMLElement, store, HANDLERS);
     try {
-      store.setTab('kontakty');
+      // Fala UI-2 krok 4: brama stoi w panelu Osoby zakladki Archiwum.
+      store.setTab('archiwum');
       const btn = container.querySelector('.arkmail-index-all') as unknown as {
         textContent?: string;
       } | null;
@@ -88,7 +89,7 @@ test('brama Kontaktow: bez indeksu przycisk indeksacji zamiast licznikow', () =>
   }
 });
 
-test('brama Kontaktow: lista kontaktow widoczna mimo braku indeksu, wskazowka nad lista', () => {
+test('brama panelu Osoby: lista kontaktow widoczna mimo braku indeksu, wskazowka nad lista', () => {
   const window = new Window();
   (globalThis as { document?: unknown }).document = window.document;
   try {
@@ -103,26 +104,34 @@ test('brama Kontaktow: lista kontaktow widoczna mimo braku indeksu, wskazowka na
     const container = window.document.createElement('div');
     const off = mountMailUi(container as unknown as HTMLElement, store, HANDLERS);
     try {
-      store.setTab('kontakty');
+      // Fala UI-2 krok 4: panel Osoby w zakladce Archiwum.
+      store.setTab('archiwum');
       const text = container.textContent ?? '';
       assert.ok(text.includes('Bar'), 'kontakt z czesciowego archiwum widoczny');
       assert.ok(text.includes('Grault'), 'drugi kontakt widoczny');
       // Wskazowka + przycisk indeksacji NAD lista kontaktow (kolejnosc
-      // w DOM: najpierw brama, potem kontrolki listy).
-      const pane = container.querySelector('[data-pane-key="kontakty"]');
-      assert.ok(pane, 'panel kontaktow');
-      const children = Array.from((pane as unknown as { children: unknown[] }).children);
-      // Fala 30: klasa poziomu doklejona obok - sprawdzamy obecnosc,
-      // nie pelna rownosc className.
-      const gateIdx = children.findIndex((el) =>
-        ((el as { className?: string }).className ?? '').split(' ').includes('arkmail-index-all'),
+      // w DOM panelu: najpierw brama, potem kontrolki listy).
+      const panel = container.querySelector('[data-arch-people]');
+      assert.ok(panel, 'panel Osoby z listow');
+      const panelText = (panel as unknown as { textContent?: string }).textContent ?? '';
+      assert.ok(
+        panelText.includes('Kontakty powstaja z listow zebranych ze wszystkich skrzynek.'),
+        'brama w panelu',
       );
-      const controlsIdx = children.findIndex(
-        (el) => (el as { className?: string }).className === 'arkmail-contact-controls',
+      const gateBtn = (panel as unknown as { querySelector(s: string): unknown }).querySelector(
+        '.arkmail-index-all',
       );
-      assert.ok(gateIdx >= 0, 'przycisk indeksacji obecny');
-      assert.ok(controlsIdx >= 0, 'kontrolki listy obecne');
-      assert.ok(gateIdx < controlsIdx, 'brama NAD lista kontaktow');
+      assert.ok(gateBtn, 'przycisk indeksacji obecny w panelu');
+      const controls = (panel as unknown as { querySelector(s: string): unknown }).querySelector(
+        '.arkmail-contact-controls',
+      );
+      assert.ok(controls, 'kontrolki listy obecne w panelu');
+      // Dowod kolejnosci: brama jest przed kontrolkami w HTML panelu.
+      const panelHtml = (panel as unknown as { innerHTML?: string }).innerHTML ?? '';
+      assert.ok(
+        panelHtml.indexOf('arkmail-index-all') < panelHtml.indexOf('arkmail-contact-controls'),
+        'brama NAD lista kontaktow',
+      );
     } finally {
       off();
     }
@@ -198,7 +207,8 @@ test('Indeksuj wszystkie: paginacja kotwicowa, flagi, gone-marking, odblokowanie
     assert.ok(texts.some((t) => t.includes('prastary')), 'dopisany list z paginacji');
 
     // Kontakty odblokowane: Foo i Fred licza sie, Corge nie.
-    click(h, '[data-tab="kontakty"]');
+    // Fala UI-2 krok 4: wiersze kontaktow stoja w panelu Archiwum.
+    click(h, '[data-tab="archiwum"]');
     await waitRt(() => !!h.content.querySelector('.arkmail-contact'), 'wiersze kontaktow');
     const names = Array.from(
       h.content.querySelectorAll('.arkmail-contact-name') as unknown as Iterable<{
@@ -208,15 +218,24 @@ test('Indeksuj wszystkie: paginacja kotwicowa, flagi, gone-marking, odblokowanie
     assert.ok(names.includes('Foo'), 'kontakt z zywych listow');
     assert.ok(names.includes('Fred'), 'kontakt z dopisanej strony');
     assert.ok(!names.includes('Corge'), 'kontakt zniknietego listu odpada');
-    // Opis indeksacji: najwczesniejsza data + rozmiar bazy (3 zywe
-    // grupy; Fala 28: zniknieta Corge jest FIZYCZNIE purgowana, nie
-    // siedzi w bazie jako zombie).
-    const foot = h.content.querySelector('.arkmail-index-foot') as unknown as {
+    // Opis indeksacji: najwczesniejsza data w kroku 1 Archiwum + rozmiar
+    // bazy w pasku licznikow (3 zywe grupy; Fala 28: zniknieta Corge
+    // jest FIZYCZNIE purgowana, nie siedzi w bazie jako zombie).
+    // Stopka Kontaktow zniknela razem z sub-pigulka Osoby (krok 4).
+    const stepStatus = h.content.querySelector('.arkmail-archive-step-status') as unknown as {
       textContent?: string;
     } | null;
-    assert.ok(foot, 'opis indeksacji');
-    assert.match(String(foot.textContent ?? ''), /^Kompletna indeksacja od: 20\d\d-\d\d-\d\d/);
-    assert.ok(String(foot.textContent ?? '').includes('3 listy w bazie'), 'rozmiar bazy');
+    assert.ok(stepStatus, 'status kroku 1 istnieje');
+    assert.match(
+      String(stepStatus!.textContent ?? ''),
+      /Gotowe od 20\d\d-\d\d-\d\d: wszystkie skrzynki zapisane/,
+      'data kompletu w kroku 1',
+    );
+    const strip = h.content.querySelector('.arkmail-arch-counts') as unknown as {
+      textContent?: string;
+    } | null;
+    assert.ok(strip, 'pasek licznikow istnieje');
+    assert.ok(String(strip!.textContent ?? '').includes('Listow w bazie: 3'), 'rozmiar bazy');
   } finally {
     await stopHarness();
   }

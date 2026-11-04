@@ -139,7 +139,8 @@ test('usuwanie: swiezy listing zmienia numery, a potwierdzenia aktualizuja dane'
     assert.equal(letters.find((letter) => letter.subject === 'Temat A'), undefined, 'Temat A fizycznie usuniety');
     assert.equal(letters.find((letter) => letter.subject === 'Temat C'), undefined, 'Temat C fizycznie usuniety');
     assert.ok(letters.some((letter) => letter.subject === 'Temat B'), 'Temat B nietkniety');
-    click(h, '[data-tab="kontakty"]');
+    // Fala UI-2 krok 4: wiersze kontaktow stoja w panelu Archiwum.
+    click(h, '[data-tab="archiwum"]');
     await h.waitFor(() => h.content.querySelectorAll('.arkmail-contact').length === 1, 'jeden kontakt');
     assert.equal(textOf(h, '.arkmail-contact-name'), 'Corge');
   } finally {

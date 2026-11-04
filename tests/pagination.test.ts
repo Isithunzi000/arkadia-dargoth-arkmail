@@ -267,7 +267,8 @@ test('kontakty: wczytaj starsze odbudowuje kontakty z dopisanej strony (Fala 24b
     f.fire('> ', 'prompt');
     await waitFor(() => notifyText(f, '(dodano: 1)'), 'notify o dopisaniu starszych');
 
-    click(h, '[data-tab="kontakty"]');
+    // Fala UI-2 krok 4: kontakty w panelu Archiwum.
+    click(h, '[data-tab="archiwum"]');
     await waitRt(() => !!h.content.querySelector('.arkmail-contact'), 'wiersze kontaktow');
     const names = Array.from(
       h.content.querySelectorAll('.arkmail-contact-name') as unknown as Iterable<{
@@ -301,7 +302,8 @@ test('kontakty: wczytaj wszystkie odbudowuje kontakty po zakonczeniu petli (Fala
       'notify konca petli',
     );
 
-    click(h, '[data-tab="kontakty"]');
+    // Fala UI-2 krok 4: kontakty w panelu Archiwum.
+    click(h, '[data-tab="archiwum"]');
     await waitRt(() => !!h.content.querySelector('.arkmail-contact'), 'wiersze kontaktow');
     const names = Array.from(
       h.content.querySelectorAll('.arkmail-contact-name') as unknown as Iterable<{
@@ -339,11 +341,13 @@ test('wczytaj wszystkie: naturalne domkniecie skrzynki stempluje indexMeta (Fala
     );
 
     // Jedna kompletna skrzynka nie wystarcza do kompletnego indeksu.
-    click(h, '[data-tab="kontakty"]');
-    await waitRt(() => !!h.content.querySelector('.arkmail-index-foot'), 'opis indeksacji');
+    // Fala UI-2 krok 4: status indeksacji ma jedno zrodlo - krok 1
+    // w Archiwum (stopka Kontaktow zniknela z sub-pigulka Osoby).
+    click(h, '[data-tab="archiwum"]');
+    await waitRt(() => textOf(h, '.arkmail-archive-step-status').length > 0, 'opis indeksacji');
     assert.match(
-      textOf(h, '.arkmail-index-foot'),
-      /^Indeksacja niekompletna/,
+      textOf(h, '.arkmail-archive-step-status'),
+      /Czesciowo: 1 z 4 skrzynek/,
       'naturalne domkniecie loadAll zachowuje date skrzynki',
     );
   } finally {
@@ -371,10 +375,13 @@ test('wczytaj wszystkie: przerwanie petli NIE stempluje indexMeta (Fala 24c)', a
     await waitRt(() => notifyText(f, 'Przerwano'), 'notify przerwania');
 
     // Petla przerwana = brak pewnosci kompletu -> bez daty skrzynki.
-    click(h, '[data-tab="kontakty"]');
-    await waitRt(() => !!h.content.querySelector('.arkmail-index-foot'), 'opis indeksacji');
-    assert.ok(
-      textOf(h, '.arkmail-index-foot').startsWith('Indeksacja niekompletna |'),
+    // Fala UI-2 krok 4: jedno zrodlo statusu - krok 1 w Archiwum;
+    // przerwana petla nie stemplowala zadnej skrzynki (Fala 24c).
+    click(h, '[data-tab="archiwum"]');
+    await waitRt(() => textOf(h, '.arkmail-archive-step-status').length > 0, 'opis indeksacji');
+    assert.match(
+      textOf(h, '.arkmail-archive-step-status'),
+      /Jeszcze nie zaczeto\./,
       'brak daty po przerwanym loadAll',
     );
   } finally {

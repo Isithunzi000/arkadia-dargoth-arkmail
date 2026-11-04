@@ -5,21 +5,14 @@ import { startHarness, stopHarness, click } from './harness';
 import type { Harness } from './harness';
 
 /**
- * Fala 25 (blad 2): kontakty nie widzialy statusu indeksacji.
- *
- * Zgloszenie: po zrobieniu indeksacji w zakladce Archiwum i przejsciu
- * do Kontaktow status indeksacji pokazywal inny stan niz Archiwum -
- * stopka kontaktow ignorowala state.indexRun (pokazywala tylko
- * flagowy "niekompletna"/"Kompletna..."), a brama z przyciskiem
- * "Przerwij indeksowanie" znikala, gdy indexMeta bylo kompletne,
- * wiec przy ponownej indeksacji nie dalo sie jej przerwac z tej
- * zakladki.
- *
- * Oczekiwanie (decyzja D3): gdy pedzel indeksacji dziala, stopka
- * kontaktow pokazuje "Indeksowanie w toku: <skrzynka> (N/4), stron: M"
- * (jak "W toku: ..." w archiwum - oba panele sie zgadzaja), a przycisk
- * "Przerwij indeksowanie" jest widoczny ZAWSZE, gdy pedzel dziala,
- * takze przy kompletnym indexMeta.
+ * Fala 25 (blad 2), po kroku 4 UI-2: status indeksacji ma jedno
+ * zrodlo prawdy - krok "1. Indeksacja" w zakladce Archiwum. Testy
+ * pilnuja dwoch regresji z gloszenia: (1) podczas pedzela status
+ * mowi "W toku: <skrzynka>, stron: M" i przycisk to "Przerwij
+ * indeksowanie (N/4)", (2) przy ponownej indeksacji z kompletnym
+ * indexMeta przycisk dalej pokazuje Przerwij (dawniej brama znikala,
+ * bo wisiala na fladze kompletu). Sub-pigulka Osoby z Kontaktow
+ * zniknela - panel jest jeden, rozjazd niemozliwy.
  */
 
 const EMPTY_LINE: Record<string, string> = {
@@ -43,36 +36,30 @@ async function finishIndexAll(h: Harness): Promise<void> {
   await waitFor(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec indeksacji');
 }
 
-test('blad 2 (D3): kontakty pokazuja "Indeksowanie w toku" podczas pedzla (zgodnie z archiwum)', async () => {
+const indexButton = (h: Harness): string =>
+  (h.content.querySelector('.arkmail-index-all') as unknown as HTMLElement | null)?.textContent ??
+  '';
+
+test('blad 2: archiwum pokazuje "W toku" podczas pedzla i Przerwij zamiast Indeksuj', async () => {
   const h = await startHarness();
   try {
     const { f, waitFor } = h;
-    click(h, '[data-tab="kontakty"]');
+    click(h, '[data-tab="archiwum"]');
     click(h, '.arkmail-index-all');
     await waitFor(() => f.sent.includes('listy odebrane'), 'start indeksacji');
     // Odswiezenie zakladki = render z biezacego stanu (indexRun aktywny).
-    click(h, '[data-tab="kontakty"]');
-    assert.match(
-      paneText(h),
-      /Indeksowanie trwa: odebrane \(1\/4\), stron: \d+/,
-      'stopka kontaktow widzi pedzel',
-    );
-    // Zgodnosc z archiwum: ten sam przebieg pokazuje "W toku" i tam.
     click(h, '[data-tab="archiwum"]');
-    assert.match(paneText(h), /W toku: odebrane, stron: \d+/, 'archiwum widzi ten sam pedzel');
-    click(h, '[data-tab="kontakty"]');
+    assert.match(paneText(h), /W toku: odebrane, stron: \d+/, 'status widzi pedzel');
+    assert.match(indexButton(h), /Przerwij indeksowanie \(1\/4\)/, 'przycisk to Przerwij');
     await finishIndexAll(h);
-    assert.match(
-      paneText(h),
-      /Kompletna indeksacja od: \d{4}-\d{2}-\d{2}/,
-      'po pedzlu znow pelny status',
-    );
+    click(h, '[data-tab="archiwum"]');
+    assert.match(paneText(h), /Gotowe: wszystkie skrzynki zapisane/, 'po pedzlu pelny status');
   } finally {
     await stopHarness();
   }
 });
 
-test('blad 2 (D3): ponowna indeksacja przy kompletnym indexMeta - "Przerwij" widoczne w kontaktach', async () => {
+test('blad 2: ponowna indeksacja przy kompletnym indexMeta - "Przerwij" widoczne', async () => {
   const h = await startHarness({
     indexMeta: {
       odebrane: '1999-08-09T00:00:00.000Z',
@@ -82,25 +69,15 @@ test('blad 2 (D3): ponowna indeksacja przy kompletnym indexMeta - "Przerwij" wid
     },
   });
   try {
-    const { f, waitFor, content } = h;
-    click(h, '[data-tab="kontakty"]');
-    assert.match(paneText(h), /Kompletna indeksacja od: 1999-08-09/, 'setup: kompletny stan');
-    // Ponowna indeksacja startuje z archiwum (tam przycisk jest zawsze).
+    const { f, waitFor } = h;
     click(h, '[data-tab="archiwum"]');
+    assert.match(paneText(h), /Gotowe: wszystkie skrzynki zapisane/, 'setup: kompletny stan');
     click(h, '.arkmail-index-all');
     await waitFor(() => f.sent.includes('listy odebrane'), 'start ponownej indeksacji');
-    click(h, '[data-tab="kontakty"]');
+    click(h, '[data-tab="archiwum"]');
+    assert.match(paneText(h), /W toku: odebrane, stron: \d+/, 'status widzi pedzel mimo kompletu');
     assert.match(
-      paneText(h),
-      /Indeksowanie trwa: odebrane \(1\/4\)/,
-      'stopka widzi pedzel mimo kompletnego indexMeta',
-    );
-    assert.ok(
-      content.querySelector('.arkmail-index-all'),
-      'przycisk Przerwij widoczny podczas ponownej indeksacji',
-    );
-    assert.match(
-      (content.querySelector('.arkmail-index-all') as unknown as HTMLElement).textContent ?? '',
+      indexButton(h),
       /Przerwij indeksowanie \(1\/4\)/,
       'przycisk to Przerwij, nie "Indeksuj wszystkie"',
     );

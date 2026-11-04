@@ -141,9 +141,9 @@ function mountFooter(archive: ArchiveLetter[]): {
   container: { querySelector(s: string): unknown };
   off: () => void;
 } {
-  // Stopka statusu indeksacji zyje w panelu KONTAKTY (render.ts:
-  // data-pane-key="kontakty" bezposrednio przed .arkmail-index-foot).
-  const store = new MailUiStore({ tab: 'kontakty' });
+  // Fala UI-2 krok 4: stopka Kontaktow zniknela; miara zywej bazy
+  // zyje w pasku licznikow zakladki Archiwum (.arkmail-arch-counts).
+  const store = new MailUiStore({ tab: 'archiwum' });
   store.setArchive(archive);
   const container = document.createElement('div');
   const off = mountMailUi(
@@ -160,13 +160,13 @@ test('total: stopka indeksacji liczy zywe grupy (blizniak raz), nie surowe rekor
     { ...archived('nieprzeczytane', 'Wspolny'), id: 'inny-rekord' },
   ]);
   try {
-    const foot = container.querySelector('.arkmail-index-foot') as {
+    const strip = container.querySelector('.arkmail-arch-counts') as {
       textContent?: string;
     } | null;
-    assert.ok(foot, 'stopka istnieje');
+    assert.ok(strip, 'pasek licznikow istnieje');
     assert.ok(
-      String(foot!.textContent).includes('1 list w bazie'),
-      `stopka: ${foot!.textContent}`,
+      String(strip!.textContent).includes('Listow w bazie: 1'),
+      `pasek: ${strip!.textContent}`,
     );
   } finally {
     off();

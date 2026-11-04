@@ -1,6 +1,6 @@
 /**
  * Fala UI-2 krok 3: widok Grupy w zakladce Kontakty.
- * Sub-pigulki Osoby/Ksiazka adresowa/Grupy (klasy .arkmail-boxes,
+ * Po kroku 4: sub-pigulki Ksiazka adresowa/Grupy (klasy .arkmail-boxes,
  * zero nowych kolorow), pelny CRUD grup (zmiana nazwy z walidacja
  * kolizji, usuwanie czlonka, dokladanie czlonka z ghosta, uzbrojone
  * usuwanie), eksport/import JSON z trybem dolacz/zastap.
@@ -62,8 +62,9 @@ const text = (el: unknown): string => (el as { textContent?: string })?.textCont
 
 const click = (el: unknown): void => (el as { click(): void }).click();
 
+// Fala UI-2 krok 4: sub-pigulka Osoby zniknela - Grupy to druga.
 const switchToGrupy = (container: unknown): void => {
-  click(qa(container, '.arkmail-subpill')[2]);
+  click(qa(container, '.arkmail-subpill')[1]);
 };
 
 const type = (el: unknown, value: string): void => {
@@ -121,27 +122,26 @@ test('grupy: stan grup w store, wipe ich nie tyka', () => {
 
 // --- widok -------------------------------------------------------------------
 
-test('grupy: trzy sub-pigulki Osoby/Ksiazka adresowa/Grupy', () => {
+test('grupy: dwie sub-pigulki Ksiazka adresowa/Grupy (Osoby w Archiwum)', () => {
   const s = new MailUiStore({ tab: 'kontakty' });
   const { container } = mount(s);
   const pills = qa(container, '.arkmail-subpill');
-  assert.deepEqual(pills.map(text), ['Osoby', 'Ksiazka adresowa', 'Grupy']);
-  assert.ok(q(container, '[data-import]'), 'domyslnie Osoby: przyciski importu widoczne');
+  assert.deepEqual(pills.map(text), ['Ksiazka adresowa', 'Grupy']);
+  assert.ok(q(container, '[data-book-new]'), 'domyslnie Ksiazka: formularz dodawania widoczny');
+  assert.ok(q(container, '[data-import]'), 'domyslnie Ksiazka: przyciski importu z gry widoczne');
   assert.ok(!q(container, '[data-group-add]'), 'domyslnie Grupy: formularz ukryty');
 });
 
 test('grupy: przełączanie sub-pigulek', () => {
   const s = new MailUiStore({ tab: 'kontakty' });
   const { container } = mount(s);
-  const ksiazka = qa(container, '.arkmail-subpill')[1];
-  click(ksiazka);
-  assert.ok(q(container, '[data-book-new]'), 'po kliku Ksiazka adresowa: formularz dodawania widoczny');
-  const grupy = qa(container, '.arkmail-subpill')[2];
+  const grupy = qa(container, '.arkmail-subpill')[1];
   click(grupy);
   assert.ok(q(container, '[data-group-add]'), 'po kliku Grupy: formularz widoczny');
-  const osoby = qa(container, '.arkmail-subpill')[0];
-  click(osoby);
-  assert.ok(q(container, '[data-import]'), 'powrot do Osoby');
+  const ksiazka = qa(container, '.arkmail-subpill')[0];
+  click(ksiazka);
+  assert.ok(q(container, '[data-book-new]'), 'powrot do Ksiazki: formularz dodawania widoczny');
+  assert.ok(q(container, '[data-import]'), 'powrot do Ksiazki: przyciski importu z gry widoczne');
 });
 
 test('grupy: dodanie grupy wywoluje zapis, pusta nazwa odrzucana', () => {

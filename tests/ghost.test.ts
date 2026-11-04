@@ -135,7 +135,8 @@ test('ghost: kursor nie na koncu = brak podpowiedzi', () => {
 });
 
 test('ghost: filtr kontaktow podpowiada nazwy i aliasy', () => {
-  const s = new MailUiStore({ tab: 'kontakty' });
+  // Fala UI-2 krok 4: filtr kontaktow mieszka w panelu Archiwum.
+  const s = new MailUiStore({ tab: 'archiwum' });
   s.setContacts([contact('Bar', 300, 'foo'), contact('Corge', 200)]);
   const c = mount(s);
   const el = input(c, '[data-filter="kontakty"]');

@@ -37,6 +37,9 @@ import type { MailBox } from '../src/arkmail/core/protocol/types';
 // Fala 18c: kontakty stoja za brama pelnego indeksu skrzynek - testy
 // widoku kontaktow montuja stan z kompletnymi flagami (sama brama i
 // jej integracja: tests/indexAll.test.ts).
+// Fala UI-2 krok 4: indeks osob mieszka w panelu zakladki Archiwum
+// (sub-pigulka Osoby zniknela z Kontaktow) - wszystkie testy montuja
+// archiwum, a skok filtruje liste listow w tym samym panelu.
 const INDEXED: Partial<Record<MailBox, string>> = {
   odebrane: '2026-10-20T00:00:00.000Z',
   nieprzeczytane: '2026-10-20T00:00:00.000Z',
@@ -129,7 +132,7 @@ const filterInputs = (container: unknown): { osoba: string; skrzynka: string } =
 });
 
 test('kontakty: klik w imie -> archiwum z filtrem osoby na odebranych (Fala 26b)', () => {
-  const s = new MailUiStore({ tab: 'kontakty', indexMeta: INDEXED });
+  const s = new MailUiStore({ tab: 'archiwum', indexMeta: INDEXED });
   s.setActiveBox('wyslane'); // aktywna skrzynka NIE moze decydowac
   s.setContacts([contact({})]);
   seedArchive(s);
@@ -146,7 +149,7 @@ test('kontakty: klik w imie -> archiwum z filtrem osoby na odebranych (Fala 26b)
 });
 
 test('kontakty: klik w imie -> wyslane, gdy odebranych brak', () => {
-  const s = new MailUiStore({ tab: 'kontakty', indexMeta: INDEXED });
+  const s = new MailUiStore({ tab: 'archiwum', indexMeta: INDEXED });
   s.setContacts([contact({ lettersReceived: 0, lettersSent: 3 })]);
   seedArchive(s);
   const { container, calls } = mount(s);
@@ -160,19 +163,23 @@ test('kontakty: klik w imie -> wyslane, gdy odebranych brak', () => {
 });
 
 test('kontakty: klik w imie bez zadnych listow -> nic sie nie dzieje', () => {
-  const s = new MailUiStore({ tab: 'kontakty', indexMeta: INDEXED });
+  const s = new MailUiStore({ tab: 'archiwum', indexMeta: INDEXED });
   s.setContacts([contact({ lettersReceived: 0, lettersSent: 0 })]);
   seedArchive(s);
   const { container, calls } = mount(s);
 
   clickEl(container.querySelector('.arkmail-contact-name'));
 
-  assert.equal(s.state.tab, 'kontakty', 'zostajemy w kontaktach');
+  assert.equal(s.state.tab, 'archiwum', 'zostajemy w archiwum');
+  const osoba = container.querySelector('[data-pane-key="archiwum"] [data-filter="osoba"]') as unknown as {
+    value: string;
+  };
+  assert.equal(osoba.value, '', 'filtr osoby bez zmian');
   assert.deepEqual(searchCalls(calls), [], 'zero szukania');
 });
 
 test('kontakty: przycisk Wyslane -> archiwum z filtrem na wyslanych', () => {
-  const s = new MailUiStore({ tab: 'kontakty', indexMeta: INDEXED });
+  const s = new MailUiStore({ tab: 'archiwum', indexMeta: INDEXED });
   s.setContacts([contact({})]); // ma oba kierunki
   seedArchive(s);
   const { container, calls } = mount(s);
@@ -190,7 +197,7 @@ test('kontakty: przycisk Wyslane -> archiwum z filtrem na wyslanych', () => {
 test('kontakty: list wieloodbiorczy trafia w skok po osobie (Fala 26b)', () => {
   // Serwerowy filtr osoby gubil listy "Odbiorcy: A, B i C"; lokalny
   // filtr archiwum to podciag po party - grupowy list jest widoczny.
-  const s = new MailUiStore({ tab: 'kontakty', indexMeta: INDEXED });
+  const s = new MailUiStore({ tab: 'archiwum', indexMeta: INDEXED });
   s.setContacts([contact({ lettersReceived: 0, lettersSent: 2 })]);
   s.setArchive([
     letter('wyslane', 'Foo, Corge i Bar', 'grupowy', '2026-10-04 10:00:00'),
@@ -205,7 +212,7 @@ test('kontakty: list wieloodbiorczy trafia w skok po osobie (Fala 26b)', () => {
 });
 
 test('kontakty: przycisk kierunku wylaczony, gdy licznik wynosi 0', () => {
-  const s = new MailUiStore({ tab: 'kontakty', indexMeta: INDEXED });
+  const s = new MailUiStore({ tab: 'archiwum', indexMeta: INDEXED });
   s.setContacts([contact({ lettersReceived: 0, lettersSent: 5 })]);
   seedArchive(s);
   const { container, calls } = mount(s);

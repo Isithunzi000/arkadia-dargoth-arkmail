@@ -1,6 +1,7 @@
 /**
  * Fala UI-2 krok 3 (UI): widok "Ksiazka adresowa" w zakladce Kontakty.
- * Trzecia sub-pigulka obok Osoby/Grupy (Osoby znika dopiero w kroku 4).
+ * Po kroku 4: pierwsza z dwoch sub-pigulek (Osoby przeniesione do
+ * panelu w Archiwum - tests/archPeople.test.ts).
  * Plaska ksiazka imion: lista A-Z z checkboxami, krzyzyk per pozycja,
  * formularz dodawania z walidacja, uzbrojone usuwanie zaznaczonych,
  * sekcja aliasow pocztowych read-only (lustro z gry, bez edycji).
@@ -64,8 +65,9 @@ const type = (el: unknown, value: string): void => {
   input.dispatchEvent(new window.Event('input') as unknown as Event);
 };
 
+// Fala UI-2 krok 4: sub-pigulka Osoby zniknela - Ksiazka to pierwsza.
 const switchToKsiazka = (container: unknown): void => {
-  click(qa(container, '.arkmail-subpill')[1]);
+  click(qa(container, '.arkmail-subpill')[0]);
 };
 
 const qs = (el: unknown, selector: string): unknown =>
@@ -73,11 +75,11 @@ const qs = (el: unknown, selector: string): unknown =>
 
 // --- sub-pigulki -------------------------------------------------------------
 
-test('ksiazka: trzy sub-pigulki Osoby/Ksiazka adresowa/Grupy', () => {
+test('ksiazka: dwie sub-pigulki Ksiazka adresowa/Grupy (Osoby przeniesione do Archiwum)', () => {
   const s = new MailUiStore({ tab: 'kontakty' });
   const { container } = mount(s);
   const pills = qa(container, '.arkmail-subpill');
-  assert.deepEqual(pills.map(text), ['Osoby', 'Ksiazka adresowa', 'Grupy']);
+  assert.deepEqual(pills.map(text), ['Ksiazka adresowa', 'Grupy']);
 });
 
 test('ksiazka: widok pokazuje liste imion A-Z z checkboxem i krzyzykiem', () => {

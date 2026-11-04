@@ -5,6 +5,15 @@ import { mountMailUi, type MailUiHandlers } from '../src/arkmail/ui/render';
 import { MailUiStore } from '../src/arkmail/ui/store';
 import type { ArchiveLetter } from '../src/arkmail/core/archive';
 
+/**
+ * Fala UI-2 krok 4: status indeksacji ma jedno zrodlo prawdy - krok
+ * "1. Indeksacja" w zakladce Archiwum (sub-pigulka Osoby z widoku
+ * Kontakty zniknela razem ze stopka .arkmail-index-foot i nota o
+ * lukach; rozdzielnosc paneli z Fali 25 przestaje istniec, bo panel
+ * jest jeden). Testy pilnuja regresji: statusy kompletu/czesciowego,
+ * liczba listow w bazie i wyciecie indeksu przez czyszczenie cache.
+ */
+
 const HANDLERS = {} as MailUiHandlers;
 const META = {
   odebrane: '1999-09-05T10:00:00.000Z',
@@ -28,7 +37,14 @@ function letter(): ArchiveLetter {
   };
 }
 
-test('status i luki sa nad kontaktami, a czyszczenie usuwa je z widoku i stanu', () => {
+const stepStatuses = (container: unknown): string[] =>
+  Array.from(
+    (container as { querySelectorAll(s: string): Iterable<unknown> }).querySelectorAll(
+      '.arkmail-archive-step-status',
+    ),
+  ).map((el) => (el as { textContent?: string }).textContent ?? '');
+
+test('archiwum: kompletny indeks z lukami - status kroku 1 mowi o brakach, licznik bazy widoczny', () => {
   const window = new Window();
   (globalThis as { document?: unknown }).document = window.document;
   try {
@@ -37,32 +53,27 @@ test('status i luki sa nad kontaktami, a czyszczenie usuwa je z widoku i stanu',
       indexMeta: META,
       archiveGaps: { wyslane: ['1999-08-21'] },
     });
-    store.setContacts([{ name: 'Foo', sources: [], lettersReceived: 1, lettersSent: 0 }]);
     const container = window.document.createElement('div');
     const off = mountMailUi(container as unknown as HTMLElement, store, HANDLERS);
     try {
-      store.setTab('kontakty');
-      const status = container.querySelector('.arkmail-index-foot');
-      assert.ok(status);
-      assert.match(status.textContent ?? '', /Kompletna indeksacja od: 1999-09-02/);
-      assert.match(status.textContent ?? '', /1 list w bazie/);
-      const gaps = container.querySelector('.arkmail-index-gaps');
-      assert.ok(gaps);
-      assert.match(gaps.textContent ?? '', /Brakuje danych z dni: wyslane: 1999-08-21/);
-      const pane = container.querySelector('[data-pane-key="kontakty"]')!;
+      store.setTab('archiwum');
+      const statuses = stepStatuses(container);
+      assert.match(statuses[0] ?? '', /Gotowe, ale brakuje danych z 1 dnia/, 'status kroku 1 z lukami');
+      assert.match(container.textContent ?? '', /1 list w bazie/, 'licznik bazy archiwum');
+      const pane = container.querySelector('[data-pane-key="archiwum"]')!;
       const children = Array.from(pane.children);
-      const statusIndex = children.indexOf(status);
-      const gapsIndex = children.indexOf(gaps);
-      const controlsIndex = children.findIndex((child) =>
-        child.classList.contains('arkmail-contact-controls'),
+      const stepsIndex = children.findIndex((child) =>
+        child.classList.contains('arkmail-archive-steps'),
       );
-      assert.ok(statusIndex >= 0 && statusIndex < controlsIndex, 'status przed filtrem i lista');
-      assert.ok(gapsIndex >= 0 && gapsIndex < controlsIndex, 'luki przed filtrem i lista');
+      const controlsIndex = children.findIndex((child) =>
+        child.classList.contains('arkmail-arch-controls'),
+      );
+      assert.ok(stepsIndex >= 0 && stepsIndex < controlsIndex, 'status przed filtrami i lista');
 
       store.clearCacheData();
       assert.deepEqual(store.state.indexMeta, {});
       assert.deepEqual(store.state.archiveGaps, {});
-      assert.doesNotMatch(container.textContent ?? '', /1999-09-02|1999-08-21/);
+      assert.doesNotMatch(container.textContent ?? '', /brakuje danych z 1 dnia/);
     } finally {
       off();
     }
@@ -71,7 +82,7 @@ test('status i luki sa nad kontaktami, a czyszczenie usuwa je z widoku i stanu',
   }
 });
 
-test('niepelny indeks ma jasny stan zamiast opisu kompletnej indeksacji', () => {
+test('archiwum: niepelny indeks ma jasny stan zamiast opisu kompletnej indeksacji', () => {
   const window = new Window();
   (globalThis as { document?: unknown }).document = window.document;
   try {
@@ -79,11 +90,10 @@ test('niepelny indeks ma jasny stan zamiast opisu kompletnej indeksacji', () => 
     const container = window.document.createElement('div');
     const off = mountMailUi(container as unknown as HTMLElement, store, HANDLERS);
     try {
-      store.setTab('kontakty');
-      const status = container.querySelector('.arkmail-index-foot');
-      assert.ok(status);
-      assert.match(status.textContent ?? '', /Indeksacja niekompletna/);
-      assert.doesNotMatch(status.textContent ?? '', /Kompletna indeksacja od:/);
+      store.setTab('archiwum');
+      const statuses = stepStatuses(container);
+      assert.match(statuses[0] ?? '', /Czesciowo: 1 z 4 skrzynek/);
+      assert.doesNotMatch(statuses[0] ?? '', /Gotowe/);
     } finally {
       off();
     }

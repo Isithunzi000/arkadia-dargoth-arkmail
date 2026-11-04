@@ -98,7 +98,9 @@ test('kontakty z archiwum: pusta skrzynka (kompletna prawda) zdejmuje liczniki',
     f.fire('> ', 'prompt');
     await waitFor(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec refreshu');
 
-    click(h, '[data-tab="kontakty"]');
+    // Fala UI-2 krok 4: wiersze kontaktow stoja w panelu zakladki
+    // Archiwum (domyslnie rozwiniety).
+    click(h, '[data-tab="archiwum"]');
     await waitFor(
       () => content.querySelectorAll('.arkmail-contact').length === 0,
       'kontakty reaguja na pusta skrzynke',

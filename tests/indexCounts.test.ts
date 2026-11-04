@@ -87,7 +87,8 @@ test('indeksacja Fala 41: blizniaki = dwa osobne rekordy i dwa osobne listy w li
       `listow w bazie = 3 (2 blizniaki jako osobne rekordy + 1 inny), pasek: "${strip}"`,
     );
 
-    click(h, '[data-tab="kontakty"]');
+    // Fala UI-2 krok 4: kontakty w panelu Archiwum.
+    click(h, '[data-tab="archiwum"]');
     await waitRt(() => !!h.content.querySelector('.arkmail-contact'), 'wiersze kontaktow');
     const rows = Array.from(
       h.content.querySelectorAll('.arkmail-contact') as unknown as Iterable<{

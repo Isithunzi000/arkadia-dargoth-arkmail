@@ -62,7 +62,8 @@ test('indeksacja odswieza skrzynke i kontakty po stronach oraz zachowuje starsze
       () => entryTexts(h).some((text) => text.includes('swiezy')),
       'pierwsza strona widoczna w skrzynce',
     );
-    click(h, '[data-tab="kontakty"]');
+    // Fala UI-2 krok 4: kontakty w panelu Archiwum.
+    click(h, '[data-tab="archiwum"]');
     await waitRt(
       () =>
         Array.from(

@@ -69,7 +69,8 @@ test('pusta skrzynka wariantem "Nie znaleziono..." tez dostaje flage (4/4)', asy
     await waitRt(() => notifyText(f, 'Zindeksowano skrzynki'), 'toast 4/4');
     await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji');
     // Kontakty odblokowane (wszystkie 4 flagi).
-    click(h, '[data-tab="kontakty"]');
+    // Fala UI-2 krok 4: kontakty w panelu Archiwum.
+    click(h, '[data-tab="archiwum"]');
     await waitRt(() => !!h.content.querySelector('.arkmail-contact'), 'kontakty po 4/4');
   } finally {
     await stopHarness();
@@ -210,8 +211,9 @@ test('skrzynka z mieleniem kotwicy: 3 proby z klepnieciem + sonda wykluczajaca d
     );
     f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
     await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji');
-    click(h, '[data-tab="kontakty"]');
-    await waitRt(() => !!h.content.querySelector('.arkmail-index-all'), 'brama nadal obecna');
+    // Fala UI-2 krok 4: brama i kontakty stoja w panelu Archiwum.
+    click(h, '[data-tab="archiwum"]');
+    await waitRt(() => !!h.content.querySelector('[data-arch-people] .arkmail-index-all'), 'brama nadal obecna');
     // Fala 24a: kontakty sa widoczne ZAWSZE (brama = wskazowka nad
     // lista, nie zamiast niej) - przy 3/4 flag lista juz pokazuje
     // kontakty z czesciowego archiwum.
@@ -435,7 +437,8 @@ test('ponad 50 listow jednego dnia: starsze dni sa pobierane, a luka jest zapisa
     );
     f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
     await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji');
-    click(h, '[data-tab="kontakty"]');
+    // Fala UI-2 krok 4: nota o lukach mieszka w panelu Archiwum.
+    click(h, '[data-tab="archiwum"]');
     await waitRt(() => !!h.content.querySelector('.arkmail-index-gaps'), 'zapisana luka w widoku');
     assert.ok(textOf(h, '.arkmail-index-gaps').includes('wyslane: 1999-08-21'), 'dzien i skrzynka luki');
   } finally {
@@ -510,7 +513,8 @@ test('ponad 50 listow jednego dnia bez starszych wpisow: luka, nie komplet', asy
     assert.ok(notifyText(f, 'ponad 50 listow z dnia 1999-08-21'), 'raport wskazuje luke');
     assert.ok(!notifyText(f, 'Zindeksowano skrzynki'), 'brak falszywego kompletu');
     assert.ok(!notifyText(f, 'odpowiada wolno'), 'bez falszywego komunikatu o wolnym serwerze');
-    click(h, '[data-tab="kontakty"]');
+    // Fala UI-2 krok 4: nota o lukach mieszka w panelu Archiwum.
+    click(h, '[data-tab="archiwum"]');
     await waitRt(() => !!h.content.querySelector('.arkmail-index-gaps'), 'zapisana luka w widoku');
     assert.ok(textOf(h, '.arkmail-index-gaps').includes('wyslane: 1999-08-21'), 'dzien i skrzynka luki');
     // Opozniony retry skrzynki odbiorczej z prologu (test > 10 s).
