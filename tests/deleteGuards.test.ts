@@ -87,6 +87,8 @@ test('guardy: klawisze usuwajace z napisem maja poziom danger', () => {
     new MailUiStore({ tab: 'kontakty', groups: [{ name: 'Gildia', members: ['Fred'] }] }),
   );
   switchSub(groups.container, 'Grupy');
+  // D3: grupy zwijane - rozwiniencie naglowkiem przed sprawdzeniem ciala.
+  click(q(groups.container, '[data-group-toggle]'));
   assert.ok(
     classesOf(q(groups.container, '[data-group-delete]')).includes('arkmail-btn-danger'),
     'Usun grupe: danger',
@@ -106,6 +108,8 @@ test('guardy: klawisze X maja poziom danger', () => {
     new MailUiStore({ tab: 'kontakty', groups: [{ name: 'Gildia', members: ['Fred'] }] }),
   );
   switchSub(groups.container, 'Grupy');
+  // D3: grupy zwijane - rozwiniencie naglowkiem przed sprawdzeniem ciala.
+  click(q(groups.container, '[data-group-toggle]'));
   for (const x of qa(groups.container, '[data-member-remove]')) {
     assert.ok(classesOf(x).includes('arkmail-btn-danger'), 'X czlonka grupy: danger');
   }
@@ -131,6 +135,8 @@ test('guardy: X czlonka grupy usuwa dopiero z drugiego klika', () => {
   });
   const { container, calls } = mount(s);
   switchSub(container, 'Grupy');
+  // D3: grupy zwijane - rozwiniencie naglowkiem przed klikami w cialo.
+  click(q(container, '[data-group-toggle]'));
   click(qa(container, '[data-member-remove]')[1]);
   assert.equal(calls.groups.length, 0, 'pierwszy klik nie kasuje');
   assert.ok(q(container, '[data-member-remove][data-armed="1"]'), 'uzbrojony X ma data-armed');

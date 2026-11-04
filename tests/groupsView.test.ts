@@ -82,6 +82,12 @@ const switchToKsiazka = (container: unknown): void => switchSubByLabel(container
 const switchToImportEksport = (container: unknown): void =>
   switchSubByLabel(container, 'Import-Eksport');
 
+// Zgloszenie 2026-11-05 (D3): grupy domyslnie zwiniete - testy dotykajace
+// ciala grupy najpierw rozwijaja ja naglowkiem.
+const expandFirstGroup = (container: unknown): void => {
+  (q(container, '[data-group-toggle]') as unknown as { click(): void }).click();
+};
+
 const type = (el: unknown, value: string): void => {
   const input = el as HTMLInputElement;
   input.value = value;
@@ -184,6 +190,7 @@ test('grupy: zmiana nazwy z walidacja kolizji', () => {
   });
   const { container, calls } = mount(s);
   switchToGrupy(container);
+  expandFirstGroup(container);
   const rename = q(container, '[data-group-rename]') as HTMLInputElement;
   type(rename, 'Patrol');
   click(q(container, '[data-group-rename-ok]'));
@@ -205,6 +212,7 @@ test('grupy: usuniecie czlonka i dodanie z ghosta', () => {
   });
   const { container, calls } = mount(s);
   switchToGrupy(container);
+  expandFirstGroup(container);
   // Guard (zgloszenie 2026-11-05): pierwszy klik uzbraja, drugi kasuje.
   click(qa(container, '[data-member-remove]')[1]);
   assert.equal(calls.groups.length, 0, 'pierwszy klik nie kasuje');
@@ -227,6 +235,7 @@ test('grupy: usuniecie grupy i wszystkich grup - uzbrojone potwierdzenie', () =>
   });
   const { container, calls } = mount(s);
   switchToGrupy(container);
+  expandFirstGroup(container);
   // Pierwszy klik uzbraja, drugi kasuje.
   const del = qa(container, '[data-group-delete]')[0];
   click(del);

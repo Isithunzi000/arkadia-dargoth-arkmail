@@ -156,11 +156,25 @@ const clickSubpill = (container: unknown, label: string): void => {
   assert.fail(`brak sub-pigulki: ${label}`);
 };
 
+// Zgloszenie 2026-11-05 (D3): grupy domyslnie zwiniete - rozwijanie
+// naglowkiem po nazwie.
+const expandGroup = (container: unknown, name: string): void => {
+  for (const toggle of qa(container, '[data-group-toggle]')) {
+    const t = toggle as HTMLElement;
+    if (t.textContent?.includes(name)) {
+      (toggle as unknown as { click(): void }).click();
+      return;
+    }
+  }
+  assert.fail(`brak grupy do rozwiniencia: ${name}`);
+};
+
 test('grupy: Napisz do grupy sklada adresata z czlonkow', () => {
   const s = new MailUiStore({ tab: 'kontakty', groups: GROUPS });
   const { container } = mount(s);
   // Przelaczenie na sub-pigulke Grupy (po etykiecie - 4 pigulki).
   clickSubpill(container, 'Grupy');
+  expandGroup(container, 'Druzyna');
   const rows = qa(container, ".arkmail-group");
   const write = q(rows[0], '[data-group-write]') as unknown as {
     click(): void;
@@ -176,6 +190,7 @@ test('grupy: Napisz do grupy wylaczone dla pustej grupy', () => {
   const s = new MailUiStore({ tab: 'kontakty', groups: GROUPS });
   const { container } = mount(s);
   clickSubpill(container, 'Grupy');
+  expandGroup(container, 'Pusta');
   const rows = qa(container, ".arkmail-group");
   const write = q(rows[1], '[data-group-write]') as unknown as {
     getAttribute(n: string): string | null;

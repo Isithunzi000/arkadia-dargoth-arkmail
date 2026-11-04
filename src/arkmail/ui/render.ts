@@ -247,6 +247,9 @@ export function mountMailUi(
   // Zgloszenie 2026-11-05: filtry list (stan lokalny, jak bookImportMode).
   let bookFilter = '';
   let groupFilter = '';
+  // Zgloszenie 2026-11-05 (D3): grupy zwijane - w zbiorze nazwy grup
+  // rozwinietych; brak wpisu = zwiniete (domyslnie wszystkie zwiniete).
+  const expandedGroups = new Set<string>();
   /** Pelnoekranowy podglad compose (Fala 12d): czysto prezentacyjny stan,
    *  lokalny jak contactView; tresc listu zyje w composeDraft (nic nie ginie). */
   let previewFull = false;
@@ -1652,6 +1655,29 @@ export function mountMailUi(
       const row = doc.createElement('div');
       row.className = 'arkmail-group';
 
+      // Zgloszenie 2026-11-05 (D3): naglowek grupy - znak stanu ASCII
+      // (">" zwiniety, "v" rozwiniety) + nazwa + liczba czlonkow.
+      // Klik rozwija/zwija; domyslnie zwiniete - lista grup jest
+      // czytelna bez otwartych formularzy.
+      const expanded = expandedGroups.has(group.name);
+      const toggle = doc.createElement('button');
+      toggle.className = 'arkmail-group-toggle';
+      toggle.setAttribute('data-group-toggle', '');
+      toggle.textContent = `${expanded ? 'v' : '>'} ${group.name} (${group.members.length})`;
+      toggle.setAttribute(
+        'title',
+        expanded
+          ? 'Zwija grupe.'
+          : 'Rozwija grupe: edycja nazwy, czlonkowie, pisanie do grupy.',
+      );
+      toggle.addEventListener('click', () => {
+        if (expandedGroups.has(group.name)) expandedGroups.delete(group.name);
+        else expandedGroups.add(group.name);
+        store.refresh();
+      });
+      row.appendChild(toggle);
+
+      if (expanded) {
       const head = doc.createElement('div');
       head.className = 'arkmail-group-head';
       const rename = doc.createElement('input');
@@ -1757,6 +1783,7 @@ export function mountMailUi(
       members.appendChild(addMember);
       members.appendChild(addMemberOk);
       row.appendChild(members);
+      }
       list.appendChild(row);
       }
       if (shown.length === 0 && state.groups.length > 0) {
@@ -2004,8 +2031,15 @@ export function mountMailUi(
     });
     filterRow.appendChild(filterInput);
     filterRow.appendChild(filterClear);
-    pane.appendChild(filterRow);
 
+    // Kontener scrollujacy (D9): filtr i lista imion; naglowek (sub-
+    // pigulki, import, dodawanie, klawisze zbiorcze) zostaje na stale.
+    // Klucz migawki scrolla jak w zakladce Listy - pozycja przetrwa
+    // rerender.
+    const scroll = doc.createElement('div');
+    scroll.className = 'arkmail-list-scroll';
+    scroll.setAttribute('data-pane-key', 'kontakty:ksiazka');
+    scroll.appendChild(filterRow);
     const listWrap = doc.createElement('div');
     const paintList = (): void => {
       const shown = currentVisible();
@@ -2065,7 +2099,8 @@ export function mountMailUi(
     }
     };
     paintList();
-    pane.appendChild(listWrap);
+    scroll.appendChild(listWrap);
+    pane.appendChild(scroll);
 
     // --- aliasy pocztowe: lustro z gry przeniesione do pigulki
     // "Aliasy Pocztowe" (zgloszenie 2026-11-05).
@@ -2074,7 +2109,11 @@ export function mountMailUi(
 
   const renderKontakty = (state: MailUiState): HTMLElement => {
     const pane = doc.createElement('div');
-    pane.className = 'arkmail-pane';
+    // Zgloszenie 2026-11-05 (D9): w Ksiazce naglowek stoi na stale
+    // (jak w zakladce Listy) - panel w trybie kolumnowym, scrolluje
+    // sie wylacznie kontener listy.
+    pane.className =
+      'arkmail-pane' + (contactView.sub === 'ksiazka' ? ' arkmail-listy' : '');
     pane.setAttribute('data-pane-key', 'kontakty');
     // Fala UI-2 krok 3: sub-pigulki; krok 4: zostaly dwie (pigulka
     // "Osoby" - indeks osob zebranych z listow - przeniesiona do
