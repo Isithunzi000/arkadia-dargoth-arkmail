@@ -66,9 +66,18 @@ const type = (el: unknown, value: string): void => {
 };
 
 // Fala UI-2 krok 4: sub-pigulka Osoby zniknela - Ksiazka to pierwsza.
-const switchToKsiazka = (container: unknown): void => {
-  click(qa(container, '.arkmail-subpill')[0]);
+// Zgloszenie 2026-11-05: wybór sub-pigulki po etykiecie (4 pigulki).
+const switchSubByLabel = (container: unknown, label: string): void => {
+  for (const pill of qa(container, '.arkmail-subpill')) {
+    if (text(pill) === label) {
+      click(pill);
+      return;
+    }
+  }
+  assert.fail(`brak sub-pigulki: ${label}`);
 };
+const switchToKsiazka = (container: unknown): void => switchSubByLabel(container, 'Ksiazka adresowa');
+const switchToAliasy = (container: unknown): void => switchSubByLabel(container, 'Aliasy Pocztowe');
 
 const qs = (el: unknown, selector: string): unknown =>
   (el as { querySelector(s: string): unknown }).querySelector(selector);
@@ -237,16 +246,16 @@ test('ksiazka: zaznacz wszystkie + usuwanie zaznaczonych', () => {
 
 // --- aliasy read-only --------------------------------------------------------
 
-test('ksiazka: aliasy pocztowe - sekcja read-only z nota', () => {
+test('aliasy: sekcja read-only z nota', () => {
   const s = new MailUiStore({
     tab: 'kontakty',
     people: ['Fred'],
     importedAliases: [{ name: 'zgromadzenie', targets: ['Fred', 'Corge'] }],
   });
   const { container } = mount(s);
-  switchToKsiazka(container);
+  switchToAliasy(container);
   const section = q(container, '[data-book-aliases]');
-  assert.ok(section, 'sekcja aliasow istnieje');
+  assert.ok(section, 'sekcja aliasow istnieje w pigulce Aliasy Pocztowe');
   assert.ok(
     text(section).includes(
       'Aliasy pocztowe z gry - tylko odczyt, nie sa zapisywane do pliku. Alias usuwasz w grze.',
@@ -257,10 +266,10 @@ test('ksiazka: aliasy pocztowe - sekcja read-only z nota', () => {
   assert.equal(qa(section as unknown as HTMLElement, 'input, textarea').length, 0, 'zero pol edycji');
 });
 
-test('ksiazka: bez aliasow sekcja pokazuje nota o pustym stanie', () => {
+test('aliasy: bez aliasow sekcja pokazuje nota o pustym stanie', () => {
   const s = new MailUiStore({ tab: 'kontakty', people: ['Fred'] });
   const { container } = mount(s);
-  switchToKsiazka(container);
+  switchToAliasy(container);
   const section = q(container, '[data-book-aliases]');
   assert.ok(section, 'sekcja istnieje takze bez aliasow');
   assert.ok(text(section).includes('Brak aliasow - aliasy pobiera sie z gry.'), 'nota o pustym stanie');

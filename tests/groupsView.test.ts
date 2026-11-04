@@ -63,9 +63,20 @@ const text = (el: unknown): string => (el as { textContent?: string })?.textCont
 const click = (el: unknown): void => (el as { click(): void }).click();
 
 // Fala UI-2 krok 4: sub-pigulka Osoby zniknela - Grupy to druga.
-const switchToGrupy = (container: unknown): void => {
-  click(qa(container, '.arkmail-subpill')[1]);
+// Zgloszenie 2026-11-05: wybór sub-pigulki po etykiecie (4 pigulki -
+// indeksowanie pozycyjne byloby kruche).
+const switchSubByLabel = (container: unknown, label: string): void => {
+  for (const pill of qa(container, '.arkmail-subpill')) {
+    if (text(pill) === label) {
+      click(pill);
+      return;
+    }
+  }
+  assert.fail(`brak sub-pigulki: ${label}`);
 };
+const switchToGrupy = (container: unknown): void => switchSubByLabel(container, 'Grupy');
+const switchToImportEksport = (container: unknown): void =>
+  switchSubByLabel(container, 'Import-Eksport');
 
 const type = (el: unknown, value: string): void => {
   const input = el as HTMLInputElement;
@@ -223,7 +234,7 @@ test('grupy: usuniecie grupy i wszystkich grup - uzbrojone potwierdzenie', () =>
   assert.deepEqual(calls.groups.at(-1), [], 'wszystkie grupy skasowane');
 });
 
-test('grupy: eksport JSON przez pobieranie pliku', async () => {
+test('import-eksport: eksport JSON przez pobieranie pliku', async () => {
   const s = new MailUiStore({
     tab: 'kontakty',
     groups: [{ name: 'Gildia', members: ['Fred'] }],
@@ -234,7 +245,7 @@ test('grupy: eksport JSON przez pobieranie pliku', async () => {
   });
   try {
     const { container } = mount(s);
-  switchToGrupy(container);
+  switchToImportEksport(container);
     click(q(container, '[data-book-export]'));
     await new Promise((r) => setImmediate(r));
     assert.equal(downloads.length, 1);
@@ -249,13 +260,13 @@ test('grupy: eksport JSON przez pobieranie pliku', async () => {
   }
 });
 
-test('grupy: import JSON wywoluje handler z danymi', () => {
+test('import-eksport: import JSON wywoluje handler z danymi', () => {
   const s = new MailUiStore({
     tab: 'kontakty',
     groups: [{ name: 'Gildia', members: ['Fred'] }],
   });
   const { container, calls } = mount(s);
-  switchToGrupy(container);
+  switchToImportEksport(container);
   const fileInput = q(container, '[data-book-import]') as HTMLInputElement;
   const payload = JSON.stringify({
     format: 'arkmail-addressbook',
@@ -280,10 +291,10 @@ test('grupy: import JSON wywoluje handler z danymi', () => {
 
 // --- tryb importu: dolacz / zastap -------------------------------------------
 
-test('ksiazka: tryb importu - domyslnie dolacz, przełacznik zastap', () => {
+test('import-eksport: tryb importu - domyslnie dolacz, przełacznik zastap', () => {
   const s = new MailUiStore({ tab: 'kontakty' });
   const { container } = mount(s);
-  switchToGrupy(container);
+  switchToImportEksport(container);
   const radios = qa(container, '[data-book-import-mode] input[type=radio]');
   assert.equal(radios.length, 2, 'dwa tryby');
   assert.deepEqual(
@@ -308,14 +319,14 @@ const importFile = (container: unknown, payload: string): Promise<void> =>
     setImmediate(resolve);
   });
 
-test('ksiazka: import w trybie zastap przekazuje mode zastap', async () => {
+test('import-eksport: import w trybie zastap przekazuje mode zastap', async () => {
   const s = new MailUiStore({
     tab: 'kontakty',
     people: ['Fred'],
     groups: [{ name: 'Stara', members: ['Fred'] }],
   });
   const { container, calls } = mount(s);
-  switchToGrupy(container);
+  switchToImportEksport(container);
   (qa(container, '[data-book-import-mode] input[type=radio]')[1] as HTMLInputElement).click();
   await importFile(
     container,
@@ -332,10 +343,10 @@ test('ksiazka: import w trybie zastap przekazuje mode zastap', async () => {
   assert.deepEqual(call.data.people, ['Corge']);
 });
 
-test('ksiazka: tooltip importu mowi o trybie, nie wspomina suffixow', () => {
+test('import-eksport: tooltip importu mowi o trybie, nie wspomina suffixow', () => {
   const s = new MailUiStore({ tab: 'kontakty' });
   const { container } = mount(s);
-  switchToGrupy(container);
+  switchToImportEksport(container);
   const impInput = q(container, '[data-book-import]') as HTMLElement;
   assert.equal(
     impInput.getAttribute('title'),

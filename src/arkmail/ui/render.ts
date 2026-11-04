@@ -144,6 +144,24 @@ export interface MailUiHandlers {
    * Opcjonalny: starsze montaze testowe go nie podaja.
    */
   onImportAddressBook?(data: AddressBookExport, mode?: ImportMode): void;
+  /**
+   * Czyszczenie lokalnego lustra aliasow (zgloszenie 2026-11-05):
+   * kasuje zaimportowane aliasy i przebudowuje kontakty; na serwerze
+   * Arkadii nic nie znika - aliasy pobiera sie z gry ponownie.
+   * Opcjonalny: starsze montaze testowe go nie podaja.
+   */
+  onClearAliases?(): void;
+  /**
+   * Czyszczenie calej ksiazki adresowej (zgloszenie 2026-11-05):
+   * imiona + grupy + aliasy lokalnie; serwer nietkniety. Opcjonalny.
+   */
+  onClearAddressBook?(): void;
+  /**
+   * Dopisanie wszystkich osob zebranych z listow do ksiazki adresowej
+   * (zgloszenie 2026-11-05): dedup bez wielkosci liter, nigdy nic
+   * nie kasuje. Opcjonalny: starsze montaze testowe go nie podaja.
+   */
+  onAddAllContacts?(): void;
   /** Reczne wyszukanie jednej strony w zakladce usuwania. */
   onDeletionSearch?(box: MailBox, query: ListingSearch): void;
   /** Zbiorcze usuniecie po potwierdzeniu w interfejsie. */
