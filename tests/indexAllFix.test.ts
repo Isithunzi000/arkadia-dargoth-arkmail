@@ -211,9 +211,14 @@ test('skrzynka z mieleniem kotwicy: 3 proby z klepnieciem + sonda wykluczajaca d
     );
     f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
     await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji');
-    // Fala UI-2 krok 4: brama i kontakty stoja w panelu Archiwum.
+    // Fala UI-2 krok 4: kontakty stoja w panelu Archiwum; klawisz
+    // indeksowania jest jeden - w kroku 1 (zgloszenie 2026-11-05).
     click(h, '[data-tab="archiwum"]');
-    await waitRt(() => !!h.content.querySelector('[data-arch-people] .arkmail-index-all'), 'brama nadal obecna');
+    await waitRt(() => !!h.content.querySelector('.arkmail-index-all'), 'klawisz indeksacji w kroku 1');
+    assert.ok(
+      !h.content.querySelector('[data-arch-people] .arkmail-index-all'),
+      'panel osob bez klawisza indeksacji',
+    );
     // Fala 24a: kontakty sa widoczne ZAWSZE (brama = wskazowka nad
     // lista, nie zamiast niej) - przy 3/4 flag lista juz pokazuje
     // kontakty z czesciowego archiwum.

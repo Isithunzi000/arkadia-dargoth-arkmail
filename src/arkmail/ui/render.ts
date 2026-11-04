@@ -2355,7 +2355,9 @@ export function mountMailUi(
     const toggle = doc.createElement('button');
     toggle.className = 'arkmail-arch-people-toggle';
     toggle.setAttribute('data-arch-people-toggle', '');
-    toggle.textContent = `Osoby z listow (${state.contacts.length})`;
+    // Zgloszenie 2026-11-05: znak stanu jak w grupach - "v" rozwiniety,
+    // ">" zwiniety.
+    toggle.textContent = `${archPeopleOpen ? 'v' : '>'} Osoby z listow (${state.contacts.length})`;
     toggle.setAttribute('title', 'Zwija albo rozwija liste osob zebranych z listow.');
     toggle.addEventListener('click', () => {
       archPeopleOpen = !archPeopleOpen;
@@ -2364,20 +2366,13 @@ export function mountMailUi(
     head.appendChild(toggle);
     panel.appendChild(head);
     if (!archPeopleOpen) return panel;
-    // Brama (Fala 18c/19b/24a/25): wskazowka + przycisk NAD lista,
-    // nie zamiast niej; widoczna zawsze, gdy pedzel dziala - inaczej
-    // nie dalo sie go przerwac z widoku osob.
+    // Zgloszenie 2026-11-05: klawisz indeksowania znika z panelu osob -
+    // zostaje dokladnie jeden, w kroku 1 Archiwum. Wskazowka o budowie
+    // bazy zostaje (kontekst listy), bez klawisza.
     if (!allBoxesIndexed(state.indexMeta) || state.indexRun) {
       panel.appendChild(
         dim('Kontakty powstaja z listow zebranych ze wszystkich skrzynek.'),
       );
-      const gate = doc.createElement('button');
-      gate.className = 'arkmail-index-all arkmail-btn-action';
-      gate.textContent = state.indexRun
-        ? `Przerwij indeksowanie (${state.indexRun.boxIndex + 1}/${INDEX_BOXES.length})`
-        : 'Indeksuj wszystkie skrzynki';
-      gate.addEventListener('click', () => handlers.onIndexAll?.());
-      panel.appendChild(gate);
     }
     const gaps = INDEX_BOXES.flatMap((box) =>
       (state.archiveGaps[box] ?? []).map((day) => `${box}: ${day}`),
@@ -2599,10 +2594,15 @@ export function mountMailUi(
         archFilter[key] = undefined;
       }
       archFilter.skrzynka = undefined;
+      // Zgloszenie 2026-11-05 (D8): czyszczenie obejmuje tez panel
+      // "Osoby z listow" - filtr i sortowanie wracaja do wartosci
+      // domyslnych (pelny widok osob).
+      contactView.filter = '';
+      contactView.sort = 'nazwa';
       controls.querySelectorAll('[data-filter]').forEach((el) => {
         (el as HTMLInputElement | HTMLSelectElement).value = '';
       });
-      repaint();
+      store.refresh();
     });
     controls.appendChild(clearFilters);
 

@@ -109,28 +109,32 @@ test('brama panelu Osoby: lista kontaktow widoczna mimo braku indeksu, wskazowka
       const text = container.textContent ?? '';
       assert.ok(text.includes('Bar'), 'kontakt z czesciowego archiwum widoczny');
       assert.ok(text.includes('Grault'), 'drugi kontakt widoczny');
-      // Wskazowka + przycisk indeksacji NAD lista kontaktow (kolejnosc
-      // w DOM panelu: najpierw brama, potem kontrolki listy).
+      // Zgloszenie 2026-11-05: w panelu zostaje sama wskazowka -
+      // klawisz indeksowania jest jeden, w kroku 1 Archiwum.
       const panel = container.querySelector('[data-arch-people]');
       assert.ok(panel, 'panel Osoby z listow');
       const panelText = (panel as unknown as { textContent?: string }).textContent ?? '';
       assert.ok(
         panelText.includes('Kontakty powstaja z listow zebranych ze wszystkich skrzynek.'),
-        'brama w panelu',
+        'wskazowka w panelu',
       );
       const gateBtn = (panel as unknown as { querySelector(s: string): unknown }).querySelector(
         '.arkmail-index-all',
       );
-      assert.ok(gateBtn, 'przycisk indeksacji obecny w panelu');
+      assert.ok(!gateBtn, 'panel osob bez klawisza indeksacji (zostaje krok 1)');
+      // Klawisz indeksowania zyje w kroku 1.
+      const stepBtn = container.querySelector('.arkmail-index-all');
+      assert.ok(stepBtn, 'klawisz indeksacji w kroku 1 Archiwum');
       const controls = (panel as unknown as { querySelector(s: string): unknown }).querySelector(
         '.arkmail-contact-controls',
       );
       assert.ok(controls, 'kontrolki listy obecne w panelu');
-      // Dowod kolejnosci: brama jest przed kontrolkami w HTML panelu.
+      // Wskazowka jest przed kontrolkami w HTML panelu.
       const panelHtml = (panel as unknown as { innerHTML?: string }).innerHTML ?? '';
       assert.ok(
-        panelHtml.indexOf('arkmail-index-all') < panelHtml.indexOf('arkmail-contact-controls'),
-        'brama NAD lista kontaktow',
+        panelHtml.indexOf('Kontakty powstaja z listow') <
+          panelHtml.indexOf('arkmail-contact-controls'),
+        'wskazowka NAD lista kontaktow',
       );
     } finally {
       off();
