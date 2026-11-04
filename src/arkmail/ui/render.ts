@@ -244,6 +244,9 @@ export function mountMailUi(
    *  zaznaczenie deterministycznie. */
   const bookSelection = new Set<string>();
   let bookPeopleRef: readonly string[] | null = null;
+  // Zgloszenie 2026-11-05: filtry list (stan lokalny, jak bookImportMode).
+  let bookFilter = '';
+  let groupFilter = '';
   /** Pelnoekranowy podglad compose (Fala 12d): czysto prezentacyjny stan,
    *  lokalny jak contactView; tresc listu zyje w composeDraft (nic nie ginie). */
   let previewFull = false;
@@ -1605,10 +1608,47 @@ export function mountMailUi(
     pane.appendChild(addRow);
     pane.appendChild(error);
 
+    // --- filtr nazw grup z przyciskiem czyszczenia
+    // Zgloszenie 2026-11-05. Repaint dotyka tylko listy - pole filtra
+    // zachowuje fokus i wpisana wartosc.
+    const filterRow = doc.createElement('div');
+    filterRow.className = 'arkmail-group-filter';
+    const filterInput = doc.createElement('input');
+    filterInput.setAttribute('data-group-filter', '');
+    filterInput.setAttribute('placeholder', 'Filtruj grupy');
+    filterInput.setAttribute('title', 'Pokazuje tylko grupy z nazwa zawierajaca wpisany fragment.');
+    filterInput.value = groupFilter;
+    const filterClear = doc.createElement('button');
+    filterClear.textContent = 'Wyczysc filtr';
+    filterClear.setAttribute('data-group-filter-clear', '');
+    filterClear.setAttribute('title', 'Czysci filtr grup - znowu wszystkie grupy.');
+    if (!groupFilter) filterClear.setAttribute('disabled', '1');
+    filterClear.addEventListener('click', () => {
+      groupFilter = '';
+      filterInput.value = '';
+      filterClear.setAttribute('disabled', '1');
+      paintGroups();
+    });
+    filterInput.addEventListener('input', () => {
+      groupFilter = filterInput.value;
+      if (groupFilter) filterClear.removeAttribute('disabled');
+      else filterClear.setAttribute('disabled', '1');
+      paintGroups();
+    });
+    filterRow.appendChild(filterInput);
+    filterRow.appendChild(filterClear);
+    pane.appendChild(filterRow);
+
     // --- lista grup
     const list = doc.createElement('div');
     pane.appendChild(list);
-    for (const group of state.groups) {
+    const paintGroups = (): void => {
+      const needle = groupFilter.trim().toLowerCase();
+      const shown = needle
+        ? state.groups.filter((g) => g.name.toLowerCase().includes(needle))
+        : state.groups;
+      list.replaceChildren();
+      for (const group of shown) {
       const row = doc.createElement('div');
       row.className = 'arkmail-group';
 
@@ -1718,14 +1758,21 @@ export function mountMailUi(
       members.appendChild(addMemberOk);
       row.appendChild(members);
       list.appendChild(row);
-    }
-
-    if (state.groups.length === 0) {
-      const empty = doc.createElement('div');
-      empty.className = 'arkmail-dim';
-      empty.textContent = 'Brak grup - utworz pierwsza grupe.';
-      pane.appendChild(empty);
-    }
+      }
+      if (shown.length === 0 && state.groups.length > 0) {
+        const empty = doc.createElement('div');
+        empty.className = 'arkmail-dim';
+        empty.textContent = 'Brak grup pasujacych do filtra.';
+        list.appendChild(empty);
+      }
+      if (state.groups.length === 0) {
+        const empty = doc.createElement('div');
+        empty.className = 'arkmail-dim';
+        empty.textContent = 'Brak grup - utworz pierwsza grupe.';
+        list.appendChild(empty);
+      }
+    };
+    paintGroups();
 
     // --- operacje zbiorcze + eksport/import ksiazki adresowej
     const ops = doc.createElement('div');
@@ -1841,6 +1888,11 @@ export function mountMailUi(
     addRow.appendChild(addInput);
     addRow.appendChild(addBtn);
     addRow.appendChild(addErr);
+    // Zgloszenie 2026-11-05: pole nowej osoby z ghost-podpowiedziami
+    // (jak pole adresata): kontakty + aliasy, strzalka w prawo wpisuje
+    // kanoniczna forme kandydata. Attach dopiero po podpięciu inputu
+    // do rodzica - ghost wrapuje element w miejscu w drzewie.
+    attachGhost(doc, addInput, personSource);
     pane.appendChild(addRow);
 
     // --- usuwanie zaznaczonych (uzbrojony dwuklik, jak w Grupy)
@@ -1869,6 +1921,14 @@ export function mountMailUi(
       if (la === lb) return 0;
       return la < lb ? -1 : 1;
     });
+    // Zgloszenie 2026-11-05: filtr listy imion (podlancuch bez
+    // wielkosci liter). Zaznacz/odznacz wszystkie operuje na widocznej
+    // (przefiltrowanej) liscie - ukrytych imion nie zaznacza.
+    const currentVisible = (): string[] => {
+      const needle = bookFilter.trim().toLowerCase();
+      return needle ? sorted.filter((p) => p.toLowerCase().includes(needle)) : sorted;
+    };
+    const visible = currentVisible();
     // Fala UI-2 krok 5: zbiorcze pisanie do zaznaczonych. Kolejnosc
     // adresatow = kolejnosc listy A-Z; po uzyciu zaznaczenie kasuje
     // sie (jak po kazdej zmianie listy - powrot nie trzyma stanu).
@@ -1897,9 +1957,9 @@ export function mountMailUi(
     selectAllBtn.textContent = 'Zaznacz wszystkie';
     selectAllBtn.setAttribute('data-book-select-all', '');
     selectAllBtn.setAttribute('title', 'Zaznacza wszystkie imiona na liscie.');
-    if (sorted.length === 0) selectAllBtn.setAttribute('disabled', '1');
+    if (visible.length === 0) selectAllBtn.setAttribute('disabled', '1');
     selectAllBtn.addEventListener('click', () => {
-      for (const p of sorted) bookSelection.add(p);
+      for (const p of visible) bookSelection.add(p);
       store.refresh();
     });
     pane.appendChild(selectAllBtn);
@@ -1908,20 +1968,60 @@ export function mountMailUi(
     deselectAllBtn.textContent = 'Odznacz wszystkie';
     deselectAllBtn.setAttribute('data-book-deselect-all', '');
     deselectAllBtn.setAttribute('title', 'Czysci zaznaczenie imion.');
-    if (sorted.length === 0) deselectAllBtn.setAttribute('disabled', '1');
+    if (visible.length === 0) deselectAllBtn.setAttribute('disabled', '1');
     deselectAllBtn.addEventListener('click', () => {
       bookSelection.clear();
       store.refresh();
     });
     pane.appendChild(deselectAllBtn);
+
+    // --- filtr listy imion z przyciskiem czyszczenia
+    // Zgloszenie 2026-11-05. Repaint dotyka tylko listy - pole filtra
+    // zachowuje fokus i wpisana wartosc.
+    const filterRow = doc.createElement('div');
+    filterRow.className = 'arkmail-book-filter';
+    const filterInput = doc.createElement('input');
+    filterInput.setAttribute('data-book-filter', '');
+    filterInput.setAttribute('placeholder', 'Filtruj imiona');
+    filterInput.setAttribute('title', 'Pokazuje tylko imiona zawierajace wpisany fragment.');
+    filterInput.value = bookFilter;
+    const filterClear = doc.createElement('button');
+    filterClear.textContent = 'Wyczysc filtr';
+    filterClear.setAttribute('data-book-filter-clear', '');
+    filterClear.setAttribute('title', 'Czysci filtr imion - znowu cala ksiazka adresowa.');
+    if (!bookFilter) filterClear.setAttribute('disabled', '1');
+    filterClear.addEventListener('click', () => {
+      bookFilter = '';
+      filterInput.value = '';
+      filterClear.setAttribute('disabled', '1');
+      paintList();
+    });
+    filterInput.addEventListener('input', () => {
+      bookFilter = filterInput.value;
+      if (bookFilter) filterClear.removeAttribute('disabled');
+      else filterClear.setAttribute('disabled', '1');
+      paintList();
+    });
+    filterRow.appendChild(filterInput);
+    filterRow.appendChild(filterClear);
+    pane.appendChild(filterRow);
+
     const listWrap = doc.createElement('div');
-    if (sorted.length === 0) {
-      listWrap.appendChild(
-        dim('Ksiazka adresowa jest pusta - zaimportuj osoby z gry albo dodaj recznie.'),
-      );
-    }
-    for (const name of sorted) {
-      const row = doc.createElement('div');
+    const paintList = (): void => {
+      const shown = currentVisible();
+      listWrap.replaceChildren();
+      if (sorted.length === 0) {
+        listWrap.appendChild(
+          dim('Ksiazka adresowa jest pusta - zaimportuj osoby z gry albo dodaj recznie.'),
+        );
+        return;
+      }
+      if (shown.length === 0) {
+        listWrap.appendChild(dim('Brak imion pasujacych do filtra.'));
+        return;
+      }
+      for (const name of shown) {
+        const row = doc.createElement('div');
       row.className = 'arkmail-book-row';
       row.setAttribute('data-book-row', '');
       const check = doc.createElement('input');
@@ -1963,6 +2063,8 @@ export function mountMailUi(
       row.appendChild(write);
       listWrap.appendChild(row);
     }
+    };
+    paintList();
     pane.appendChild(listWrap);
 
     // --- aliasy pocztowe: lustro z gry przeniesione do pigulki

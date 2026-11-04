@@ -322,7 +322,7 @@ test('ksiazka: filtr listy imion z przyciskiem czyszczenia', () => {
     dispatchEvent(e: unknown): void;
   };
   assert.ok(filter, 'pole filtra istnieje');
-  filter.value = 'fra';
+  filter.value = 'grau';
   filter.dispatchEvent(new window.Event('input') as unknown as Event);
   const rows = qa(container, '[data-book-row]');
   assert.equal(rows.length, 1, 'filtr zaweza liste do Grault');
