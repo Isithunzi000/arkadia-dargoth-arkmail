@@ -95,6 +95,10 @@ export const STYLES = `
   color: ${ACCENT_FG};
 }
 .arkmail-root .arkmail-btn-danger:hover { background: #c2564d; border-color: #c2564d; }
+/* Zgloszenie 2026-11-05: uzbrojony guard dwukliku (pierwszy klik)
+   dostaje czerwone tlo niezaleznie od bazowej klasy klawisza - stan
+   "drugi klik kasuje" widac z daleka, bez zmiany szerokosci przycisku. */
+.arkmail-root button[data-armed="1"] { background: ${DANGER}; border-color: ${DANGER}; color: ${ACCENT_FG}; }
 .arkmail-root .arkmail-btn-reset {
   background: ${BG_PANEL};
   border-color: ${BORDER};

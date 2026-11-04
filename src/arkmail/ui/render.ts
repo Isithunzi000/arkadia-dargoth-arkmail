@@ -247,6 +247,59 @@ export function mountMailUi(
   // tej samej semantyki (osobny "Odswiez" byl redundantny).
   const SEARCH_GO_LABEL = 'Szukaj / Odswiez';
   const SEARCH_GO_TITLE = 'Szuka po wpisanych filtrach; przy pustych filtrach odswieza skrzynke';
+
+  // --- Guard dwukliku klawiszy usuwajacych (zgloszenie 2026-11-05):
+  // jeden wzorzec dla calego UI. Pierwszy klik uzbraja na 3 s
+  // (data-armed="1", czerwone tlo daje regula w styles.ts), drugi w tym
+  // czasie kasuje; wygasniecie albo ESC rozbraja. Stan w zamknieciu
+  // modulu: uzbrojony element ginie z kazdym repaintem, timer sprzata
+  // rejestr. Klawisze z napisem dostaja etykiete "Na pewno usunac?",
+  // klawisze X zostaja "x" - ich uzbrojenie widac kolorem.
+  const GUARD_ARM_MS = 3000;
+  interface ArmedButton {
+    el: HTMLButtonElement;
+    timer: ReturnType<typeof setTimeout> | null;
+    baseText: string;
+    baseTitle: string;
+  }
+  const armedButtons = new Set<ArmedButton>();
+  const disarmButton = (g: ArmedButton): void => {
+    if (g.timer !== null) clearTimeout(g.timer);
+    g.timer = null;
+    g.el.removeAttribute('data-armed');
+    if (g.el.isConnected) {
+      g.el.textContent = g.baseText;
+      g.el.setAttribute('title', g.baseTitle);
+    }
+    armedButtons.delete(g);
+  };
+  const disarmAllButtons = (): void => {
+    for (const g of [...armedButtons]) disarmButton(g);
+  };
+  const guardDeleteButton = (
+    btn: HTMLButtonElement,
+    onConfirm: () => void,
+    opts: { armedLabel?: string; armedTitle?: string } = {},
+  ): void => {
+    const g: ArmedButton = {
+      el: btn,
+      timer: null,
+      baseText: btn.textContent ?? '',
+      baseTitle: btn.getAttribute('title') ?? '',
+    };
+    btn.addEventListener('click', () => {
+      if (g.timer === null) {
+        g.timer = setTimeout(() => disarmButton(g), GUARD_ARM_MS);
+        btn.setAttribute('data-armed', '1');
+        if (opts.armedLabel !== undefined) btn.textContent = opts.armedLabel;
+        btn.setAttribute('title', opts.armedTitle ?? 'Kliknij ponownie, aby usunac.');
+        armedButtons.add(g);
+        return;
+      }
+      disarmButton(g);
+      onConfirm();
+    });
+  };
   const fillButtonTitles = (scope: ParentNode): void => {
     scope.querySelectorAll('button').forEach((element) => {
       const button = element as HTMLButtonElement;
@@ -1559,18 +1612,17 @@ export function mountMailUi(
         }
         save(state.groups.map((g) => (g.name === group.name ? { ...g, name } : g)));
       });
+      // Zgloszenie 2026-11-05: poziom danger + wspolny guard dwukliku.
       const del = doc.createElement('button');
+      del.className = 'arkmail-btn-danger';
       del.textContent = 'Usun grupe';
       del.setAttribute('data-group-delete', '');
       del.setAttribute('title', 'Dwuklik: pierwszy klik pyta o potwierdzenie, drugi kasuje grupe.');
-      del.addEventListener('click', () => {
-        if (del.getAttribute('data-armed') !== '1') {
-          del.setAttribute('data-armed', '1');
-          del.textContent = 'Na pewno usunac?';
-          return;
-        }
-        save(state.groups.filter((g) => g.name !== group.name));
-      });
+      guardDeleteButton(
+        del,
+        () => save(state.groups.filter((g) => g.name !== group.name)),
+        { armedLabel: 'Na pewno usunac?' },
+      );
       head.appendChild(rename);
       head.appendChild(renameOk);
       head.appendChild(del);
@@ -1595,18 +1647,24 @@ export function mountMailUi(
         const chip = doc.createElement('span');
         chip.className = 'arkmail-group-member';
         chip.textContent = member;
+        // Zgloszenie 2026-11-05: X czlonka to klawisz usuwajacy -
+        // poziom danger i guard dwukliku (pierwszy klik uzbraja).
         const x = doc.createElement('button');
+        x.className = 'arkmail-btn-danger';
         x.textContent = 'x';
         x.setAttribute('data-member-remove', '');
         x.setAttribute('title', `Usuwa ${member} z grupy.`);
-        x.addEventListener('click', () =>
-          save(
-            state.groups.map((g) =>
-              g.name === group.name
-                ? { ...g, members: g.members.filter((m) => m !== member) }
-                : g,
+        guardDeleteButton(
+          x,
+          () =>
+            save(
+              state.groups.map((g) =>
+                g.name === group.name
+                  ? { ...g, members: g.members.filter((m) => m !== member) }
+                  : g,
+              ),
             ),
-          ),
+          { armedTitle: `Kliknij ponownie, aby usunac ${member} z grupy.` },
         );
         chip.appendChild(x);
         members.appendChild(chip);
@@ -1651,17 +1709,13 @@ export function mountMailUi(
     const ops = doc.createElement('div');
     ops.className = 'arkmail-box-ops';
     const delAll = doc.createElement('button');
+    delAll.className = 'arkmail-btn-danger';
     delAll.textContent = 'Usun wszystkie grupy';
     delAll.setAttribute('data-groups-delete-all', '');
     delAll.setAttribute('title', 'Dwuklik: pierwszy klik pyta o potwierdzenie, drugi kasuje wszystkie grupy.');
     if (state.groups.length === 0) delAll.setAttribute('disabled', '1');
-    delAll.addEventListener('click', () => {
-      if (delAll.getAttribute('data-armed') !== '1') {
-        delAll.setAttribute('data-armed', '1');
-        delAll.textContent = 'Na pewno usunac wszystkie?';
-        return;
-      }
-      save([]);
+    guardDeleteButton(delAll, () => save([]), {
+      armedLabel: 'Na pewno usunac wszystkie?',
     });
     const expBtn = doc.createElement('button');
     expBtn.textContent = 'Eksportuj ksiazke';
@@ -1849,8 +1903,10 @@ export function mountMailUi(
     pane.appendChild(addRow);
 
     // --- usuwanie zaznaczonych (uzbrojony dwuklik, jak w Grupy)
+    // Zgloszenie 2026-11-05: poziom danger - kazde usuwanie danych
+    // dzieli jedna kolorystyke w calym UI.
     const bulk = doc.createElement('button');
-    bulk.className = 'arkmail-btn-action';
+    bulk.className = 'arkmail-btn-danger';
     bulk.textContent = 'Usun zaznaczone imiona';
     bulk.setAttribute('data-book-delete-checked', '');
     bulk.setAttribute(
@@ -1858,15 +1914,11 @@ export function mountMailUi(
       'Dwuklik: pierwszy klik pyta o potwierdzenie, drugi kasuje zaznaczone imiona.',
     );
     if (bookSelection.size === 0) bulk.setAttribute('disabled', '1');
-    bulk.addEventListener('click', () => {
-      if (bookSelection.size === 0) return;
-      if (bulk.getAttribute('data-armed') !== '1') {
-        bulk.setAttribute('data-armed', '1');
-        bulk.textContent = `Na pewno usunac zaznaczone (${bookSelection.size})?`;
-        return;
-      }
-      save(state.people.filter((p) => !bookSelection.has(p)));
-    });
+    guardDeleteButton(
+      bulk,
+      () => save(state.people.filter((p) => !bookSelection.has(p))),
+      { armedLabel: `Na pewno usunac zaznaczone (${bookSelection.size})?` },
+    );
     pane.appendChild(bulk);
 
     // --- lista imion A-Z (bez wielkosci liter, stabilnie)
@@ -1919,12 +1971,18 @@ export function mountMailUi(
       nameEl.className = 'arkmail-book-name';
       nameEl.setAttribute('data-book-name', '');
       nameEl.textContent = name;
+      // Zgloszenie 2026-11-05: X jest klawiszem usuwajacym - poziom
+      // danger (wyraznie widac, ze kasuje) i guard dwukliku: pierwszy
+      // klik uzbraja (czerwone tlo przez regule [data-armed]), drugi
+      // kasuje. Bez guarda jeden przypadkowy klik niszczyl ksiazke.
       const remove = doc.createElement('button');
-      remove.className = 'arkmail-book-remove';
+      remove.className = 'arkmail-book-remove arkmail-btn-danger';
       remove.setAttribute('data-book-remove', '');
       remove.textContent = 'x';
       remove.setAttribute('title', `Usuwa ${name} z ksiazki adresowej.`);
-      remove.addEventListener('click', () => save(state.people.filter((p) => p !== name)));
+      guardDeleteButton(remove, () => save(state.people.filter((p) => p !== name)), {
+        armedTitle: `Kliknij ponownie, aby usunac ${name} z ksiazki adresowej.`,
+      });
       row.appendChild(check);
       row.appendChild(nameEl);
       row.appendChild(remove);
@@ -2549,6 +2607,10 @@ export function mountMailUi(
   // a function).
   const onEscape = (event: Event): void => {
     if ((event as KeyboardEvent).key !== 'Escape') return;
+    // Zgloszenie 2026-11-05: ESC rozbraja kazde uzbrojenie w oknie -
+    // guard klawiszy usuwajacych (X, Na pewno usunac?) i guard sesji
+    // usuwania w zakladce Usuwanie.
+    disarmAllButtons();
     if (store.state.deletion.armedAt !== 0) store.disarmDeletionConfirm();
   };
   const canListen = typeof (doc as Document).addEventListener === 'function';
