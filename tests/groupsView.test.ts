@@ -23,11 +23,12 @@ const document = window.document;
 interface Calls {
   groups: string[][];
   imports: unknown[];
+  bookExports: number;
 }
 
 function mount(store: MailUiStore) {
   const container = document.createElement('div');
-  const calls: Calls = { groups: [], imports: [] };
+  const calls: Calls = { groups: [], imports: [], bookExports: 0 };
   mountMailUi(container as unknown as HTMLElement, store, {
     onOpenLetter: () => {},
     onSendCompose: () => {},
@@ -41,12 +42,18 @@ function mount(store: MailUiStore) {
     onForwardLetter: () => {},
     // Jak index.ts: zapis trwa w tym samym przebiegu (storage + stan
     // UI), wiec render pracuje na swiezej liscie grup.
-    onSaveGroups: (groups) => {
+    onSaveGroups: (groups: { name: string; members: string[] }[]) => {
       calls.groups.push(groups.map((g) => `${g.name}=${g.members.join('+')}`));
       store.setGroups(groups);
     },
-    onImportAddressBook: (data, mode) => calls.imports.push({ data, mode }),
-  });
+    onImportAddressBook: (data: unknown, mode: unknown) => calls.imports.push({ data, mode }),
+    // Zgloszenie 2026-11-05 (K7): eksport ksiazki idzie przez handler
+    // (pobranie pliku + komunikat robi index.ts jak przy eksporcie
+    // listu). Handler swiezy - cast jak w clearFilters.test.ts.
+    onExportAddressBook: () => {
+      calls.bookExports += 1;
+    },
+  } as unknown as Parameters<typeof mountMailUi>[2]);
   return { container, calls };
 }
 
@@ -274,6 +281,20 @@ test('import-eksport: eksport JSON przez pobieranie pliku', async () => {
   } finally {
     setDownloadImpl(null);
   }
+});
+
+test('import-eksport: eksport wywoluje handler (pobranie i komunikat w index.ts)', () => {
+  // Zgloszenie 2026-11-05 (K7): eksport ksiazki przez handler - jak
+  // eksport listu: pobranie pliku + status + toast robi index.ts.
+  const s = new MailUiStore({
+    tab: 'kontakty',
+    people: ['Corge'],
+    groups: [{ name: 'Gildia', members: ['Fred'] }],
+  });
+  const { container, calls } = mount(s);
+  switchToImportEksport(container);
+  click(q(container, '[data-book-export]'));
+  assert.equal(calls.bookExports, 1, 'klik eksportu = jedno wywolanie handlera');
 });
 
 test('import-eksport: import JSON wywoluje handler z danymi', () => {
