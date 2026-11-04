@@ -146,11 +146,21 @@ const GROUPS: ContactGroup[] = [
   { name: 'Pusta', members: [] },
 ];
 
+const clickSubpill = (container: unknown, label: string): void => {
+  for (const pill of qa(container, '.arkmail-subpill')) {
+    if ((pill as HTMLElement).textContent === label) {
+      (pill as unknown as HTMLElement).click();
+      return;
+    }
+  }
+  assert.fail(`brak sub-pigulki: ${label}`);
+};
+
 test('grupy: Napisz do grupy sklada adresata z czlonkow', () => {
   const s = new MailUiStore({ tab: 'kontakty', groups: GROUPS });
   const { container } = mount(s);
-  // Przelaczenie na sub-pigulke Grupy (druga pozycja).
-  (qa(container, '.arkmail-subpill')[1] as unknown as HTMLElement).click();
+  // Przelaczenie na sub-pigulke Grupy (po etykiecie - 4 pigulki).
+  clickSubpill(container, 'Grupy');
   const rows = qa(container, ".arkmail-group");
   const write = q(rows[0], '[data-group-write]') as unknown as {
     click(): void;
@@ -165,7 +175,7 @@ test('grupy: Napisz do grupy sklada adresata z czlonkow', () => {
 test('grupy: Napisz do grupy wylaczone dla pustej grupy', () => {
   const s = new MailUiStore({ tab: 'kontakty', groups: GROUPS });
   const { container } = mount(s);
-  (qa(container, '.arkmail-subpill')[1] as unknown as HTMLElement).click();
+  clickSubpill(container, 'Grupy');
   const rows = qa(container, ".arkmail-group");
   const write = q(rows[1], '[data-group-write]') as unknown as {
     getAttribute(n: string): string | null;

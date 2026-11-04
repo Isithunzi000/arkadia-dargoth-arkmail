@@ -75,6 +75,7 @@ const switchSubByLabel = (container: unknown, label: string): void => {
   assert.fail(`brak sub-pigulki: ${label}`);
 };
 const switchToGrupy = (container: unknown): void => switchSubByLabel(container, 'Grupy');
+const switchToKsiazka = (container: unknown): void => switchSubByLabel(container, 'Ksiazka adresowa');
 const switchToImportEksport = (container: unknown): void =>
   switchSubByLabel(container, 'Import-Eksport');
 
@@ -133,11 +134,16 @@ test('grupy: stan grup w store, wipe ich nie tyka', () => {
 
 // --- widok -------------------------------------------------------------------
 
-test('grupy: dwie sub-pigulki Ksiazka adresowa/Grupy (Osoby w Archiwum)', () => {
+test('grupy: cztery sub-pigulki (Osoby w Archiwum)', () => {
   const s = new MailUiStore({ tab: 'kontakty' });
   const { container } = mount(s);
   const pills = qa(container, '.arkmail-subpill');
-  assert.deepEqual(pills.map(text), ['Ksiazka adresowa', 'Grupy']);
+  assert.deepEqual(pills.map(text), [
+    'Ksiazka adresowa',
+    'Aliasy Pocztowe',
+    'Grupy',
+    'Import-Eksport',
+  ]);
   assert.ok(q(container, '[data-book-new]'), 'domyslnie Ksiazka: formularz dodawania widoczny');
   assert.ok(q(container, '[data-import]'), 'domyslnie Ksiazka: przyciski importu z gry widoczne');
   assert.ok(!q(container, '[data-group-add]'), 'domyslnie Grupy: formularz ukryty');
@@ -146,11 +152,9 @@ test('grupy: dwie sub-pigulki Ksiazka adresowa/Grupy (Osoby w Archiwum)', () => 
 test('grupy: przełączanie sub-pigulek', () => {
   const s = new MailUiStore({ tab: 'kontakty' });
   const { container } = mount(s);
-  const grupy = qa(container, '.arkmail-subpill')[1];
-  click(grupy);
+  switchToGrupy(container);
   assert.ok(q(container, '[data-group-add]'), 'po kliku Grupy: formularz widoczny');
-  const ksiazka = qa(container, '.arkmail-subpill')[0];
-  click(ksiazka);
+  switchToKsiazka(container);
   assert.ok(q(container, '[data-book-new]'), 'powrot do Ksiazki: formularz dodawania widoczny');
   assert.ok(q(container, '[data-import]'), 'powrot do Ksiazki: przyciski importu z gry widoczne');
 });

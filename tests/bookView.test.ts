@@ -84,11 +84,16 @@ const qs = (el: unknown, selector: string): unknown =>
 
 // --- sub-pigulki -------------------------------------------------------------
 
-test('ksiazka: dwie sub-pigulki Ksiazka adresowa/Grupy (Osoby przeniesione do Archiwum)', () => {
+test('ksiazka: cztery sub-pigulki (Osoby przeniesione do Archiwum)', () => {
   const s = new MailUiStore({ tab: 'kontakty' });
   const { container } = mount(s);
   const pills = qa(container, '.arkmail-subpill');
-  assert.deepEqual(pills.map(text), ['Ksiazka adresowa', 'Grupy']);
+  assert.deepEqual(pills.map(text), [
+    'Ksiazka adresowa',
+    'Aliasy Pocztowe',
+    'Grupy',
+    'Import-Eksport',
+  ]);
 });
 
 test('ksiazka: widok pokazuje liste imion A-Z z checkboxem i krzyzykiem', () => {

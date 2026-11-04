@@ -2071,6 +2071,41 @@ export async function init(api: PluginApi) {
         ? `Ksiazka adresowa zastapiona. Grup: ${merged.groups.length}, imion: ${merged.people.length}.`
         : `Dolaczono. Grup: ${data.groups.length} (nowe: ${stats.addedGroups}, scalone: ${stats.mergedGroups}). Imion: ${merged.people.length} (nowe: ${stats.addedPeople}).`, { level: "success" });
     },
+    // Zgloszenie 2026-11-05: wyczyszczenie lokalnego lustra aliasow
+    // (przycisk w pigulce "Aliasy Pocztowe"). Kasuje wylacznie lokalny
+    // storage; na serwerze Arkadii nic nie znika - aliasy pobiera sie
+    // z gry ponownie.
+    onClearAliases: () => {
+      saveImportedAliases(storage, []);
+      ui.setImportedAliases([]);
+      rebuildContacts();
+      notify(api, "Wyczyszczono lokalne aliasy. Pobierz aliasy z gry ponownie, gdy beda potrzebne.", { level: "success" });
+    },
+    // Zgloszenie 2026-11-05: wyczyszczenie calej ksiazki adresowej
+    // (imiona + grupy + aliasy) z guardem dwukliku w pigulce
+    // "Import-Eksport". Kasuje wylacznie lokalny storage; na serwerze
+    // Arkadii nic nie znika.
+    onClearAddressBook: () => {
+      savePeople(storage, []);
+      saveGroups(storage, []);
+      saveImportedAliases(storage, []);
+      ui.setPeople([]);
+      ui.setGroups([]);
+      ui.setImportedAliases([]);
+      rebuildContacts();
+      notify(api, "Wyczyszczono cala ksiazke adresowa (imiona, grupy, aliasy).", { level: "success" });
+    },
+    // Zgloszenie 2026-11-05: dopisanie wszystkich osob zebranych z
+    // listow do ksiazki adresowej jednym klikiem. Dedup bez wielkosci
+    // liter robi unionPeople; przycisk aktywny tylko gdy baza istnieje.
+    onAddAllContacts: () => {
+      const names = ui.state.contacts.map((c) => c.name);
+      const before = ui.state.people.length;
+      const people = unionPeople(ui.state.people, names);
+      savePeople(storage, people);
+      ui.setPeople(people);
+      notify(api, `Dopisano do ksiazki: ${people.length - before} nowych osob (razem: ${people.length}).`, { level: "success" });
+    },
     // Fala 17g: eksporty TXT/ZIP - operacje czysto lokalne (dane
     // z cache), bez locka i bez komend do serwera.
     onExportLetter: () => {
