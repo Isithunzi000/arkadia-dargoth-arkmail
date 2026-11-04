@@ -48,6 +48,7 @@ import {
   savePeople,
   migratePeople,
   applyBookImport,
+  buildAddressBookExport,
   unionPeople,
   type AddressBookExport,
   type ImportMode,
@@ -2094,6 +2095,26 @@ export async function init(api: PluginApi) {
       ui.setImportedAliases([]);
       rebuildContacts();
       notify(api, "Wyczyszczono cala ksiazke adresowa (imiona, grupy, aliasy).", { level: "success" });
+    },
+    // Zgloszenie 2026-11-05 (K7): eksport ksiazki do pliku JSON przez
+    // handler - pobranie pliku + status + toast (jak eksport listu);
+    // UI nie pobiera pliku bez potwierdzenia w pasku statusu.
+    onExportAddressBook: () => {
+      const json = buildAddressBookExport({
+        people: ui.state.people,
+        groups: ui.state.groups,
+      });
+      const ok = downloadBlob(
+        "arkmail-adresy.json",
+        new Blob([json], { type: "application/json" }),
+      );
+      notify(
+        api,
+        ok
+          ? `Ksiazka adresowa zapisana do pliku (imion: ${ui.state.people.length}, grup: ${ui.state.groups.length}).`
+          : "Nie udalo sie zapisac pliku - klient nie obsluguje pobierania.",
+        { level: ok ? "success" : "error" },
+      );
     },
     // Zgloszenie 2026-11-05: dopisanie wszystkich osob zebranych z
     // listow do ksiazki adresowej jednym klikiem. Dedup bez wielkosci

@@ -28,13 +28,11 @@ import { parseMailDate } from '../core/protocol/parser.js';
 import { archiveExportEntries } from '../core/exportTxt.js';
 import { viewContacts, type ContactSort } from '../core/contacts.js';
 import {
-  buildAddressBookExport,
   parseAddressBookExport,
   type AddressBookExport,
   type ContactGroup,
   type ImportMode,
 } from '../core/addressBook.js';
-import { downloadBlob } from './download.js';
 import {
   clampLineWidth,
   renderLetter,
@@ -144,6 +142,13 @@ export interface MailUiHandlers {
    * Opcjonalny: starsze montaze testowe go nie podaja.
    */
   onImportAddressBook?(data: AddressBookExport, mode?: ImportMode): void;
+  /**
+   * Eksport ksiazki adresowej do pliku JSON (zgloszenie 2026-11-05):
+   * pobranie pliku + komunikat (status + toast) robi index.ts, jak
+   * przy eksporcie listu - UI nie pobiera pliku bez potwierdzenia.
+   * Opcjonalny: starsze montaze testowe go nie podaja.
+   */
+  onExportAddressBook?(): void;
   /**
    * Czyszczenie lokalnego lustra aliasow (zgloszenie 2026-11-05):
    * kasuje zaimportowane aliasy i przebudowuje kontakty; na serwerze
@@ -2236,25 +2241,13 @@ export function mountMailUi(
     pane.appendChild(doc.createElement('hr'));
 
     // Eksport: imiona + grupy do pliku JSON (aliasy nie wchodza -
-    // pobiera sie je z gry).
+    // pobiera sie je z gry). Zgloszenie 2026-11-05: przez handler -
+    // pobranie pliku + komunikat robi index.ts (jak eksport listu).
     const expBtn = doc.createElement('button');
     expBtn.textContent = 'Eksportuj ksiazke';
     expBtn.setAttribute('data-book-export', '');
     expBtn.setAttribute('title', 'Pobiera plik JSON: imiona i grupy. Aliasy pocztowe nie wchodza do pliku - pobierasz je z gry.');
-    expBtn.addEventListener('click', () => {
-      downloadBlob(
-        'arkmail-adresy.json',
-        new Blob(
-          [
-            buildAddressBookExport({
-              people: state.people,
-              groups: state.groups,
-            }),
-          ],
-          { type: 'application/json' },
-        ),
-      );
-    });
+    expBtn.addEventListener('click', () => handlers.onExportAddressBook?.());
     pane.appendChild(expBtn);
 
     // Import: tryb dolacz/zastap (stan lokalny jak dotad).

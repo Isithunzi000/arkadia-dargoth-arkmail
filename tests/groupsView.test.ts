@@ -14,8 +14,7 @@ import { Window } from 'happy-dom';
 
 import { mountMailUi } from '../src/arkmail/ui/render';
 import { MailUiStore } from '../src/arkmail/ui/store';
-import { parseAddressBookExport } from '../src/arkmail/core/addressBook';
-import { setDownloadImpl } from '../src/arkmail/ui/download';
+import { buildAddressBookExport, parseAddressBookExport } from '../src/arkmail/core/addressBook';
 
 const window = new Window();
 const document = window.document;
@@ -257,30 +256,19 @@ test('grupy: usuniecie grupy i wszystkich grup - uzbrojone potwierdzenie', () =>
   assert.deepEqual(calls.groups.at(-1), [], 'wszystkie grupy skasowane');
 });
 
-test('import-eksport: eksport JSON przez pobieranie pliku', async () => {
-  const s = new MailUiStore({
-    tab: 'kontakty',
-    groups: [{ name: 'Gildia', members: ['Fred'] }],
-  });
-  const downloads: Array<[string, string]> = [];
-  setDownloadImpl((name, blob) => {
-    void blob.text().then((t) => downloads.push([name, t]));
-  });
-  try {
-    const { container } = mount(s);
-  switchToImportEksport(container);
-    click(q(container, '[data-book-export]'));
-    await new Promise((r) => setImmediate(r));
-    assert.equal(downloads.length, 1);
-    assert.match(downloads[0][0], /arkmail-adresy/i);
-    const parsed = JSON.parse(downloads[0][1]);
-    assert.equal(parsed.format, 'arkmail-addressbook');
-    assert.equal(parsed.version, 2);
-    assert.deepEqual(parsed.people, []);
-    assert.deepEqual(parsed.groups, [{ name: 'Gildia', members: ['Fred'] }]);
-  } finally {
-    setDownloadImpl(null);
-  }
+test('import-eksport: format eksportu JSON v2 (imiona + grupy, bez aliasow)', () => {
+  // Zgloszenie 2026-11-05 (K7): pobranie pliku przeniesione do
+  // index.ts (handler + komunikat); format danych pokrywa test jednostki.
+  const parsed = JSON.parse(
+    buildAddressBookExport({
+      people: ['Corge'],
+      groups: [{ name: 'Gildia', members: ['Fred'] }],
+    }),
+  );
+  assert.equal(parsed.format, 'arkmail-addressbook');
+  assert.equal(parsed.version, 2);
+  assert.deepEqual(parsed.people, ['Corge']);
+  assert.deepEqual(parsed.groups, [{ name: 'Gildia', members: ['Fred'] }]);
 });
 
 test('import-eksport: eksport wywoluje handler (pobranie i komunikat w index.ts)', () => {
