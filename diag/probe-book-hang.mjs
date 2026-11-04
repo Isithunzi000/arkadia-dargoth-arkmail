@@ -42,7 +42,10 @@ const q = (sel) => container.querySelector(sel);
 const qa = (sel) => Array.from(container.querySelectorAll(sel));
 const click = (el) => el.click();
 
-qa('.arkmail-subpill')[1].click();
+// Fala UI-2 krok 4: zostaly dwie sub-pigulki (Ksiazka adresowa,
+// Grupy) - Ksiazka to indeks 0 (wczesniej trzy pigulki: Osoby,
+// Ksiazka, Grupy). Domyslnym subem jest Ksiazka, klik dla pewnosci.
+qa('.arkmail-subpill')[0].click();
 mark('switched-to-ksiazka');
 
 const checkAt = (i) => {
