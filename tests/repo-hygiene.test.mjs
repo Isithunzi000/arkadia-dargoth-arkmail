@@ -23,6 +23,25 @@ const BANNED = [
   'xhejn', 'phejn', 'puhw', 'cvrqmby', 'wronp', 'qhcn', 'pvcn', 'cvmqn',
   'fxhejflfa', 'shpx', 'fuvg', 'ovgpu',
 ].map(rot13);
+// Rdzenie lapia formy odmienione (podciag, nie granice wyrazu).
+const BANNED_STEMS = ['wron'].map(rot13);
+
+function boundary(w) {
+  return new RegExp(`(^|[^a-z])${w}([^a-z]|$)`, 'i');
+}
+
+// Zwraca wykryty wzorzec albo null. Formy podstawowe: granice wyrazu;
+// rdzenie: dowolne wystapienie podciagu (formy odmienione).
+function findBad(content) {
+  const lower = content.toLowerCase();
+  for (const bad of BANNED) {
+    if (boundary(bad).test(lower)) return bad;
+  }
+  for (const stem of BANNED_STEMS) {
+    if (lower.includes(stem)) return stem;
+  }
+  return null;
+}
 
 function textFiles() {
   const out = execSync('git ls-files -co --exclude-standard', { cwd: REPO, encoding: 'utf8' });
@@ -51,12 +70,9 @@ test('higiena: zero placeholderow edytora pluginow', () => {
 });
 
 test('higiena: zero wulgaryzmow w plikach repo', () => {
-  const boundary = (w) => new RegExp(`(^|[^a-z])${w}([^a-z]|$)`, 'i');
   for (const f of textFiles()) {
-    const content = read(f).toLowerCase();
-    for (const bad of BANNED) {
-      assert.ok(!boundary(bad).test(content), `${f}: niedozwolone slowo (poz.${BANNED.indexOf(bad)})`);
-    }
+    const hit = findBad(read(f));
+    assert.equal(hit, null, `${f}: niedozwolone slowo`);
   }
 });
 

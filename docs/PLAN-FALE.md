@@ -11,9 +11,10 @@ Status: aktywny (zatwierdzony 2026-11-04).
     odmienione" - formy odmienione ROT13, asercja wykrycia przez matcher.
     Matcher jeszcze nie istnieje - test pada (RED).
 - A-GREEN (jeden commit):
-  - tests/repo-hygiene.test.mjs: matcher z listą rdzeni (ROT13, od "jeba")
-    dopasowywanych podciagiem + istniejace granice form podstawowych;
-    petla skanujaca pliki korzysta z matchera.
+  - tests/repo-hygiene.test.mjs: matcher z lista rdzeni (ROT13, pierwszy
+    rdzen od formy, ktora umknelo straznikowi 2026-10-19) dopasowywanych
+    podciagiem + istniejace granice form podstawowych; petla skanujaca
+    pliki korzysta z matchera.
   - Weryfikacja: pelny skan repo zero trafien, CI 760/760.
 
 ## Zmiana B - układ wierszy ksiazki i headow grup
