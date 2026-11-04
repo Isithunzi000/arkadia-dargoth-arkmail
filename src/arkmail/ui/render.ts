@@ -200,9 +200,9 @@ export function mountMailUi(
   /** Filtr archiwum: lokalny (poza store) - input zachowuje fokus. */
   const archFilter: ArchiveFilter = {};
   /** Filtr i sort kontaktow: lokalne (poza store) - ten sam powod co wyzej.
-   *  Fala UI-2 krok 4: sub-pigulka Osoby zniknela (indeks osob mieszka w
-   *  panelu Archiwum), wiec w Kontaktach zostaly dwie pigulki i domyslnie
-   *  Ksiazka adresowa. */
+   *  Fala UI-2 krok 4: sub-pigulka Osoby ustapila miejsca panelowi
+   *  osob w Archiwum (indeks osob mieszka tam), wiec w Kontaktach
+   *  zostaly dwie pigulki i domyslnie Ksiazka adresowa. */
   const contactView: { filter: string; sort: ContactSort; sub: 'ksiazka' | 'grupy' } = {
     filter: '',
     sort: 'nazwa',
@@ -1732,8 +1732,8 @@ export function mountMailUi(
     const save = (people: string[]): void => handlers.onSavePeople?.(people);
 
     // --- import bazy osob z gry (Fala UI-2 krok 4: przeniesione z
-    // sub-pigulki Osoby w Kontaktach - pigulka zniknela, import jest
-    // czynnoscia ksiazki adresowej). Import ZAMIENIA pule (refresh),
+    // sub-pigulki Osoby w Kontaktach - indeks osob przeniesiony do
+    // panelu Archiwum, a import jest czynnoscia ksiazki adresowej). Import ZAMIENIA pule (refresh),
     // nie tworzy grup - z bazy gracz sklada grupy recznie (widok Grupy).
     const importRow = doc.createElement('div');
     importRow.className = 'arkmail-import-row';
@@ -1951,8 +1951,8 @@ export function mountMailUi(
    * listow - skok z osoby filtruje dokladnie te liste listow, ktora
    * jest tuz pod panelem. Zachowuje brame indeksacji (wskazowka +
    * przycisk NAD lista, Fala 24a) i notke o lukach; stopka ze
-   * statusem indeksacji zniknela - status z data kompletu mieszka
-   * w kroku 1 Archiwum, rozmiar bazy w pasku licznikow.
+   * statusem indeksacji ustapila miejsca krokowi 1 Archiwum - status
+   * z data kompletu mieszka tam, rozmiar bazy w pasku licznikow.
    */
   const renderArchPeople = (state: MailUiState): HTMLElement => {
     const panel = doc.createElement('div');
@@ -2235,7 +2235,8 @@ export function mountMailUi(
     const gapCount = Object.values(state.archiveGaps).reduce((sum, days) => sum + days.length, 0);
     // Fala UI-2 krok 4: status kompletu dostaje najwczesniejsza date
     // indeksacji (dawniej data mieszkala w stopce sub-pigulki Osoby,
-    // ktora zniknela). Pusta przy nieindeksowanym archiwum - uzywana
+    // stopce sub-pigulki Osoby, ktora ustapila miejsca panelowi).
+    // Pusta przy nieindeksowanym archiwum - uzywana
     // tylko w galezi kompletu, wiec pustka nigdy nie trafia na ekran.
     const indexDates = INDEX_BOXES.map((box) => state.indexMeta[box])
       .filter((d): d is string => d !== undefined)
