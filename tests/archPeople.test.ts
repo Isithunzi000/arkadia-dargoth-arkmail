@@ -155,18 +155,23 @@ test('archiwum: po dopisaniu do ksiazki przycisk sie wylacza (repaint)', () => {
 
 // --- skok i panel ------------------------------------------------------------
 
-test('archiwum: skok z osoby rozwija panel i filtruje liste listow', () => {
+test('archiwum: skok z osoby filtruje liste listow, panel zostaje rozwiniety', () => {
   const s = new MailUiStore({ tab: 'archiwum' });
   s.setContacts([contact({})]);
   const { container } = mount(s);
-  click(toggle(container));
-  assert.equal(qa(container, '[data-arch-people] .arkmail-contact').length, 0, 'zwiniety przed skokiem');
+  // Skok z wiersza osoby: zostajemy w archiwum, filtr osoby dostaje
+  // imie, panel NIE zwinie sie przy skoku (jumpTo ustawia
+  // archPeopleOpen = true - zabezpieczenie na wypadek skoku z
+  // zrodla przy zwinietych wierszach, np. przyszle przyciski w
+  // kroku 5). Zwiniety panel nie pokazuje wierszy, wiec scenariusz
+  // "klik w wiersz przy zwinietych panelu" jest niedostepny z DOM
+  // i testuje sie go tylko po stronie handlera (archPeopleOpen).
   click(q(container, '[data-arch-people] .arkmail-contact-name'));
   assert.equal(s.state.tab, 'archiwum', 'zostajemy w archiwum');
   assert.equal(
     qa(container, '[data-arch-people] .arkmail-contact').length,
     1,
-    'skok rozwija panel',
+    'panel rozwiniety po skoku',
   );
   const osoba = q(container, '[data-pane-key="archiwum"] [data-filter="osoba"]') as {
     value: string;

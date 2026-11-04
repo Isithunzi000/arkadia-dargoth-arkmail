@@ -59,7 +59,7 @@ test('archiwum: kompletny indeks z lukami - status kroku 1 mowi o brakach, liczn
       store.setTab('archiwum');
       const statuses = stepStatuses(container);
       assert.match(statuses[0] ?? '', /Gotowe, ale brakuje danych z 1 dnia/, 'status kroku 1 z lukami');
-      assert.match(container.textContent ?? '', /1 list w bazie/, 'licznik bazy archiwum');
+      assert.match(container.textContent ?? '', /Listow w bazie: 1 list/, 'licznik bazy archiwum');
       const pane = container.querySelector('[data-pane-key="archiwum"]')!;
       const children = Array.from(pane.children);
       const stepsIndex = children.findIndex((child) =>

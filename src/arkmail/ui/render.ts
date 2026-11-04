@@ -199,12 +199,20 @@ export function mountMailUi(
 
   /** Filtr archiwum: lokalny (poza store) - input zachowuje fokus. */
   const archFilter: ArchiveFilter = {};
-  /** Filtr i sort kontaktow: lokalne (poza store) - ten sam powod co wyzej. */
-  const contactView: { filter: string; sort: ContactSort; sub: 'osoby' | 'ksiazka' | 'grupy' } = {
+  /** Filtr i sort kontaktow: lokalne (poza store) - ten sam powod co wyzej.
+   *  Fala UI-2 krok 4: sub-pigulka Osoby zniknela (indeks osob mieszka w
+   *  panelu Archiwum), wiec w Kontaktach zostaly dwie pigulki i domyslnie
+   *  Ksiazka adresowa. */
+  const contactView: { filter: string; sort: ContactSort; sub: 'ksiazka' | 'grupy' } = {
     filter: '',
     sort: 'nazwa',
-    sub: 'osoby',
+    sub: 'ksiazka',
   };
+  /** Zwijanie panelu "Osoby z listow" w Archiwum (Fala UI-2 krok 4):
+   *  lokalne (poza store) jak filtry - toggle nie traca stanu przy
+   *  repaint. Domyslnie rozwiniety; skok z osoby rozwija panel z powrotem
+   *  (kontekst osoby ma byc widoczny przy przefiltrowanej liscie). */
+  let archPeopleOpen = true;
   /** Tryb importu pliku ksiazki (Fala UI-2 krok 3): lokalny jak
    *  contactView - domyslnie dolacz; "zastap" podmienia imiona i grupy. */
   let bookImportMode: ImportMode = 'dolacz';
@@ -1723,6 +1731,43 @@ export function mountMailUi(
     }
     const save = (people: string[]): void => handlers.onSavePeople?.(people);
 
+    // --- import bazy osob z gry (Fala UI-2 krok 4: przeniesione z
+    // sub-pigulki Osoby w Kontaktach - pigulka zniknela, import jest
+    // czynnoscia ksiazki adresowej). Import ZAMIENIA pule (refresh),
+    // nie tworzy grup - z bazy gracz sklada grupy recznie (widok Grupy).
+    const importRow = doc.createElement('div');
+    importRow.className = 'arkmail-import-row';
+    const IMPORT_BTNS: Array<[string, string, string]> = [
+      [
+        'zapamietani',
+        'Importuj zapamietanych',
+        'Pobiera z gry osoby zapamietane na stale i zapisuje je jako baze osob. Grup nie tworzy.',
+      ],
+      [
+        'przedstawieni',
+        'Importuj przedstawionych',
+        'Pobiera z gry osoby, ktore zostaly ci ostatnio przedstawione, i zapisuje je jako baze osob. Grup nie tworzy.',
+      ],
+      [
+        'aliasy',
+        'Importuj aliasy pocztowe',
+        'Pobiera z gry aliasy pocztowe. Nie da sie ich edytowac - rozwija je serwer przy wysylce. Osoby z aliasow dolaczaja do bazy osob.',
+      ],
+    ];
+    for (const [kind, label, title] of IMPORT_BTNS) {
+      const btn = doc.createElement('button');
+      btn.className = 'arkmail-import-btn';
+      btn.setAttribute('data-import', kind);
+      btn.textContent = label;
+      btn.setAttribute('title', title);
+      btn.addEventListener('click', () => {
+        if (kind === 'aliasy') handlers.onImportAliases?.();
+        else handlers.onImportPeople?.(kind as 'zapamietani' | 'przedstawieni');
+      });
+      importRow.appendChild(btn);
+    }
+    pane.appendChild(importRow);
+
     // --- dodawanie imienia
     const addRow = doc.createElement('div');
     addRow.className = 'arkmail-book-add';
@@ -1864,14 +1909,14 @@ export function mountMailUi(
     const pane = doc.createElement('div');
     pane.className = 'arkmail-pane';
     pane.setAttribute('data-pane-key', 'kontakty');
-    // Fala UI-2 krok 3: sub-pigulki Osoby/Ksiazka adresowa/Grupy.
-    // Klasy .arkmail-boxes (zero nowych kolorow); stan lokalny jak
-    // filtr/sort - repaint renderuje tylko wybrany podpanel. Pigulka
-    // "Osoby" (kontakty z archiwum) znika w kroku 4 razem z indeksem.
+    // Fala UI-2 krok 3: sub-pigulki; krok 4: zostaly dwie (pigulka
+    // "Osoby" - indeks osob zebranych z listow - przeniesiona do
+    // panelu zakladki Archiwum). Klasy .arkmail-boxes (zero nowych
+    // kolorow); stan lokalny jak filtr/sort - repaint renderuje tylko
+    // wybrany podpanel.
     const subRow = doc.createElement('div');
     subRow.className = 'arkmail-boxes arkmail-subpills';
-    const SUBPILLS: Array<['osoby' | 'ksiazka' | 'grupy', string]> = [
-      ['osoby', 'Osoby'],
+    const SUBPILLS: Array<['ksiazka' | 'grupy', string]> = [
       ['ksiazka', 'Ksiazka adresowa'],
       ['grupy', 'Grupy'],
     ];
@@ -1895,49 +1940,43 @@ export function mountMailUi(
       renderKsiazka(state, pane);
       return pane;
     }
-    const foot = doc.createElement('div');
-    foot.className = 'arkmail-dim arkmail-index-foot';
-    const dates = INDEX_BOXES.map((b) => state.indexMeta[b])
-      .filter((d): d is string => d !== undefined)
-      .sort();
-    // Fala 25 (blad 2): pedzel indeksacji ma pierwszenstwo przed
-    // flagowym stanem - stopka pokazuje "w toku" zgodnie z archiwum,
-    // zeby oba panele nie pokazywaly roznych statusow tego samego przebiegu.
-    // Fala 28: ta sama miara co pasek archiwum (totalLive - zywe
-    // grupy po deduplikacji blizniakow), nie surowa dlugosc bazy.
-    foot.textContent = state.indexRun
-      ? `Indeksowanie trwa: ${state.indexRun.box} (${state.indexRun.boxIndex + 1}/${INDEX_BOXES.length}), stron: ${state.indexRun.pages} | ${formatListCount(totalLive(state.archive))} w bazie`
-      : allBoxesIndexed(state.indexMeta)
-        ? `Kompletna indeksacja od: ${dates[0]!.slice(0, 10)} | ${formatListCount(totalLive(state.archive))} w bazie`
-        : `Indeksacja niekompletna | ${formatListCount(totalLive(state.archive))} w bazie`;
-    pane.appendChild(foot);
-    const gaps = INDEX_BOXES.flatMap((box) =>
-      (state.archiveGaps[box] ?? []).map((day) => `${box}: ${day}`),
-    );
-    if (gaps.length > 0) {
-      const gapNote = doc.createElement('div');
-      gapNote.className = 'arkmail-dim arkmail-index-gaps';
-      gapNote.textContent = `Brakuje danych z dni: ${gaps.join(', ')}`;
-      pane.appendChild(gapNote);
-    }
-    // Fala 18c (zgloszenie 2026-10-20 pkt 1): kontakty liczone z
-    // archiwum sa kompletne dopiero po pelnej indeksacji wszystkich
-    // skrzynek - wczesniej (baza = pierwsze 50 wpisow) liczniki
-    // klamaly, wiec zamiast nich brama z przyciskiem indeksacji.
-    // Fala 19b (zgloszenie 2026-10-20): tekst bramy bez szczegolow
-    // technicznych - gracz ma wiedziec tylko, po co indeksowanie.
-    // Fala 24a (zgloszenie 2026-10-21): kontakty sa widoczne ZAWSZE -
-    // brama to wskazowka + przycisk NAD lista, nie zamiast niej
-    // (gracz z pelnym archiwum po "Wczytaj wszystkie" nie widzial
-    // kontaktow, bo brama wisala na fladze indeksu, nie na danych).
-    // Dopisek "(jednorazowo)" usuniety - indeksowanie nie jest
-    // jednorazowe (Fala 24e: incrementalna, przeczes co 7 dni).
-    // Fala 25 (blad 2): brama (i przycisk "Przerwij indeksowanie")
-    // widoczne ZAWSZE, gdy pedzel dziala - takze przy kompletnym
-    // indexMeta (ponowna indeksacja), inaczej nie dalo sie jej
-    // przerwac z zakladki kontaktow.
+    return pane;
+  };
+
+  /**
+   * Panel "Osoby z listow" zakladki Archiwum (Fala UI-2 krok 4):
+   * zwijany indeks osob zebranych z listow - wczesniej sub-pigulka
+   * "Osoby" w Kontaktach (usunieta w tym kroku). Panel stoi w
+   * Archiwum, bo osoby i ich liczniki stoja na lokalnej bazie
+   * listow - skok z osoby filtruje dokladnie te liste listow, ktora
+   * jest tuz pod panelem. Zachowuje brame indeksacji (wskazowka +
+   * przycisk NAD lista, Fala 24a) i notke o lukach; stopka ze
+   * statusem indeksacji zniknela - status z data kompletu mieszka
+   * w kroku 1 Archiwum, rozmiar bazy w pasku licznikow.
+   */
+  const renderArchPeople = (state: MailUiState): HTMLElement => {
+    const panel = doc.createElement('div');
+    panel.setAttribute('data-arch-people', '');
+    // Naglowek z licznikiem = zawsze widoczny; toggle zwija liste.
+    const head = doc.createElement('div');
+    head.className = 'arkmail-arch-people-head';
+    const toggle = doc.createElement('button');
+    toggle.className = 'arkmail-arch-people-toggle';
+    toggle.setAttribute('data-arch-people-toggle', '');
+    toggle.textContent = `Osoby z listow (${state.contacts.length})`;
+    toggle.setAttribute('title', 'Zwija albo rozwija liste osob zebranych z listow.');
+    toggle.addEventListener('click', () => {
+      archPeopleOpen = !archPeopleOpen;
+      store.refresh();
+    });
+    head.appendChild(toggle);
+    panel.appendChild(head);
+    if (!archPeopleOpen) return panel;
+    // Brama (Fala 18c/19b/24a/25): wskazowka + przycisk NAD lista,
+    // nie zamiast niej; widoczna zawsze, gdy pedzel dziala - inaczej
+    // nie dalo sie go przerwac z widoku osob.
     if (!allBoxesIndexed(state.indexMeta) || state.indexRun) {
-      pane.appendChild(
+      panel.appendChild(
         dim('Kontakty powstaja z listow zebranych ze wszystkich skrzynek.'),
       );
       const gate = doc.createElement('button');
@@ -1946,42 +1985,17 @@ export function mountMailUi(
         ? `Przerwij indeksowanie (${state.indexRun.boxIndex + 1}/${INDEX_BOXES.length})`
         : 'Indeksuj wszystkie skrzynki';
       gate.addEventListener('click', () => handlers.onIndexAll?.());
-      pane.appendChild(gate);
+      panel.appendChild(gate);
     }
-    // Fala UI-2: import bazy osob z gry. Import ZAMIENIA pule (refresh),
-    // nie tworzy grup - z bazy gracz sklada grupy recznie (widok Grupy).
-    const importRow = doc.createElement('div');
-    importRow.className = 'arkmail-import-row';
-    const IMPORT_BTNS: Array<[string, string, string]> = [
-      [
-        'zapamietani',
-        'Importuj zapamietanych',
-        'Pobiera z gry osoby zapamietane na stale i zapisuje je jako baze osob. Grup nie tworzy.',
-      ],
-      [
-        'przedstawieni',
-        'Importuj przedstawionych',
-        'Pobiera z gry osoby, ktore zostaly ci ostatnio przedstawione, i zapisuje je jako baze osob. Grup nie tworzy.',
-      ],
-      [
-        'aliasy',
-        'Importuj aliasy pocztowe',
-        'Pobiera z gry aliasy pocztowe. Nie da sie ich edytowac - rozwija je serwer przy wysylce. Osoby z aliasow dolaczaja do bazy osob.',
-      ],
-    ];
-    for (const [kind, label, title] of IMPORT_BTNS) {
-      const btn = doc.createElement('button');
-      btn.className = 'arkmail-import-btn';
-      btn.setAttribute('data-import', kind);
-      btn.textContent = label;
-      btn.setAttribute('title', title);
-      btn.addEventListener('click', () => {
-        if (kind === 'aliasy') handlers.onImportAliases?.();
-        else handlers.onImportPeople?.(kind as 'zapamietani' | 'przedstawieni');
-      });
-      importRow.appendChild(btn);
+    const gaps = INDEX_BOXES.flatMap((box) =>
+      (state.archiveGaps[box] ?? []).map((day) => `${box}: ${day}`),
+    );
+    if (gaps.length > 0) {
+      const gapNote = doc.createElement('div');
+      gapNote.className = 'arkmail-dim arkmail-index-gaps';
+      gapNote.textContent = `Brakuje danych z dni: ${gaps.join(', ')}`;
+      panel.appendChild(gapNote);
     }
-    pane.appendChild(importRow);
     // Filtr i sort sa lokalne (poza store, jak filtr archiwum):
     // repaint dotyczy tylko listy, input nie traci fokusu przy pisaniu.
     const controls = doc.createElement('div');
@@ -2007,14 +2021,13 @@ export function mountMailUi(
     sel.value = contactView.sort;
     controls.appendChild(input);
     controls.appendChild(sel);
-    pane.appendChild(controls);
-    // Fala 40 (zgloszenie 2026-11-01): filtr kontaktow z ghostem jak
-    // pole Osoba w Archiwum - kandydaci z kontaktow + aliasow,
-    // strzalka w prawo wpisuje kanoniczna forme. Akceptacja dispatchuje
-    // 'input', wiec repaint listy odpala sie sam.
+    panel.appendChild(controls);
+    // Fala 40: filtr z ghostem jak pole Osoba w Archiwum - kandydaci
+    // z kontaktow + aliasow, strzalka w prawo wpisuje kanoniczna forme.
+    // Akceptacja dispatchuje 'input', wiec repaint listy odpala sie sam.
     attachGhost(doc, input, personSource);
     const list = doc.createElement('div');
-    pane.appendChild(list);
+    panel.appendChild(list);
     const repaint = () => {
       const rows = viewContacts(state.contacts, contactView);
       list.replaceChildren(
@@ -2025,20 +2038,13 @@ export function mountMailUi(
           name.className = 'arkmail-contact-name';
           name.textContent = c.name;
           // Fala 12c: jawny wybor kierunku - gracz decyduje, czy pokazac
-          // odebrane OD osoby czy wyslane DO niej (wczesniej klik szukal
-          // na aktywnej skrzynce, czyli "gdzie popadnie").
+          // odebrane OD osoby czy wyslane DO niej.
           // Fala 26b (zgloszenie 2026-10-22): skok filtruje LOKALNE
           // archiwum (zakladka Archiwum), zamiast strzelac szukaniem
-          // do serwera. Liczniki kontaktow stoja na archiwum i licza
-          // listy wieloodbiorcze KAZDEMU odbiorcy (splitParty), a
-          // serwerowy filtr od/do lapie dokladnie jedna osobe, wiec
-          // listow grupowych nie widzi - stad licznik > 0 przy pustym
-          // wyniku serwera. Filtr osoby w archiwum to podciag po
-          // party, wiec listy wieloodbiorcze tez trafiaja.
-          // (Fala 26d: korekta uzasadnienia - skrzynki serwerowe sa
-          // pelne od zawsze, nikt ich nie sprzata.)
-          // Skok jest deterministyczny: osoba + skrzynka, reszta
-          // filtrow archiwum czyszczona.
+          // do serwera; skok jest deterministyczny: osoba + skrzynka,
+          // reszta filtrow archiwum czyszczona.
+          // Fala UI-2 krok 4: skok rozwija panel (kontekst osoby ma
+          // byc widoczny przy przefiltrowanej liscie listow).
           const jumpTo = (box: MailBox) => {
             archFilter.osoba = c.name;
             archFilter.skrzynka = box;
@@ -2046,6 +2052,7 @@ export function mountMailUi(
             archFilter.tresc = undefined;
             archFilter.odDaty = undefined;
             archFilter.doDaty = undefined;
+            archPeopleOpen = true;
             store.setTab('archiwum');
           };
           // Klik w imie = kierunek domyslny: odebrane, gdy sa.
@@ -2088,6 +2095,24 @@ export function mountMailUi(
             dirs.appendChild(btn);
           }
           row.appendChild(dirs);
+          // Fala UI-2 krok 4: dopisanie osoby do ksiazki adresowej
+          // jednym klikiem ("Do ksiazki"). Wylaczony, gdy imie juz
+          // jest w ksiazce (bez wzgledu na wielkosc liter) - brak
+          // listenera, wiec klikniecie nie zapisuje.
+          const addBook = doc.createElement('button');
+          addBook.className = 'arkmail-contact-addbook';
+          addBook.setAttribute('data-arch-add-book', '');
+          addBook.textContent = 'Do ksiazki';
+          if (state.people.some((p) => p.toLowerCase() === c.name.toLowerCase())) {
+            addBook.setAttribute('disabled', '1');
+            addBook.setAttribute('title', 'Juz w ksiazce.');
+          } else {
+            addBook.setAttribute('title', `Dopisuje ${c.name} do ksiazki adresowej.`);
+            addBook.addEventListener('click', () =>
+              handlers.onSavePeople?.([...state.people, c.name]),
+            );
+          }
+          row.appendChild(addBook);
           return row;
         }),
       );
@@ -2111,7 +2136,7 @@ export function mountMailUi(
       repaint();
     });
     repaint();
-    return pane;
+    return panel;
   };
 
   const renderArchiwum = (state: MailUiState): HTMLElement => {
@@ -2208,6 +2233,14 @@ export function mountMailUi(
     };
     const indexedCount = INDEX_BOXES.filter((box) => state.indexMeta[box] !== undefined).length;
     const gapCount = Object.values(state.archiveGaps).reduce((sum, days) => sum + days.length, 0);
+    // Fala UI-2 krok 4: status kompletu dostaje najwczesniejsza date
+    // indeksacji (dawniej data mieszkala w stopce sub-pigulki Osoby,
+    // ktora zniknela). Pusta przy nieindeksowanym archiwum - uzywana
+    // tylko w galezi kompletu, wiec pustka nigdy nie trafia na ekran.
+    const indexDates = INDEX_BOXES.map((box) => state.indexMeta[box])
+      .filter((d): d is string => d !== undefined)
+      .sort();
+    const earliestIndexDate = indexDates.length > 0 ? indexDates[0]!.slice(0, 10) : '';
     // Fala 31e: mowimy, czego brakuje ("brakuje danych z N dni").
     // Liczebnik dni: 1 dnia / 2 dni / 5 dni.
     const gapPhrase = (days: number): string =>
@@ -2217,7 +2250,7 @@ export function mountMailUi(
       : allBoxesIndexed(state.indexMeta)
         ? gapCount > 0
           ? `Gotowe, ale ${gapPhrase(gapCount)}.`
-          : 'Gotowe: wszystkie skrzynki zapisane.'
+          : `Gotowe od ${earliestIndexDate}: wszystkie skrzynki zapisane.`
         : indexedCount > 0 || gapCount > 0
           ? `Czesciowo: ${indexedCount} z ${INDEX_BOXES.length} skrzynek${gapCount > 0 ? ` (${gapPhrase(gapCount)})` : ''}.`
           : 'Jeszcze nie zaczeto.';
@@ -2341,6 +2374,10 @@ export function mountMailUi(
     pane.appendChild(steps);
     pane.appendChild(controls);
     if (countsStrip) pane.appendChild(countsStrip);
+    // Fala UI-2 krok 4: indeks osob zebranych z listow jako zwijany
+    // panel miedzy paskiem licznikow a lista listow (dawniej
+    // sub-pigulka Osoby w Kontaktach).
+    pane.appendChild(renderArchPeople(state));
     const list = doc.createElement('div');
     pane.appendChild(list);
     const repaint = () => {

@@ -340,14 +340,16 @@ test('wczytaj wszystkie: naturalne domkniecie skrzynki stempluje indexMeta (Fala
       'notify konca petli',
     );
 
-    // Jedna kompletna skrzynka nie wystarcza do kompletnego indeksu.
+    // Dwie skrzynki z datami: pusta nieprzeczytana z prologu dostala
+    // stempel (Fala 25, decyzja D1: pelna wiedza = stempel), petla
+    // domkniete naturally odebrane - 2 z 4, nie komplet.
     // Fala UI-2 krok 4: status indeksacji ma jedno zrodlo - krok 1
     // w Archiwum (stopka Kontaktow zniknela z sub-pigulka Osoby).
     click(h, '[data-tab="archiwum"]');
     await waitRt(() => textOf(h, '.arkmail-archive-step-status').length > 0, 'opis indeksacji');
     assert.match(
       textOf(h, '.arkmail-archive-step-status'),
-      /Czesciowo: 1 z 4 skrzynek/,
+      /Czesciowo: 2 z 4 skrzynek/,
       'naturalne domkniecie loadAll zachowuje date skrzynki',
     );
   } finally {
@@ -374,15 +376,18 @@ test('wczytaj wszystkie: przerwanie petli NIE stempluje indexMeta (Fala 24c)', a
     click(h, '.arkmail-older-all');
     await waitRt(() => notifyText(f, 'Przerwano'), 'notify przerwania');
 
-    // Petla przerwana = brak pewnosci kompletu -> bez daty skrzynki.
+    // Petla przerwana = brak pewnosci kompletu odebranych -> bez ich
+    // daty; zostaje stempel pustej nieprzeczytanej z prologu
+    // (Fala 25, decyzja D1: pelna wiedza = stempel), wiec stan to
+    // 1 z 4, nie "Jeszcze nie zaczeto.".
     // Fala UI-2 krok 4: jedno zrodlo statusu - krok 1 w Archiwum;
-    // przerwana petla nie stemplowala zadnej skrzynki (Fala 24c).
+    // przerwana petla nie stemplowala odebranych (Fala 24c).
     click(h, '[data-tab="archiwum"]');
     await waitRt(() => textOf(h, '.arkmail-archive-step-status').length > 0, 'opis indeksacji');
     assert.match(
       textOf(h, '.arkmail-archive-step-status'),
-      /Jeszcze nie zaczeto\./,
-      'brak daty po przerwanym loadAll',
+      /Czesciowo: 1 z 4 skrzynek/,
+      'brak daty odebranych po przerwanym loadAll',
     );
   } finally {
     await stopHarness();

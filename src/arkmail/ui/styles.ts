@@ -460,7 +460,7 @@ export const STYLES = `
 .arkmail-contact-name { color: ${FG}; font-weight: 600; cursor: pointer; }
 .arkmail-contact-name:hover { text-decoration: underline; }
 .arkmail-contact-dirs { margin-left: auto; display: flex; gap: calc(4px * var(--window-font-scale, 1)); }
-.arkmail-root .arkmail-contact-dir {
+.arkmail-root .arkmail-contact-dir, .arkmail-root .arkmail-contact-addbook, .arkmail-root .arkmail-arch-people-toggle {
   background: ${BG_RAISED};
   color: ${FG};
   border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
@@ -469,11 +469,13 @@ export const STYLES = `
   font-size: calc(11px * var(--window-font-scale, 1));
   cursor: pointer;
 }
-.arkmail-root .arkmail-contact-dir:hover { border-color: ${FG_DIM}; }
-.arkmail-root .arkmail-contact-dir:disabled {
+.arkmail-root .arkmail-contact-dir:hover, .arkmail-root .arkmail-contact-addbook:hover, .arkmail-root .arkmail-arch-people-toggle:hover { border-color: ${FG_DIM}; }
+.arkmail-root .arkmail-contact-dir:disabled, .arkmail-root .arkmail-contact-addbook:disabled {
   opacity: 0.4;
   cursor: default;
 }
+/* Fala UI-2 krok 4: naglowek zwijanego panelu "Osoby z listow". */
+.arkmail-arch-people-head { margin: calc(8px * var(--window-font-scale, 1)) 0 calc(4px * var(--window-font-scale, 1)); }
 .arkmail-contact-stats, .arkmail-arch-meta { color: ${FG_DIM}; font-size: calc(12px * var(--window-font-scale, 1)); }
 .arkmail-arch-expand { margin-left: calc(8px * var(--window-font-scale, 1)); }
 .arkmail-arch-occ-list { margin: calc(2px * var(--window-font-scale, 1)) 0 calc(6px * var(--window-font-scale, 1)) calc(18px * var(--window-font-scale, 1)); }

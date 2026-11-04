@@ -175,8 +175,11 @@ test('stringi klasa B: poprawione, naturalne polskie (ASCII)', () => {
   assert.ok(render.includes('Zapisz w niewyslanych'), 'spojne ze skrzynka niewyslane');
   assert.ok(render.includes('Kontakty powstaja z listow zebranych ze wszystkich skrzynek'), 'brama 21b');
   assert.ok(render.includes('Wybierz list, aby go przeczytac.'), 'bez "list z listy"');
-  assert.ok(render.includes('Kompletna indeksacja od:'), 'jasny opis kompletnej indeksacji');
-  assert.ok(render.includes('Indeksacja niekompletna'), 'jasny opis niekompletnej indeksacji');
+  // Fala UI-2 krok 4: data kompletu indeksacji mieszka w kroku 1
+  // Archiwum (stopka sub-pigulki Osoby zniknela).
+  assert.ok(render.includes('Gotowe od '), 'jasny opis kompletnej indeksacji z data');
+  assert.ok(render.includes('wszystkie skrzynki zapisane'), 'komplet po ludzku');
+  assert.ok(render.includes('Jeszcze nie zaczeto.'), 'jasny opis niezaczetej indeksacji');
   assert.ok(render.includes('Indeksuj wszystkie skrzynki'), 'jedna wersja przycisku indeksacji');
   assert.ok(render.includes('Pobieranie potrwa dlugo - kliknij ponownie'), 'nowy tekst uzbrojenia');
   assert.ok(render.includes('Archiwum puste albo zaden list nie pasuje do filtra.'), 'nowe puste archiwum');

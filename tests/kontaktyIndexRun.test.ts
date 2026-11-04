@@ -53,7 +53,7 @@ test('blad 2: archiwum pokazuje "W toku" podczas pedzla i Przerwij zamiast Indek
     assert.match(indexButton(h), /Przerwij indeksowanie \(1\/4\)/, 'przycisk to Przerwij');
     await finishIndexAll(h);
     click(h, '[data-tab="archiwum"]');
-    assert.match(paneText(h), /Gotowe: wszystkie skrzynki zapisane/, 'po pedzlu pelny status');
+    assert.match(paneText(h), /Gotowe od \d{4}-\d{2}-\d{2}: wszystkie skrzynki zapisane/, 'po pedzlu pelny status');
   } finally {
     await stopHarness();
   }
@@ -71,7 +71,7 @@ test('blad 2: ponowna indeksacja przy kompletnym indexMeta - "Przerwij" widoczne
   try {
     const { f, waitFor } = h;
     click(h, '[data-tab="archiwum"]');
-    assert.match(paneText(h), /Gotowe: wszystkie skrzynki zapisane/, 'setup: kompletny stan');
+    assert.match(paneText(h), /Gotowe od \d{4}-\d{2}-\d{2}: wszystkie skrzynki zapisane/, 'setup: kompletny stan');
     click(h, '.arkmail-index-all');
     await waitFor(() => f.sent.includes('listy odebrane'), 'start ponownej indeksacji');
     click(h, '[data-tab="archiwum"]');

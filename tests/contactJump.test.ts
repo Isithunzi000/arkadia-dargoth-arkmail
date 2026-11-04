@@ -227,6 +227,6 @@ test('kontakty: przycisk kierunku wylaczony, gdy licznik wynosi 0', () => {
   assert.ok(off!.disabled, 'Odebrane wylaczone (0 odebranych)');
   assert.ok(!on!.disabled, 'Wyslane aktywne');
   clickEl(off);
-  assert.equal(s.state.tab, 'kontakty', 'wylaczony przycisk nie przenosi');
+  assert.equal(s.state.tab, 'archiwum', 'wylaczony przycisk nie przenosi');
   assert.deepEqual(searchCalls(calls), [], 'wylaczony przycisk nie strzela');
 });

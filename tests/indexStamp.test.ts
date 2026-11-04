@@ -128,7 +128,7 @@ test('blad 1 (D2): loadOlder do dna stempluje skrzynke i czysci luki', async () 
     click(h, '[data-tab="archiwum"]');
     assert.match(
       paneText(h),
-      /Gotowe: wszystkie skrzynki zapisane\./,
+      /Gotowe od \d{4}-\d{2}-\d{2}: wszystkie skrzynki zapisane\./,
       'dno skrzynki = pelna wiedza, luki wyczyszczone',
     );
   } finally {
