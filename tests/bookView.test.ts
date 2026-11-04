@@ -101,13 +101,16 @@ test('ksiazka: widok pokazuje liste imion A-Z z checkboxem i krzyzykiem', () => 
   );
 });
 
-test('ksiazka: krzyzyk usuwa imie przez onSavePeople', () => {
+test('ksiazka: krzyzyk usuwa imie przez onSavePeople - dwuklik z guardem', () => {
   const s = new MailUiStore({ tab: 'kontakty', people: ['Fred', 'Grault'] });
   const { container, calls } = mount(s);
   switchToKsiazka(container);
   const rows = qa(container, '[data-book-row]');
   // A-Z: Fred, Grault - usuwamy Grault (drugi wiersz).
+  // Guard (zgloszenie 2026-11-05): pierwszy klik uzbraja, drugi kasuje.
   click(qs(rows[1], '[data-book-remove]'));
+  assert.equal(calls.saves.length, 0, 'pierwszy klik nie kasuje');
+  click(q(container, '[data-book-remove][data-armed="1"]'));
   assert.deepEqual(calls.saves, [['Fred']], 'pozostala lista w kolejnosci zapisu');
 });
 

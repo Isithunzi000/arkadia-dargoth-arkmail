@@ -187,7 +187,10 @@ test('grupy: usuniecie czlonka i dodanie z ghosta', () => {
   });
   const { container, calls } = mount(s);
   switchToGrupy(container);
+  // Guard (zgloszenie 2026-11-05): pierwszy klik uzbraja, drugi kasuje.
   click(qa(container, '[data-member-remove]')[1]);
+  assert.equal(calls.groups.length, 0, 'pierwszy klik nie kasuje');
+  click(q(container, '[data-member-remove][data-armed="1"]'));
   assert.deepEqual(calls.groups, [['Gildia=Fred']], 'Grault odpada');
   const add = q(container, '[data-member-add]') as HTMLInputElement;
   type(add, 'cor');
