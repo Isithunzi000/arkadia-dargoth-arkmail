@@ -247,3 +247,16 @@ test('ghost: szukajka osoby nie ma podpowiedzi, a Przekaz ja zachowuje', () => {
   type(input(c2, '[data-field="forward"]'), 'cor');
   assert.equal(ghostRest(c2, '[data-field="forward"]'), 'ge');
 });
+test('ghost: pole nowej osoby w Ksiazce podpowiada kontakt', () => {
+  // Zgloszenie 2026-11-05: pole "Imie nowej osoby" dostaje te same
+  // podpowiedzi co pole adresata (kontakty + aliasy), strzalka w prawo
+  // wpisuje kanoniczna forme.
+  const s = new MailUiStore({ tab: 'kontakty', people: [] });
+  s.setContacts([contact('Corge', 200)]);
+  const c = mount(s);
+  const el = input(c, '[data-book-new]');
+  type(el, 'co');
+  assert.equal(ghostRest(c, '[data-book-new]'), 'rge');
+  key(el, 'ArrowRight');
+  assert.equal(el.value, 'Corge');
+});

@@ -314,3 +314,34 @@ test('ksiazka: zaznaczenie znika po zmianie listy (import)', () => {
     'po imporcie zaznaczenie wyzerowane',
   );
 });
+test('ksiazka: filtr listy imion z przyciskiem czyszczenia', () => {
+  const s = new MailUiStore({ tab: 'kontakty', people: ['Fred', 'Grault', 'Corge'] });
+  const { container } = mount(s);
+  const filter = q(container, '[data-book-filter]') as unknown as {
+    value: string;
+    dispatchEvent(e: unknown): void;
+  };
+  assert.ok(filter, 'pole filtra istnieje');
+  filter.value = 'fra';
+  filter.dispatchEvent(new window.Event('input') as unknown as Event);
+  const rows = qa(container, '[data-book-row]');
+  assert.equal(rows.length, 1, 'filtr zaweza liste do Grault');
+  assert.equal(text(qs(rows[0], '[data-book-name]')), 'Grault');
+  const clear = q(container, '[data-book-filter-clear]') as unknown as { click(): void };
+  assert.ok(clear, 'przycisk czyszczenia filtra istnieje');
+  click(clear);
+  assert.equal(qa(container, '[data-book-row]').length, 3, 'po czyszczeniu znowu cala lista');
+});
+
+test('ksiazka: filtr bez trafien pokazuje komunikat pustej listy', () => {
+  const s = new MailUiStore({ tab: 'kontakty', people: ['Fred', 'Grault'] });
+  const { container } = mount(s);
+  const filter = q(container, '[data-book-filter]') as unknown as {
+    value: string;
+    dispatchEvent(e: unknown): void;
+  };
+  filter.value = 'zzz';
+  filter.dispatchEvent(new window.Event('input') as unknown as Event);
+  assert.equal(qa(container, '[data-book-row]').length, 0, 'brak pasujacych imion');
+  assert.match(container.textContent ?? '', /Brak imion pasujacych do filtra/);
+});

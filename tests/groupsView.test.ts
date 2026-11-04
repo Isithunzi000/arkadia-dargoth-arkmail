@@ -357,3 +357,26 @@ test('import-eksport: tooltip importu mowi o trybie, nie wspomina suffixow', () 
     'Wczytuje imiona i grupy z pliku JSON. Sposob zalezy od trybu: dolacz albo zastap. Aliasy pobierasz z gry.',
   );
 });
+test('grupy: filtr nazw grup z przyciskiem czyszczenia', () => {
+  const s = new MailUiStore({
+    tab: 'kontakty',
+    groups: [
+      { name: 'Gildia', members: ['Fred'] },
+      { name: 'Patrol', members: ['Corge'] },
+    ],
+  });
+  const { container } = mount(s);
+  switchToGrupy(container);
+  const filter = q(container, '[data-group-filter]') as unknown as {
+    value: string;
+    dispatchEvent(e: unknown): void;
+  };
+  assert.ok(filter, 'pole filtra grup istnieje');
+  filter.value = 'gil';
+  filter.dispatchEvent(new window.Event('input') as unknown as Event);
+  assert.equal(qa(container, '.arkmail-group').length, 1, 'filtr zaweza liste do Gildii');
+  const clear = q(container, '[data-group-filter-clear]') as unknown as { click(): void };
+  assert.ok(clear, 'przycisk czyszczenia filtra istnieje');
+  click(clear);
+  assert.equal(qa(container, '.arkmail-group').length, 2, 'po czyszczeniu znowu obie grupy');
+});
