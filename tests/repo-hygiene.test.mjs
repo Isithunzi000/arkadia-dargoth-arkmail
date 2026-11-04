@@ -59,3 +59,13 @@ test('higiena: zero wulgaryzmow w plikach repo', () => {
     }
   }
 });
+
+// Straznik ma lapac rowniez formy odmienione (komentarz 2026-10-19
+// przeszedl dotychczasowa liste). Formy w ROT13, ten sam standard co BANNED.
+test('higiena: straznik lapie formy odmienione', () => {
+  const forms = ['mwronar', 'mwronqn', 'mwronf', 'wronar', 'wronqv'].map(rot13);
+  for (const f of forms) {
+    assert.ok(findBad(f) !== null, `forma odmieniona niewykryta: ${f}`);
+  }
+  assert.equal(findBad('zliczanie kontaktow dziala poprawnie'), null);
+});

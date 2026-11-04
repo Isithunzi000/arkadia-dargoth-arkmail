@@ -1,7 +1,7 @@
 /**
  * Kontakty liczone z ARCHIWUM, nie z zaladowanych widokow skrzynek
  * (Fala 14a, zgloszenie uzytkownika z sesji 2026-10-19: "zliczanie
- * wiadomosci per kontakt jest zjebane").
+ * wiadomosci per kontakt dziala niepoprawnie").
  *
  * Problem: contactsFromBoxes liczy tylko wpisy aktualnie zaladowane
  * (domyslnie pierwsze 50 na skrzynke) - licznik skakal w zaleznosci
