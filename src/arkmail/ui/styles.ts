@@ -476,6 +476,27 @@ export const STYLES = `
 }
 /* Fala UI-2 krok 4: naglowek zwijanego panelu "Osoby z listow". */
 .arkmail-arch-people-head { margin: calc(8px * var(--window-font-scale, 1)) 0 calc(4px * var(--window-font-scale, 1)); }
+/* Waski popup: wiersz ksiazki trzyma checkbox, imie i oba przyciski
+ * w jednej linii; imie sie skraca (wielokropek), nie wypycha przyciskow.
+ * Head grupy zawija kontrolki zamiast je ucinac. */
+.arkmail-root .arkmail-book-row {
+  display: flex;
+  align-items: center;
+  gap: calc(6px * var(--window-font-scale, 1));
+}
+.arkmail-root .arkmail-book-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.arkmail-root .arkmail-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(6px * var(--window-font-scale, 1));
+}
 .arkmail-contact-stats, .arkmail-arch-meta { color: ${FG_DIM}; font-size: calc(12px * var(--window-font-scale, 1)); }
 .arkmail-arch-expand { margin-left: calc(8px * var(--window-font-scale, 1)); }
 .arkmail-arch-occ-list { margin: calc(2px * var(--window-font-scale, 1)) 0 calc(6px * var(--window-font-scale, 1)) calc(18px * var(--window-font-scale, 1)); }
