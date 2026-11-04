@@ -187,6 +187,54 @@ test('ksiazka: usuwanie zaznaczonych - uzbrojony dwuklik, puste = wylaczone', ()
   assert.deepEqual(calls.saves, [['Fred']], 'zostaly tylko niezaznaczone');
 });
 
+// --- zaznaczanie zbiorcze (zgloszenie 2026-11-05 pkt 1) ----------------------
+
+test('ksiazka: Zaznacz wszystkie i Odznacz wszystkie', () => {
+  const s = new MailUiStore({ tab: 'kontakty', people: ['Fred', 'Grault', 'Corge'] });
+  const { container } = mount(s);
+  switchToKsiazka(container);
+  const selectAll = q(container, '[data-book-select-all]');
+  const deselectAll = q(container, '[data-book-deselect-all]');
+  assert.ok(selectAll, 'klawisz Zaznacz wszystkie istnieje');
+  assert.ok(deselectAll, 'klawisz Odznacz wszystkie istnieje');
+
+  click(selectAll);
+  const checked = () =>
+    qa(container, '[data-book-row] input[type=checkbox]').filter(
+      (c) => (c as HTMLInputElement).checked,
+    ).length;
+  assert.equal(checked(), 3, 'zaznacz wszystkie: wszystkie imiona');
+  assert.equal(
+    text(q(container, '[data-book-write-checked]')),
+    'Napisz list do zaznaczonych (3)',
+    'licznik zaznaczonych w klawiszu pisania',
+  );
+
+  // Idempotentne: drugi klik nic nie psuje.
+  click(q(container, '[data-book-select-all]'));
+  assert.equal(checked(), 3, 'powtorzony klik bez zmian');
+
+  click(q(container, '[data-book-deselect-all]'));
+  assert.equal(checked(), 0, 'odznacz wszystkie czysci zaznaczenie');
+  assert.equal(
+    (q(container, '[data-book-delete-checked]') as HTMLButtonElement).getAttribute('disabled'),
+    '1',
+    'zbiorcze usuwanie z powrotem wylaczone',
+  );
+});
+
+test('ksiazka: zaznacz wszystkie + usuwanie zaznaczonych', () => {
+  const s = new MailUiStore({ tab: 'kontakty', people: ['Fred', 'Grault'] });
+  const { container, calls } = mount(s);
+  switchToKsiazka(container);
+  click(q(container, '[data-book-select-all]'));
+  const bulkBtn = () => q(container, '[data-book-delete-checked]') as HTMLButtonElement;
+  click(bulkBtn());
+  assert.equal(text(bulkBtn()), 'Na pewno usunac zaznaczone (2)?', 'guard liczy zaznaczenie');
+  click(bulkBtn());
+  assert.deepEqual(calls.saves, [[]], 'wszystkie imiona skasowane');
+});
+
 // --- aliasy read-only --------------------------------------------------------
 
 test('ksiazka: aliasy pocztowe - sekcja read-only z nota', () => {
