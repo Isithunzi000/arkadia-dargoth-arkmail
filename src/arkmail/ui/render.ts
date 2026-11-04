@@ -1947,6 +1947,32 @@ export function mountMailUi(
       writeTo(party);
     });
     pane.appendChild(writeBulk);
+    // Zgloszenie 2026-11-05 pkt 1: zaznaczanie zbiorcze jednym klikiem
+    // (precedens: zakladka Usuwanie). Zaznacz wszystkie = cala lista
+    // A-Z; odznacz wszystkie czysci zaznaczenie. Niedestrukcyjne -
+    // poziom action.
+    const selectAllBtn = doc.createElement('button');
+    selectAllBtn.className = 'arkmail-btn-action';
+    selectAllBtn.textContent = 'Zaznacz wszystkie';
+    selectAllBtn.setAttribute('data-book-select-all', '');
+    selectAllBtn.setAttribute('title', 'Zaznacza wszystkie imiona na liscie.');
+    if (sorted.length === 0) selectAllBtn.setAttribute('disabled', '1');
+    selectAllBtn.addEventListener('click', () => {
+      for (const p of sorted) bookSelection.add(p);
+      store.refresh();
+    });
+    pane.appendChild(selectAllBtn);
+    const deselectAllBtn = doc.createElement('button');
+    deselectAllBtn.className = 'arkmail-btn-action';
+    deselectAllBtn.textContent = 'Odznacz wszystkie';
+    deselectAllBtn.setAttribute('data-book-deselect-all', '');
+    deselectAllBtn.setAttribute('title', 'Czysci zaznaczenie imion.');
+    if (sorted.length === 0) deselectAllBtn.setAttribute('disabled', '1');
+    deselectAllBtn.addEventListener('click', () => {
+      bookSelection.clear();
+      store.refresh();
+    });
+    pane.appendChild(deselectAllBtn);
     const listWrap = doc.createElement('div');
     if (sorted.length === 0) {
       listWrap.appendChild(
