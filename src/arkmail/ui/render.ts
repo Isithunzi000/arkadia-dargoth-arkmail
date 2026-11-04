@@ -1191,6 +1191,24 @@ export function mountMailUi(
   /** Robocza tresc compose: poza store, przetrwa pelne rerendery
    *  (zmiana szablonu/szerokosci nie kasuje wpisanego listu). */
   const composeDraft = { adresat: '', temat: '', dw: '', tresc: '' };
+  // Fala UI-2 krok 5: pisanie z ksiazki adresowej i grup. Precedens:
+  // Odpowiedz/Przekaz - czysta operacja UI (zero komend do serwera):
+  // prefill composeDraft + przejscie na zakladke Napisz. Temat, tresc
+  // i DW zawsze puste (gracz pisze od zera).
+  const writeTo = (adresat: string): void => {
+    composeDraft.adresat = adresat;
+    composeDraft.dw = '';
+    composeDraft.temat = '';
+    composeDraft.tresc = '';
+    store.setTab('napisz');
+  };
+  // Format listy adresatow zgodny z listingami gry: "A, B i C"
+  // (splitParty rozbija party po ", " i " i "). Jedna osoba = samo
+  // imie. Pusta lista nie wystepuje - przyciski sa wylaczone.
+  const partyLabel = (names: readonly string[]): string =>
+    names.length <= 1
+      ? (names[0] ?? '')
+      : `${names.slice(0, -1).join(', ')} i ${names[names.length - 1]}`;
 
   // Fala 11d: podglad compose w wide to OSOBNY prawy panel (jak /list
   // w kliencie), wiec <pre> zyje poza formularzem - referencja i repaint
@@ -1556,6 +1574,19 @@ export function mountMailUi(
       head.appendChild(rename);
       head.appendChild(renameOk);
       head.appendChild(del);
+      // Fala UI-2 krok 5: pisanie do calej grupy jednym klikiem.
+      // Pusta grupa = brak adresatow - przycisk wylaczony.
+      const write = doc.createElement('button');
+      write.textContent = 'Napisz do grupy';
+      write.setAttribute('data-group-write', '');
+      if (group.members.length === 0) {
+        write.setAttribute('disabled', '1');
+        write.setAttribute('title', 'Pusta grupa - najpierw dodaj czlonkow.');
+      } else {
+        write.setAttribute('title', 'Otwiera zakladke Napisz z czlonkami grupy jako adresatami.');
+        write.addEventListener('click', () => writeTo(partyLabel(group.members)));
+      }
+      head.appendChild(write);
       row.appendChild(head);
 
       const members = doc.createElement('div');
@@ -1845,6 +1876,25 @@ export function mountMailUi(
       if (la === lb) return 0;
       return la < lb ? -1 : 1;
     });
+    // Fala UI-2 krok 5: zbiorcze pisanie do zaznaczonych. Kolejnosc
+    // adresatow = kolejnosc listy A-Z; po uzyciu zaznaczenie kasuje
+    // sie (jak po kazdej zmianie listy - powrot nie trzyma stanu).
+    const writeBulk = doc.createElement('button');
+    writeBulk.className = 'arkmail-btn-action';
+    writeBulk.textContent = `Napisz list do zaznaczonych (${bookSelection.size})`;
+    writeBulk.setAttribute('data-book-write-checked', '');
+    writeBulk.setAttribute(
+      'title',
+      'Otwiera zakladke Napisz z zaznaczonymi osobami jako adresatami.',
+    );
+    if (bookSelection.size === 0) writeBulk.setAttribute('disabled', '1');
+    writeBulk.addEventListener('click', () => {
+      if (bookSelection.size === 0) return;
+      const party = partyLabel(sorted.filter((p) => bookSelection.has(p)));
+      bookSelection.clear();
+      writeTo(party);
+    });
+    pane.appendChild(writeBulk);
     const listWrap = doc.createElement('div');
     if (sorted.length === 0) {
       listWrap.appendChild(
@@ -1878,6 +1928,14 @@ export function mountMailUi(
       row.appendChild(check);
       row.appendChild(nameEl);
       row.appendChild(remove);
+      // Fala UI-2 krok 5: pisanie bez przepisywania - prefill adresata.
+      const write = doc.createElement('button');
+      write.className = 'arkmail-book-write';
+      write.setAttribute('data-book-write', '');
+      write.textContent = 'Napisz';
+      write.setAttribute('title', `Otwiera zakladke Napisz z adresem: ${name}.`);
+      write.addEventListener('click', () => writeTo(name));
+      row.appendChild(write);
       listWrap.appendChild(row);
     }
     pane.appendChild(listWrap);

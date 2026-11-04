@@ -97,12 +97,13 @@ test('ksiazka: Napisz list do zaznaczonych sklada adresata w formacie gry', () =
   const { container } = mount(s);
   checkAt(container, 0); // Corge (A-Z)
   checkAt(container, 1); // Fred
+  checkAt(container, 2); // Grault
   const bulk = q(container, '[data-book-write-checked]') as unknown as {
     textContent: string;
     click(): void;
   };
   assert.ok(bulk, 'przycisk zbiorczy istnieje');
-  assert.match(bulk.textContent, /Napisz list do zaznaczonych \(2\)/, 'etykieta z licznikiem');
+  assert.match(bulk.textContent, /Napisz list do zaznaczonych \(3\)/, 'etykieta z licznikiem');
   click(bulk);
   assert.equal(s.state.tab, 'napisz', 'przejscie na Napisz');
   assert.equal(fieldValue(container, 'adresat'), 'Corge, Fred i Grault', 'format A, B i C');
