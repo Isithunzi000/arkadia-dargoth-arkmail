@@ -154,20 +154,10 @@ test('ksiazka: walidacja - puste, cyfry, duplikat', () => {
 
 // --- usuwanie zaznaczonych ---------------------------------------------------
 
-// Diagnostyka 2026-11-04: checkpointi [bv6] na stderr - ten test zawiesza
-// agenta CI w trybie node --test (sonda diag/probe-book-hang.mjs z tymi
-// samymi krokami przechodzi w 18 ms). Checkpointi wskaza krok zapetlenia.
-// Do usuniecia po diagnozie.
-const bv6 = (label: string): void => console.error(`[bv6] ${label} t=+${Date.now() - BV6_T0}ms`);
-const BV6_T0 = Date.now();
-
 test('ksiazka: usuwanie zaznaczonych - uzbrojony dwuklik, puste = wylaczone', () => {
-  bv6('test-start');
   const s = new MailUiStore({ tab: 'kontakty', people: ['Fred', 'Grault', 'Corge'] });
   const { container, calls } = mount(s);
-  bv6('mounted');
   switchToKsiazka(container);
-  bv6('switched');
   // Repaint po kazdym zdarzeniu (store.refresh) podmienia DOM, wiec
   // wszystkie zapytania ponawiane na swiezym drzewie.
   const bulkBtn = () => q(container, '[data-book-delete-checked]') as HTMLButtonElement;
@@ -183,20 +173,15 @@ test('ksiazka: usuwanie zaznaczonych - uzbrojony dwuklik, puste = wylaczone', ()
     (boxes[i] as HTMLInputElement).dispatchEvent(new window.Event('change') as unknown as Event);
   };
   checkAt(0);
-  bv6('checkAt(0) done');
   checkAt(2);
-  bv6('checkAt(2) done');
   assert.notEqual(bulkBtn().getAttribute('disabled'), '1', 'po zaznaczeniu aktywny');
 
   click(bulkBtn());
-  bv6('arm-click done');
   assert.equal(text(bulkBtn()), 'Na pewno usunac zaznaczone (2)?', 'pierwszy klik uzbraja');
   assert.equal(calls.saves.length, 0, 'uzbrojenie nic nie kasuje');
 
   click(bulkBtn());
-  bv6('delete-click done');
   assert.deepEqual(calls.saves, [['Fred']], 'zostaly tylko niezaznaczone');
-  bv6('test-end');
 });
 
 // --- aliasy read-only --------------------------------------------------------

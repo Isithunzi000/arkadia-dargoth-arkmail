@@ -9,7 +9,6 @@ on:
       - "src/**"
       - "tests/**"
       - "types/**"
-      - "diag/**"
       - "package.json"
       - "tsconfig*.json"
       - ".github/workflows/build.yml"
@@ -39,44 +38,6 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
-
-      # Diagnostyka 2026-11-03: runnery GitHub padaly w tym repo zawsze
-      # w punkcie bookView.test.js (5/5 prob, solo-run tez). Połowienie:
-      # 3 grupy testow w osobnych procesach; krok, ktory zabije agenta,
-      # wskazuje grupe winowajcy. Kolejnosc testow w grupach zachowana
-      # (stan modulowy wspoldzielony w procesie).
-      - name: Diag bookView G1 (render)
-        run: npx tsc -p tsconfig.test.json && node --test --test-name-pattern='trzy sub-pigulki|widok pokazuje liste|aliasy pocztowe|bez aliasow' out-test/tests/bookView.test.js
-
-      - name: Diag bookView G2 (dodaj/usun pojedyncze)
-        run: node --test --test-name-pattern='krzyzyk usuwa|dodanie imienia|walidacja' out-test/tests/bookView.test.js
-
-      # Diagnostyka 2026-11-04: G3 zabilo agenta w 42 s (petla albo
-      # wisiaca obietnica; lokalnie brak reprodukcji na Node 20/24.22.1/
-      # 24.22.2). Kroki zabitego procesu uniemozliwiaja dalsze kroki,
-      # wiec najpierw sondy, potwierdzenie na koncu:
-      # - probe: replika krokow testu z punktami kontrolnymi na stderr
-      #   (wskaze dokladny krok, w ktorym proces sie zapetla);
-      # - G3b: ten sam test z --test-timeout=15000 - dzialajacy timeout
-      #   = wisiaca obietnica; zabity agent mimo timeoutu = petla
-      #   synchroniczna (timeout nie przerywa zablokowanego watku).
-      - name: Diag bookView probe (replika testu z checkpointami)
-        run: node diag/probe-book-hang.mjs
-
-      # G3b: instrumentowany test z checkpointami [bv6], 6 powtorzen.
-      # Zawieszenie jest losowe (1 przebieg na zielono mimo 6 wczesniejszych
-      # zabitych agentow), wiec petla lapie je statystycznie. timeout -s KILL
-      # 20 odcina zawieszony proces przed progiem zdrowia agenta (ok. 30-40 s
-      # spinu), wiec log z checkpointami i kolejne kroki zostaja zachowane.
-      - name: Diag bookView G3b (instrumentowany, 6x timeout 20s)
-        continue-on-error: true
-        run: |
-          node -e "const o=require('os');console.log('cpus',o.cpus().length,'memGB',(o.totalmem()/2**30).toFixed(1))"
-          for i in 1 2 3 4 5 6; do
-            echo "=== g3b iter $i ==="
-            timeout -s KILL 20 node --test --test-name-pattern='usuwanie zaznaczonych' out-test/tests/bookView.test.js
-            echo "g3b-iter-$i-exit=$?"
-          done
 
       - name: Tests
         timeout-minutes: 30
