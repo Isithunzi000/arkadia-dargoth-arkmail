@@ -172,3 +172,24 @@ test('style: karty Archiwum nie maja ozdobnych strzalek', () => {
   assert.doesNotMatch(STYLES, /\.arkmail-archive-step[^{]*::after/);
   assert.ok(!STYLES.includes("content: '›'"));
 });
+
+// Waski popup: wiersz ksiazki trzyma checkbox, imie i oba przyciski
+// w jednej linii (imie sie skraca, nie wypycha przyciskow); head grupy
+// zawija kontrolki zamiast je ucinac.
+test('style: wiersze ksiazki i heady grup maja uklad flex', () => {
+  const row = ruleBody(/\.arkmail-root\s+\.arkmail-book-row\b/);
+  assert.ok(row, 'regula .arkmail-book-row istnieje');
+  assert.match(row!, /display:\s*flex/, 'flexbox w wierszu ksiazki');
+  assert.match(row!, /align-items:\s*center/, 'centrowanie w pionie');
+
+  const name = ruleBody(/\.arkmail-root\s+\.arkmail-book-name\b/);
+  assert.ok(name, 'regula .arkmail-book-name istnieje');
+  assert.match(name!, /flex:\s*1\s+1\s+auto/, 'imiage zajmuje wolna przestrzen');
+  assert.match(name!, /min-width:\s*0/, 'bez sztywnego minimum');
+  assert.match(name!, /text-overflow:\s*ellipsis/, 'nadmiar jako wielokropek');
+
+  const head = ruleBody(/\.arkmail-root\s+\.arkmail-group-head\b/);
+  assert.ok(head, 'regula .arkmail-group-head istnieje');
+  assert.match(head!, /display:\s*flex/, 'flexbox w headzie grupy');
+  assert.match(head!, /flex-wrap:\s*wrap/, 'zawijanie w waskim oknie');
+});
