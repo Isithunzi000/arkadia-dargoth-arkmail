@@ -97,3 +97,41 @@ test('scroll: pozycja scrolla zachowana przy rerenderze (migawka na kontenerze)'
   const po = q('[data-pane-key="listy:odebrane"]') as unknown as { scrollTop: number };
   assert.equal(po.scrollTop, 42, 'scrollTop nie skacze po rerenderze');
 });
+test('scroll: Ksiazka adresowa - naglowek staly, lista w kontenerze scrolla', () => {
+  // Zgloszenie 2026-11-05 (D9): wzorzec z zakladki Listy - sub-pigulki,
+  // import z gry, dodawanie i klawisze zbiorcze stoja na stale, scrolluje
+  // sie tylko filtr i lista imion.
+  const container = document.createElement('div');
+  const store = new MailUiStore({ tab: 'kontakty', people: ['Fred', 'Grault'] });
+  mountMailUi(container as unknown as HTMLElement, store, {
+    onOpenLetter: () => {},
+    onSendCompose: () => {},
+    onCloseLetter: () => {},
+    onRefreshBox: () => {},
+    onLoadOlder: () => {},
+    onLoadAll: () => {},
+    onSearch: () => {},
+    onClearSearch: () => {},
+    onDeleteLetter: () => {},
+    onForwardLetter: () => {},
+  });
+  const cq = (s: string) =>
+    (container as { querySelector(s: string): unknown }).querySelector(s) as unknown as El | null;
+  const scroll = cq('.arkmail-list-scroll');
+  assert.ok(scroll, 'kontener scrolla istnieje w Ksiazce');
+  assert.ok(
+    cq('[data-pane-key="kontakty"]') &&
+      isInside(cq('[data-pane-key="kontakty"]') as unknown as El, scroll as unknown as El),
+    'scroll wewnatrz panelu Kontakty',
+  );
+  const addRow = cq('[data-book-new]');
+  const importBtn = cq('[data-import]');
+  const bulk = cq('[data-book-delete-checked]');
+  assert.ok(addRow && !isInside(scroll as unknown as El, addRow as unknown as El), 'dodawanie NIE w scrollu');
+  assert.ok(importBtn && !isInside(scroll as unknown as El, importBtn as unknown as El), 'import NIE w scrollu');
+  assert.ok(bulk && !isInside(scroll as unknown as El, bulk as unknown as El), 'klawisze zbiorcze NIE w scrollu');
+  const row = cq('[data-book-row]');
+  assert.ok(row && isInside(scroll as unknown as El, row as unknown as El), 'wiersze imion WEWNATRZ scrolla');
+  const filter = cq('[data-book-filter]');
+  assert.ok(filter && isInside(scroll as unknown as El, filter as unknown as El), 'filtr WEWNATRZ scrolla');
+});

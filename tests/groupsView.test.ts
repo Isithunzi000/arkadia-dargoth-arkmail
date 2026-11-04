@@ -53,6 +53,9 @@ function mount(store: MailUiStore) {
 const q = (container: unknown, selector: string): unknown =>
   (container as { querySelector(s: string): unknown }).querySelector(selector);
 
+const qs = (el: unknown, selector: string): unknown =>
+  (el as { querySelector(s: string): unknown }).querySelector(selector);
+
 const qa = (container: unknown, selector: string): unknown[] =>
   Array.from(
     (container as { querySelectorAll(s: string): Iterable<unknown> }).querySelectorAll(selector),
@@ -379,4 +382,37 @@ test('grupy: filtr nazw grup z przyciskiem czyszczenia', () => {
   assert.ok(clear, 'przycisk czyszczenia filtra istnieje');
   click(clear);
   assert.equal(qa(container, '.arkmail-group').length, 2, 'po czyszczeniu znowu obie grupy');
+});
+test('grupy: domyslnie zwiniete - naglowek ze znakiem stanu i liczba czlonkow', () => {
+  const s = new MailUiStore({
+    tab: 'kontakty',
+    groups: [
+      { name: 'Gildia', members: ['Fred'] },
+      { name: 'Patrol', members: ['Corge', 'Grault'] },
+    ],
+  });
+  const { container } = mount(s);
+  switchToGrupy(container);
+  const rows = qa(container, '.arkmail-group');
+  assert.equal(rows.length, 2, 'obie grupy na liscie');
+  assert.match(text(qs(rows[0], '[data-group-toggle]')), /^> Gildia \(1\)$/, 'znak + nazwa + liczba');
+  assert.match(text(qs(rows[1], '[data-group-toggle]')), /^> Patrol \(2\)$/);
+  assert.ok(!q(rows[0], '[data-group-rename]'), 'zwiniete: brak edycji nazwy');
+  assert.ok(!q(rows[0], '[data-member-add]'), 'zwiniete: brak dodawania czlonka');
+});
+
+test('grupy: klik w naglowek rozwija i zwija grupe', () => {
+  const s = new MailUiStore({
+    tab: 'kontakty',
+    groups: [{ name: 'Gildia', members: ['Fred'] }],
+  });
+  const { container } = mount(s);
+  switchToGrupy(container);
+  (q(container, '[data-group-toggle]') as unknown as { click(): void }).click();
+  assert.match(text(q(container, '[data-group-toggle]')), /^v Gildia \(1\)$/, 'rozwinieta: znak v');
+  assert.ok(q(container, '[data-group-rename]'), 'rozwinieta: edycja nazwy widoczna');
+  assert.ok(q(container, '[data-member-add]'), 'rozwinieta: dodawanie czlonka widoczne');
+  (q(container, '[data-group-toggle]') as unknown as { click(): void }).click();
+  assert.match(text(q(container, '[data-group-toggle]')), /^> Gildia \(1\)$/, 'zwiniete: znak >');
+  assert.ok(!q(container, '[data-group-rename]'), 'zwiniete: edycji nazwy brak');
 });
