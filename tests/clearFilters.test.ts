@@ -154,3 +154,45 @@ test('archiwum: Wyczysc filtry zeruje wszystkie pola i pokazuje pelna liste', ()
   );
   off();
 });
+test('archiwum: Wyczysc filtry czysci tez filtr i sortowanie panelu osob', () => {
+  // Zgloszenie 2026-11-05 (D8): "Wyczysc filtry" ma zerowac WSZYSTKIE
+  // filtry widoku - takze filtr i sortowanie panelu "Osoby z listow".
+  const s = new MailUiStore({ tab: 'archiwum' });
+  s.setContacts([
+    { name: 'Corge', sources: ['korespondencja'], lettersReceived: 2, lettersSent: 0 },
+    { name: 'Foo', sources: ['korespondencja'], lettersReceived: 1, lettersSent: 0 },
+  ]);
+  const { container, off } = mount(s);
+
+  setInput(container, '[data-filter="kontakty"]', 'cor');
+  const sort = container.querySelector('.arkmail-contact-sort') as unknown as {
+    value: string;
+    dispatchEvent(e: unknown): void;
+  };
+  sort.value = 'liczba';
+  sort.dispatchEvent(new window.Event('change'));
+  assert.equal(
+    (container.querySelectorAll('[data-arch-people] .arkmail-contact') as unknown as unknown[])
+      .length,
+    1,
+    'filtr panelu osob zwezyl liste',
+  );
+
+  const clear = container.querySelector('.arkmail-arch-clear');
+  assert.ok(clear, 'przycisk Wyczysc filtry istnieje');
+  click(clear);
+
+  assert.equal(inputVal(container, '[data-filter="kontakty"]'), '', 'filtr osob pusty');
+  assert.equal(
+    (container.querySelector('.arkmail-contact-sort') as unknown as { value: string }).value,
+    'nazwa',
+    'sortowanie osob zresetowane do Nazwa A-Z',
+  );
+  assert.equal(
+    (container.querySelectorAll('[data-arch-people] .arkmail-contact') as unknown as unknown[])
+      .length,
+    2,
+    'pelna lista osob po wyczyszczeniu',
+  );
+  off();
+});

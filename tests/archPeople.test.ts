@@ -178,3 +178,27 @@ test('archiwum: skok z osoby filtruje liste listow, panel zostaje rozwiniety', (
   };
   assert.equal(osoba.value, 'Corge', 'filtr osoby ustawiony przez skok');
 });
+test('archiwum: panel osob bez duplikatu klawisza indeksacji (zostaje krok 1)', () => {
+  // Zgloszenie 2026-11-05: jeden klawisz "Indeksuj wszystkie skrzynki"
+  // wystarczy - ten z kroku 1. Dolny duplikat z panelu osob znika.
+  const s = new MailUiStore({ tab: 'archiwum' });
+  const { container } = mount(s);
+  const all = qa(container, '.arkmail-index-all');
+  assert.equal(all.length, 1, 'dokladnie jeden klawisz indeksacji w zakladce');
+  const p = panel(container) as { querySelector(s: string): unknown };
+  assert.ok(!p.querySelector('.arkmail-index-all'), 'panel osob bez klawisza indeksacji');
+});
+
+test('archiwum: toggle osob ze znakiem stanu rozwiniencia', () => {
+  // Zgloszenie 2026-11-05: jak w grupach - "v" rozwiniety, ">" zwiniety.
+  const s = new MailUiStore({ tab: 'archiwum' });
+  s.setContacts([contact({})]);
+  const { container } = mount(s);
+  assert.match(text(toggle(container)), /^v Osoby z listow \(1\)$/, 'domyslnie rozwiniety: v');
+  click(toggle(container));
+  assert.match(
+    text(q(container, '[data-arch-people-toggle]')),
+    /^> Osoby z listow \(1\)$/,
+    'po kliku zwiniety: >',
+  );
+});
