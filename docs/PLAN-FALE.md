@@ -1,34 +1,18 @@
-# Plan prac - higiena repo i układ wierszy
+# Plan prac - wydanie 1.27.1
 
 Status: aktywny (zatwierdzony 2026-11-04).
 
 ## Zmiana A - wulgaryzm i strażnik form odmienionych
 
-- A-RED (jeden commit, oczekiwany failure na CI):
-  - tests/contactsArchive.test.ts: parafraza cytatu ("dziala niepoprawnie",
-    zachowane zrodlo: zgloszenie z sesji 2026-10-19).
-  - tests/repo-hygiene.test.mjs: nowy test "higiena: straznik lapie formy
-    odmienione" - formy odmienione ROT13, asercja wykrycia przez matcher.
-    Matcher jeszcze nie istnieje - test pada (RED).
-- A-GREEN (jeden commit):
-  - tests/repo-hygiene.test.mjs: matcher z lista rdzeni (ROT13, pierwszy
-    rdzen od formy, ktora umknelo straznikowi 2026-10-19) dopasowywanych
-    podciagiem + istniejace granice form podstawowych; petla skanujaca
-    pliki korzysta z matchera.
-  - Weryfikacja: pelny skan repo zero trafien, CI 760/760.
+Wykonana 100%: parafraza w contactsArchive.test.ts, matcher findBad
+(formy podstawowe granice + rdzenie podciagiem), pelny skan repo zero
+trafien. RED 299be58306 -> GREEN a4fb751bc0 (CI 761/761).
 
 ## Zmiana B - układ wierszy ksiazki i headow grup
 
-- B-RED (jeden commit, oczekiwany failure na CI):
-  - tests/uiStyles.test.ts: test guarda - styles.ts zawiera display:flex
-    dla .arkmail-book-row i .arkmail-group-head.
-- B-GREEN (jeden commit):
-  - src/arkmail/ui/styles.ts: dwie reguly, sam uklad, zero nowych kolorow,
-    wzorce z istniejacych reguł repo:
-    - .arkmail-book-row: flex, align-items:center, gap 6px x skala;
-      .arkmail-book-name: flex 1 1 auto, min-width 0, ellipsis.
-    - .arkmail-group-head: flex, flex-wrap:wrap, align-items:center, ten sam gap.
-  - CI 760/760.
+Wykonana 100%: reguly flex .arkmail-book-row/.arkmail-book-name/
+.arkmail-group-head w styles.ts (sam uklad, zero nowych kolorow).
+RED fc774a4969 -> GREEN 825022abd2 (CI 762/762).
 
 ## Wydanie 1.27.1 (obowiazkowe, po A i B zielonych)
 
