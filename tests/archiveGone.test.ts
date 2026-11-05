@@ -16,6 +16,7 @@ import {
   click,
   notifyText,
   type Harness,
+  clickText,
 } from './harness';
 import { mountMailUi, type MailUiHandlers } from '../src/arkmail/ui/render';
 import { MailUiStore } from '../src/arkmail/ui/store';
@@ -86,7 +87,7 @@ test('kompletny listing: znikniety list znika z widoku archiwum i kontaktow', as
     // Zgloszenie 2026-11-05 (A1): panel domyslnie zwiniety - toggle
     // przed odczytem wierszy.
     click(h, '[data-tab="archiwum"]');
-    click(h, '[data-arch-people-toggle]');
+    clickText(h, '.arkmail-subpill', 'Osoby z listow');
     await waitRt(() => !!h.content.querySelector('.arkmail-contact'), 'wiersze kontaktow');
     const names = Array.from(
       h.content.querySelectorAll('.arkmail-contact-name') as unknown as Iterable<{

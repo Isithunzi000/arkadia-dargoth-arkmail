@@ -84,8 +84,7 @@ export const STYLES = `
 .arkmail-root .arkmail-tab:focus-visible,
 .arkmail-root .arkmail-box:focus-visible,
 .arkmail-root .arkmail-contact-dir:focus-visible,
-.arkmail-root .arkmail-contact-addbook:focus-visible,
-.arkmail-root .arkmail-arch-people-toggle:focus-visible { outline: calc(2px * var(--window-font-scale, 1)) solid ${ACCENT_BRIGHT}; outline-offset: calc(1px * var(--window-font-scale, 1)); }
+.arkmail-root .arkmail-contact-addbook:focus-visible { outline: calc(2px * var(--window-font-scale, 1)) solid ${ACCENT_BRIGHT}; outline-offset: calc(1px * var(--window-font-scale, 1)); }
 
 /* Zgloszenie 2026-11-05 (A3): poziomy przyciskow to klasy natywnego
  * UI klienta (popup-btn--control/solid/danger/ghost) - zero wlasnych
@@ -430,7 +429,7 @@ export const STYLES = `
 .arkmail-contact-name:hover { text-decoration: underline; }
 .arkmail-contact-dirs { margin-left: auto; display: flex; gap: calc(4px * var(--window-font-scale, 1)); }
 /* Rodzina mini: kompaktowy wariant poziomu action (jeden jezyk przyciskow). */
-.arkmail-root button.arkmail-contact-dir, .arkmail-root button.arkmail-contact-addbook, .arkmail-root button.arkmail-arch-people-toggle {
+.arkmail-root button.arkmail-contact-dir, .arkmail-root button.arkmail-contact-addbook {
   background: ${BG_RAISED};
   color: ${FG};
   border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
@@ -439,9 +438,8 @@ export const STYLES = `
   font-size: calc(11px * var(--window-font-scale, 1));
   cursor: pointer;
 }
-.arkmail-root button.arkmail-contact-dir:hover, .arkmail-root button.arkmail-contact-addbook:hover, .arkmail-root button.arkmail-arch-people-toggle:hover { background: ${HOVER_BASE}; border-color: ${ACCENT_SOFT}; color: ${ACCENT_FG}; }
+.arkmail-root button.arkmail-contact-dir:hover, .arkmail-root button.arkmail-contact-addbook:hover { background: ${HOVER_BASE}; border-color: ${ACCENT_SOFT}; color: ${ACCENT_FG}; }
 /* Fala UI-2 krok 4: naglowek zwijanego panelu "Osoby z listow". */
-.arkmail-arch-people-head { margin: calc(8px * var(--window-font-scale, 1)) 0 calc(4px * var(--window-font-scale, 1)); }
 /* Zgloszenie 2026-11-05 (A1): rozwineta lista osob scrolluje sie
  * wlasnym kontenerem - dluga ksiazka osob nie pcha calej zakladki
  * w dol (skala zgodnie z sekcja "rozmiar czcionki okna"). */

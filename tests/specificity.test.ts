@@ -36,7 +36,7 @@ test('specyficznosc: rodzina skrzynek (box) w postaci button.<klasa>', () => {
 
 test('specyficznosc: mini rodzina w postaci button.<klasa>', () => {
   // A4: kompaktowe klawisze pomocnicze nie rosna do rozmiaru catch-all.
-  for (const cls of ['arkmail-contact-dir', 'arkmail-contact-addbook', 'arkmail-arch-people-toggle']) {
+  for (const cls of ['arkmail-contact-dir', 'arkmail-contact-addbook']) {
     const body = ruleBody(new RegExp(`\\.arkmail-root\\s+button\\.${cls}(?![\\w-])`));
     assert.ok(body, `regula button.${cls} istnieje`);
     assert.match(

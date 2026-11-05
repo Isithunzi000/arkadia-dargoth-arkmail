@@ -20,6 +20,7 @@ import {
   click,
   notifyText,
   waitRt,
+  clickText,
 } from './harness';
 
 const TWIN_DATE = 'Wt, 24 VIII 1999, 10:00:00';
@@ -91,7 +92,7 @@ test('indeksacja Fala 41: blizniaki = dwa osobne rekordy i dwa osobne listy w li
     // Zgloszenie 2026-11-05 (A1): panel domyslnie zwiniety - toggle
     // przed odczytem wierszy.
     click(h, '[data-tab="archiwum"]');
-    click(h, '[data-arch-people-toggle]');
+    clickText(h, '.arkmail-subpill', 'Osoby z listow');
     await waitRt(() => !!h.content.querySelector('.arkmail-contact'), 'wiersze kontaktow');
     const rows = Array.from(
       h.content.querySelectorAll('.arkmail-contact') as unknown as Iterable<{

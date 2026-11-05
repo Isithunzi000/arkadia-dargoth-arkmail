@@ -7,6 +7,7 @@ import {
   waitRt,
   click,
   type Harness,
+  clickText,
 } from './harness';
 
 function entryTexts(h: Harness): string[] {
@@ -66,7 +67,7 @@ test('indeksacja odswieza skrzynke i kontakty po stronach oraz zachowuje starsze
     // Zgloszenie 2026-11-05 (A1): panel domyslnie zwiniety - toggle
     // przed odczytem wierszy.
     click(h, '[data-tab="archiwum"]');
-    click(h, '[data-arch-people-toggle]');
+    clickText(h, '.arkmail-subpill', 'Osoby z listow');
     await waitRt(
       () =>
         Array.from(

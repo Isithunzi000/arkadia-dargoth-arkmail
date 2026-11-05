@@ -26,6 +26,7 @@ import {
   notifyText,
   textOf,
   type Harness,
+  clickText,
 } from './harness';
 
 /** Indeksacja z klikiem w przycisk archiwum; zwraca nic - replay leci w tescie. */
@@ -73,7 +74,7 @@ test('pusta skrzynka wariantem "Nie znaleziono..." tez dostaje flage (4/4)', asy
     // Zgloszenie 2026-11-05 (A1): panel domyslnie zwiniety - toggle
     // przed odczytem wierszy.
     click(h, '[data-tab="archiwum"]');
-    click(h, '[data-arch-people-toggle]');
+    clickText(h, '.arkmail-subpill', 'Osoby z listow');
     await waitRt(() => !!h.content.querySelector('.arkmail-contact'), 'kontakty po 4/4');
   } finally {
     await stopHarness();
@@ -227,7 +228,7 @@ test('skrzynka z mieleniem kotwicy: 3 proby z klepnieciem + sonda wykluczajaca d
     // kontakty z czesciowego archiwum.
     // Zgloszenie 2026-11-05 (A1): panel domyslnie zwiniety - toggle
     // przed odczytem wierszy.
-    click(h, '[data-arch-people-toggle]');
+    clickText(h, '.arkmail-subpill', 'Osoby z listow');
     assert.ok(h.content.querySelector('.arkmail-contact'), 'kontakty widoczne przy 3/4 (Fala 24a)');
   } finally {
     await stopHarness();
@@ -452,7 +453,7 @@ test('ponad 50 listow jednego dnia: starsze dni sa pobierane, a luka jest zapisa
     // Zgloszenie 2026-11-05 (A1): panel domyslnie zwiniety - toggle
     // przed odczytem noty.
     click(h, '[data-tab="archiwum"]');
-    click(h, '[data-arch-people-toggle]');
+    clickText(h, '.arkmail-subpill', 'Osoby z listow');
     await waitRt(() => !!h.content.querySelector('.arkmail-index-gaps'), 'zapisana luka w widoku');
     assert.ok(textOf(h, '.arkmail-index-gaps').includes('wyslane: 1999-08-21'), 'dzien i skrzynka luki');
   } finally {
@@ -531,7 +532,7 @@ test('ponad 50 listow jednego dnia bez starszych wpisow: luka, nie komplet', asy
     // Zgloszenie 2026-11-05 (A1): panel domyslnie zwiniety - toggle
     // przed odczytem noty.
     click(h, '[data-tab="archiwum"]');
-    click(h, '[data-arch-people-toggle]');
+    clickText(h, '.arkmail-subpill', 'Osoby z listow');
     await waitRt(() => !!h.content.querySelector('.arkmail-index-gaps'), 'zapisana luka w widoku');
     assert.ok(textOf(h, '.arkmail-index-gaps').includes('wyslane: 1999-08-21'), 'dzien i skrzynka luki');
     // Opozniony retry skrzynki odbiorczej z prologu (test > 10 s).

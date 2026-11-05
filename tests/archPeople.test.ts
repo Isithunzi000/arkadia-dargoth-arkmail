@@ -1,15 +1,13 @@
 /**
- * Fala UI-2 krok 4: indeks osob zebranych z listow jako zwijany panel
- * w zakladce Archiwum ("Osoby z listow"). Zastepuje sub-pigulke Osoby
- * w Kontaktach (usunieta w tym kroku). Panel: naglowek z licznikiem,
- * filtr + sort (jak dawniej), wiersz osoby z licznikami, przyciskami
- * kierunku (skok do archiwum) i nowym przyciskiem "Do ksiazki"
- * (dopisanie do ksiazki adresowej przez onSavePeople). Skok z osoby
- * rozwija panel (kontekst osoby widoczny przy przefiltrowanej liscie)
- * i przewija widok do listy listow (zgloszenie 2026-11-05, A2).
- * Zgloszenie 2026-11-05 (A1): panel domyslnie ZWINIETY - lista listow
- * ma byc od razu na widoku; rozwiniecie = klik w naglowek, a rozwineta
- * lista osob scrolluje sie wlasnym kontenerem (max-height + overflow).
+ * Fala UI-2 krok 4: indeks osob zebranych z listow w zakladce Archiwum
+ * ("Osoby z listow"). Wydanie 1.30.1 (zgloszenie 6): osoby i listy to
+ * osobne widoki przełaczane chipsami (jak sub-pigulki Kontaktow) -
+ * domyslnie "Archiwum listow", panel osob pod chipem "Osoby z listow".
+ * Panel: filtr + sort, wiersz osoby z licznikami, przyciskami kierunku
+ * (skok do archiwum) i przyciskiem "Do ksiazki" (dopisanie przez
+ * onSavePeople). Skok z osoby wraca na chips listy (filtr osoby stoi na
+ * liscie) i przewija widok do listy listow (zgloszenie 2026-11-05, A2).
+ * Lista osob scrolluje sie wlasnym kontenerem (max-height + overflow).
  * Imiona syntetyczne (Foo/Bar/Corge - dozwolone przez guardy).
  */
 import { test } from 'node:test';
@@ -71,49 +69,57 @@ const contact = (over: Partial<Contact>): Contact => ({
 });
 
 const panel = (container: unknown): unknown => q(container, '[data-arch-people]');
-const toggle = (container: unknown): unknown => q(container, '[data-arch-people-toggle]');
+// Wydanie 1.30.1 (zgloszenie 6): panel osob mieszka pod chipem.
+const clickChip = (container: unknown, label: string): void => {
+  for (const pill of qa(container, '.arkmail-subpill')) {
+    if (text(pill) === label) {
+      click(pill);
+      return;
+    }
+  }
+  throw new Error(`brak chipsu: ${label}`);
+};
 
 // --- panel ------------------------------------------------------------------
 
-test('archiwum: panel Osoby z listow domyslnie zwiniety, toggle rozwija liste', () => {
-  // Zgloszenie 2026-11-05 (A1): domyslnie zwiniety - lista listow od
-  // razu na widoku; rozwineta lista osob ma wlasny kontener scrolla.
+test('archiwum: panel Osoby z listow pod chipem, chips przełącza widok', () => {
+  // Wydanie 1.30.1 (zgloszenie 6): osoby i listy jako osobne widoki
+  // (chipsy jak w Kontaktach) - domyslnie "Archiwum listow"; chips
+  // "Osoby z listow" pokazuje panel. Lista osob ma wlasny kontener
+  // scrolla (zgloszenie 2026-11-05, A1).
   const s = new MailUiStore({ tab: 'archiwum' });
   s.setContacts([contact({}), contact({ name: 'Foo', lettersReceived: 1, lettersSent: 0 })]);
   const { container } = mount(s);
-  assert.ok(panel(container), 'panel istnieje');
-  assert.match(text(panel(container)), /Osoby z listow \(2\)/, 'naglowek z licznikiem');
-  assert.equal(
-    qa(container, '[data-arch-people] .arkmail-contact').length,
-    0,
-    'domyslnie zwiniety - bez wierszy',
-  );
-  click(toggle(container));
+  assert.equal(panel(container), null, 'domyslnie widok listow - bez panelu');
+  assert.ok(q(container, '.arkmail-arch-list'), 'lista listow od razu na widoku');
+  clickChip(container, 'Osoby z listow');
+  assert.ok(panel(container), 'panel istnieje po kliku w chips');
   const names = qa(container, '[data-arch-people] .arkmail-contact-name').map(text);
-  assert.deepEqual(names, ['Corge', 'Foo'], 'osoby z listami w kolejnosci po rozwinieciu');
+  assert.deepEqual(names, ['Corge', 'Foo'], 'osoby z listami po przełączeniu');
   assert.ok(
     q(container, '.arkmail-arch-people-list'),
-    'rozwineta lista osob z wlasna klasa kontenera scrolla',
+    'lista osob z wlasna klasa kontenera scrolla',
   );
 });
 
-test('archiwum: panel domyslnie zwiniety, toggle rozwija i zwija', () => {
+test('archiwum: chips Osoby z listow przełącza w obie strony', () => {
   const s = new MailUiStore({ tab: 'archiwum' });
   s.setContacts([contact({})]);
   const { container } = mount(s);
-  assert.equal(qa(container, '[data-arch-people] .arkmail-contact').length, 0, 'zwiniety');
-  click(toggle(container));
-  assert.equal(qa(container, '[data-arch-people] .arkmail-contact').length, 1, 'rozwiniety');
-  assert.ok(panel(container), 'naglowek zostaje po zwinieciu');
-  click(toggle(container));
-  assert.equal(qa(container, '[data-arch-people] .arkmail-contact').length, 0, 'z powrotem zwiniety');
+  assert.equal(qa(container, '[data-arch-people] .arkmail-contact').length, 0, 'widok listow');
+  clickChip(container, 'Osoby z listow');
+  assert.equal(qa(container, '[data-arch-people] .arkmail-contact').length, 1, 'widok osob');
+  assert.equal(q(container, '.arkmail-arch-list'), null, 'lista listow nie malowana');
+  clickChip(container, 'Archiwum listow');
+  assert.equal(qa(container, '[data-arch-people] .arkmail-contact').length, 0, 'z powrotem listy');
+  assert.ok(q(container, '.arkmail-arch-list'), 'lista listow z powrotem na widoku');
 });
 
 test('archiwum: filtr panelu dziala na liscie osob', () => {
   const s = new MailUiStore({ tab: 'archiwum' });
   s.setContacts([contact({}), contact({ name: 'Foo', lettersReceived: 1, lettersSent: 0 })]);
   const { container } = mount(s);
-  click(toggle(container));
+  clickChip(container, 'Osoby z listow');
   const input = q(container, '[data-arch-people] [data-filter="kontakty"]') as {
     value: string;
     dispatchEvent(e: unknown): void;
@@ -130,7 +136,7 @@ test('archiwum: Do ksiazki dopisuje osobe przez onSavePeople', () => {
   const s = new MailUiStore({ tab: 'archiwum', people: ['Fred'] });
   s.setContacts([contact({})]);
   const { container, calls } = mount(s);
-  click(toggle(container));
+  clickChip(container, 'Osoby z listow');
   const btn = q(container, '[data-arch-add-book]');
   assert.ok(btn, 'przycisk Do ksiazki w wierszu');
   assert.equal(
@@ -146,7 +152,7 @@ test('archiwum: Do ksiazki wylaczone, gdy osoba juz w ksiazce (bez wzgledu na wi
   const s = new MailUiStore({ tab: 'archiwum', people: ['corge'] });
   s.setContacts([contact({})]);
   const { container, calls } = mount(s);
-  click(toggle(container));
+  clickChip(container, 'Osoby z listow');
   const btn = q(container, '[data-arch-add-book]') as unknown as {
     getAttribute(n: string): string | null;
     click(): void;
@@ -165,7 +171,7 @@ test('archiwum: po dopisaniu do ksiazki przycisk sie wylacza (repaint)', () => {
   const s = new MailUiStore({ tab: 'archiwum', people: [] });
   s.setContacts([contact({})]);
   const { container } = mount(s);
-  click(toggle(container));
+  clickChip(container, 'Osoby z listow');
   click(q(container, '[data-arch-add-book]'));
   const btn = q(container, '[data-arch-add-book]') as unknown as {
     getAttribute(n: string): string | null;
@@ -175,17 +181,13 @@ test('archiwum: po dopisaniu do ksiazki przycisk sie wylacza (repaint)', () => {
 
 // --- skok i panel ------------------------------------------------------------
 
-test('archiwum: skok z osoby filtruje liste listow, panel zostaje rozwiniety', () => {
+test('archiwum: skok z osoby filtruje liste listow i wraca na chips listy', () => {
   const s = new MailUiStore({ tab: 'archiwum' });
   s.setContacts([contact({})]);
   const { container } = mount(s);
-  // Skok z wiersza osoby: zostajemy w archiwum, filtr osoby dostaje
-  // imie, panel NIE zwinie sie przy skoku (jumpTo ustawia
-  // archPeopleOpen = true - zabezpieczenie na wypadek skoku z
-  // zrodla przy zwinietych wierszach, np. przyszle przyciski w
-  // kroku 5). Zwiniety panel nie pokazuje wierszy, wiec najpierw
-  // rozwijamy go toggle'm.
-  click(toggle(container));
+  // Wydanie 1.30.1 (zgloszenie 6): skok z osoby przełącza chips na
+  // "Archiwum listow" - osoby i listy nie stoja jedno nad drugim.
+  clickChip(container, 'Osoby z listow');
   // Zgloszenie 2026-11-05 (A2): po skoku widok przewija sie do listy
   // listow - panel osob nie wymusza dlugiego recznego scrolla.
   const scrolled: unknown[] = [];
@@ -207,15 +209,17 @@ test('archiwum: skok z osoby filtruje liste listow, panel zostaje rozwiniety', (
   );
   assert.equal(s.state.tab, 'archiwum', 'zostajemy w archiwum');
   assert.equal(
-    qa(container, '[data-arch-people] .arkmail-contact').length,
-    1,
-    'panel rozwiniety po skoku',
+    text(qa(container, '.arkmail-subpill.is-active')[0]),
+    'Archiwum listow',
+    'chips listy aktywny po skoku',
   );
+  assert.ok(q(container, '.arkmail-arch-list'), 'lista listow na widoku po skoku');
   const osoba = q(container, '[data-pane-key="archiwum"] [data-filter="osoba"]') as {
     value: string;
   };
   assert.equal(osoba.value, 'Corge', 'filtr osoby ustawiony przez skok');
 });
+
 test('archiwum: panel osob bez duplikatu klawisza indeksacji (zostaje krok 1)', () => {
   // Zgloszenie 2026-11-05: jeden klawisz "Indeksuj wszystkie skrzynki"
   // wystarczy - ten z kroku 1. Dolny duplikat z panelu osob znika.
@@ -223,21 +227,7 @@ test('archiwum: panel osob bez duplikatu klawisza indeksacji (zostaje krok 1)', 
   const { container } = mount(s);
   const all = qa(container, '.arkmail-index-all');
   assert.equal(all.length, 1, 'dokladnie jeden klawisz indeksacji w zakladce');
+  clickChip(container, 'Osoby z listow');
   const p = panel(container) as { querySelector(s: string): unknown };
   assert.ok(!p.querySelector('.arkmail-index-all'), 'panel osob bez klawisza indeksacji');
-});
-
-test('archiwum: toggle osob ze znakiem stanu rozwiniencia', () => {
-  // Zgloszenie 2026-11-05: jak w grupach - "v" rozwiniety, ">" zwiniety.
-  // A1: domyslnie zwiniety (">").
-  const s = new MailUiStore({ tab: 'archiwum' });
-  s.setContacts([contact({})]);
-  const { container } = mount(s);
-  assert.match(text(toggle(container)), /^> Osoby z listow \(1\)$/, 'domyslnie zwiniety: >');
-  click(toggle(container));
-  assert.match(
-    text(q(container, '[data-arch-people-toggle]')),
-    /^v Osoby z listow \(1\)$/,
-    'po kliku rozwiniety: v',
-  );
 });

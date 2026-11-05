@@ -248,7 +248,10 @@ const nativeFieldClass = (el: HTMLElement): void => {
    *  listow ma byc od razu na widoku; skok z osoby rozwija panel z
    *  powrotem (kontekst osoby ma byc widoczny przy przefiltrowanej
    *  liscie) i przewija widok do listy listow (A2). */
-  let archPeopleOpen = false;
+  // Wydanie 1.30.1 (zgloszenie 6): Archiwum na chipsy jak Kontakty -
+  // 'listy' (domyslnie) albo 'osoby'. Stan lokalny, repaint przez
+  // store.refresh(), jak sub-pigulki Kontaktow.
+  const archView = { sub: 'listy' as 'listy' | 'osoby' };
   /** Tryb importu pliku ksiazki (Fala UI-2 krok 3): lokalny jak
    *  contactView - domyslnie dolacz; "zastap" podmienia imiona i grupy. */
   let bookImportMode: ImportMode = 'dolacz';
@@ -2408,36 +2411,21 @@ const nativeFieldClass = (el: HTMLElement): void => {
   };
 
   /**
-   * Panel "Osoby z listow" zakladki Archiwum (Fala UI-2 krok 4):
-   * zwijany indeks osob zebranych z listow - wczesniej sub-pigulka
-   * "Osoby" w Kontaktach (usunieta w tym kroku). Panel stoi w
-   * Archiwum, bo osoby i ich liczniki stoja na lokalnej bazie
-   * listow - skok z osoby filtruje dokladnie te liste listow, ktora
-   * jest tuz pod panelem. Zachowuje brame indeksacji (wskazowka +
-   * przycisk NAD lista, Fala 24a) i notke o lukach; stopka ze
-   * statusem indeksacji ustapila miejsca krokowi 1 Archiwum - status
-   * z data kompletu mieszka tam, rozmiar bazy w pasku licznikow.
+   * Panel "Osoby z listow" zakladki Archiwum (Fala UI-2 krok 4).
+   * Wydanie 1.30.1 (zgloszenie 6): panel mieszka pod chipem
+   * "Osoby z listow" - osoby i listy nie stoja jedno nad drugim.
+   * Indeks osob zebranych z listow - wczesniej sub-pigulka "Osoby"
+   * w Kontaktach (usunieta w Fala UI-2). Panel stoi w Archiwum, bo
+   * osoby i ich liczniki stoja na lokalnej bazie listow - skok z
+   * osoby filtruje dokladnie te liste listow. Zachowuje brame
+   * indeksacji (wskazowka) i notke o lukach; stopka ze statusem
+   * indeksacji ustapila miejsca krokowi 1 Archiwum.
    */
   const renderArchPeople = (state: MailUiState): HTMLElement => {
     const panel = doc.createElement('div');
     panel.setAttribute('data-arch-people', '');
-    // Naglowek z licznikiem = zawsze widoczny; toggle zwija liste.
-    const head = doc.createElement('div');
-    head.className = 'arkmail-arch-people-head';
-    const toggle = doc.createElement('button');
-    toggle.className = 'arkmail-arch-people-toggle';
-    toggle.setAttribute('data-arch-people-toggle', '');
-    // Zgloszenie 2026-11-05: znak stanu jak w grupach - "v" rozwiniety,
-    // ">" zwiniety.
-    toggle.textContent = `${archPeopleOpen ? 'v' : '>'} Osoby z listow (${state.contacts.length})`;
-    toggle.setAttribute('title', 'Zwija albo rozwija liste osob zebranych z listow.');
-    toggle.addEventListener('click', () => {
-      archPeopleOpen = !archPeopleOpen;
-      store.refresh();
-    });
-    head.appendChild(toggle);
-    panel.appendChild(head);
-    if (!archPeopleOpen) return panel;
+    // Wydanie 1.30.1 (zgloszenie 6): panel mieszka pod chipem
+    // "Osoby z listow" - zwijanie ustapilo chipsom.
     // Zgloszenie 2026-11-05: klawisz indeksowania znika z panelu osob -
     // zostaje dokladnie jeden, w kroku 1 Archiwum. Wskazowka o budowie
     // bazy zostaje (kontekst listy), bez klawisza.
@@ -2506,8 +2494,8 @@ const nativeFieldClass = (el: HTMLElement): void => {
           // archiwum (zakladka Archiwum), zamiast strzelac szukaniem
           // do serwera; skok jest deterministyczny: osoba + skrzynka,
           // reszta filtrow archiwum czyszczona.
-          // Fala UI-2 krok 4: skok rozwija panel (kontekst osoby ma
-          // byc widoczny przy przefiltrowanej liscie listow).
+          // Wydanie 1.30.1: skok przelacza chips na liste listow
+          // (kontekst osoby = filtr osoby na liscie).
           const jumpTo = (box: MailBox) => {
             archFilter.osoba = c.name;
             archFilter.skrzynka = box;
@@ -2515,7 +2503,10 @@ const nativeFieldClass = (el: HTMLElement): void => {
             archFilter.tresc = undefined;
             archFilter.odDaty = undefined;
             archFilter.doDaty = undefined;
-            archPeopleOpen = true;
+            // Wydanie 1.30.1 (zgloszenie 6): skok przelacza chips na
+            // "Archiwum listow" - osoby i listy nie stoja jedno nad
+            // drugim. Kolejnosc: sub -> filtr -> scroll (deterministyczna).
+            archView.sub = 'listy';
             store.setTab('archiwum');
             // Zgloszenie 2026-11-05 (A2): po skoku przewijamy widok do
             // listy listow - panel osob (teraz rozwiniety) nie wymusza
@@ -2612,6 +2603,30 @@ const nativeFieldClass = (el: HTMLElement): void => {
     const pane = doc.createElement('div');
     pane.className = 'arkmail-pane';
     pane.setAttribute('data-pane-key', 'archiwum');
+    // Wydanie 1.30.1 (zgloszenie 6): chipsy jak w Kontaktach - lista
+    // listow i osoby jako osobne widoki, nie jedno nad drugim.
+    const subRow = doc.createElement('div');
+    subRow.className = 'arkmail-boxes';
+    const ARCH_SUBS: Array<[typeof archView.sub, string]> = [
+      ['listy', 'Archiwum listow'],
+      ['osoby', 'Osoby z listow'],
+    ];
+    for (const [sub, label] of ARCH_SUBS) {
+      const pill = doc.createElement('button');
+      pill.className =
+        'arkmail-subpill dialog-tab' + (archView.sub === sub ? ' is-active' : '');
+      pill.textContent = label;
+      pill.addEventListener('click', () => {
+        archView.sub = sub;
+        store.refresh();
+      });
+      subRow.appendChild(pill);
+    }
+    pane.appendChild(subRow);
+    if (archView.sub === 'osoby') {
+      pane.appendChild(renderArchPeople(state));
+      return pane;
+    }
     // Wszystkie filtry lokalne (poza store): repaint tylko listy,
     // input nie traci fokusu przy pisaniu.
     const controls = doc.createElement('div');
@@ -2851,10 +2866,6 @@ const nativeFieldClass = (el: HTMLElement): void => {
     pane.appendChild(steps);
     pane.appendChild(controls);
     if (countsStrip) pane.appendChild(countsStrip);
-    // Fala UI-2 krok 4: indeks osob zebranych z listow jako zwijany
-    // panel miedzy paskiem licznikow a lista listow (dawniej
-    // sub-pigulka Osoby w Kontaktach).
-    pane.appendChild(renderArchPeople(state));
     const list = doc.createElement('div');
     // Zgloszenie 2026-11-05 (A2): klasa = punkt przewijania po skoku
     // z osoby (jumpTo w renderArchPeople).

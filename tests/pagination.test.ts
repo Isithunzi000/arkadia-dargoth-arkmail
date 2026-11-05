@@ -29,6 +29,7 @@ import {
   waitRt,
   notifyText,
   textOf,
+  clickText,
 } from './harness';
 
 test('paginacja: miesiac rzymski WIELKA litera (wymog serwera)', () => {
@@ -271,7 +272,7 @@ test('kontakty: wczytaj starsze odbudowuje kontakty z dopisanej strony (Fala 24b
     // Zgloszenie 2026-11-05 (A1): panel domyslnie zwiniety - toggle
     // przed odczytem wierszy.
     click(h, '[data-tab="archiwum"]');
-    click(h, '[data-arch-people-toggle]');
+    clickText(h, '.arkmail-subpill', 'Osoby z listow');
     await waitRt(() => !!h.content.querySelector('.arkmail-contact'), 'wiersze kontaktow');
     const names = Array.from(
       h.content.querySelectorAll('.arkmail-contact-name') as unknown as Iterable<{
@@ -309,7 +310,7 @@ test('kontakty: wczytaj wszystkie odbudowuje kontakty po zakonczeniu petli (Fala
     // Zgloszenie 2026-11-05 (A1): panel domyslnie zwiniety - toggle
     // przed odczytem wierszy.
     click(h, '[data-tab="archiwum"]');
-    click(h, '[data-arch-people-toggle]');
+    clickText(h, '.arkmail-subpill', 'Osoby z listow');
     await waitRt(() => !!h.content.querySelector('.arkmail-contact'), 'wiersze kontaktow');
     const names = Array.from(
       h.content.querySelectorAll('.arkmail-contact-name') as unknown as Iterable<{

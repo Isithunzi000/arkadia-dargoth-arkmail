@@ -153,12 +153,15 @@ test('ghost: kursor nie na koncu = brak podpowiedzi', () => {
 
 test('ghost: filtr kontaktow podpowiada nazwy i aliasy', () => {
   // Fala UI-2 krok 4: filtr kontaktow mieszka w panelu Archiwum.
-  // Zgloszenie 2026-11-05 (A1): panel domyslnie zwiniety - toggle
-  // przed dojsciem do filtru.
+  // Wydanie 1.30.1 (zgloszenie 6): panel pod chipem "Osoby z listow".
   const s = new MailUiStore({ tab: 'archiwum' });
   s.setContacts([contact('Bar', 300, 'foo'), contact('Corge', 200)]);
   const c = mount(s);
-  click(c.querySelector('[data-arch-people-toggle]'));
+  for (const pill of Array.from(
+    (c as { querySelectorAll(s: string): Iterable<{ textContent?: string; click(): void }> }).querySelectorAll('.arkmail-subpill'),
+  )) {
+    if (pill.textContent === 'Osoby z listow') click(pill);
+  }
   const el = input(c, '[data-filter="kontakty"]');
   type(el, 'co');
   assert.equal(ghostRest(c, '[data-filter="kontakty"]'), 'rge');

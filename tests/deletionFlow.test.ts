@@ -8,6 +8,7 @@ import {
   textOf,
   waitRt,
   type Harness,
+  clickText,
 } from './harness';
 import { fromMailboxEntry, type ArchiveLetter } from '../src/arkmail/core/archive';
 import type { MailboxEntry } from '../src/arkmail/core/session/mailbox';
@@ -143,7 +144,7 @@ test('usuwanie: swiezy listing zmienia numery, a potwierdzenia aktualizuja dane'
     // Zgloszenie 2026-11-05 (A1): panel domyslnie zwiniety - toggle
     // przed odczytem wierszy.
     click(h, '[data-tab="archiwum"]');
-    click(h, '[data-arch-people-toggle]');
+    clickText(h, '.arkmail-subpill', 'Osoby z listow');
     await h.waitFor(() => h.content.querySelectorAll('.arkmail-contact').length === 1, 'jeden kontakt');
     assert.equal(textOf(h, '.arkmail-contact-name'), 'Corge');
   } finally {

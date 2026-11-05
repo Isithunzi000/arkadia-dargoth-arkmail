@@ -164,12 +164,13 @@ test('archiwum: Wyczysc filtry czysci tez filtr i sortowanie panelu osob', () =>
   ]);
   const { container, off } = mount(s);
 
-  // Zgloszenie 2026-11-05 (A1): panel osob domyslnie zwiniety -
-  // rozwijamy go toggle'm, zeby dobrac sie do filtru.
-  const toggle = container.querySelector('[data-arch-people-toggle]') as unknown as {
-    click(): void;
-  };
-  toggle.click();
+  // Wydanie 1.30.1 (zgloszenie 6): panel osob pod chipem
+  // "Osoby z listow" - klikamy chips, zeby dobrac sie do filtru.
+  for (const pill of Array.from(
+    container.querySelectorAll('.arkmail-subpill') as unknown as Array<{ textContent?: string; click(): void }>,
+  )) {
+    if (pill.textContent === 'Osoby z listow') pill.click();
+  }
 
   setInput(container, '[data-filter="kontakty"]', 'cor');
   const sort = container.querySelector('.arkmail-contact-sort') as unknown as {
@@ -185,10 +186,24 @@ test('archiwum: Wyczysc filtry czysci tez filtr i sortowanie panelu osob', () =>
     'filtr panelu osob zwezyl liste',
   );
 
+  // Wydanie 1.30.1 (zgloszenie 6): "Wyczysc filtry" mieszka w widoku
+  // listow - wracamy na chips listy przed kliknieciem.
+  for (const pill of Array.from(
+    container.querySelectorAll('.arkmail-subpill') as unknown as Array<{ textContent?: string; click(): void }>,
+  )) {
+    if (pill.textContent === 'Archiwum listow') click(pill);
+  }
   const clear = container.querySelector('.arkmail-arch-clear');
   assert.ok(clear, 'przycisk Wyczysc filtry istnieje');
   click(clear);
 
+  // Wydanie 1.30.1: czyszczenie nie zmienia subu - wracamy na chips
+  // osob, zeby zweryfikowac reset filtra i sortu panelu.
+  for (const pill of Array.from(
+    container.querySelectorAll('.arkmail-subpill') as unknown as Array<{ textContent?: string; click(): void }>,
+  )) {
+    if (pill.textContent === 'Osoby z listow') click(pill);
+  }
   assert.equal(inputVal(container, '[data-filter="kontakty"]'), '', 'filtr osob pusty');
   assert.equal(
     (container.querySelector('.arkmail-contact-sort') as unknown as { value: string }).value,

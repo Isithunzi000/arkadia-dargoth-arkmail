@@ -18,12 +18,7 @@ const SRC = readFileSync(
   'utf-8',
 );
 
-const ALLOWED = [
-  'arkmail-box',
-  'arkmail-contact-dir',
-  'arkmail-contact-addbook',
-  'arkmail-arch-people-toggle',
-];
+const ALLOWED = ['arkmail-box', 'arkmail-contact-dir', 'arkmail-contact-addbook'];
 
 test('render: kazdy przycisk ma klasy natywne klienta', () => {
   const lines = SRC.split('\n');

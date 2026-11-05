@@ -23,6 +23,7 @@ import {
   click,
   notifyText,
   type Harness,
+  clickText,
 } from './harness';
 import { mountMailUi, type MailUiHandlers } from '../src/arkmail/ui/render';
 import { MailUiStore } from '../src/arkmail/ui/store';
@@ -48,18 +49,22 @@ test('brama panelu Osoby: bez indeksu przycisk indeksacji zamiast licznikow', ()
     const container = window.document.createElement('div');
     const off = mountMailUi(container as unknown as HTMLElement, store, HANDLERS);
     try {
-      // Fala UI-2 krok 4: brama stoi w panelu Osoby zakladki Archiwum.
+      // Fala UI-2 krok 4: brama stoi w zakladce Archiwum.
       store.setTab('archiwum');
-      // Zgloszenie 2026-11-05 (A1): panel domyslnie zwiniety -
-      // rozwijamy toggle, zeby dobrac sie do bramy i listy.
-      (container.querySelector('[data-arch-people-toggle]') as unknown as {
-        click(): void;
-      }).click();
+      // Wydanie 1.30.1 (zgloszenie 6): klawisz indeksacji mieszka w
+      // kroku 1 widoku listow; wskazowka bramy - pod chipem osoby.
       const btn = container.querySelector('.arkmail-index-all') as unknown as {
         textContent?: string;
       } | null;
       assert.ok(btn, 'przycisk indeksacji w bramie Kontaktow');
       assert.equal(btn.textContent, 'Indeksuj wszystkie skrzynki');
+      // Wydanie 1.30.1 (zgloszenie 6): wskazowka bramy i kontrolki
+      // osob mieszkaja pod chipem "Osoby z listow".
+      for (const pill of Array.from(
+        container.querySelectorAll('.arkmail-subpill') as unknown as Array<{ textContent?: string; click(): void }>,
+      )) {
+        if (pill.textContent === 'Osoby z listow') pill.click();
+      }
       // Fala 19b: brama ma wyjasniac, ze indeksowanie buduje baze
       // kontaktow ze wszystkich skrzynek i wszystkich listow - bez
       // technicznych szczegolow ("pierwszych 50") nic nie mowiacych
@@ -111,10 +116,16 @@ test('brama panelu Osoby: lista kontaktow widoczna mimo braku indeksu, wskazowka
     try {
       // Fala UI-2 krok 4: panel Osoby w zakladce Archiwum.
       store.setTab('archiwum');
-      // Zgloszenie 2026-11-05 (A1): panel domyslnie zwiniety.
-      (container.querySelector('[data-arch-people-toggle]') as unknown as {
-        click(): void;
-      }).click();
+      // Wydanie 1.30.1 (zgloszenie 6): klawisz indeksacji zyje w
+      // kroku 1 widoku listow - sprawdzamy przed przełączeniem chipsu.
+      const stepBtn = container.querySelector('.arkmail-index-all');
+      assert.ok(stepBtn, 'klawisz indeksacji w kroku 1 Archiwum');
+      // Wydanie 1.30.1 (zgloszenie 6): panel osob pod chipem.
+      for (const pill of Array.from(
+        container.querySelectorAll('.arkmail-subpill') as unknown as Array<{ textContent?: string; click(): void }>,
+      )) {
+        if (pill.textContent === 'Osoby z listow') pill.click();
+      }
       const text = container.textContent ?? '';
       assert.ok(text.includes('Bar'), 'kontakt z czesciowego archiwum widoczny');
       assert.ok(text.includes('Grault'), 'drugi kontakt widoczny');
@@ -131,9 +142,6 @@ test('brama panelu Osoby: lista kontaktow widoczna mimo braku indeksu, wskazowka
         '.arkmail-index-all',
       );
       assert.ok(!gateBtn, 'panel osob bez klawisza indeksacji (zostaje krok 1)');
-      // Klawisz indeksowania zyje w kroku 1.
-      const stepBtn = container.querySelector('.arkmail-index-all');
-      assert.ok(stepBtn, 'klawisz indeksacji w kroku 1 Archiwum');
       const controls = (panel as unknown as { querySelector(s: string): unknown }).querySelector(
         '.arkmail-contact-controls',
       );
@@ -224,7 +232,7 @@ test('Indeksuj wszystkie: paginacja kotwicowa, flagi, gone-marking, odblokowanie
     // Zgloszenie 2026-11-05 (A1): panel domyslnie zwiniety - toggle
     // przed odczytem wierszy.
     click(h, '[data-tab="archiwum"]');
-    click(h, '[data-arch-people-toggle]');
+    clickText(h, '.arkmail-subpill', 'Osoby z listow');
     await waitRt(() => !!h.content.querySelector('.arkmail-contact'), 'wiersze kontaktow');
     const names = Array.from(
       h.content.querySelectorAll('.arkmail-contact-name') as unknown as Iterable<{
@@ -234,6 +242,9 @@ test('Indeksuj wszystkie: paginacja kotwicowa, flagi, gone-marking, odblokowanie
     assert.ok(names.includes('Foo'), 'kontakt z zywych listow');
     assert.ok(names.includes('Fred'), 'kontakt z dopisanej strony');
     assert.ok(!names.includes('Corge'), 'kontakt zniknietego listu odpada');
+    // Wydanie 1.30.1 (zgloszenie 6): krok 1 i pasek licznikow stoja
+    // w widoku listow - wracamy na chips listy.
+    clickText(h, '.arkmail-subpill', 'Archiwum listow');
     // Opis indeksacji: najwczesniejsza data w kroku 1 Archiwum + rozmiar
     // bazy w pasku licznikow (3 zywe grupy; Fala 28: zniknieta Corge
     // jest FIZYCZNIE purgowana, nie siedzi w bazie jako zombie).

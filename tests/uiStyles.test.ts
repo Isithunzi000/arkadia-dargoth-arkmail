@@ -263,7 +263,7 @@ test('style F5: focus-visible obwodka akcentu i stan :active', () => {
   assert.match(fv!, /outline-offset:\s*calc\(1px \* var\(--window-font-scale, 1\)\)/, 'focus-visible: offset 1px');
   assert.match(STYLES, /\.arkmail-tab:focus-visible,/, 'focus-visible obejmuje zakladki');
   assert.match(STYLES, /\.arkmail-box:focus-visible,/, 'focus-visible obejmuje skrzynki');
-  assert.match(STYLES, /\.arkmail-arch-people-toggle:focus-visible/, 'focus-visible obejmuje rodzine mini');
+  assert.match(STYLES, /\.arkmail-contact-dir:focus-visible/, 'focus-visible obejmuje rodzine mini');
   const active = ruleBody(/button:not\(\.popup-btn\):not\(\.dialog-tab\):not\(\[data-armed="1"\]\):active/);
   assert.ok(active, 'regula :active istnieje');
   assert.match(active!, /background:\s*var\(--popup-control-hover-bg\)/, ':active uzywa control-hover');

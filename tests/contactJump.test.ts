@@ -108,14 +108,14 @@ const clickEl = (el: unknown): void => {
   (el as { dispatchEvent(e: unknown): void }).dispatchEvent(new window.Event('click'));
 };
 
-// Zgloszenie 2026-11-05 (A1): panel "Osoby z listow" domyslnie
-// zwiniety - wiersze kontaktow sa dostepne dopiero po toggle.
+// Wydanie 1.30.1 (zgloszenie 6): panel "Osoby z listow" mieszka pod
+// chipem - wiersze kontaktow sa dostepne dopiero po kliku w chips.
 const expandPeople = (container: unknown): void => {
-  clickEl(
-    (container as { querySelector(s: string): unknown }).querySelector(
-      '[data-arch-people-toggle]',
-    ),
-  );
+  for (const pill of Array.from(
+    (container as { querySelectorAll(s: string): Iterable<{ textContent?: string; click(): void }> }).querySelectorAll('.arkmail-subpill'),
+  )) {
+    if (pill.textContent === 'Osoby z listow') clickEl(pill);
+  }
 };
 
 const searchCalls = (calls: Mounted['calls']) =>
@@ -184,6 +184,13 @@ test('kontakty: klik w imie bez zadnych listow -> nic sie nie dzieje', () => {
   clickEl(container.querySelector('.arkmail-contact-name'));
 
   assert.equal(s.state.tab, 'archiwum', 'zostajemy w archiwum');
+  // Wydanie 1.30.1 (zgloszenie 6): bez skoku zostajemy na chipsie
+  // osob - wracamy na chips listy, zeby odczytac filtr archiwum.
+  for (const pill of Array.from(
+    (container as { querySelectorAll(s: string): Iterable<{ textContent?: string; click(): void }> }).querySelectorAll('.arkmail-subpill'),
+  )) {
+    if (pill.textContent === 'Archiwum listow') clickEl(pill);
+  }
   const osoba = container.querySelector('[data-pane-key="archiwum"] [data-filter="osoba"]') as unknown as {
     value: string;
   };

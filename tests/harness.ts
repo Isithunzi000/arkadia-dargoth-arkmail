@@ -243,6 +243,14 @@ export const click = (h: Harness, selector: string): void =>
     new h.window.Event('click'),
   );
 
+/** Klik w pierwszy element pasujacy do selektora o DOKLADNIE takiej tresci. */
+export const clickText = (h: Harness, selector: string, text: string): void => {
+  const el = Array.from(h.content.querySelectorAll(selector)).find(
+    (e) => (e as { textContent?: string }).textContent === text,
+  ) as { dispatchEvent(e: unknown): void };
+  el.dispatchEvent(new h.window.Event('click'));
+};
+
 /**
  * Napedza pelny przebieg indeksacji 4 skrzynek (indexAllBoxes) do konca.
  * Dla kazdej skrzynki (kolejnosc stala: odebrane, nieprzeczytane,
