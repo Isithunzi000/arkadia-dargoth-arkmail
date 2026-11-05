@@ -31,6 +31,32 @@ należy go usunąć z repo (ostatni krok ostatniej fali).
 - Timer flasha (index.ts, 3000 ms) poza zakresem K3 — osobna koncepcja.
 - `GUARD_ARM_MS` (render.ts 291) jest już nazwaną stałą — bez zmian.
 
+## F0b — Higiena nazewnictwa wydań (bez zmian w kodzie)
+
+Wykonanie PRZED F1 — wylacznie operacje na GitHub API (edycja metadanych
+release'ow), zero zmian w kodzie, jeden commit dokumentacyjny dla ZASADY.md.
+Standard obowiazujacy od wydania 1.29.0 w tym repo (docelowo wspolny dla
+wszystkich projektow):
+
+- Nazwa release: "ArkMail X.Y.Z" — wylacznie nazwa produktu i numer
+  wersji. Tag: vX.Y.Z. Asset: dokladnie jeden, arkmail_X_Y_Z.zip.
+- Opis release: jeden krotki akapit prostym jezykiem — co sie zmienilo
+  i po co; zakaz: zargonu ("fala", "RED/GREEN", "higiena"), dat sesji,
+  sha, numerow przebiegow CI, naglowkow markdown, prefiksu "release:".
+- Commity: jezyk polski, rzeczowy opis zmiany, zakaz jezyka angielskiego
+  i zargonu. Historii git NIE przepisujemy (zakaz force-push) — konwencja
+  obowiazuje commity od 1.29.0.
+
+Kroki:
+
+1. Audyt nazw 43 istniejacych release'ow ArkMaila: wszystkie juz w formie
+   "ArkMail X.Y.Z" (poprawnych 43/43) — nazwy bez zmian.
+2. Przepisanie opisow wszystkich 43 release'ow do standardu (API PATCH,
+   po jednym akapicie, wylacznie fakty o funkcjach, po polsku).
+3. docs/ZASADY.md: dopisanie konwencji nazewnictwa wydan i commitow
+   (jeden commit dokumentacyjny; zielone przez reczny dispatch builda).
+4. F6 tworzy opis wydania 1.29.0 juz wg tego standardu.
+
 ## F1 — Kontrasty (K1): styles.ts, 9 poprawek kolorów
 
 Nowa stała `ACCENT_BRIGHT = '#6b93ea'` (tekst/elementy akcentowe na tle
@@ -89,6 +115,15 @@ lines.ts:5 i :11, mailbox.ts:8, index.ts:2423.
 Etykiety i komunikaty interfejsu są już w czystym ASCII — bez zmian.
 Uwaga: plugin.json musi być zgodny z meta.ts (test wersji porównuje
 oba źródła).
+
+## F2b — Strażnik komunikatów commitów
+
+Wzorzec: test straznika z obu repozytoriow arkszeptu (ostatnie commity
+obu repo). Test czyta komunikat commita i weryfikuje konwencje z F0b:
+jezyk polski, bez zargonu, bez jezyka angielskiego; identyfikatory
+techniczne (nazwy plikow, symboli) dozwolone. Red lokalnie: test
+importuje nieistniejacy jeszcze modul / fixture komunikatu z lamaniem
+konwencji; potem implementacja straznika. Jeden commit (test + kod).
 
 ## F3 — ERROR_LABEL_MS (K3): render.ts
 
@@ -155,8 +190,9 @@ accent width 3px, brak 4px i 18px, focus-visible, :active).
 3. Pełny zestaw lokalnie na zielono (szacunek: około 820 testów).
 4. Jeden commit, CI zielone.
 5. Tag `v1.29.0`; release o nazwie „ArkMail 1.29.0", opis zwykłym
-   językiem użytkownika (zakaz żargonu: bez numerów przebiegów CI,
-   identyfikatorów commitów, haseł typu red→green, sha, znaczków).
+   językiem użytkownika wg standardu z F0b (jeden akapit, zakaz żargonu:
+   bez numerów przebiegów CI, identyfikatorów commitów, haseł typu
+   red→green, sha, znaczków).
 6. Dokładnie jeden asset: `arkmail_1_29_0.zip` (wersjonowana nazwa —
    wymóg potoku publikacji).
 7. Usunąć docs/PLAN-1.29.0.md (commit). Marketplace: poza zakresem.
@@ -170,3 +206,5 @@ accent width 3px, brak 4px i 18px, focus-visible, :active).
 - src/ w czystym ASCII + U+2192 (test whitelist na zielono).
 - Wydanie 1.29.0 opublikowane na GitHub (tag + release + asset);
   dokument planu usunięty z repo.
+- Opisy wszystkich 43 istniejących release'ów zgodne ze standardem F0b;
+  docs/ZASADY.md zawiera konwencję nazewnictwa wydań i commitów.
