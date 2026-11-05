@@ -433,7 +433,7 @@ export const STYLES = `
   font-size: calc(11px * var(--window-font-scale, 1));
   cursor: pointer;
 }
-.arkmail-root button.arkmail-contact-dir:hover, .arkmail-root button.arkmail-contact-addbook:hover { background: ${HOVER_BASE}; border-color: ${ACCENT}; color: ${ACCENT_FG}; }
+.arkmail-root button.arkmail-contact-dir:hover, .arkmail-root button.arkmail-contact-addbook:hover { background: ${HOVER_BASE}; border-color: ${ACCENT}; color: ${ACCENT}; }
 /* Fala UI-2 krok 4: naglowek zwijanego panelu "Osoby z listow". */
 /* Zgloszenie 2026-11-05 (A1): rozwineta lista osob scrolluje sie
  * wlasnym kontenerem - dluga ksiazka osob nie pcha calej zakladki

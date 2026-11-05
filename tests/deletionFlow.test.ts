@@ -136,7 +136,19 @@ test('usuwanie: swiezy listing zmienia numery, a potwierdzenia aktualizuja dane'
 
     // Fala 28: potwierdzone usuniecia FIZYCZNIE wypadaja z archiwum
     // (zamiast flagi missingOnServer - zombie siedzialy w bazie).
-    const letters = await storedArchive();
+    // Fizyczne usuniecie zapisuje sie do IndexedDB asynchronicznie -
+    // pod obciazeniem macierzy odczyt wyprzedza zapis, dlatego czekamy
+    // na docelowy stan magazynu zamiast jednorazowego odczytu.
+    let letters: ArchiveLetter[] = [];
+    for (let i = 0; i < 240; i++) {
+      letters = await storedArchive();
+      if (
+        letters.find((letter) => letter.subject === 'Temat A') === undefined &&
+        letters.find((letter) => letter.subject === 'Temat C') === undefined &&
+        letters.some((letter) => letter.subject === 'Temat B')
+      ) break;
+      await new Promise((r) => setTimeout(r, 25));
+    }
     assert.equal(letters.find((letter) => letter.subject === 'Temat A'), undefined, 'Temat A fizycznie usuniety');
     assert.equal(letters.find((letter) => letter.subject === 'Temat C'), undefined, 'Temat C fizycznie usuniety');
     assert.ok(letters.some((letter) => letter.subject === 'Temat B'), 'Temat B nietkniety');

@@ -256,7 +256,7 @@ test('style F5: rodzina mini promien 6px i hover z tlem', () => {
   const miniHover = ruleBody(/\.arkmail-contact-dir:hover,/);
   assert.ok(miniHover, 'hover rodziny mini istnieje');
   assert.match(miniHover!, /background:\s*var\(--popup-control-hover-bg\)/, 'hover mini: control-hover');
-  assert.match(miniHover!, /color:\s*var\(--popup-bg\)/, 'hover mini: tekst w kolorze tla okna');
+  assert.match(miniHover!, /(?:^|;)\s*color:\s*var\(--popup-accent\)/, 'hover mini: tekst w kolorze akcentu');
 });
 
 test('style F5: focus-visible obwodka akcentu i stan :active', () => {
