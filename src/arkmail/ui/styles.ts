@@ -29,6 +29,9 @@ const DANGER = '#b04a42'; // tlo btn-danger (bialy 5.38)
 const DANGER_TEXT = '#d4736c'; // tekst bledow na panelu (4.58)
 const BG_UNREAD = '#313a4e'; // tlo wiersza nieprzeczytanego
 const ACCENT_BRIGHT = '#6b93ea'; // wyroznienia na BG_UNREAD (3.79)
+const HOVER_BASE = '#454a58';
+const HOVER_DANGER = '#c04a40';
+const HOVER_RESET = '#2b2d34';
 
 export const STYLES = `
 .arkmail-root {
@@ -75,7 +78,14 @@ export const STYLES = `
   justify-content: center;
   min-height: calc(26px * var(--window-font-scale, 1));
 }
-.arkmail-root button:hover { background: #454a58; }
+.arkmail-root button:hover { background: ${HOVER_BASE}; }
+.arkmail-root button:not([data-armed="1"]):active { background: ${HOVER_RESET}; }
+.arkmail-root button:focus-visible,
+.arkmail-root .arkmail-tab:focus-visible,
+.arkmail-root .arkmail-box:focus-visible,
+.arkmail-root .arkmail-contact-dir:focus-visible,
+.arkmail-root .arkmail-contact-addbook:focus-visible,
+.arkmail-root .arkmail-arch-people-toggle:focus-visible { outline: calc(2px * var(--window-font-scale, 1)) solid ${ACCENT_BRIGHT}; outline-offset: calc(1px * var(--window-font-scale, 1)); }
 
 /* --- Fala 30: cztery poziomy przyciskow (jeden jezyk calego UI) --- */
 .arkmail-root .arkmail-btn-primary {
@@ -89,13 +99,13 @@ export const STYLES = `
   border: calc(1px * var(--window-font-scale, 1)) solid ${ACCENT};
   color: ${ACCENT_SOFT};
 }
-.arkmail-root .arkmail-btn-action:hover { background: #454a58; border-color: ${ACCENT_SOFT}; color: #ffffff; }
+.arkmail-root .arkmail-btn-action:hover { background: ${HOVER_BASE}; border-color: ${ACCENT_SOFT}; color: #ffffff; }
 .arkmail-root .arkmail-btn-danger {
   background: ${DANGER};
   border-color: ${DANGER};
   color: ${ACCENT_FG};
 }
-.arkmail-root .arkmail-btn-danger:hover { background: #c04a40; border-color: #c04a40; }
+.arkmail-root .arkmail-btn-danger:hover { background: ${HOVER_DANGER}; border-color: ${HOVER_DANGER}; }
 /* Zgloszenie 2026-11-05: uzbrojony guard dwukliku (pierwszy klik)
    dostaje czerwone tlo niezaleznie od bazowej klasy klawisza - stan
    "drugi klik kasuje" widac z daleka, bez zmiany szerokosci przycisku. */
@@ -105,7 +115,7 @@ export const STYLES = `
   border-color: ${BORDER};
   color: ${FG_DIM};
 }
-.arkmail-root .arkmail-btn-reset:hover { background: #2b2d34; }
+.arkmail-root .arkmail-btn-reset:hover { background: ${HOVER_RESET}; }
 .arkmail-root input, .arkmail-root textarea, .arkmail-root select {
   background: ${BG_INPUT};
   color: ${FG};
@@ -367,7 +377,7 @@ export const STYLES = `
   border-color: ${DANGER};
   color: ${ACCENT_FG};
 }
-.arkmail-root .arkmail-del:hover { background: #c04a40; border-color: #c04a40; }
+.arkmail-root .arkmail-del:hover { background: ${HOVER_DANGER}; border-color: ${HOVER_DANGER}; }
 .arkmail-fwd { flex: none; }
 
 /* --- formularz compose --- */
@@ -434,13 +444,13 @@ export const STYLES = `
 .arkmail-deletion-filter { min-width: 0; color: ${FG_DIM}; font-size: calc(12px * var(--window-font-scale, 1)); }
 .arkmail-deletion-filter span { display: block; margin-bottom: calc(2px * var(--window-font-scale, 1)); }
 .arkmail-root .arkmail-deletion-filter input { width: 100%; min-width: 0; }
-.arkmail-deletion-results { border-top: calc(1px * var(--window-font-scale, 1)) solid ${BORDER}; }
+.arkmail-deletion-results { border-top: calc(1px * var(--window-font-scale, 1)) solid ${BG}; }
 .arkmail-deletion-entry {
   display: flex;
   align-items: flex-start;
   gap: calc(8px * var(--window-font-scale, 1));
   padding: calc(7px * var(--window-font-scale, 1)) calc(4px * var(--window-font-scale, 1));
-  border-bottom: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
+  border-bottom: calc(1px * var(--window-font-scale, 1)) solid ${BG};
   cursor: pointer;
 }
 .arkmail-deletion-entry input { flex: none; margin-top: calc(3px * var(--window-font-scale, 1)); }
@@ -450,7 +460,6 @@ export const STYLES = `
   border-color: ${DANGER};
   color: ${ACCENT_FG};
 }
-.arkmail-root .arkmail-deletion-delete:disabled { background: ${BG_RAISED}; color: ${FG_DIM}; }
 
 /* --- kontakty i archiwum --- */
 .arkmail-contact, .arkmail-arch-entry {
@@ -465,20 +474,17 @@ export const STYLES = `
 .arkmail-contact-name { color: ${FG}; font-weight: 600; cursor: pointer; }
 .arkmail-contact-name:hover { text-decoration: underline; }
 .arkmail-contact-dirs { margin-left: auto; display: flex; gap: calc(4px * var(--window-font-scale, 1)); }
+/* Rodzina mini: kompaktowy wariant poziomu action (jeden jezyk przyciskow). */
 .arkmail-root .arkmail-contact-dir, .arkmail-root .arkmail-contact-addbook, .arkmail-root .arkmail-arch-people-toggle {
   background: ${BG_RAISED};
   color: ${FG};
   border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
-  border-radius: calc(4px * var(--window-font-scale, 1));
+  border-radius: calc(6px * var(--window-font-scale, 1));
   padding: calc(1px * var(--window-font-scale, 1)) calc(8px * var(--window-font-scale, 1));
   font-size: calc(11px * var(--window-font-scale, 1));
   cursor: pointer;
 }
-.arkmail-root .arkmail-contact-dir:hover, .arkmail-root .arkmail-contact-addbook:hover, .arkmail-root .arkmail-arch-people-toggle:hover { border-color: ${FG_DIM}; }
-.arkmail-root .arkmail-contact-dir:disabled, .arkmail-root .arkmail-contact-addbook:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
+.arkmail-root .arkmail-contact-dir:hover, .arkmail-root .arkmail-contact-addbook:hover, .arkmail-root .arkmail-arch-people-toggle:hover { background: ${HOVER_BASE}; border-color: ${ACCENT_SOFT}; color: #ffffff; }
 /* Fala UI-2 krok 4: naglowek zwijanego panelu "Osoby z listow". */
 .arkmail-arch-people-head { margin: calc(8px * var(--window-font-scale, 1)) 0 calc(4px * var(--window-font-scale, 1)); }
 /* Waski popup: wiersz ksiazki trzyma checkbox, imie i oba przyciski
@@ -516,7 +522,7 @@ export const STYLES = `
 .arkmail-archive-steps {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(calc(220px * var(--window-font-scale, 1)), 1fr));
-  gap: calc(18px * var(--window-font-scale, 1));
+  gap: calc(10px * var(--window-font-scale, 1));
   margin: calc(10px * var(--window-font-scale, 1)) 0 calc(12px * var(--window-font-scale, 1));
 }
 .arkmail-archive-step {
@@ -524,7 +530,7 @@ export const STYLES = `
   min-width: 0;
   padding: calc(10px * var(--window-font-scale, 1));
   border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
-  border-left: calc(4px * var(--window-font-scale, 1)) solid ${FG_DIM};
+  border-left: calc(3px * var(--window-font-scale, 1)) solid ${FG_DIM};
   border-radius: calc(6px * var(--window-font-scale, 1));
   background: ${BG_RAISED};
 }

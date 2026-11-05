@@ -193,3 +193,94 @@ test('style: wiersze ksiazki i heady grup maja uklad flex', () => {
   assert.match(head!, /display:\s*flex/, 'flexbox w headzie grupy');
   assert.match(head!, /flex-wrap:\s*wrap/, 'zawijanie w waskim oknie');
 });
+
+/* --- F5: tokeny systemu projektowego (hover, disabled, dividery, mini, focus) --- */
+
+test('style F5: hover przez tokeny HOVER_BASE/HOVER_DANGER/HOVER_RESET', () => {
+  const hover = ruleBody(/\.arkmail-root\s+button:hover/);
+  assert.ok(hover, 'regula button:hover istnieje');
+  assert.match(hover!, /background:\s*#454a58/, 'button:hover uzywa HOVER_BASE');
+  const action = ruleBody(/\.arkmail-btn-action:hover/);
+  assert.match(action!, /background:\s*#454a58/, 'btn-action:hover uzywa HOVER_BASE');
+  const danger = ruleBody(/\.arkmail-btn-danger:hover/);
+  assert.match(danger!, /background:\s*#c04a40/, 'btn-danger:hover: tlo HOVER_DANGER');
+  assert.match(danger!, /border-color:\s*#c04a40/, 'btn-danger:hover: obwodka HOVER_DANGER');
+  const reset = ruleBody(/\.arkmail-btn-reset:hover/);
+  assert.match(reset!, /background:\s*#2b2d34/, 'btn-reset:hover uzywa HOVER_RESET');
+  const del = ruleBody(/\.arkmail-del:hover/);
+  assert.match(del!, /background:\s*#c04a40/, 'del:hover: tlo HOVER_DANGER');
+  assert.match(del!, /border-color:\s*#c04a40/, 'del:hover: obwodka HOVER_DANGER');
+});
+
+test('style F5: liczba uzyc tokenow hover w STYLES dokladna', () => {
+  assert.equal((STYLES.match(/#454a58/g) || []).length, 3, 'HOVER_BASE: button:hover + btn-action:hover + hover rodziny mini');
+  assert.equal((STYLES.match(/#c04a40/g) || []).length, 4, 'HOVER_DANGER: 2 reguly po 2 wlasciwosci');
+  assert.equal((STYLES.match(/#2b2d34/g) || []).length, 2, 'HOVER_RESET: btn-reset:hover + :active');
+});
+
+test('style F5: jeden mechanizm disabled (generyczny button:disabled)', () => {
+  assert.doesNotMatch(STYLES, /deletion-delete:disabled/, 'usuniety override deletion-delete:disabled');
+  assert.doesNotMatch(STYLES, /contact-dir:disabled/, 'usuniety blok contact-dir/addbook:disabled');
+  assert.doesNotMatch(STYLES, /opacity:\s*0\.4(?!\d)/, 'brak bloku opacity 0.4');
+  const disabled = ruleBody(/\.arkmail-root\s+button:disabled\b/);
+  assert.ok(disabled, 'generyczna regula button:disabled zostaje');
+  assert.match(disabled!, /opacity:\s*0\.45/, 'generyczna przezroczystosc 0.45');
+});
+
+test('style F5: dividery usuwania w tonie BG jak pozostale wiersze', () => {
+  const results = ruleBody(/\.arkmail-deletion-results/);
+  assert.ok(results, 'regula deletion-results istnieje');
+  assert.match(results!, /border-top:\s*calc\(1px \* var\(--window-font-scale, 1\)\) solid #1e1f24/,
+    'border-top dividera w tonie BG');
+  assert.doesNotMatch(results!, /#787e8f/, 'divider bez BORDER');
+});
+
+test('style F5: krok archiwum 3px i siatka krokow 10px', () => {
+  const step = ruleBody(/\.arkmail-archive-step\b/);
+  assert.ok(step, 'regula archive-step istnieje');
+  assert.match(step!, /border-left:\s*calc\(3px \* var\(--window-font-scale, 1\)\) solid #9a9da8/,
+    'pasek kroku 3px (jak pasek zajetosci)');
+  assert.doesNotMatch(step!, /4px \* var\(--window-font-scale, 1\)\) solid #9a9da8/,
+    'brak 4px na pasku kroku');
+  const steps = ruleBody(/\.arkmail-archive-steps/);
+  assert.match(steps!, /gap:\s*calc\(10px \* var\(--window-font-scale, 1\)\)/, 'siatka krokow gap 10px');
+  assert.doesNotMatch(steps!, /18px/, 'siatka krokow bez 18px');
+});
+
+test('style F5: rodzina mini promien 6px i hover z tlem', () => {
+  const mini = ruleBody(/\.arkmail-contact-dir,/);
+  assert.ok(mini, 'regula rodziny mini istnieje');
+  assert.match(mini!, /border-radius:\s*calc\(6px \* var\(--window-font-scale, 1\)\)/,
+    'promien rodziny mini 6px');
+  const miniHover = ruleBody(/\.arkmail-contact-dir:hover,/);
+  assert.ok(miniHover, 'hover rodziny mini istnieje');
+  assert.match(miniHover!, /background:\s*#454a58/, 'hover mini zmienia tlo (HOVER_BASE)');
+  assert.match(miniHover!, /color:\s*#ffffff/, 'hover mini: jawny kolor tekstu');
+});
+
+test('style F5: focus-visible obwodka akcentu i stan :active', () => {
+  const fv = ruleBody(/button:focus-visible,/);
+  assert.ok(fv, 'regula focus-visible istnieje');
+  assert.match(fv!, /outline:\s*calc\(2px \* var\(--window-font-scale, 1\)\) solid #6b93ea/, 'focus-visible: 2px ACCENT_BRIGHT');
+  assert.match(fv!, /outline-offset:\s*calc\(1px \* var\(--window-font-scale, 1\)\)/, 'focus-visible: offset 1px');
+  assert.match(STYLES, /\.arkmail-tab:focus-visible,/, 'focus-visible obejmuje zakladki');
+  assert.match(STYLES, /\.arkmail-box:focus-visible,/, 'focus-visible obejmuje skrzynki');
+  assert.match(STYLES, /\.arkmail-arch-people-toggle:focus-visible/, 'focus-visible obejmuje rodzine mini');
+  const active = ruleBody(/button:not\(\[data-armed="1"\]\):active/);
+  assert.ok(active, 'regula :active istnieje');
+  assert.match(active!, /background:\s*#2b2d34/, ':active uzywa HOVER_RESET');
+});
+
+test('style F5: swiadome wyjatki bez zmian', () => {
+  const send = ruleBody(/\.arkmail-send\b/);
+  assert.match(send!, /padding:\s*calc\(6px \* var\(--window-font-scale, 1\)\) calc\(18px \* var\(--window-font-scale, 1\)\)/,
+    'padding wysylki 18px zostaje');
+  const occ = ruleBody(/\.arkmail-arch-occ-list/);
+  assert.match(occ!, /18px/, 'wciecie arch-occ-list 18px zostaje');
+  assert.match(STYLES, /scrollbar-thumb \{ background:\s*#[0-9a-f]{6}; border-radius:\s*calc\(4px/,
+    'promien scrollbara 4px zostaje');
+  const track = ruleBody(/\.arkmail-busy-track/);
+  assert.match(track!, /border-radius:\s*calc\(3px/, 'promien paska postepu 3px zostaje');
+  const attention = ruleBody(/\.arkmail-box-attention/);
+  assert.match(attention!, /border-color:\s*#4a7de0/, 'obramowanie box-attention ACCENT zostaje');
+});
