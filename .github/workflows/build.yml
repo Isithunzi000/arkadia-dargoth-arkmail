@@ -41,6 +41,8 @@ jobs:
 
       - name: Tests
         timeout-minutes: 30
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
         run: npm test -- --test-timeout=120000
 
       - name: Build plugins
