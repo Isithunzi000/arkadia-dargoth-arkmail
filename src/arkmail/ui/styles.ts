@@ -175,7 +175,9 @@ export const STYLES = `
    flex: none; caly skurcz idzie w .arkmail-list-scroll. */
 .arkmail-listy > button,
 .arkmail-listy > .arkmail-boxes,
-.arkmail-listy > .arkmail-search-row { flex: none; }
+.arkmail-listy > .arkmail-search-row,
+.arkmail-listy > .arkmail-group-add,
+.arkmail-listy > .arkmail-group-filter { flex: none; }
 .arkmail-pane::-webkit-scrollbar,
 .arkmail-list-scroll::-webkit-scrollbar { width: calc(8px * var(--window-font-scale, 1)); }
 .arkmail-pane::-webkit-scrollbar-thumb,
@@ -212,6 +214,12 @@ export const STYLES = `
 .arkmail-box-ops button { flex: 0 1 auto; }
 .arkmail-root button:not(.popup-btn):not(.dialog-tab):disabled { opacity: 0.45; cursor: default; }
 .arkmail-root button:not(.popup-btn):not(.dialog-tab):disabled:hover { background: ${BG_RAISED}; }
+/* Zgloszenie 2026-11-05: klawisze natywne klienta (popup-btn) tez
+ * gasna po wylaczeniu - bez reguly wygladaja na aktywne. */
+.arkmail-root .popup-btn:disabled { opacity: 0.45; cursor: default; }
+/* Zgloszenie 2026-11-05: poziome linie oddzielajace sekcje w tokenach
+ * obramowania (wczesniej domyslny styl klienta/browsera). */
+.arkmail-root hr { border: none; border-top: calc(1px * var(--window-font-scale, 1)) solid ${BORDER}; margin: calc(8px * var(--window-font-scale, 1)) 0; }
 
 /* --- wiersze listow: nadawca | temat | data --- */
 .arkmail-entry {

@@ -219,6 +219,21 @@ test('style F5: liczba uzyc tokenow hover w STYLES dokladna', () => {
   assert.equal((STYLES.match(/var\(--popup-danger-hover-bg\)/g) || []).length, 0, 'danger-hover-bg: 0 regul');
 });
 
+test('style F5: disabled takze dla klawiszy natywnych popup-btn', () => {
+  const disabled = ruleBody(/\.arkmail-root \.popup-btn:disabled/);
+  assert.ok(disabled, 'regula popup-btn:disabled istnieje');
+  assert.match(disabled!, /opacity:\s*0\.45/, 'popup-btn:disabled przezroczystosc 0.45');
+  assert.match(disabled!, /cursor:\s*default/, 'popup-btn:disabled bez kursora pointer');
+});
+
+test('style F5: pozioma linia hr w tokenach obramowania', () => {
+  const hr = ruleBody(/\.arkmail-root hr/);
+  assert.ok(hr, 'regula hr istnieje');
+  assert.match(hr!, /border-top:\s*calc\(1px \* var\(--window-font-scale, 1\)\) solid var\(--popup-border\)/,
+    'hr: linia w kolorze obramowania, skalowana');
+  assert.doesNotMatch(hr!, /#[0-9a-fA-F]{3,8}/, 'hr: bez sztywnych kolorow hex');
+});
+
 test('style F5: jeden mechanizm disabled (generyczny button:disabled)', () => {
   assert.doesNotMatch(STYLES, /deletion-delete:disabled/, 'usuniety override deletion-delete:disabled');
   assert.doesNotMatch(STYLES, /contact-dir:disabled/, 'usuniety blok contact-dir/addbook:disabled');
