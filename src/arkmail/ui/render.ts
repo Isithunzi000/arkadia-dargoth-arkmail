@@ -2214,7 +2214,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     const aliasNote = doc.createElement('div');
     aliasNote.className = 'arkmail-dim';
     aliasNote.textContent =
-      'Aliasy pocztowe z gry - tylko odczyt, nie sa zapisywane do pliku. Aliasy edytujesz i uswasz w grze.';
+      'Aliasy pocztowe z gry - tylko odczyt, nie sa zapisywane do pliku. Aliasy edytujesz i usuniesz w grze.';
     aliasSec.appendChild(aliasNote);
     if (state.importedAliases.length === 0) {
       aliasSec.appendChild(dim('Brak aliasow - aliasy pobiera sie z gry.'));

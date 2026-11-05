@@ -37,6 +37,8 @@ const BANNED: Array<[string, string]> = [
   ['dni z brakami', 'zamiast tego: "brakuje danych z N dni"'],
   ['\u00b7', 'znak "srodkowa kropka" nie wystepuje w UI (ASCII)'],
   ['\u2014', 'myślnik em-dash nie wystepuje w UI (ASCII)'],
+  // 1.30.2 (Etap 3): literowki z audytu - znane zgrzyty twardo pinowane.
+  ['uswasz', 'literowka - poprawna forma: "usuniesz" / "usuwasz"'],
 ];
 
 test('audyt: zakazane slowa i znaki nie wystepuja w src/', () => {

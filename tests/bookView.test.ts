@@ -264,7 +264,7 @@ test('aliasy: sekcja read-only z nota', () => {
   assert.ok(section, 'sekcja aliasow istnieje w pigulce Aliasy Pocztowe');
   assert.ok(
     text(section).includes(
-      'Aliasy pocztowe z gry - tylko odczyt, nie sa zapisywane do pliku. Aliasy edytujesz i uswasz w grze.',
+      'Aliasy pocztowe z gry - tylko odczyt, nie sa zapisywane do pliku. Aliasy edytujesz i usuniesz w grze.',
     ),
   );
   assert.ok(text(section).includes('zgromadzenie'), 'nazwa aliasu widoczna');
