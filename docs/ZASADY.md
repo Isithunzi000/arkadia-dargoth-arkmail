@@ -23,11 +23,22 @@ wszystkie sesje i wygrywają z każdym innym zwyczajem.
 
 ## Wydania (release)
 
-- Nazwa wydania: „ArkMail X.Y.Z” — bez nazw fal, bez dopisków.
-- Opis: zwykły język użytkownika — co się zmieniło, jak zainstalować.
-  Zakaz żargonu: żadnych numerów przebiegów CI, identyfikatorów
-  commitów, haseł typu red→green, sha256, znaczków ✖/✓.
+- Nazwa wydania: „ArkMail vX.Y.Z” — wyłącznie nazwa produktu i numer
+  wersji, bez nazw fal, bez dopisków.
+- Opis: krótki akapit zwykłym językiem użytkownika — co się zmieniło
+  i po co. Zakaz: żargonu (fale, hasła procesowe), dat sesji,
+  identyfikatorów commitów, sha256, numerów przebiegów CI, nagłówków
+  markdown, prefiksu „release:”, znaczków ✖/✓.
 - Assety: dokładnie jeden plik `arkmail_X_Y_Z.zip`. Bez paczek
   typu „-red”, bez plików o stałej nazwie, bez duplikatów.
   Wersjonowana nazwa jest wymogiem potoku publikacji (strona
   projektu i katalog wtyczek parsują ją regexem).
+
+## Commity
+
+- Język polski, rzeczowy opis zmiany — co i gdzie.
+- Zakaz: języka angielskiego, żargonu procesowego (fale, RED/GREEN,
+  identyfikatory własne), wulgaryzmów.
+- Dozwolone: nazwy plików, symboli i identyfikatory techniczne.
+- Historii git nie przepisujemy (brak wymuszonych pushy) — konwencja
+  obowiązuje commity od wersji 1.29.0.
