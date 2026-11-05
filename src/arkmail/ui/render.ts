@@ -1803,7 +1803,6 @@ const nativeFieldClass = (el: HTMLElement): void => {
     nativeFieldClass(addMember);
       addMember.setAttribute('data-member-add', '');
       addMember.setAttribute('placeholder', 'Dodaj osobe');
-      attachGhost(doc, addMember, personSource);
       const addMemberOk = doc.createElement('button');
       addMemberOk.className = 'popup-btn popup-btn--control';
       addMemberOk.textContent = 'Dodaj';
@@ -1822,7 +1821,10 @@ const nativeFieldClass = (el: HTMLElement): void => {
           ),
         );
       });
+      // 1.30.2 (Etap 2): attachGhost dopiero po podpieciu inputu do
+      // rodzica - wrap liczy na parentNode (jak w Ksiazce, bookAddRow).
       members.appendChild(addMember);
+      attachGhost(doc, addMember, personSource);
       members.appendChild(addMemberOk);
       row.appendChild(members);
       }
