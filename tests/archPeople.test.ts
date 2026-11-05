@@ -5,7 +5,11 @@
  * filtr + sort (jak dawniej), wiersz osoby z licznikami, przyciskami
  * kierunku (skok do archiwum) i nowym przyciskiem "Do ksiazki"
  * (dopisanie do ksiazki adresowej przez onSavePeople). Skok z osoby
- * rozwija panel (kontekst osoby widoczny przy przefiltrowanej liscie).
+ * rozwija panel (kontekst osoby widoczny przy przefiltrowanej liscie)
+ * i przewija widok do listy listow (zgloszenie 2026-11-05, A2).
+ * Zgloszenie 2026-11-05 (A1): panel domyslnie ZWINIETY - lista listow
+ * ma byc od razu na widoku; rozwiniecie = klik w naglowek, a rozwineta
+ * lista osob scrolluje sie wlasnym kontenerem (max-height + overflow).
  * Imiona syntetyczne (Foo/Bar/Corge - dozwolone przez guardy).
  */
 import { test } from 'node:test';
@@ -71,32 +75,45 @@ const toggle = (container: unknown): unknown => q(container, '[data-arch-people-
 
 // --- panel ------------------------------------------------------------------
 
-test('archiwum: panel Osoby z listow widoczny z lista osob', () => {
+test('archiwum: panel Osoby z listow domyslnie zwiniety, toggle rozwija liste', () => {
+  // Zgloszenie 2026-11-05 (A1): domyslnie zwiniety - lista listow od
+  // razu na widoku; rozwineta lista osob ma wlasny kontener scrolla.
   const s = new MailUiStore({ tab: 'archiwum' });
   s.setContacts([contact({}), contact({ name: 'Foo', lettersReceived: 1, lettersSent: 0 })]);
   const { container } = mount(s);
   assert.ok(panel(container), 'panel istnieje');
   assert.match(text(panel(container)), /Osoby z listow \(2\)/, 'naglowek z licznikiem');
+  assert.equal(
+    qa(container, '[data-arch-people] .arkmail-contact').length,
+    0,
+    'domyslnie zwiniety - bez wierszy',
+  );
+  click(toggle(container));
   const names = qa(container, '[data-arch-people] .arkmail-contact-name').map(text);
-  assert.deepEqual(names, ['Corge', 'Foo'], 'osoby z listami w kolejnosci');
+  assert.deepEqual(names, ['Corge', 'Foo'], 'osoby z listami w kolejnosci po rozwinieciu');
+  assert.ok(
+    q(container, '.arkmail-arch-people-list'),
+    'rozwineta lista osob z wlasna klasa kontenera scrolla',
+  );
 });
 
-test('archiwum: panel domyslnie rozwiniety, toggle zwija i rozwija', () => {
+test('archiwum: panel domyslnie zwiniety, toggle rozwija i zwija', () => {
   const s = new MailUiStore({ tab: 'archiwum' });
   s.setContacts([contact({})]);
   const { container } = mount(s);
-  assert.equal(qa(container, '[data-arch-people] .arkmail-contact').length, 1, 'rozwiniety');
-  click(toggle(container));
   assert.equal(qa(container, '[data-arch-people] .arkmail-contact').length, 0, 'zwiniety');
+  click(toggle(container));
+  assert.equal(qa(container, '[data-arch-people] .arkmail-contact').length, 1, 'rozwiniety');
   assert.ok(panel(container), 'naglowek zostaje po zwinieciu');
   click(toggle(container));
-  assert.equal(qa(container, '[data-arch-people] .arkmail-contact').length, 1, 'z powrotem rozwiniety');
+  assert.equal(qa(container, '[data-arch-people] .arkmail-contact').length, 0, 'z powrotem zwiniety');
 });
 
 test('archiwum: filtr panelu dziala na liscie osob', () => {
   const s = new MailUiStore({ tab: 'archiwum' });
   s.setContacts([contact({}), contact({ name: 'Foo', lettersReceived: 1, lettersSent: 0 })]);
   const { container } = mount(s);
+  click(toggle(container));
   const input = q(container, '[data-arch-people] [data-filter="kontakty"]') as {
     value: string;
     dispatchEvent(e: unknown): void;
@@ -113,6 +130,7 @@ test('archiwum: Do ksiazki dopisuje osobe przez onSavePeople', () => {
   const s = new MailUiStore({ tab: 'archiwum', people: ['Fred'] });
   s.setContacts([contact({})]);
   const { container, calls } = mount(s);
+  click(toggle(container));
   const btn = q(container, '[data-arch-add-book]');
   assert.ok(btn, 'przycisk Do ksiazki w wierszu');
   assert.equal(
@@ -128,6 +146,7 @@ test('archiwum: Do ksiazki wylaczone, gdy osoba juz w ksiazce (bez wzgledu na wi
   const s = new MailUiStore({ tab: 'archiwum', people: ['corge'] });
   s.setContacts([contact({})]);
   const { container, calls } = mount(s);
+  click(toggle(container));
   const btn = q(container, '[data-arch-add-book]') as unknown as {
     getAttribute(n: string): string | null;
     click(): void;
@@ -146,6 +165,7 @@ test('archiwum: po dopisaniu do ksiazki przycisk sie wylacza (repaint)', () => {
   const s = new MailUiStore({ tab: 'archiwum', people: [] });
   s.setContacts([contact({})]);
   const { container } = mount(s);
+  click(toggle(container));
   click(q(container, '[data-arch-add-book]'));
   const btn = q(container, '[data-arch-add-book]') as unknown as {
     getAttribute(n: string): string | null;
@@ -163,10 +183,28 @@ test('archiwum: skok z osoby filtruje liste listow, panel zostaje rozwiniety', (
   // imie, panel NIE zwinie sie przy skoku (jumpTo ustawia
   // archPeopleOpen = true - zabezpieczenie na wypadek skoku z
   // zrodla przy zwinietych wierszach, np. przyszle przyciski w
-  // kroku 5). Zwiniety panel nie pokazuje wierszy, wiec scenariusz
-  // "klik w wiersz przy zwinietych panelu" jest niedostepny z DOM
-  // i testuje sie go tylko po stronie handlera (archPeopleOpen).
-  click(q(container, '[data-arch-people] .arkmail-contact-name'));
+  // kroku 5). Zwiniety panel nie pokazuje wierszy, wiec najpierw
+  // rozwijamy go toggle'm.
+  click(toggle(container));
+  // Zgloszenie 2026-11-05 (A2): po skoku widok przewija sie do listy
+  // listow - panel osob nie wymusza dlugiego recznego scrolla.
+  const scrolled: unknown[] = [];
+  const proto = window.Element.prototype as unknown as { scrollIntoView(): void };
+  const origScroll = proto.scrollIntoView;
+  proto.scrollIntoView = function (this: unknown) {
+    scrolled.push(this);
+  };
+  try {
+    click(q(container, '[data-arch-people] .arkmail-contact-name'));
+  } finally {
+    proto.scrollIntoView = origScroll;
+  }
+  assert.ok(
+    scrolled.some(
+      (el) => (el as { className?: string }).className === 'arkmail-arch-list',
+    ),
+    'skok przewija widok do listy listow',
+  );
   assert.equal(s.state.tab, 'archiwum', 'zostajemy w archiwum');
   assert.equal(
     qa(container, '[data-arch-people] .arkmail-contact').length,
@@ -191,14 +229,15 @@ test('archiwum: panel osob bez duplikatu klawisza indeksacji (zostaje krok 1)', 
 
 test('archiwum: toggle osob ze znakiem stanu rozwiniencia', () => {
   // Zgloszenie 2026-11-05: jak w grupach - "v" rozwiniety, ">" zwiniety.
+  // A1: domyslnie zwiniety (">").
   const s = new MailUiStore({ tab: 'archiwum' });
   s.setContacts([contact({})]);
   const { container } = mount(s);
-  assert.match(text(toggle(container)), /^v Osoby z listow \(1\)$/, 'domyslnie rozwiniety: v');
+  assert.match(text(toggle(container)), /^> Osoby z listow \(1\)$/, 'domyslnie zwiniety: >');
   click(toggle(container));
   assert.match(
     text(q(container, '[data-arch-people-toggle]')),
-    /^> Osoby z listow \(1\)$/,
-    'po kliku zwiniety: >',
+    /^v Osoby z listow \(1\)$/,
+    'po kliku rozwiniety: v',
   );
 });

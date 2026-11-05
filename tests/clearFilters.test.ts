@@ -164,6 +164,13 @@ test('archiwum: Wyczysc filtry czysci tez filtr i sortowanie panelu osob', () =>
   ]);
   const { container, off } = mount(s);
 
+  // Zgloszenie 2026-11-05 (A1): panel osob domyslnie zwiniety -
+  // rozwijamy go toggle'm, zeby dobrac sie do filtru.
+  const toggle = container.querySelector('[data-arch-people-toggle]') as unknown as {
+    click(): void;
+  };
+  toggle.click();
+
   setInput(container, '[data-filter="kontakty"]', 'cor');
   const sort = container.querySelector('.arkmail-contact-sort') as unknown as {
     value: string;

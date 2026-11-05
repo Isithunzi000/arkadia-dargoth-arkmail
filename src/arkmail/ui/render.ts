@@ -237,9 +237,11 @@ export function mountMailUi(
   };
   /** Zwijanie panelu "Osoby z listow" w Archiwum (Fala UI-2 krok 4):
    *  lokalne (poza store) jak filtry - toggle nie traca stanu przy
-   *  repaint. Domyslnie rozwiniety; skok z osoby rozwija panel z powrotem
-   *  (kontekst osoby ma byc widoczny przy przefiltrowanej liscie). */
-  let archPeopleOpen = true;
+   *  repaint. Zgloszenie 2026-11-05 (A1): domyslnie ZWINIETY - lista
+   *  listow ma byc od razu na widoku; skok z osoby rozwija panel z
+   *  powrotem (kontekst osoby ma byc widoczny przy przefiltrowanej
+   *  liscie) i przewija widok do listy listow (A2). */
+  let archPeopleOpen = false;
   /** Tryb importu pliku ksiazki (Fala UI-2 krok 3): lokalny jak
    *  contactView - domyslnie dolacz; "zastap" podmienia imiona i grupy. */
   let bookImportMode: ImportMode = 'dolacz';
@@ -2448,6 +2450,10 @@ export function mountMailUi(
     // Akceptacja dispatchuje 'input', wiec repaint listy odpala sie sam.
     attachGhost(doc, input, personSource);
     const list = doc.createElement('div');
+    // Zgloszenie 2026-11-05 (A1): rozwineta lista osob scrolluje sie
+    // wlasnym kontenerem (max-height + overflow w styles.ts), zamiast
+    // pchac cala zakladke w dol.
+    list.className = 'arkmail-arch-people-list';
     panel.appendChild(list);
     const repaint = () => {
       const rows = viewContacts(state.contacts, contactView);
@@ -2475,6 +2481,12 @@ export function mountMailUi(
             archFilter.doDaty = undefined;
             archPeopleOpen = true;
             store.setTab('archiwum');
+            // Zgloszenie 2026-11-05 (A2): po skoku przewijamy widok do
+            // listy listow - panel osob (teraz rozwiniety) nie wymusza
+            // dlugiego recznego scrolla. Guard na wypadek braku metody
+            // w starszym srodowisku.
+            const target = doc.querySelector('.arkmail-arch-list');
+            (target as { scrollIntoView?: () => void } | null)?.scrollIntoView?.();
           };
           // Klik w imie = kierunek domyslny: odebrane, gdy sa.
           name.setAttribute('title', 'Pokaz listy tej osoby w archiwum (domyslnie: odebrane)');
@@ -2806,6 +2818,9 @@ export function mountMailUi(
     // sub-pigulka Osoby w Kontaktach).
     pane.appendChild(renderArchPeople(state));
     const list = doc.createElement('div');
+    // Zgloszenie 2026-11-05 (A2): klasa = punkt przewijania po skoku
+    // z osoby (jumpTo w renderArchPeople).
+    list.className = 'arkmail-arch-list';
     pane.appendChild(list);
     const repaint = () => {
       // Fala 30a: sprzeczny zakres dat (Od pozniej niz Do) = komunikat

@@ -163,9 +163,12 @@ test('podpowiedzi: dynamiczne stany i ponownie utworzone przyciski zachowuja tit
   assert.ok(title(listy, '.arkmail-older-all').includes('Przerwij'));
 
   // Fala UI-2 krok 4: filtr kontaktow mieszka w panelu Archiwum.
+  // Zgloszenie 2026-11-05 (A1): panel domyslnie zwiniety - toggle
+  // przed dojsciem do filtru.
   const contactsStore = new MailUiStore({ tab: 'archiwum' });
   contactsStore.setContacts([contact()]);
   const contacts = mount(contactsStore);
+  click(contacts, '[data-arch-people-toggle]');
   const filter = (contacts as { querySelector(s: string): unknown }).querySelector('[data-filter="kontakty"]') as {
     value: string;
     dispatchEvent(event: unknown): void;

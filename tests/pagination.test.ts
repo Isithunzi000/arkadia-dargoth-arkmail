@@ -268,7 +268,10 @@ test('kontakty: wczytaj starsze odbudowuje kontakty z dopisanej strony (Fala 24b
     await waitFor(() => notifyText(f, '(dodano: 1)'), 'notify o dopisaniu starszych');
 
     // Fala UI-2 krok 4: kontakty w panelu Archiwum.
+    // Zgloszenie 2026-11-05 (A1): panel domyslnie zwiniety - toggle
+    // przed odczytem wierszy.
     click(h, '[data-tab="archiwum"]');
+    click(h, '[data-arch-people-toggle]');
     await waitRt(() => !!h.content.querySelector('.arkmail-contact'), 'wiersze kontaktow');
     const names = Array.from(
       h.content.querySelectorAll('.arkmail-contact-name') as unknown as Iterable<{
@@ -303,7 +306,10 @@ test('kontakty: wczytaj wszystkie odbudowuje kontakty po zakonczeniu petli (Fala
     );
 
     // Fala UI-2 krok 4: kontakty w panelu Archiwum.
+    // Zgloszenie 2026-11-05 (A1): panel domyslnie zwiniety - toggle
+    // przed odczytem wierszy.
     click(h, '[data-tab="archiwum"]');
+    click(h, '[data-arch-people-toggle]');
     await waitRt(() => !!h.content.querySelector('.arkmail-contact'), 'wiersze kontaktow');
     const names = Array.from(
       h.content.querySelectorAll('.arkmail-contact-name') as unknown as Iterable<{

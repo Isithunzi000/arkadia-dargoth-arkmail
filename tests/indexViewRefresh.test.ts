@@ -63,7 +63,10 @@ test('indeksacja odswieza skrzynke i kontakty po stronach oraz zachowuje starsze
       'pierwsza strona widoczna w skrzynce',
     );
     // Fala UI-2 krok 4: kontakty w panelu Archiwum.
+    // Zgloszenie 2026-11-05 (A1): panel domyslnie zwiniety - toggle
+    // przed odczytem wierszy.
     click(h, '[data-tab="archiwum"]');
+    click(h, '[data-arch-people-toggle]');
     await waitRt(
       () =>
         Array.from(

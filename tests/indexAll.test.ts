@@ -50,6 +50,11 @@ test('brama panelu Osoby: bez indeksu przycisk indeksacji zamiast licznikow', ()
     try {
       // Fala UI-2 krok 4: brama stoi w panelu Osoby zakladki Archiwum.
       store.setTab('archiwum');
+      // Zgloszenie 2026-11-05 (A1): panel domyslnie zwiniety -
+      // rozwijamy toggle, zeby dobrac sie do bramy i listy.
+      (container.querySelector('[data-arch-people-toggle]') as unknown as {
+        click(): void;
+      }).click();
       const btn = container.querySelector('.arkmail-index-all') as unknown as {
         textContent?: string;
       } | null;
@@ -106,6 +111,10 @@ test('brama panelu Osoby: lista kontaktow widoczna mimo braku indeksu, wskazowka
     try {
       // Fala UI-2 krok 4: panel Osoby w zakladce Archiwum.
       store.setTab('archiwum');
+      // Zgloszenie 2026-11-05 (A1): panel domyslnie zwiniety.
+      (container.querySelector('[data-arch-people-toggle]') as unknown as {
+        click(): void;
+      }).click();
       const text = container.textContent ?? '';
       assert.ok(text.includes('Bar'), 'kontakt z czesciowego archiwum widoczny');
       assert.ok(text.includes('Grault'), 'drugi kontakt widoczny');
@@ -212,7 +221,10 @@ test('Indeksuj wszystkie: paginacja kotwicowa, flagi, gone-marking, odblokowanie
 
     // Kontakty odblokowane: Foo i Fred licza sie, Corge nie.
     // Fala UI-2 krok 4: wiersze kontaktow stoja w panelu Archiwum.
+    // Zgloszenie 2026-11-05 (A1): panel domyslnie zwiniety - toggle
+    // przed odczytem wierszy.
     click(h, '[data-tab="archiwum"]');
+    click(h, '[data-arch-people-toggle]');
     await waitRt(() => !!h.content.querySelector('.arkmail-contact'), 'wiersze kontaktow');
     const names = Array.from(
       h.content.querySelectorAll('.arkmail-contact-name') as unknown as Iterable<{

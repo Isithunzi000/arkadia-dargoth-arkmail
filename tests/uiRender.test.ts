@@ -587,6 +587,9 @@ test('render: kontakty - filtr i sort lokalne (bez store), wiersz z data', () =>
     ],
   }));
   const { container, off } = mount(s);
+  // Zgloszenie 2026-11-05 (A1): panel Osoby domyslnie zwiniety -
+  // rozwijamy toggle przed odczytem wierszy.
+  (container.querySelector('[data-arch-people-toggle]') as unknown as { click(): void }).click();
   const names = () =>
     [...container.querySelectorAll('.arkmail-contact-name')].map((n) => n.textContent);
   assert.deepEqual(names(), ['Bar', 'Garply', 'Grault'], 'domyslnie sort po nazwie');

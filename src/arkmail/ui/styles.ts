@@ -487,6 +487,13 @@ export const STYLES = `
 .arkmail-root .arkmail-contact-dir:hover, .arkmail-root .arkmail-contact-addbook:hover, .arkmail-root .arkmail-arch-people-toggle:hover { background: ${HOVER_BASE}; border-color: ${ACCENT_SOFT}; color: #ffffff; }
 /* Fala UI-2 krok 4: naglowek zwijanego panelu "Osoby z listow". */
 .arkmail-arch-people-head { margin: calc(8px * var(--window-font-scale, 1)) 0 calc(4px * var(--window-font-scale, 1)); }
+/* Zgloszenie 2026-11-05 (A1): rozwineta lista osob scrolluje sie
+ * wlasnym kontenerem - dluga ksiazka osob nie pcha calej zakladki
+ * w dol (skala zgodnie z sekcja "rozmiar czcionki okna"). */
+.arkmail-root .arkmail-arch-people-list {
+  overflow-y: auto;
+  max-height: calc(240px * var(--window-font-scale, 1));
+}
 /* Waski popup: wiersz ksiazki trzyma checkbox, imie i oba przyciski
  * w jednej linii; imie sie skraca (wielokropek), nie wypycha przyciskow.
  * Head grupy zawija kontrolki zamiast je ucinac. */

@@ -108,6 +108,16 @@ const clickEl = (el: unknown): void => {
   (el as { dispatchEvent(e: unknown): void }).dispatchEvent(new window.Event('click'));
 };
 
+// Zgloszenie 2026-11-05 (A1): panel "Osoby z listow" domyslnie
+// zwiniety - wiersze kontaktow sa dostepne dopiero po toggle.
+const expandPeople = (container: unknown): void => {
+  clickEl(
+    (container as { querySelector(s: string): unknown }).querySelector(
+      '[data-arch-people-toggle]',
+    ),
+  );
+};
+
 const searchCalls = (calls: Mounted['calls']) =>
   calls.filter((c) => c.name === 'search').map((c) => c.args);
 
@@ -137,6 +147,7 @@ test('kontakty: klik w imie -> archiwum z filtrem osoby na odebranych (Fala 26b)
   s.setContacts([contact({})]);
   seedArchive(s);
   const { container, calls } = mount(s);
+  expandPeople(container);
 
   const row = container.querySelector('.arkmail-contact-name');
   assert.ok(row, 'imie kontaktu');
@@ -153,6 +164,7 @@ test('kontakty: klik w imie -> wyslane, gdy odebranych brak', () => {
   s.setContacts([contact({ lettersReceived: 0, lettersSent: 3 })]);
   seedArchive(s);
   const { container, calls } = mount(s);
+  expandPeople(container);
 
   clickEl(container.querySelector('.arkmail-contact-name'));
 
@@ -167,6 +179,7 @@ test('kontakty: klik w imie bez zadnych listow -> nic sie nie dzieje', () => {
   s.setContacts([contact({ lettersReceived: 0, lettersSent: 0 })]);
   seedArchive(s);
   const { container, calls } = mount(s);
+  expandPeople(container);
 
   clickEl(container.querySelector('.arkmail-contact-name'));
 
@@ -183,6 +196,7 @@ test('kontakty: przycisk Wyslane -> archiwum z filtrem na wyslanych', () => {
   s.setContacts([contact({})]); // ma oba kierunki
   seedArchive(s);
   const { container, calls } = mount(s);
+  expandPeople(container);
 
   const btn = container.querySelector('[data-dir="wyslane"]');
   assert.ok(btn, 'przycisk kierunku Wyslane');
@@ -204,6 +218,7 @@ test('kontakty: list wieloodbiorczy trafia w skok po osobie (Fala 26b)', () => {
     letter('wyslane', 'Foo', 'nie do niego', '2026-10-05 10:00:00'),
   ]);
   const { container } = mount(s);
+  expandPeople(container);
 
   clickEl(container.querySelector('[data-dir="wyslane"]'));
 
@@ -216,6 +231,7 @@ test('kontakty: przycisk kierunku wylaczony, gdy licznik wynosi 0', () => {
   s.setContacts([contact({ lettersReceived: 0, lettersSent: 5 })]);
   seedArchive(s);
   const { container, calls } = mount(s);
+  expandPeople(container);
 
   const off = container.querySelector('[data-dir="odebrane"]') as unknown as {
     disabled: boolean;

@@ -83,7 +83,10 @@ test('kompletny listing: znikniety list znika z widoku archiwum i kontaktow', as
 
     // Kontakty: Corge (nadawca zniknietego) odpada z licznikow.
     // Fala UI-2 krok 4: kontakty w panelu Archiwum.
+    // Zgloszenie 2026-11-05 (A1): panel domyslnie zwiniety - toggle
+    // przed odczytem wierszy.
     click(h, '[data-tab="archiwum"]');
+    click(h, '[data-arch-people-toggle]');
     await waitRt(() => !!h.content.querySelector('.arkmail-contact'), 'wiersze kontaktow');
     const names = Array.from(
       h.content.querySelectorAll('.arkmail-contact-name') as unknown as Iterable<{

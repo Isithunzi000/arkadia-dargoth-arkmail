@@ -88,7 +88,10 @@ test('indeksacja Fala 41: blizniaki = dwa osobne rekordy i dwa osobne listy w li
     );
 
     // Fala UI-2 krok 4: kontakty w panelu Archiwum.
+    // Zgloszenie 2026-11-05 (A1): panel domyslnie zwiniety - toggle
+    // przed odczytem wierszy.
     click(h, '[data-tab="archiwum"]');
+    click(h, '[data-arch-people-toggle]');
     await waitRt(() => !!h.content.querySelector('.arkmail-contact'), 'wiersze kontaktow');
     const rows = Array.from(
       h.content.querySelectorAll('.arkmail-contact') as unknown as Iterable<{
