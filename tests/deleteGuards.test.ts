@@ -80,7 +80,7 @@ const classesOf = (el: unknown): string[] =>
 test('guardy: klawisze usuwajace z napisem maja poziom danger', () => {
   const book = mount(new MailUiStore({ tab: 'kontakty', people: ['Fred'] }));
   assert.ok(
-    classesOf(q(book.container, '[data-book-delete-checked]')).includes('arkmail-btn-danger'),
+    classesOf(q(book.container, '[data-book-delete-checked]')).includes('popup-btn--danger'),
     'Usun zaznaczone imiona: danger',
   );
   const groups = mount(
@@ -90,19 +90,24 @@ test('guardy: klawisze usuwajace z napisem maja poziom danger', () => {
   // D3: grupy zwijane - rozwiniencie naglowkiem przed sprawdzeniem ciala.
   click(q(groups.container, '[data-group-toggle]'));
   assert.ok(
-    classesOf(q(groups.container, '[data-group-delete]')).includes('arkmail-btn-danger'),
+    classesOf(q(groups.container, '[data-group-delete]')).includes('popup-btn--danger'),
     'Usun grupe: danger',
   );
   assert.ok(
-    classesOf(q(groups.container, '[data-groups-delete-all]')).includes('arkmail-btn-danger'),
+    classesOf(q(groups.container, '[data-groups-delete-all]')).includes('popup-btn--danger'),
     'Usun wszystkie grupy: danger',
   );
 });
 
-test('guardy: klawisze X maja poziom danger', () => {
+test('guardy: klawisze X maja poziom danger i wariant ikonowy (K1)', () => {
+  // Zgloszenie 2026-11-05 (K1): X to maly kwadratowy klawisz ikonowy
+  // (popup-btn--sm --icon), ghost w spoczynku - nie zlewaja sie w slad.
   const book = mount(new MailUiStore({ tab: 'kontakty', people: ['Fred', 'Grault'] }));
   for (const x of qa(book.container, '[data-book-remove]')) {
-    assert.ok(classesOf(x).includes('arkmail-btn-danger'), 'X ksiazki: danger');
+    assert.ok(classesOf(x).includes('popup-btn--danger'), 'X ksiazki: danger');
+    assert.ok(classesOf(x).includes('popup-btn--sm'), 'X ksiazki: mały');
+    assert.ok(classesOf(x).includes('popup-btn--icon'), 'X ksiazki: ikonowy');
+    assert.ok(classesOf(x).includes('popup-btn--ghost'), 'X ksiazki: ghost w spoczynku');
   }
   const groups = mount(
     new MailUiStore({ tab: 'kontakty', groups: [{ name: 'Gildia', members: ['Fred'] }] }),
@@ -111,8 +116,23 @@ test('guardy: klawisze X maja poziom danger', () => {
   // D3: grupy zwijane - rozwiniencie naglowkiem przed sprawdzeniem ciala.
   click(q(groups.container, '[data-group-toggle]'));
   for (const x of qa(groups.container, '[data-member-remove]')) {
-    assert.ok(classesOf(x).includes('arkmail-btn-danger'), 'X czlonka grupy: danger');
+    assert.ok(classesOf(x).includes('popup-btn--danger'), 'X czlonka grupy: danger');
+    assert.ok(classesOf(x).includes('popup-btn--icon'), 'X czlonka grupy: ikonowy');
   }
+});
+
+test('guardy: uzbrojony X ma wypelnienie danger i grubsza obwodke (K2)', () => {
+  // Zgloszenie 2026-11-05 (K2): stan uzbrojony wyglada inaczej niz
+  // spoczynkowy - wypelnienie danger + obrys danger-border.
+  const s = new MailUiStore({ tab: 'kontakty', people: ['Fred', 'Grault'] });
+  const { container } = mount(s);
+  click(q(container, '[data-book-remove]'));
+  const armed = q(container, '[data-book-remove][data-armed="1"]');
+  assert.ok(armed, 'uzbrojony X ma data-armed');
+  const m = STYLES.match(/\.arkmail-root button\.popup-btn--danger\[data-armed="1"\]\s*\{([^}]*)\}/);
+  assert.ok(m, 'regula uzbrojonego danger istnieje');
+  assert.match(m![1]!, /var\(--popup-danger-bg\)/, 'uzbrojony: wypelnienie danger');
+  assert.match(m![1]!, /var\(--popup-danger-border\)/, 'uzbrojony: obrys danger-border');
 });
 
 test('guardy: X ksiazki usuwa dopiero z drugiego klika', () => {
@@ -144,11 +164,10 @@ test('guardy: X czlonka grupy usuwa dopiero z drugiego klika', () => {
   assert.deepEqual(calls.groups, [['Gildia=Fred']], 'drugi klik zdejmuje czlonka');
 });
 
-test('guardy: styles.ts ma dangerowa regule dla uzbrojonego klawisza', () => {
-  // Zgloszenie 2026-11-05 (A3): kolory ze zmiennych natywnego UI.
-  const m = STYLES.match(/\[data-armed="1"\]\s*\{([^}]*)\}/);
-  assert.ok(m, 'regula [data-armed="1"] istnieje');
-  assert.match(m![1]!, /var\(--popup-danger-bg\)/, 'uzbrojony klawisz ma tlo danger');
+test('guardy: styles.ts ma regule uzbrojenia tylko pod natywna klase danger', () => {
+  // Zgloszenie 2026-11-05 (A3/K2): regula uzbrojenia wisi pod klasa
+  // natywna; stary ogolny selektor [data-armed="1"] zniknal.
+  assert.doesNotMatch(STYLES, /\.arkmail-root button\[data-armed="1"\]/, 'stary selektor usuniety');
 });
 
 test('guardy: ESC rozbraja uzbrojony X', () => {

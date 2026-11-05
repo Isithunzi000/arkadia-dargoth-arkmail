@@ -51,11 +51,12 @@ test('style: pola formularzy maja jawne tlo i kolor ze zmiennych', () => {
   }
 });
 
-test('style: ostylowane klasy dotychczas gole (preview/ops/del/fwd/notify)', () => {
+test('style: ostylowane klasy dotychczas gole (preview/ops/fwd/notify)', () => {
+  // Zgloszenie 2026-11-05 (F4b): .arkmail-del nie ma juz wlasnej reguly;
+  // klawisz kasowania listu dziala na klasach natywnego UI klienta.
   for (const cls of [
     'arkmail-preview',
     'arkmail-letter-ops',
-    'arkmail-del',
     'arkmail-fwd',
     'arkmail-notify-toggle',
   ]) {
@@ -203,37 +204,28 @@ test('style: wiersze ksiazki i heady grup maja uklad flex', () => {
 
 /* --- F5: tokeny systemu projektowego (hover, disabled, dividery, mini, focus) --- */
 
-test('style F5: hover przez tokeny natywnego UI (control-hover, danger-hover)', () => {
-  // Zgloszenie 2026-11-05 (A3): hovery ze zmiennych klienta.
-  const hover = ruleBody(/\.arkmail-root\s+button:hover/);
-  assert.ok(hover, 'regula button:hover istnieje');
-  assert.match(hover!, /background:\s*var\(--popup-control-hover-bg\)/, 'button:hover: control-hover');
-  const action = ruleBody(/\.arkmail-btn-action:hover/);
-  assert.match(action!, /background:\s*var\(--popup-control-hover-bg\)/, 'btn-action:hover: control-hover');
-  const danger = ruleBody(/\.arkmail-btn-danger:hover/);
-  assert.match(danger!, /background:\s*var\(--popup-danger-hover-bg\)/, 'btn-danger:hover: danger-hover');
-  assert.match(danger!, /border-color:\s*var\(--popup-danger-hover-bg\)/, 'obwodka danger-hover');
-  const reset = ruleBody(/\.arkmail-btn-reset:hover/);
-  assert.match(reset!, /background:\s*var\(--popup-control-hover-bg\)/, 'btn-reset:hover: control-hover');
-  const del = ruleBody(/\.arkmail-del:hover/);
-  assert.match(del!, /background:\s*var\(--popup-danger-hover-bg\)/, 'del:hover: danger-hover');
-  assert.match(del!, /border-color:\s*var\(--popup-danger-hover-bg\)/, 'obwodka del danger-hover');
+test('style F5: hover tylko dla klawiszy spoza natywnych klas klienta', () => {
+  // Zgloszenie 2026-11-05 (F4b): klawisze z klasami popup-btn--* maja hovery
+  // z arkusza klienta; wlasny hover dotyczy wylacznie button:not(.popup-btn).
+  const hover = ruleBody(/button:not\(\.popup-btn\):hover/);
+  assert.ok(hover, 'regula catch-all hover istnieje');
+  assert.match(hover!, /background:\s*var\(--popup-control-hover-bg\)/, 'catch-all hover: control-hover');
+  assert.doesNotMatch(STYLES, /\.arkmail-btn-(primary|action|danger|reset):hover/, 'zero wlasnych regul hover starych poziomow');
 });
 
 test('style F5: liczba uzyc tokenow hover w STYLES dokladna', () => {
-  // Zgloszenie 2026-11-05 (A3): liczby wystapien po mapowaniu na hovery
-  // natywnego UI (control-hover x5: button:hover, btn-action:hover,
-  // hover rodziny mini, :active, btn-reset:hover; danger-hover x4:
-  // btn-danger:hover + del:hover, kazda po 2 wlasciwosci).
-  assert.equal((STYLES.match(/var\(--popup-control-hover-bg\)/g) || []).length, 5, 'control-hover-bg: 5 regul');
-  assert.equal((STYLES.match(/var\(--popup-danger-hover-bg\)/g) || []).length, 4, 'danger-hover-bg: 2 reguly po 2 wlasciwosci');
+  // Zgloszenie 2026-11-05 (F4b): control-hover x3 (catch-all hover,
+  // catch-all :active, hover rodziny mini); danger-hover x0 (hover
+  // klawiszy danger obsluguje arkusz klienta).
+  assert.equal((STYLES.match(/var\(--popup-control-hover-bg\)/g) || []).length, 3, 'control-hover-bg: 3 reguly');
+  assert.equal((STYLES.match(/var\(--popup-danger-hover-bg\)/g) || []).length, 0, 'danger-hover-bg: 0 regul');
 });
 
 test('style F5: jeden mechanizm disabled (generyczny button:disabled)', () => {
   assert.doesNotMatch(STYLES, /deletion-delete:disabled/, 'usuniety override deletion-delete:disabled');
   assert.doesNotMatch(STYLES, /contact-dir:disabled/, 'usuniety blok contact-dir/addbook:disabled');
   assert.doesNotMatch(STYLES, /opacity:\s*0\.4(?!\d)/, 'brak bloku opacity 0.4');
-  const disabled = ruleBody(/\.arkmail-root\s+button:disabled\b/);
+  const disabled = ruleBody(/\.arkmail-root\s+button:not\(\.popup-btn\):disabled\b/);
   assert.ok(disabled, 'generyczna regula button:disabled zostaje');
   assert.match(disabled!, /opacity:\s*0\.45/, 'generyczna przezroczystosc 0.45');
 });
@@ -270,14 +262,14 @@ test('style F5: rodzina mini promien 6px i hover z tlem', () => {
 });
 
 test('style F5: focus-visible obwodka akcentu i stan :active', () => {
-  const fv = ruleBody(/button:focus-visible,/);
+  const fv = ruleBody(/button:not\(\.popup-btn\):focus-visible,/);
   assert.ok(fv, 'regula focus-visible istnieje');
   assert.match(fv!, /outline:\s*calc\(2px \* var\(--window-font-scale, 1\)\) solid var\(--popup-accent\)/, 'focus-visible: 2px akcent');
   assert.match(fv!, /outline-offset:\s*calc\(1px \* var\(--window-font-scale, 1\)\)/, 'focus-visible: offset 1px');
   assert.match(STYLES, /\.arkmail-tab:focus-visible,/, 'focus-visible obejmuje zakladki');
   assert.match(STYLES, /\.arkmail-box:focus-visible,/, 'focus-visible obejmuje skrzynki');
   assert.match(STYLES, /\.arkmail-arch-people-toggle:focus-visible/, 'focus-visible obejmuje rodzine mini');
-  const active = ruleBody(/button:not\(\[data-armed="1"\]\):active/);
+  const active = ruleBody(/button:not\(\.popup-btn\):not\(\[data-armed="1"\]\):active/);
   assert.ok(active, 'regula :active istnieje');
   assert.match(active!, /background:\s*var\(--popup-control-hover-bg\)/, ':active uzywa control-hover');
 });

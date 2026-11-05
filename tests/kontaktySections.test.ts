@@ -140,7 +140,7 @@ test('kontakty: Aliasy Pocztowe jako osobna sekcja z czyszczeniem', () => {
   );
   const clear = q(container, '[data-aliases-clear]');
   assert.ok(clear, 'klawisz czyszczenia aliasow');
-  assert.ok(classesOf(clear).includes('arkmail-btn-danger'), 'czyszczenie: danger');
+  assert.ok(classesOf(clear).includes('popup-btn--danger'), 'czyszczenie: danger');
   click(clear);
   assert.equal(calls.clearAliases, 0, 'pierwszy klik tylko uzbraja');
   click(q(container, '[data-aliases-clear][data-armed="1"]'));
@@ -152,7 +152,7 @@ test('kontakty: Wyczysc cala ksiazke - guard i zakres', () => {
   switchSub(container, 'Import-Eksport');
   const clearAll = q(container, '[data-book-clear-all]');
   assert.ok(clearAll, 'klawisz czyszczenia calej ksiazki');
-  assert.ok(classesOf(clearAll).includes('arkmail-btn-danger'), 'danger');
+  assert.ok(classesOf(clearAll).includes('popup-btn--danger'), 'danger');
   assert.match(
     (clearAll as { getAttribute(n: string): string | null }).getAttribute('title') ?? '',
     /imiona.*grupy.*aliasy/i,

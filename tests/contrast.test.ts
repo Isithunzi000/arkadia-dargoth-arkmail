@@ -33,37 +33,18 @@ test('style: zero hex w arkuszu (kolory tylko ze zmiennych klienta)', () => {
   );
 });
 
-test('style: przycisk Wyslij na wypelnieniu akcentu', () => {
+test('style: przycisk Wyslij bez wlasnych kolorow (solid z arkusza klienta)', () => {
+  // Zgloszenie 2026-11-05 (F4b): wysylka to popup-btn--solid; kolory i
+  // kontrast pilnuje motyw klienta, regula .arkmail-send ma tylko uklad.
   const b = ruleBody('send');
-  assert.match(b, /background:\s*var\(--popup-accent\)/, 'tlo akcentu');
-  assert.match(b, /border-color:\s*var\(--popup-accent\)/, 'obwodka akcentu');
+  assert.doesNotMatch(b, /background:/, 'wysylka: zero wlasnego tla');
+  assert.doesNotMatch(b, /(?:border|color):/, 'wysylka: zero wlasnych kolorow');
+  assert.match(b, /font-weight:\s*600/, 'wysylka: pogrubienie etykiety zostaje');
 });
 
-test('style: hover Wyslij rozjasnia wypelnienie (filter)', () => {
-  const b = hoverBody('send');
-  assert.match(b, /background:\s*var\(--popup-accent\)/, 'hover: akcent');
-  assert.match(b, /border-color:\s*var\(--popup-accent\)/, 'obwodka hover: akcent');
-  assert.match(b, /filter:\s*brightness\(1\.1\)/, 'rozjasnienie hover jak w kliencie');
-});
-
-test('style: hover usuwania na danger-hover klienta', () => {
-  const b = hoverBody('btn-danger');
-  assert.match(b, /background:\s*var\(--popup-danger-hover-bg\)/, 'hover danger-hover-bg');
-  assert.match(b, /border-color:\s*var\(--popup-danger-hover-bg\)/, 'obwodka hover danger-hover-bg');
-});
-
-test('style: hover klawisza kasowania listu symetryczny z btn-danger', () => {
-  const b = hoverBody('del');
-  assert.match(b, /background:\s*var\(--popup-danger-hover-bg\)/, 'hover danger-hover-bg');
-  assert.match(b, /border-color:\s*var\(--popup-danger-hover-bg\)/, 'obwodka hover danger-hover-bg');
-});
-
-test('style: hover akcji - tekst w kolorze tla okna na hover kontrolki', () => {
-  const b = hoverBody('btn-action');
-  assert.match(b, /color:\s*var\(--popup-bg\)/, 'tekst w kolorze tla okna (konwencja klienta)');
-  assert.match(b, /border-color:\s*var\(--popup-accent\)/, 'obwodka akcentu');
-  assert.match(b, /background:\s*var\(--popup-control-hover-bg\)/, 'tlo hover kontrolki');
-});
+// Hovery klawiszy (send, action, danger, del) obsluguje arkusz klienta
+// Dargoth dla klas popup-btn--*; plugin nie definiuje wlasnych regul hover
+// dla natywnych klawiszy (zgloszenie 2026-11-05, F4b).
 
 test('style: nieprzeczytany wiersz ma pasek akcentowy z lewej', () => {
   const b = ruleBody('unread');

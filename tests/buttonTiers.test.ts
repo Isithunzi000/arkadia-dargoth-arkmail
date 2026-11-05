@@ -21,6 +21,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { Window } from 'happy-dom';
 
 import { STYLES } from '../src/arkmail/ui/styles';
@@ -95,24 +97,24 @@ function mount(store: MailUiStore) {
 
 /** Oczekiwane klasy poziomow per przycisk (istniejaca klasa -> poziom). */
 const TIERS: Array<{ tab: string; selector: string; tier: string }> = [
-  { tab: 'listy', selector: '.arkmail-search-go', tier: 'arkmail-btn-primary' },
-  { tab: 'listy', selector: '.arkmail-animal-send', tier: 'arkmail-btn-action' },
-  { tab: 'listy', selector: '.arkmail-older-all', tier: 'arkmail-btn-action' },
-  { tab: 'listy-full', selector: '.arkmail-older', tier: 'arkmail-btn-action' },
-  { tab: 'listy', selector: '.arkmail-cache-clear', tier: 'arkmail-btn-danger' },
-  { tab: 'listy', selector: '.arkmail-search-clear', tier: 'arkmail-btn-danger' },
-  { tab: 'list', selector: '.arkmail-del', tier: 'arkmail-btn-danger' },
-  { tab: 'napisz', selector: '.arkmail-send', tier: 'arkmail-btn-primary' },
-  { tab: 'napisz', selector: '.arkmail-compose-clear', tier: 'arkmail-btn-danger' },
+  { tab: 'listy', selector: '.arkmail-search-go', tier: 'popup-btn--solid' },
+  { tab: 'listy', selector: '.arkmail-animal-send', tier: 'popup-btn--control' },
+  { tab: 'listy', selector: '.arkmail-older-all', tier: 'popup-btn--control' },
+  { tab: 'listy-full', selector: '.arkmail-older', tier: 'popup-btn--control' },
+  { tab: 'listy', selector: '.arkmail-cache-clear', tier: 'popup-btn--danger' },
+  { tab: 'listy', selector: '.arkmail-search-clear', tier: 'popup-btn--danger' },
+  { tab: 'list', selector: '.arkmail-del', tier: 'popup-btn--danger' },
+  { tab: 'napisz', selector: '.arkmail-send', tier: 'popup-btn--solid' },
+  { tab: 'napisz', selector: '.arkmail-compose-clear', tier: 'popup-btn--danger' },
   // Fala UI-2 krok 4: przycisk indeksacji z bramy Kontaktow przeniesiony
   // do panelu Osoby w Archiwum - poziom ten sam, zakrywa wpis archiwum.
-  { tab: 'archiwum', selector: '.arkmail-index-all', tier: 'arkmail-btn-action' },
-  { tab: 'archiwum', selector: '.arkmail-arch-download', tier: 'arkmail-btn-action' },
-  { tab: 'archiwum', selector: '.arkmail-arch-export', tier: 'arkmail-btn-primary' },
-  { tab: 'archiwum', selector: '.arkmail-arch-clear', tier: 'arkmail-btn-danger' },
-  { tab: 'usuwanie', selector: '.arkmail-deletion-search', tier: 'arkmail-btn-primary' },
-  { tab: 'usuwanie', selector: '.arkmail-deletion-delete', tier: 'arkmail-btn-danger' },
-  { tab: 'usuwanie', selector: '.arkmail-deletion-clear-filters', tier: 'arkmail-btn-danger' },
+  { tab: 'archiwum', selector: '.arkmail-index-all', tier: 'popup-btn--control' },
+  { tab: 'archiwum', selector: '.arkmail-arch-download', tier: 'popup-btn--control' },
+  { tab: 'archiwum', selector: '.arkmail-arch-export', tier: 'popup-btn--solid' },
+  { tab: 'archiwum', selector: '.arkmail-arch-clear', tier: 'popup-btn--danger' },
+  { tab: 'usuwanie', selector: '.arkmail-deletion-search', tier: 'popup-btn--solid' },
+  { tab: 'usuwanie', selector: '.arkmail-deletion-delete', tier: 'popup-btn--danger' },
+  { tab: 'usuwanie', selector: '.arkmail-deletion-clear-filters', tier: 'popup-btn--danger' },
 ];
 
 function mountedTabs(): Record<string, { querySelector(s: string): unknown; querySelectorAll(s: string): unknown }> {
@@ -150,7 +152,7 @@ test('tiers: kazdy przycisk ma klase swojego poziomu', () => {
 test('tiers: primary max 2 na zakladke - wyroznienie nie zlewa sie', () => {
   const tabs = mountedTabs();
   for (const [name, container] of Object.entries(tabs)) {
-    const primary = (container.querySelectorAll('.arkmail-btn-primary') as unknown as unknown[]).length;
+    const primary = (container.querySelectorAll('.popup-btn--solid') as unknown as unknown[]).length;
     assert.ok(primary <= 2, `${name}: ${primary} primary > 2`);
   }
 });
@@ -167,19 +169,20 @@ test('tiers: wszystkie przyciski czyszczenia dziela poziom danger z Usun', () =>
     const el = tabs[tab]!.querySelector(selector) as { className: string } | null;
     assert.ok(el, `${tab} ${selector} istnieje`);
     assert.ok(
-      el.className.split(' ').includes('arkmail-btn-danger'),
+      el.className.split(' ').includes('popup-btn--danger'),
       `${tab} ${selector} ma poziom danger`,
     );
   }
 });
 
-test('tiers: kazdy poziom ma regule w styles.ts i poziomy sie roznia', () => {
-  const bodies: Record<string, string> = {};
-  for (const tier of ['primary', 'action', 'danger', 'reset']) {
-    const m = STYLES.match(new RegExp(`\\.arkmail-btn-${tier}\\s*\\{([^}]*)\\}`));
-    assert.ok(m, `regula .arkmail-btn-${tier} istnieje w styles.ts`);
-    bodies[tier] = m[1]!;
-  }
-  const distinct = new Set(Object.values(bodies));
-  assert.equal(distinct.size, 4, 'cztery poziomy = cztery rozne wyglady');
+test('tiers: zero wlasnych regul poziomow - kolory i wyglad daje klient', () => {
+  // Zgloszenie 2026-11-05 (A3): pelna migracja na natywne UI. Poziomy
+  // to teraz klasy klienta (popup-btn--control/solid/danger/ghost) -
+  // zero regul .arkmail-btn-* w styles.ts, zero przypisan tych klas
+  // w render.ts. Kontrast i wyglad pilnuje motyw klienta.
+  assert.doesNotMatch(STYLES, /\.arkmail-btn-(primary|action|danger|reset)\b/,
+    'styles.ts bez wlasnych regul poziomow');
+  const src = readFileSync(join(__dirname, '..', '..', 'src/arkmail/ui/render.ts'), 'utf8');
+  assert.doesNotMatch(src, /className = '[^']*arkmail-btn-(primary|action|danger|reset)/,
+    'render.ts bez przypisan starych klas poziomow');
 });

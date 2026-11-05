@@ -26,15 +26,14 @@ const FG_DIM = 'var(--popup-text-dim)'; // tekst przytlumiony
 const BORDER = 'var(--popup-border)'; // obramowania
 const ACCENT = 'var(--popup-accent)'; // akcent (aktywne, wysylka, kropki, obwodki)
 const ACCENT_SOFT = 'var(--popup-accent)'; // tekst akcentowy
-const ACCENT_DEEP = 'var(--popup-accent)'; // tlo btn-primary
-const ACCENT_DEEPER = 'var(--popup-accent)'; // hover btn-primary + filter brightness
+const ACCENT_DEEP = 'var(--popup-accent)'; // tlo klawisza glownego (solid)
+const ACCENT_DEEPER = 'var(--popup-accent)'; // hover zakladek aktywnych
 const ACCENT_FG = 'var(--popup-bg)'; // tekst na wypelnieniu akcentu (konwencja klienta)
-const DANGER = 'var(--popup-danger-bg)'; // tlo btn-danger
+const DANGER = 'var(--popup-danger-bg)'; // tlo klawiszy danger (uzbrojenie)
 const DANGER_TEXT = 'var(--popup-danger)'; // tekst bledow na panelu
 const BG_UNREAD = 'var(--popup-accent-subtle-bg)'; // tlo wiersza nieprzeczytanego
 const ACCENT_BRIGHT = 'var(--popup-accent)'; // wyroznienia na nieprzeczytanym
 const HOVER_BASE = 'var(--popup-control-hover-bg)';
-const HOVER_DANGER = 'var(--popup-danger-hover-bg)';
 const HOVER_RESET = 'var(--popup-control-hover-bg)';
 
 export const STYLES = `
@@ -64,7 +63,7 @@ export const STYLES = `
 }
 
 /* --- kontrolki bazowe: JAWNE kolory (bug bialy-na-bialym) --- */
-.arkmail-root button {
+.arkmail-root button:not(.popup-btn) {
   background: ${BG_RAISED};
   color: ${FG};
   border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
@@ -81,44 +80,29 @@ export const STYLES = `
   justify-content: center;
   min-height: calc(26px * var(--window-font-scale, 1));
 }
-.arkmail-root button:hover { background: ${HOVER_BASE}; }
-.arkmail-root button:not([data-armed="1"]):active { background: ${HOVER_RESET}; }
-.arkmail-root button:focus-visible,
+.arkmail-root button:not(.popup-btn):hover { background: ${HOVER_BASE}; }
+.arkmail-root button:not(.popup-btn):not([data-armed="1"]):active { background: ${HOVER_RESET}; }
+.arkmail-root button:not(.popup-btn):focus-visible,
 .arkmail-root .arkmail-tab:focus-visible,
 .arkmail-root .arkmail-box:focus-visible,
 .arkmail-root .arkmail-contact-dir:focus-visible,
 .arkmail-root .arkmail-contact-addbook:focus-visible,
 .arkmail-root .arkmail-arch-people-toggle:focus-visible { outline: calc(2px * var(--window-font-scale, 1)) solid ${ACCENT_BRIGHT}; outline-offset: calc(1px * var(--window-font-scale, 1)); }
 
-/* --- Fala 30: cztery poziomy przyciskow (jeden jezyk calego UI) --- */
-.arkmail-root .arkmail-btn-primary {
-  background: ${ACCENT_DEEP};
-  border-color: ${ACCENT_DEEP};
-  color: ${ACCENT_FG};
+/* Zgloszenie 2026-11-05 (A3): poziomy przyciskow to klasy natywnego
+ * UI klienta (popup-btn--control/solid/danger/ghost) - zero wlasnych
+ * regul kolorow; wyglad i kontrast pilnuje motyw klienta.
+ * K2: uzbrojony guard dwukliku (pierwszy klik) dostaje wypelnienie
+ * danger i grubsza jasniejsza obwodke - stan "drugi klik kasuje" widac
+ * z daleka, wyraznie odroznialny od ghosta w spoczynku. Selektor ma
+ * wyzsza specyficznosc niz .popup-btn--danger.ghost klienta. */
+.arkmail-root button.popup-btn--danger[data-armed="1"] {
+  background: var(--popup-danger-bg);
+  border-color: var(--popup-danger-border);
+  color: var(--popup-danger);
+  outline: calc(2px * var(--window-font-scale, 1)) solid var(--popup-danger-border);
+  outline-offset: calc(1px * var(--window-font-scale, 1));
 }
-.arkmail-root .arkmail-btn-primary:hover { background: ${ACCENT_DEEPER}; border-color: ${ACCENT_DEEPER}; filter: brightness(1.1); }
-.arkmail-root .arkmail-btn-action {
-  background: ${BG_RAISED};
-  border: calc(1px * var(--window-font-scale, 1)) solid ${ACCENT};
-  color: ${ACCENT_SOFT};
-}
-.arkmail-root .arkmail-btn-action:hover { background: ${HOVER_BASE}; border-color: ${ACCENT_SOFT}; color: ${ACCENT_FG}; }
-.arkmail-root .arkmail-btn-danger {
-  background: ${DANGER};
-  border-color: ${DANGER};
-  color: ${ACCENT_FG};
-}
-.arkmail-root .arkmail-btn-danger:hover { background: ${HOVER_DANGER}; border-color: ${HOVER_DANGER}; }
-/* Zgloszenie 2026-11-05: uzbrojony guard dwukliku (pierwszy klik)
-   dostaje czerwone tlo niezaleznie od bazowej klasy klawisza - stan
-   "drugi klik kasuje" widac z daleka, bez zmiany szerokosci przycisku. */
-.arkmail-root button[data-armed="1"] { background: ${DANGER}; border-color: ${DANGER}; color: ${ACCENT_FG}; }
-.arkmail-root .arkmail-btn-reset {
-  background: ${BG_PANEL};
-  border-color: ${BORDER};
-  color: ${FG_DIM};
-}
-.arkmail-root .arkmail-btn-reset:hover { background: ${HOVER_RESET}; }
 .arkmail-root input, .arkmail-root textarea, .arkmail-root select {
   background: ${BG_INPUT};
   color: ${FG};
@@ -259,8 +243,8 @@ export const STYLES = `
 /* Fala 11e: zbiorcze operacje na aktywnej skrzynce (zamiast obrotu per box). */
 .arkmail-box-ops { display: flex; flex-wrap: wrap; gap: calc(6px * var(--window-font-scale, 1)); margin-bottom: calc(8px * var(--window-font-scale, 1)); }
 .arkmail-box-ops button { flex: 1 1 calc(140px * var(--window-font-scale, 1)); }
-.arkmail-root button:disabled { opacity: 0.45; cursor: default; }
-.arkmail-root button:disabled:hover { background: ${BG_RAISED}; }
+.arkmail-root button:not(.popup-btn):disabled { opacity: 0.45; cursor: default; }
+.arkmail-root button:not(.popup-btn):disabled:hover { background: ${BG_RAISED}; }
 
 /* --- wiersze listow: nadawca | temat | data --- */
 .arkmail-entry {
@@ -375,12 +359,8 @@ export const STYLES = `
 }
 .arkmail-letter-ops { display: flex; flex-wrap: wrap; gap: calc(6px * var(--window-font-scale, 1)); margin-top: calc(8px * var(--window-font-scale, 1)); align-items: center; }
 .arkmail-letter-ops input { flex: 1; }
-.arkmail-root .arkmail-del {
-  background: ${DANGER};
-  border-color: ${DANGER};
-  color: ${ACCENT_FG};
-}
-.arkmail-root .arkmail-del:hover { background: ${HOVER_DANGER}; border-color: ${HOVER_DANGER}; }
+/* Zgloszenie 2026-11-05 (A3): kolory klawisza kasowania listu daje
+ * klasa natywna popup-btn--danger. */
 .arkmail-fwd { flex: none; }
 
 /* --- formularz compose --- */
@@ -420,12 +400,8 @@ export const STYLES = `
 .arkmail-root .arkmail-send {
   margin-top: calc(10px * var(--window-font-scale, 1));
   padding: calc(6px * var(--window-font-scale, 1)) calc(18px * var(--window-font-scale, 1));
-  background: ${ACCENT_DEEP};
-  border-color: ${ACCENT_DEEP};
-  color: ${ACCENT_FG};
   font-weight: 600;
 }
-.arkmail-root .arkmail-send:hover { background: ${ACCENT_DEEPER}; border-color: ${ACCENT_DEEPER}; filter: brightness(1.1); }
 
 /* --- usuwanie listow --- */
 .arkmail-deletion-intro, .arkmail-deletion-message, .arkmail-deletion-summary,
@@ -458,11 +434,8 @@ export const STYLES = `
 }
 .arkmail-deletion-entry input { flex: none; margin-top: calc(3px * var(--window-font-scale, 1)); }
 .arkmail-deletion-entry span { min-width: 0; overflow-wrap: anywhere; }
-.arkmail-root .arkmail-deletion-delete {
-  background: ${DANGER};
-  border-color: ${DANGER};
-  color: ${ACCENT_FG};
-}
+/* Zgloszenie 2026-11-05 (A3): kolor daje klasa natywna
+ * popup-btn--danger. */
 
 /* --- kontakty i archiwum --- */
 .arkmail-contact, .arkmail-arch-entry {
