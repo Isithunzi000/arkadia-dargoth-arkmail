@@ -45,7 +45,7 @@ graficznych).
    tło i obramowanie.
 4. `.arkmail-del:hover` (369): #c2564d → #c04a40 oraz dodać
    border-color #c04a40 (symetria z btn-danger — ustalenie D6).
-5. `.arkmail-btn-action:hover` (91): color #6b93ea → #ffffff (7.11 na
+5. `.arkmail-btn-action:hover` (91): color #6b93ea → #ffffff (8.85 na
    #454a58); border-color #6b93ea → ACCENT_SOFT (3.49, element
    graficzny); background zostaje #454a58 (token w F5).
 6. `.arkmail-unread` (282): inset box-shadow ACCENT → ACCENT_BRIGHT.
@@ -63,9 +63,11 @@ Po zmianach ACCENT (#4a7de0) pełni wyłącznie role elementów graficznych
 ACCENT. Minimum tekstowe 4.65 (FG_DIM/BG_RAISED).
 
 Testy: nowy tests/contrast.test.ts (asercje ruleBody na wszystkie
-powyższe reguły) plus aktualizacja tests/unreadAccent.test.ts (2
-asercje #4a7de0 → #6b93ea i komentarz kontrastu). Czerwień weryfikowana
-lokalnie na starym kodzie przed commitem.
+powyższe reguły) plus aktualizacja tests/unreadAccent.test.ts (1
+asercja: pasek nieprzeczytanego #4a7de0 → #6b93ea i komentarz
+kontrastu; asercja obwodki box-attention ZOSTAJE #4a7de0 — zamknięty
+wyjątek z F5). Czerwień weryfikowana lokalnie na starym kodzie przed
+commitem.
 
 ## F2 — ASCII (K2): meta.ts, plugin.json, komentarze
 
