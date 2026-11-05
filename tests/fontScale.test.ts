@@ -30,7 +30,10 @@ test('style: kazda dlugosc px skaluje sie przez --window-font-scale', () => {
   // czy zostal surowy piksel gdziekolwiek.
   const code = STYLES.replace(/\/\*[\s\S]*?\*\//g, '');
   const stripped = code.replace(/calc\(\d+px \* var\(--window-font-scale, 1\)\)/g, '');
-  const raw = stripped.match(/\d+px\b/g) ?? [];
+  // Wydanie 1.30.1: fallbacki px w var() (np. var(--ui-input-fs, 14px))
+  // to konwencja klienta, nie wlasna dlugosc pluginu.
+  const noFallbacks = stripped.replace(/var\([^)]*?\d+px[^)]*?\)/g, 'var()');
+  const raw = noFallbacks.match(/\d+px\b/g) ?? [];
   assert.deepEqual(raw, [], `surowe piksele poza calc(): ${raw.join(', ')}`);
 });
 
@@ -48,12 +51,21 @@ test('style: podglad compose uzywa czcionki wyjscia okna', () => {
   assert.match(body!, /font-size:\s*var\(--output-font-size/, 'rozmiar czcionki z ustawien okna');
 });
 
-test('style: pola formularza bez wlasnych wysokosci (skalowanie w kliencie)', () => {
+test('style: pola formularza bez catch-all wysokosci; textarea compose z chroniona min-wysokoscia', () => {
   // Zgloszenie 2026-11-05 (F4c): pola uzywaja natywnych klas klienta
   // (popup-input popup-input--control) - wysokosc i jej skalowanie ze
   // skala okna pilnuje zmienna --ui-ctrl z arkusza klienta. Plugin
-  // nie wolno miec wlasnych regulek wysokosci dla pol.
+  // nie wolno miec catch-alla wysokosci dla pol. Wyjatek: textarea
+  // compose ma chroniona skalowana min-wysokosc 120px (regula w sile
+  // 0,2,1, wiecej w specificity.test.ts).
   const body = ruleBody(/\.arkmail-root\s+input,\s*\.arkmail-root\s+textarea/);
   assert.equal(body, null, 'brak catch-all z wysokosciami pol');
-  assert.doesNotMatch(STYLES, /\.arkmail-form input[^}]*height:/, 'form bez wlasnych wysokosci');
+  assert.doesNotMatch(STYLES, /\.arkmail-form input[^}]*height:/, 'form bez wlasnych wysokosci input');
+  const ta = ruleBody(/\.arkmail-root\s+\.arkmail-form\s+textarea(?![\w-])/);
+  assert.ok(ta, 'regula textarea compose istnieje');
+  assert.match(
+    ta!,
+    /min-height:\s*calc\(120px \* var\(--window-font-scale, 1\)\)/,
+    'min-wysokosc textarea skalowana',
+  );
 });

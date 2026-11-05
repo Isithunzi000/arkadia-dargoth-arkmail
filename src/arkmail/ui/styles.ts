@@ -27,9 +27,7 @@ const BORDER = 'var(--popup-border)'; // obramowania
 const ACCENT = 'var(--popup-accent)'; // akcent (aktywne, wysylka, kropki, obwodki)
 const ACCENT_SOFT = 'var(--popup-accent)'; // tekst akcentowy
 const ACCENT_DEEP = 'var(--popup-accent)'; // tlo klawisza glownego (solid)
-const ACCENT_DEEPER = 'var(--popup-accent)'; // hover zakladek aktywnych
 const ACCENT_FG = 'var(--popup-bg)'; // tekst na wypelnieniu akcentu (konwencja klienta)
-const DANGER = 'var(--popup-danger-bg)'; // tlo klawiszy danger (uzbrojenie)
 const DANGER_TEXT = 'var(--popup-danger)'; // tekst bledow na panelu
 const BG_UNREAD = 'var(--popup-accent-subtle-bg)'; // tlo wiersza nieprzeczytanego
 const ACCENT_BRIGHT = 'var(--popup-accent)'; // wyroznienia na nieprzeczytanym
@@ -191,24 +189,24 @@ export const STYLES = `
 
 /* --- skrzynki: pigulki --- */
 .arkmail-boxes { display: flex; gap: calc(4px * var(--window-font-scale, 1)); margin-bottom: calc(8px * var(--window-font-scale, 1)); flex-wrap: wrap; }
-.arkmail-root .arkmail-box {
+.arkmail-root button.arkmail-box {
   border-radius: calc(999px * var(--window-font-scale, 1));
   padding: calc(3px * var(--window-font-scale, 1)) calc(12px * var(--window-font-scale, 1));
   background: ${BG};
   color: ${FG_DIM};
   border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
 }
-.arkmail-root .arkmail-box:hover { color: ${FG}; background: ${BG_RAISED}; }
-.arkmail-root .arkmail-box-active {
+.arkmail-root button.arkmail-box:hover { color: ${FG}; background: ${BG_RAISED}; }
+.arkmail-root button.arkmail-box-active {
   background: ${ACCENT_DEEP};
   border-color: ${ACCENT_DEEP};
   color: ${ACCENT_FG};
   font-weight: 600;
 }
-.arkmail-root .arkmail-box-active:hover { background: ${ACCENT_DEEP}; color: ${ACCENT_FG}; }
+.arkmail-root button.arkmail-box-active:hover { background: ${ACCENT_DEEP}; color: ${ACCENT_FG}; }
 /* Fala 16f: trwaly akcent (obwodka) na skrzynce z licznikiem > 0 -
    Nieprzeczytane/Niewyslane widac z daleka (zgloszenie pkt 5/8). */
-.arkmail-root .arkmail-box-attention {
+.arkmail-root button.arkmail-box-attention {
   border-color: ${ACCENT};
   color: ${FG};
 }
@@ -266,7 +264,6 @@ export const STYLES = `
 }
 
 .arkmail-root .arkmail-older { margin-top: calc(8px * var(--window-font-scale, 1)); width: 100%; }
-.arkmail-older-row { display: flex; gap: calc(6px * var(--window-font-scale, 1)); margin-top: calc(8px * var(--window-font-scale, 1)); }
 /* Fala 11a: szukajka stosowo (2 kolumny), nie 5 w linii - w waskiej
    kolumnie splitu pola tekstowe zachowuja sensowna szerokosc. */
 .arkmail-search-row {
@@ -299,11 +296,9 @@ export const STYLES = `
   color: ${FG};
   font-size: calc(12px * var(--window-font-scale, 1));
 }
-.arkmail-root .arkmail-search-clear { flex: none; padding: calc(2px * var(--window-font-scale, 1)) calc(10px * var(--window-font-scale, 1)); }
-.arkmail-older-row .arkmail-older { margin-top: 0; flex: 1; }
+.arkmail-root button.arkmail-search-clear { flex: none; padding: calc(2px * var(--window-font-scale, 1)) calc(10px * var(--window-font-scale, 1)); }
 .arkmail-root .arkmail-older-all { flex: 1; }
 .arkmail-root button.arkmail-older-all { margin-top: calc(8px * var(--window-font-scale, 1)); width: 100%; }
-.arkmail-older-row button.arkmail-older-all { margin-top: 0; width: auto; }
 /* Fala 17e: "Wczytaj wszystkie" w box-ops - regula paginacji wyzej
  * (margin-top: 8px; width: 100%) lapala go specyficznoscia 0,2,1 i
  * przycisk odjezdzal od sasiadow (zgloszenie pkt 1). */
@@ -341,7 +336,10 @@ export const STYLES = `
 .arkmail-form input, .arkmail-form textarea, .arkmail-form select {
   width: 100%;
 }
-.arkmail-form textarea { min-height: calc(120px * var(--window-font-scale, 1)); resize: vertical; }
+/* Wydanie 1.30.1 (B1): sila 0,2,1 - regula klienta textarea.popup-input.popup-input--control
+   (0,2,1; height: auto; min-height: var(--ui-ctrl)) inaczej zaglusza pluginowi
+   wysokosc pola compose; remis specyficznosci wygrywa kolejnoscia. */
+.arkmail-root .arkmail-form textarea { min-height: calc(120px * var(--window-font-scale, 1)); resize: vertical; }
 .arkmail-preview {
   margin: 0;
   padding: calc(8px * var(--window-font-scale, 1)) calc(10px * var(--window-font-scale, 1));
@@ -430,7 +428,7 @@ export const STYLES = `
 .arkmail-contact-name:hover { text-decoration: underline; }
 .arkmail-contact-dirs { margin-left: auto; display: flex; gap: calc(4px * var(--window-font-scale, 1)); }
 /* Rodzina mini: kompaktowy wariant poziomu action (jeden jezyk przyciskow). */
-.arkmail-root .arkmail-contact-dir, .arkmail-root .arkmail-contact-addbook, .arkmail-root .arkmail-arch-people-toggle {
+.arkmail-root button.arkmail-contact-dir, .arkmail-root button.arkmail-contact-addbook, .arkmail-root button.arkmail-arch-people-toggle {
   background: ${BG_RAISED};
   color: ${FG};
   border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
@@ -439,7 +437,7 @@ export const STYLES = `
   font-size: calc(11px * var(--window-font-scale, 1));
   cursor: pointer;
 }
-.arkmail-root .arkmail-contact-dir:hover, .arkmail-root .arkmail-contact-addbook:hover, .arkmail-root .arkmail-arch-people-toggle:hover { background: ${HOVER_BASE}; border-color: ${ACCENT_SOFT}; color: ${ACCENT_FG}; }
+.arkmail-root button.arkmail-contact-dir:hover, .arkmail-root button.arkmail-contact-addbook:hover, .arkmail-root button.arkmail-arch-people-toggle:hover { background: ${HOVER_BASE}; border-color: ${ACCENT_SOFT}; color: ${ACCENT_FG}; }
 /* Fala UI-2 krok 4: naglowek zwijanego panelu "Osoby z listow". */
 .arkmail-arch-people-head { margin: calc(8px * var(--window-font-scale, 1)) 0 calc(4px * var(--window-font-scale, 1)); }
 /* Zgloszenie 2026-11-05 (A1): rozwineta lista osob scrolluje sie
@@ -531,8 +529,15 @@ export const STYLES = `
 .arkmail-root .arkmail-ghost {
   position: absolute;
   inset: 0;
-  /* padding inputu (5px 8px) + jego border (1px) = tekst 1:1 nad polem */
-  padding: calc(6px * var(--window-font-scale, 1)) calc(9px * var(--window-font-scale, 1));
+  display: flex;
+  align-items: center;
+  /* Wydanie 1.30.1 (B2): ten sam font-size co pole klienta
+     (var(--ui-input-fs)) i wyrownanie pionowe jak tekst w inputcie -
+     podpowiedz stoi 1:1 za kursorem. Padding poziomy = padding
+     inputu (8px) + jego border (1px). */
+  font-size: var(--ui-input-fs, 14px);
+  line-height: normal;
+  padding: 0 calc(9px * var(--window-font-scale, 1));
   overflow: hidden;
   pointer-events: none;
   white-space: pre;
