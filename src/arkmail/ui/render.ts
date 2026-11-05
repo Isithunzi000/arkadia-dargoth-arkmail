@@ -2325,6 +2325,9 @@ const nativeFieldClass = (el: HTMLElement): void => {
     // pobiera sie je z gry). Zgloszenie 2026-11-05: przez handler -
     // pobranie pliku + komunikat robi index.ts (jak eksport listu).
     const expBtn = doc.createElement('button');
+    // 1.30.2 (Etap 1): klasy natywne jak przy kazdym eksporcie akcji
+    // (solid - pobranie pliku to operacja glowna sekcji).
+    expBtn.className = 'popup-btn popup-btn--control popup-btn--solid';
     expBtn.textContent = 'Eksportuj ksiazke';
     expBtn.setAttribute('data-book-export', '');
     expBtn.setAttribute('title', 'Pobiera plik JSON: imiona i grupy. Aliasy pocztowe nie wchodza do pliku - pobierasz je z gry.');
