@@ -131,20 +131,21 @@ test('ui: skrzynki z licznikiem > 0 maja trwaly akcent (obwodka)', () => {
   m0.off();
 });
 
-test('style: nieprzeczytany wiersz ma jasniejsze tlo (hex)', () => {
+test('style: nieprzeczytany wiersz ma jasniejsze tlo (zmienna natywna)', () => {
+  // Zgloszenie 2026-11-05 (A3): tlo nieprzeczytanych ze zmiennej UI.
   const m = STYLES.match(/\.arkmail-unread\s*\{([^}]*)\}/);
   assert.ok(m, 'regula .arkmail-unread istnieje');
-  assert.match(m[1], /background:\s*#[0-9a-fA-F]{3,8}\b/, 'jawne jasniejsze tlo wiersza');
+  assert.match(m[1], /background:\s*var\(--popup-accent-subtle-bg\)/, 'jawne jasniejsze tlo wiersza');
 });
 
 test('style: nieprzeczytany wiersz ma pasek akcentowy z lewej', () => {
   const m = STYLES.match(/\.arkmail-unread\s*\{([^}]*)\}/);
   assert.ok(m, 'regula .arkmail-unread istnieje');
-  assert.match(m[1], /inset calc\(3px \* var\(--window-font-scale, 1\)\) 0 0 #6b93ea/, 'pasek ACCENT_BRIGHT z lewej (3.79 na tle nieprzeczytanym, WCAG 1.4.11)');
+  assert.match(m[1], /inset calc\(3px \* var\(--window-font-scale, 1\)\) 0 0 var\(--popup-accent\)/, 'pasek akcentowy z lewej (kontrast pilnuje motyw klienta, WCAG 1.4.11)');
 });
 
-test('style: akcent skrzynki to obwodka w kolorze #4a7de0', () => {
+test('style: akcent skrzynki to obwodka w kolorze akcentu', () => {
   const m = STYLES.match(/\.arkmail-box-attention\s*\{([^}]*)\}/);
   assert.ok(m, 'regula .arkmail-box-attention istnieje');
-  assert.match(m[1], /border-color:\s*#4a7de0\b/, 'obwodka ACCENT');
+  assert.match(m[1], /border-color:\s*var\(--popup-accent\)/, 'obwodka ACCENT');
 });

@@ -144,10 +144,11 @@ test('guardy: X czlonka grupy usuwa dopiero z drugiego klika', () => {
   assert.deepEqual(calls.groups, [['Gildia=Fred']], 'drugi klik zdejmuje czlonka');
 });
 
-test('guardy: styles.ts ma czerwona regule dla uzbrojonego klawisza', () => {
+test('guardy: styles.ts ma dangerowa regule dla uzbrojonego klawisza', () => {
+  // Zgloszenie 2026-11-05 (A3): kolory ze zmiennych natywnego UI.
   const m = STYLES.match(/\[data-armed="1"\]\s*\{([^}]*)\}/);
   assert.ok(m, 'regula [data-armed="1"] istnieje');
-  assert.match(m![1]!, /#b04a42/, 'uzbrojony klawisz ma kolor danger');
+  assert.match(m![1]!, /var\(--popup-danger-bg\)/, 'uzbrojony klawisz ma tlo danger');
 });
 
 test('guardy: ESC rozbraja uzbrojony X', () => {

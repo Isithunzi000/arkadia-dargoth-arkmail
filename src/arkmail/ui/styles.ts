@@ -13,25 +13,29 @@
  * byloby bledne - liczy sie szerokosc samego okna).
  */
 
-const BG = '#1e1f24'; // tlo glowne
-const BG_PANEL = '#26272e'; // panele, karty
-const BG_RAISED = '#31333c'; // przyciski, hover
-const BG_INPUT = '#141519'; // pola tekstowe
-const FG = '#e6e6ea'; // tekst glowny
-const FG_DIM = '#9a9da8'; // tekst przytlumiony
-const BORDER = '#787e8f'; // obramowania (AA non-text vs wszystkie panele)
-const ACCENT = '#4a7de0'; // akcent (aktywne, wysylka, kropki, obwodki)
-const ACCENT_SOFT = '#7ea2ee'; // tekst akcentowy na BG_RAISED (4.97)
-const ACCENT_DEEP = '#3a63b8'; // tlo btn-primary (bialy 5.74)
-const ACCENT_DEEPER = '#2f4f94'; // hover btn-primary (bialy 7.87)
-const ACCENT_FG = '#ffffff';
-const DANGER = '#b04a42'; // tlo btn-danger (bialy 5.38)
-const DANGER_TEXT = '#d4736c'; // tekst bledow na panelu (4.58)
-const BG_UNREAD = '#313a4e'; // tlo wiersza nieprzeczytanego
-const ACCENT_BRIGHT = '#6b93ea'; // wyroznienia na BG_UNREAD (3.79)
-const HOVER_BASE = '#454a58';
-const HOVER_DANGER = '#c04a40';
-const HOVER_RESET = '#2b2d34';
+// Zgloszenie 2026-11-05 (A3): pelna migracja na natywne UI klienta
+// Dargoth - kolory WYLACZNIE ze zmiennych var(--popup-...), zero hex
+// (dokumentacja: PLUGINS.md, sekcja "Wyglad Interfejsu (UI)"). Plugin
+// podaza za motywem klienta, w tym za jasnym. Mapowanie 1:1 wg rol:
+const BG = 'var(--popup-bg)'; // tlo glowne
+const BG_PANEL = 'var(--popup-section-bg)'; // panele, karty
+const BG_RAISED = 'var(--popup-control-bg)'; // przyciski, hover
+const BG_INPUT = 'var(--popup-input-bg)'; // pola tekstowe
+const FG = 'var(--popup-text)'; // tekst glowny
+const FG_DIM = 'var(--popup-text-dim)'; // tekst przytlumiony
+const BORDER = 'var(--popup-border)'; // obramowania
+const ACCENT = 'var(--popup-accent)'; // akcent (aktywne, wysylka, kropki, obwodki)
+const ACCENT_SOFT = 'var(--popup-accent)'; // tekst akcentowy
+const ACCENT_DEEP = 'var(--popup-accent)'; // tlo btn-primary
+const ACCENT_DEEPER = 'var(--popup-accent)'; // hover btn-primary + filter brightness
+const ACCENT_FG = 'var(--popup-bg)'; // tekst na wypelnieniu akcentu (konwencja klienta)
+const DANGER = 'var(--popup-danger-bg)'; // tlo btn-danger
+const DANGER_TEXT = 'var(--popup-danger)'; // tekst bledow na panelu
+const BG_UNREAD = 'var(--popup-accent-subtle-bg)'; // tlo wiersza nieprzeczytanego
+const ACCENT_BRIGHT = 'var(--popup-accent)'; // wyroznienia na nieprzeczytanym
+const HOVER_BASE = 'var(--popup-control-hover-bg)';
+const HOVER_DANGER = 'var(--popup-danger-hover-bg)';
+const HOVER_RESET = 'var(--popup-control-hover-bg)';
 
 export const STYLES = `
 .arkmail-root {
@@ -46,7 +50,6 @@ export const STYLES = `
   gap: calc(8px * var(--window-font-scale, 1));
   background: ${BG};
   color: ${FG};
-  color-scheme: dark;
   line-height: 1.45;
 }
 .arkmail-version-footer {
@@ -93,13 +96,13 @@ export const STYLES = `
   border-color: ${ACCENT_DEEP};
   color: ${ACCENT_FG};
 }
-.arkmail-root .arkmail-btn-primary:hover { background: ${ACCENT_DEEPER}; border-color: ${ACCENT_DEEPER}; }
+.arkmail-root .arkmail-btn-primary:hover { background: ${ACCENT_DEEPER}; border-color: ${ACCENT_DEEPER}; filter: brightness(1.1); }
 .arkmail-root .arkmail-btn-action {
   background: ${BG_RAISED};
   border: calc(1px * var(--window-font-scale, 1)) solid ${ACCENT};
   color: ${ACCENT_SOFT};
 }
-.arkmail-root .arkmail-btn-action:hover { background: ${HOVER_BASE}; border-color: ${ACCENT_SOFT}; color: #ffffff; }
+.arkmail-root .arkmail-btn-action:hover { background: ${HOVER_BASE}; border-color: ${ACCENT_SOFT}; color: ${ACCENT_FG}; }
 .arkmail-root .arkmail-btn-danger {
   background: ${DANGER};
   border-color: ${DANGER};
@@ -320,7 +323,7 @@ export const STYLES = `
 /* Fala 30a: Tresc pelna szerokosc, dzieki temu pola dat laduja para
    Od|Do w jednym rzedzie (lewo-prawo, jak czyta sie zakres). */
 .arkmail-search-row .arkmail-search-wide { grid-column: 1 / -1; }
-.arkmail-search-row input[type='date'] { color-scheme: dark; }
+.arkmail-search-row input[type='date'] { color-scheme: light dark; }
 /* Pole daty z widoczna etykieta (placeholder na date nie dziala). */
 .arkmail-date-field { display: flex; flex-direction: column; gap: calc(2px * var(--window-font-scale, 1)); min-width: 0; }
 .arkmail-date-field input { width: 100%; box-sizing: border-box; }
@@ -422,7 +425,7 @@ export const STYLES = `
   color: ${ACCENT_FG};
   font-weight: 600;
 }
-.arkmail-root .arkmail-send:hover { background: ${ACCENT_DEEPER}; border-color: ${ACCENT_DEEPER}; }
+.arkmail-root .arkmail-send:hover { background: ${ACCENT_DEEPER}; border-color: ${ACCENT_DEEPER}; filter: brightness(1.1); }
 
 /* --- usuwanie listow --- */
 .arkmail-deletion-intro, .arkmail-deletion-message, .arkmail-deletion-summary,
@@ -484,7 +487,7 @@ export const STYLES = `
   font-size: calc(11px * var(--window-font-scale, 1));
   cursor: pointer;
 }
-.arkmail-root .arkmail-contact-dir:hover, .arkmail-root .arkmail-contact-addbook:hover, .arkmail-root .arkmail-arch-people-toggle:hover { background: ${HOVER_BASE}; border-color: ${ACCENT_SOFT}; color: #ffffff; }
+.arkmail-root .arkmail-contact-dir:hover, .arkmail-root .arkmail-contact-addbook:hover, .arkmail-root .arkmail-arch-people-toggle:hover { background: ${HOVER_BASE}; border-color: ${ACCENT_SOFT}; color: ${ACCENT_FG}; }
 /* Fala UI-2 krok 4: naglowek zwijanego panelu "Osoby z listow". */
 .arkmail-arch-people-head { margin: calc(8px * var(--window-font-scale, 1)) 0 calc(4px * var(--window-font-scale, 1)); }
 /* Zgloszenie 2026-11-05 (A1): rozwineta lista osob scrolluje sie
@@ -551,8 +554,8 @@ export const STYLES = `
 }
 .arkmail-archive-step button { width: 100%; margin: 0; }
 .arkmail-step-active { border-left-color: ${ACCENT}; }
-.arkmail-step-done { border-left-color: #55aa77; }
-.arkmail-step-warning, .arkmail-step-incomplete { border-left-color: #cc9944; }
+.arkmail-step-done { border-left-color: var(--popup-success); }
+.arkmail-step-warning, .arkmail-step-incomplete { border-left-color: var(--popup-warning); }
 .arkmail-arch-controls {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -560,7 +563,7 @@ export const STYLES = `
   margin-bottom: calc(8px * var(--window-font-scale, 1));
 }
 .arkmail-arch-controls .arkmail-arch-clear { grid-column: 1 / -1; }
-.arkmail-arch-controls input[type='date'] { color-scheme: dark; }
+.arkmail-arch-controls input[type='date'] { color-scheme: light dark; }
 .arkmail-root .arkmail-contact-filter { flex: 1 1 calc(140px * var(--window-font-scale, 1)); min-width: 0; }
 .arkmail-root .arkmail-contact-sort { max-width: 100%; }
 .arkmail-contact-last { color: ${FG_DIM}; font-size: calc(11px * var(--window-font-scale, 1)); white-space: nowrap; }
