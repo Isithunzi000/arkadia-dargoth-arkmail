@@ -78,6 +78,8 @@ const switchSubByLabel = (container: unknown, label: string): void => {
 };
 const switchToKsiazka = (container: unknown): void => switchSubByLabel(container, 'Ksiazka adresowa');
 const switchToAliasy = (container: unknown): void => switchSubByLabel(container, 'Aliasy Pocztowe');
+const switchToImportEksport = (container: unknown): void =>
+  switchSubByLabel(container, 'Import-Eksport');
 
 const qs = (el: unknown, selector: string): unknown =>
   (el as { querySelector(s: string): unknown }).querySelector(selector);
@@ -133,7 +135,8 @@ test('ksiazka: krzyzyk usuwa imie przez onSavePeople - dwuklik z guardem', () =>
 test('ksiazka: dodanie imienia wywoluje zapis i czysci pole', () => {
   const s = new MailUiStore({ tab: 'kontakty', people: ['Fred'] });
   const { container, calls } = mount(s);
-  switchToKsiazka(container);
+  // Zgloszenie 2026-11-05 (K7): dodawanie mieszka w Import-Eksport.
+  switchToImportEksport(container);
   type(q(container, '[data-book-new]'), 'Grault');
   click(q(container, '[data-book-add]'));
   assert.deepEqual(calls.saves, [['Fred', 'Grault']], 'dopisanie na koniec');
@@ -144,7 +147,7 @@ test('ksiazka: dodanie imienia wywoluje zapis i czysci pole', () => {
 test('ksiazka: walidacja - puste, cyfry, duplikat', () => {
   const s = new MailUiStore({ tab: 'kontakty', people: ['Fred'] });
   const { container, calls } = mount(s);
-  switchToKsiazka(container);
+  switchToImportEksport(container);
   const add = () => click(q(container, '[data-book-add]'));
   const err = () => text(q(container, '[data-book-error]'));
 
@@ -361,4 +364,42 @@ test('ksiazka: filtr bez trafien pokazuje komunikat pustej listy', () => {
   filter.dispatchEvent(new window.Event('input') as unknown as Event);
   assert.equal(qa(container, '[data-book-row]').length, 0, 'brak pasujacych imion');
   assert.match(container.textContent ?? '', /Brak imion pasujacych do filtra/);
+});
+
+// Zgloszenie 2026-11-05 (K3): total liczby imion w ksiazce - gracz widzi,
+// ile ma pozycji, i ile z nich pokazuje aktywny filtr.
+test('ksiazka: licznik total i widocznych przy aktywnym filtrze', () => {
+  const s = new MailUiStore({ tab: 'kontakty', people: ['Fred', 'Grault', 'Corge'] });
+  const { container } = mount(s);
+  const count = () => text(q(container, '[data-book-count]'));
+  assert.equal(count(), 'Ksiazka: 3 imiona', 'total przy pelnej liscie');
+  const filter = q(container, '[data-book-filter]') as unknown as {
+    value: string;
+    dispatchEvent(e: unknown): void;
+  };
+  filter.value = 'grau';
+  filter.dispatchEvent(new window.Event('input') as unknown as Event);
+  assert.equal(count(), 'Ksiazka: 3 imiona (widoczne: 1)', 'filtr pokazuje liczbe widocznych');
+});
+
+// Zgloszenie 2026-11-05 (K8): filtr listy imion z ghost-podpowiedziami
+// osob i aliasow (jak pole Osoba w Archiwum).
+test('ksiazka: filtr imion podpowiada osoby ghostem', () => {
+  const s = new MailUiStore({ tab: 'kontakty', people: ['Fred', 'Grault'] });
+  const { container } = mount(s);
+  const filter = q(container, '[data-book-filter]') as unknown as {
+    value: string;
+    selectionStart: number;
+    selectionEnd: number;
+    dispatchEvent(e: unknown): void;
+    closest(s: string): unknown;
+  };
+  assert.ok(filter.closest('.arkmail-ghost-wrap'), 'filtr opakowany ghostem');
+  filter.value = 'gr';
+  filter.selectionStart = 2;
+  filter.selectionEnd = 2;
+  filter.dispatchEvent(new window.Event('input') as unknown as Event);
+  const rest = (filter.closest('.arkmail-ghost-wrap') as { querySelector(s: string): unknown })
+    .querySelector('.arkmail-ghost-rest') as { textContent?: string } | null;
+  assert.equal(rest?.textContent ?? '', 'ault', 'Grault podpowiada w filtrze');
 });

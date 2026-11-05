@@ -443,6 +443,8 @@ export function mountMailUi(
       .filter((g) => g.members.length > 0)
       .map((g) => ({ text: g.name, expand: g.members.join(', ') })),
   ];
+  // Filtr grup: nazwy grup z ksiazki (zgloszenie 2026-11-05, K8).
+  const groupNameSource: GhostSource = () => store.state.groups.map((g) => g.name);
   // Pola tematu: tematy z archiwum (archiwum jest najnowsze->najstarsze).
   const subjectSource: GhostSource = () => {
     const seen = new Set<string>();
@@ -1588,32 +1590,8 @@ export function mountMailUi(
         (g) => g.name !== ignore && g.name.toLowerCase() === name.toLowerCase(),
       );
 
-    // --- dodawanie grupy
-    const addRow = doc.createElement('div');
-    addRow.className = 'arkmail-group-add';
-    const addInput = doc.createElement('input');
-    addInput.setAttribute('data-group-add', '');
-    addInput.setAttribute('placeholder', 'Nazwa nowej grupy');
-    const addBtn = doc.createElement('button');
-    addBtn.textContent = 'Utworz grupe';
-    addBtn.setAttribute('data-group-create', '');
-    addBtn.setAttribute('title', 'Tworzy pusta grupe. Czlonkow dolaczysz po utworzeniu.');
-    addBtn.addEventListener('click', () => {
-      const name = addInput.value.trim();
-      if (!name) {
-        showError('Podaj nazwe grupy.');
-        return;
-      }
-      if (nameTaken(name)) {
-        showError(`Grupa "${name}" juz istnieje.`);
-        return;
-      }
-      addInput.value = '';
-      save([...state.groups, { name, members: [] }]);
-    });
-    addRow.appendChild(addInput);
-    addRow.appendChild(addBtn);
-    pane.appendChild(addRow);
+    // Tworzenie grupy mieszka w pigulce Import-Eksport (zgloszenie
+    // 2026-11-05, K7) - ta pigulka to lista grup i ich czlonkow.
     pane.appendChild(error);
 
     // --- filtr nazw grup z przyciskiem czyszczenia
@@ -1645,6 +1623,8 @@ export function mountMailUi(
     });
     filterRow.appendChild(filterInput);
     filterRow.appendChild(filterClear);
+    // Zgloszenie 2026-11-05 (K8): filtr grup z podpowiedziami nazw grup.
+    attachGhost(doc, filterInput, groupNameSource);
     pane.appendChild(filterRow);
 
     // --- lista grup
@@ -1836,96 +1816,9 @@ export function mountMailUi(
     }
     const save = (people: string[]): void => handlers.onSavePeople?.(people);
 
-    // --- import bazy osob z gry (Fala UI-2 krok 4: przeniesione z
-    // sub-pigulki Osoby w Kontaktach - indeks osob przeniesiony do
-    // panelu Archiwum, a import jest czynnoscia ksiazki adresowej). Import ZAMIENIA pule (refresh),
-    // nie tworzy grup - z bazy gracz sklada grupy recznie (widok Grupy).
-    const importRow = doc.createElement('div');
-    importRow.className = 'arkmail-import-row';
-    const IMPORT_BTNS: Array<[string, string, string]> = [
-      [
-        'zapamietani',
-        'Importuj zapamietanych',
-        'Pobiera z gry osoby zapamietane na stale i zapisuje je jako baze osob. Grup nie tworzy.',
-      ],
-      [
-        'przedstawieni',
-        'Importuj przedstawionych',
-        'Pobiera z gry osoby, ktore zostaly ci ostatnio przedstawione, i zapisuje je jako baze osob. Grup nie tworzy.',
-      ],
-      [
-        'aliasy',
-        'Importuj aliasy pocztowe',
-        'Pobiera z gry aliasy pocztowe. Nie da sie ich edytowac - rozwija je serwer przy wysylce. Osoby z aliasow dolaczaja do bazy osob.',
-      ],
-    ];
-    for (const [kind, label, title] of IMPORT_BTNS) {
-      const btn = doc.createElement('button');
-      btn.className = 'arkmail-import-btn';
-      btn.setAttribute('data-import', kind);
-      btn.textContent = label;
-      btn.setAttribute('title', title);
-      btn.addEventListener('click', () => {
-        if (kind === 'aliasy') handlers.onImportAliases?.();
-        else handlers.onImportPeople?.(kind as 'zapamietani' | 'przedstawieni');
-      });
-      importRow.appendChild(btn);
-    }
-    pane.appendChild(importRow);
-
-    // --- dodawanie imienia
-    const addRow = doc.createElement('div');
-    addRow.className = 'arkmail-book-add';
-    const addInput = doc.createElement('input');
-    addInput.setAttribute('data-book-new', '');
-    addInput.setAttribute('placeholder', 'Imie nowej osoby');
-    const addBtn = doc.createElement('button');
-    addBtn.className = 'arkmail-btn-action';
-    addBtn.textContent = 'Dodaj';
-    addBtn.setAttribute('data-book-add', '');
-    addBtn.setAttribute('title', 'Dodaje imie do ksiazki adresowej.');
-    const addErr = doc.createElement('span');
-    addErr.className = 'arkmail-group-error';
-    const showAddError = (msg: string): void => {
-      addErr.textContent = msg;
-      addErr.setAttribute('data-book-error', '');
-    };
-    const clearAddError = (): void => {
-      addErr.textContent = '';
-      addErr.removeAttribute('data-book-error');
-    };
-    const tryAdd = (): void => {
-      const name = addInput.value.trim();
-      if (!name) {
-        showAddError('Podaj imie.');
-        return;
-      }
-      if (!/^[A-Za-z]+$/.test(name)) {
-        showAddError('Imie: tylko litery.');
-        return;
-      }
-      if (state.people.some((p) => p.toLowerCase() === name.toLowerCase())) {
-        showAddError('To imie juz jest w ksiazce.');
-        return;
-      }
-      clearAddError();
-      addInput.value = '';
-      // Dopisanie na koniec; deduplikacje robi savePeople w index.ts.
-      save([...state.people, name]);
-    };
-    addBtn.addEventListener('click', tryAdd);
-    addInput.addEventListener('keydown', (ev) => {
-      if ((ev as KeyboardEvent).key === 'Enter') tryAdd();
-    });
-    addRow.appendChild(addInput);
-    addRow.appendChild(addBtn);
-    addRow.appendChild(addErr);
-    // Zgloszenie 2026-11-05: pole nowej osoby z ghost-podpowiedziami
-    // (jak pole adresata): kontakty + aliasy, strzalka w prawo wpisuje
-    // kanoniczna forme kandydata. Attach dopiero po podpieciu inputu
-    // do rodzica - ghost wrapuje element w miejscu w drzewie.
-    attachGhost(doc, addInput, personSource);
-    pane.appendChild(addRow);
+    // Import z gry, dodawanie imion i tworzenie grup mieszkaja w
+    // pigulce Import-Eksport (zgloszenie 2026-11-05, K7): jedno
+    // miejsce budowy ksiazki. Ta pigulka to czysta lista imion.
 
     // --- usuwanie zaznaczonych (uzbrojony dwuklik, jak w Grupy)
     // Zgloszenie 2026-11-05: poziom danger - kazde usuwanie danych
@@ -2036,11 +1929,13 @@ export function mountMailUi(
     });
     filterRow.appendChild(filterInput);
     filterRow.appendChild(filterClear);
+    // Zgloszenie 2026-11-05 (K8): filtr imion z podpowiedziami osob
+    // i aliasow (jak pole Osoba w Archiwum).
+    attachGhost(doc, filterInput, personSource);
 
     // Kontener scrollujacy (D9): filtr i lista imion; naglowek (sub-
-    // pigulki, import, dodawanie, klawisze zbiorcze) zostaje na stale.
-    // Klucz migawki scrolla jak w zakladce Listy - pozycja przetrwa
-    // rerender.
+    // pigulki, klawisze zbiorcze) zostaje na stale. Klucz migawki
+    // scrolla jak w zakladce Listy - pozycja przetrwa rerender.
     const scroll = doc.createElement('div');
     scroll.className = 'arkmail-list-scroll';
     scroll.setAttribute('data-pane-key', 'kontakty:ksiazka');
@@ -2049,6 +1944,23 @@ export function mountMailUi(
     const paintList = (): void => {
       const shown = currentVisible();
       listWrap.replaceChildren();
+      // Zgloszenie 2026-11-05 (K3): total ksiazki nad lista; przy
+      // aktywnym filtrze dopisuje liczbe widocznych pozycji.
+      const count = doc.createElement('div');
+      count.className = 'arkmail-dim';
+      count.setAttribute('data-book-count', '');
+      const lastTwo = sorted.length % 100;
+      const last = sorted.length % 10;
+      const noun =
+        sorted.length === 1
+          ? 'imie'
+          : last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14)
+            ? 'imiona'
+            : 'imion';
+      count.textContent =
+        `Ksiazka: ${sorted.length} ${noun}` +
+        (bookFilter.trim() ? ` (widoczne: ${shown.length})` : '');
+      listWrap.appendChild(count);
       if (sorted.length === 0) {
         listWrap.appendChild(
           dim('Ksiazka adresowa jest pusta - zaimportuj osoby z gry albo dodaj recznie.'),
@@ -2248,6 +2160,125 @@ export function mountMailUi(
     if (state.contacts.length === 0) addAll.setAttribute('disabled', '1');
     addAll.addEventListener('click', () => handlers.onAddAllContacts?.());
     pane.appendChild(addAll);
+
+    // --- import bazy osob z gry (Fala UI-2 krok 4: przeniesione z
+    // sub-pigulki Osoby w Kontaktach - indeks osob przeniesiony do
+    // panelu Archiwum, a import jest czynnoscia ksiazki adresowej).
+    // Import ZAMIENIA pule (refresh), nie tworzy grup - z bazy gracz
+    // sklada grupy recznie (widok Grupy).
+    const importRow = doc.createElement('div');
+    importRow.className = 'arkmail-import-row';
+    const IMPORT_BTNS: Array<[string, string, string]> = [
+      [
+        'zapamietani',
+        'Importuj zapamietanych',
+        'Pobiera z gry osoby zapamietane na stale i zapisuje je jako baze osob. Grup nie tworzy.',
+      ],
+      [
+        'przedstawieni',
+        'Importuj przedstawionych',
+        'Pobiera z gry osoby, ktore zostaly ci ostatnio przedstawione, i zapisuje je jako baze osob. Grup nie tworzy.',
+      ],
+      [
+        'aliasy',
+        'Importuj aliasy pocztowe',
+        'Pobiera z gry aliasy pocztowe. Nie da sie ich edytowac - rozwija je serwer przy wysylce. Osoby z aliasow dolaczaja do bazy osob.',
+      ],
+    ];
+    for (const [kind, label, title] of IMPORT_BTNS) {
+      const btn = doc.createElement('button');
+      btn.className = 'arkmail-import-btn';
+      btn.setAttribute('data-import', kind);
+      btn.textContent = label;
+      btn.setAttribute('title', title);
+      btn.addEventListener('click', () => {
+        if (kind === 'aliasy') handlers.onImportAliases?.();
+        else handlers.onImportPeople?.(kind as 'zapamietani' | 'przedstawieni');
+      });
+      importRow.appendChild(btn);
+    }
+    pane.appendChild(importRow);
+
+    // --- dodawanie imienia (przeniesione z pigulki Ksiazka, K7)
+    const bookAddRow = doc.createElement('div');
+    bookAddRow.className = 'arkmail-book-add';
+    const addInput = doc.createElement('input');
+    addInput.setAttribute('data-book-new', '');
+    addInput.setAttribute('placeholder', 'Imie nowej osoby');
+    const addBtn = doc.createElement('button');
+    addBtn.className = 'arkmail-btn-action';
+    addBtn.textContent = 'Dodaj';
+    addBtn.setAttribute('data-book-add', '');
+    addBtn.setAttribute('title', 'Dodaje imie do ksiazki adresowej.');
+    const addErr = doc.createElement('span');
+    addErr.className = 'arkmail-group-error';
+    const showAddError = (msg: string): void => {
+      addErr.textContent = msg;
+      addErr.setAttribute('data-book-error', '');
+    };
+    const clearAddError = (): void => {
+      addErr.textContent = '';
+      addErr.removeAttribute('data-book-error');
+    };
+    const tryAdd = (): void => {
+      const name = addInput.value.trim();
+      if (!name) {
+        showAddError('Podaj imie.');
+        return;
+      }
+      if (!/^[A-Za-z]+$/.test(name)) {
+        showAddError('Imie: tylko litery.');
+        return;
+      }
+      if (state.people.some((p) => p.toLowerCase() === name.toLowerCase())) {
+        showAddError('To imie juz jest w ksiazce.');
+        return;
+      }
+      clearAddError();
+      addInput.value = '';
+      // Dopisanie na koniec; deduplikacje robi savePeople w index.ts.
+      handlers.onSavePeople?.([...state.people, name]);
+    };
+    addBtn.addEventListener('click', tryAdd);
+    addInput.addEventListener('keydown', (ev) => {
+      if ((ev as KeyboardEvent).key === 'Enter') tryAdd();
+    });
+    bookAddRow.appendChild(addInput);
+    bookAddRow.appendChild(addBtn);
+    bookAddRow.appendChild(addErr);
+    // Pole nowej osoby z ghost-podpowiedziami (jak pole adresata):
+    // kontakty + aliasy, strzalka w prawo wpisuje kanoniczna forme
+    // kandydata. Attach dopiero po podpieciu inputu do rodzica - ghost
+    // wrapuje element w miejscu w drzewie.
+    attachGhost(doc, addInput, personSource);
+    pane.appendChild(bookAddRow);
+
+    // --- tworzenie grupy (przeniesione z pigulki Grupy, K7)
+    const groupAddRow = doc.createElement('div');
+    groupAddRow.className = 'arkmail-group-add';
+    const groupAddInput = doc.createElement('input');
+    groupAddInput.setAttribute('data-group-add', '');
+    groupAddInput.setAttribute('placeholder', 'Nazwa nowej grupy');
+    const groupAddBtn = doc.createElement('button');
+    groupAddBtn.textContent = 'Utworz grupe';
+    groupAddBtn.setAttribute('data-group-create', '');
+    groupAddBtn.setAttribute('title', 'Tworzy pusta grupe. Czlonkow dolaczysz po utworzeniu.');
+    groupAddBtn.addEventListener('click', () => {
+      const name = groupAddInput.value.trim();
+      if (!name) {
+        showError('Podaj nazwe grupy.');
+        return;
+      }
+      if (state.groups.some((g) => g.name.toLowerCase() === name.toLowerCase())) {
+        showError(`Grupa "${name}" juz istnieje.`);
+        return;
+      }
+      groupAddInput.value = '';
+      handlers.onSaveGroups?.([...state.groups, { name, members: [] }]);
+    });
+    groupAddRow.appendChild(groupAddInput);
+    groupAddRow.appendChild(groupAddBtn);
+    pane.appendChild(groupAddRow);
     pane.appendChild(doc.createElement('hr'));
 
     // Eksport: imiona + grupy do pliku JSON (aliasy nie wchodza -

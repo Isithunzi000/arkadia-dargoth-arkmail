@@ -117,6 +117,10 @@ test('kontakty: sekcja Import-Eksport ma eksport, import i tryby', () => {
     2,
     'dwa tryby importu',
   );
+  // Zgloszenie 2026-11-05 (K7): cala budowa ksiazki w jednej pigulce.
+  assert.equal(qa(container, '[data-import]').length, 3, 'trzy importy z gry');
+  assert.ok(q(container, '[data-book-new]'), 'dodawanie imienia');
+  assert.ok(q(container, '[data-group-add]'), 'tworzenie grupy');
 });
 
 test('kontakty: Aliasy Pocztowe jako osobna sekcja z czyszczeniem', () => {

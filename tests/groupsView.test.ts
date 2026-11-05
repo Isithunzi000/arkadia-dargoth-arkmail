@@ -159,25 +159,31 @@ test('grupy: cztery sub-pigulki (Osoby w Archiwum)', () => {
     'Grupy',
     'Import-Eksport',
   ]);
-  assert.ok(q(container, '[data-book-new]'), 'domyslnie Ksiazka: formularz dodawania widoczny');
-  assert.ok(q(container, '[data-import]'), 'domyslnie Ksiazka: przyciski importu z gry widoczne');
+  // Zgloszenie 2026-11-05 (K7): budowa ksiazki (dodawanie imion i grup,
+  // importy z gry) mieszka w pigulce Import-Eksport.
+  assert.ok(!q(container, '[data-book-new]'), 'domyslnie Ksiazka: bez formularza dodawania');
+  assert.ok(!q(container, '[data-import]'), 'domyslnie Ksiazka: bez przyciskow importu');
   assert.ok(!q(container, '[data-group-add]'), 'domyslnie Grupy: formularz ukryty');
+  switchToImportEksport(container);
+  assert.ok(q(container, '[data-book-new]'), 'Import-Eksport: formularz dodawania widoczny');
+  assert.ok(q(container, '[data-import]'), 'Import-Eksport: przyciski importu z gry widoczne');
+  assert.ok(q(container, '[data-group-add]'), 'Import-Eksport: tworzenie grupy widoczne');
 });
 
 test('grupy: przełączanie sub-pigulek', () => {
   const s = new MailUiStore({ tab: 'kontakty' });
   const { container } = mount(s);
   switchToGrupy(container);
-  assert.ok(q(container, '[data-group-add]'), 'po kliku Grupy: formularz widoczny');
+  assert.ok(!q(container, '[data-group-add]'), 'Grupy: tylko lista grup, bez formularza');
   switchToKsiazka(container);
-  assert.ok(q(container, '[data-book-new]'), 'powrot do Ksiazki: formularz dodawania widoczny');
-  assert.ok(q(container, '[data-import]'), 'powrot do Ksiazki: przyciski importu z gry widoczne');
+  assert.ok(!q(container, '[data-book-new]'), 'Ksiazka: tylko lista imion, bez formularza');
+  assert.ok(!q(container, '[data-import]'), 'Ksiazka: bez przyciskow importu z gry');
 });
 
 test('grupy: dodanie grupy wywoluje zapis, pusta nazwa odrzucana', () => {
   const s = new MailUiStore({ tab: 'kontakty' });
   const { container, calls } = mount(s);
-  switchToGrupy(container);
+  switchToImportEksport(container);
   type(q(container, '[data-group-add]'), '   ');
   click(q(container, '[data-group-create]'));
   assert.equal(calls.groups.length, 0, 'pusta nazwa: bez zapisu');
@@ -400,6 +406,34 @@ test('grupy: filtr nazw grup z przyciskiem czyszczenia', () => {
   assert.ok(clear, 'przycisk czyszczenia filtra istnieje');
   click(clear);
   assert.equal(qa(container, '.arkmail-group').length, 2, 'po czyszczeniu znowu obie grupy');
+});
+
+// Zgloszenie 2026-11-05 (K8): filtr grup z ghost-podpowiedziami nazw grup.
+test('grupy: filtr podpowiada nazwy grup ghostem', () => {
+  const s = new MailUiStore({
+    tab: 'kontakty',
+    groups: [
+      { name: 'Gildia', members: ['Fred'] },
+      { name: 'Patrol', members: ['Corge'] },
+    ],
+  });
+  const { container } = mount(s);
+  switchToGrupy(container);
+  const filter = q(container, '[data-group-filter]') as unknown as {
+    value: string;
+    selectionStart: number;
+    selectionEnd: number;
+    dispatchEvent(e: unknown): void;
+    closest(s: string): unknown;
+  };
+  assert.ok(filter.closest('.arkmail-ghost-wrap'), 'filtr opakowany ghostem');
+  filter.value = 'gil';
+  filter.selectionStart = 3;
+  filter.selectionEnd = 3;
+  filter.dispatchEvent(new window.Event('input') as unknown as Event);
+  const rest = (filter.closest('.arkmail-ghost-wrap') as { querySelector(s: string): unknown })
+    .querySelector('.arkmail-ghost-rest') as { textContent?: string } | null;
+  assert.equal(rest?.textContent ?? '', 'dia', 'Gildia podpowiada w filtrze grup');
 });
 test('grupy: domyslnie zwiniete - naglowek ze znakiem stanu i liczba czlonkow', () => {
   const s = new MailUiStore({

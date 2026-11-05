@@ -47,16 +47,31 @@ function mount(
 const q = (container: unknown, selector: string): unknown =>
   (container as { querySelector(s: string): unknown }).querySelector(selector);
 
+const text = (el: unknown): string => (el as { textContent?: string })?.textContent ?? '';
+
+const click = (el: unknown): void => (el as { click(): void }).click();
+
 const qa = (container: unknown, selector: string): unknown[] =>
   Array.from(
     (container as { querySelectorAll(s: string): Iterable<unknown> }).querySelectorAll(selector),
   );
 
-test('import: widok Ksiazka adresowa ma trzy przyciski importu z podpowiedziami', () => {
+const switchSubByLabel = (container: unknown, label: string): void => {
+  for (const pill of qa(container, '.arkmail-subpill')) {
+    if (text(pill) === label) {
+      click(pill);
+      return;
+    }
+  }
+  throw new Error(`brak pigulki: ${label}`);
+};
+
+test('import: pigulka Import-Eksport ma trzy przyciski importu z podpowiedziami', () => {
   const s = new MailUiStore({ tab: 'kontakty' });
   const { container } = mount(s);
-  // Krok 4: domyslny widok Kontaktow to Ksiazka adresowa - przyciski
-  // importu z gry stoja wlasnie tam.
+  // Zgloszenie 2026-11-05 (K7): wszystkie importy w pigulce Import-Eksport.
+  assert.equal(q(container, '[data-import]'), null, 'Ksiazka bez przyciskow importu');
+  switchSubByLabel(container, 'Import-Eksport');
   const btns = qa(container, '[data-import]');
   assert.deepEqual(
     btns.map((b) => (b as { getAttribute(n: string): string }).getAttribute('data-import')),
@@ -74,7 +89,7 @@ test('import: widok Ksiazka adresowa ma trzy przyciski importu z podpowiedziami'
 test('import: klik wywoluje handler z rodzajem importu', () => {
   const s = new MailUiStore({ tab: 'kontakty' });
   const { container, calls } = mount(s);
-  // Domyslnie Ksiazka adresowa (krok 4) - zero przelaczania.
+  switchSubByLabel(container, 'Import-Eksport');
   for (const kind of ['zapamietani', 'przedstawieni', 'aliasy']) {
     (q(container, `[data-import="${kind}"]`) as { click(): void }).click();
   }

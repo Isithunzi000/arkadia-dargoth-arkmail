@@ -41,6 +41,23 @@ const arch = (subject: string, sortKey: string): ArchiveLetter => ({
   body: [],
 });
 
+const click = (el: unknown): void => (el as { click(): void }).click();
+
+// Zgloszenie 2026-11-05 (K7): dodawanie osob i importy stoja w pigulce
+// Import-Eksport; repaint renderuje tylko wybrany podpanel, wiec trzeba
+// go najpierw wlaczyc kliknieciem.
+const switchToImportEksport = (container: unknown): void => {
+  for (const pill of (container as { querySelectorAll(s: string): Iterable<unknown> }).querySelectorAll(
+    '.arkmail-subpill',
+  )) {
+    if ((pill as { textContent?: string }).textContent === 'Import-Eksport') {
+      click(pill);
+      return;
+    }
+  }
+  assert.fail('brak sub-pigulki Import-Eksport');
+};
+
 function mount(store: MailUiStore, overrides?: { onSearch?: (box: unknown, q: unknown) => void }) {
   const container = document.createElement('div');
   mountMailUi(container as unknown as HTMLElement, store, {
@@ -247,13 +264,15 @@ test('ghost: szukajka osoby nie ma podpowiedzi, a Przekaz ja zachowuje', () => {
   type(input(c2, '[data-field="forward"]'), 'cor');
   assert.equal(ghostRest(c2, '[data-field="forward"]'), 'ge');
 });
-test('ghost: pole nowej osoby w Ksiazce podpowiada kontakt', () => {
+test('ghost: pole nowej osoby w sekcji Import-Eksport podpowiada kontakt', () => {
   // Zgloszenie 2026-11-05: pole "Imie nowej osoby" dostaje te same
   // podpowiedzi co pole adresata (kontakty + aliasy), strzalka w prawo
-  // wpisuje kanoniczna forme.
+  // wpisuje kanoniczna forme. K7: pole przeniesione z Ksiazki do
+  // pigulki Import-Eksport.
   const s = new MailUiStore({ tab: 'kontakty', people: [] });
   s.setContacts([contact('Corge', 200)]);
   const c = mount(s);
+  switchToImportEksport(c);
   const el = input(c, '[data-book-new]');
   type(el, 'co');
   assert.equal(ghostRest(c, '[data-book-new]'), 'rge');

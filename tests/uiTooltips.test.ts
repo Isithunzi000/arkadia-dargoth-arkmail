@@ -142,6 +142,15 @@ test('tooltipy: import bazy osob - slownictwo zatwierdzone', () => {
       onForwardLetter: noop,
     } as never);
     s.setTab('kontakty' as never);
+    // Zgloszenie 2026-11-05 (K7): przyciski importu stoja w pigulce
+    // Import-Eksport, nie w Ksiazce.
+    for (const sub of Array.from(
+      container.querySelectorAll('.arkmail-subpill') as unknown as Array<{ click(): void }>,
+    )) {
+      sub.click();
+      const found = container.querySelector(`[data-import="${kind}"]`);
+      if (found) break;
+    }
     const btn = container.querySelector(`[data-import="${kind}"]`) as {
       getAttribute(n: string): string | null;
     } | null;
