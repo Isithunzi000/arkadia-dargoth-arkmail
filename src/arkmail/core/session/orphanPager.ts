@@ -3,9 +3,9 @@
  *
  * Sierocy pager (otwarty na serwerze po awarii NASZEJ sesji) konsumuje
  * wszystkie komendy gracza az do "q" - straznik w index.ts zamyka go
- * automatycznie. Ale prompt pagera serwera jest NIEROZRÓŻNIALNY od
+ * automatycznie. Ale prompt pagera serwera jest NIEROZROZNIALNY od
  * promptu trybu czytania poczty, ktory gracz otworzyl recznie
- * ("[1-50 ...] (aktualny: N) -- "), wiec straznik NIE MOŻE strzelac
+ * ("[1-50 ...] (aktualny: N) -- "), wiec straznik NIE MOZE strzelac
  * na sam widok promptu (Fala 11g zabijala reczne sesje gracza - log
  * 2026-10-21: "d" ladowalo jako ruch na dol, "?" dawalo pomoc gry
  * zamiast pomocy edytora poczty).

@@ -686,7 +686,7 @@ export async function init(api: PluginApi) {
   // i brama zostaje wiecznie rozbrojona. Generyczny event 'gmcp'
   // (MudClient emituje go dla KAZDEGO envelope'a, PluginApi.ts) jest
   // dowodem ZYWEGO ruchu z gry - Arkadia wysyla Char.State przy
-  // kazdym ticku, wiec uzbrojenie nastepuje w ciagu sekund. Straż
+  // kazdym ticku, wiec uzbrojenie nastepuje w ciagu sekund. Straz
   // anti-replay obowiazuje identycznie jak dla sygnalow gate.
   const onAnyGmcp = (): void => {
     if (lastUpstreamClosed) return;
@@ -712,7 +712,7 @@ export async function init(api: PluginApi) {
       onClientDisconnect();
     } else {
       // Swiezy attach (brak resumed i upstreamClosed) - czysta sesja
-      // na ekranie logowania; zdejmujemy straż anti-replay.
+      // na ekranie logowania; zdejmujemy straz anti-replay.
       lastUpstreamClosed = false;
     }
   };
@@ -739,8 +739,8 @@ export async function init(api: PluginApi) {
    * tekstowe i GMCP Mail.State zwykle przychodza RAZEM (to samo zdarzenie
    * serwera) - bez zbiornika kazde zrodlo kolejkowaloby osobny refresh,
    * marnujac komendy i blokade. Skrzynki laduja w zbiorniku; jedna sesja
-   * drenażuja pobiera caly aktywny zbior; zdarzenia naplywajace w trakcie
-   * drenażu odpalaja dokladnie jedna kolejna ture.
+   * drenazuja pobiera caly aktywny zbior; zdarzenia naplywajace w trakcie
+   * drenazu odpalaja dokladnie jedna kolejna ture.
    */
   const pendingRefresh = new Set<MailBox>();
   let drainScheduled = false;
@@ -823,7 +823,7 @@ export async function init(api: PluginApi) {
    * w gmcp.ts). Po co, skoro sa linie tekstowe: one potrafia sie rozjechac
    * ze stanem (log 1999-09-05 01:03 - "Masz nowa poczte od X.", a 15 s
    * pozniej przy ladowaniu zwierzecia "Nie masz zadnych nieprzeczytanych
-   * listow.", choć list byl w skrzynce). GMCP jest WYZWALACZEM odswiezenia;
+   * listow.", choc list byl w skrzynce). GMCP jest WYZWALACZEM odswiezenia;
    * badge nadal liczy sie z listingow (computeBadge).
    *
    * Kontrakt: pierwsza ramka po starcie odswieza tylko grupy z flaga true;
@@ -1298,7 +1298,7 @@ export async function init(api: PluginApi) {
                 return {
                   archiveAdded: merged.added,
                   // Fala 41: strona bez ani jednego nowego rekordu =
-                  // klamra doszla do znanego materiału - przeglad
+                  // klamra doszla do znanego materialu - przeglad
                   // inkrementalny moze stac.
                   stop: sweepMode === "incremental" && merged.added === 0,
                 };
@@ -1385,7 +1385,7 @@ export async function init(api: PluginApi) {
    * "wyslij zwierze" i tylko do potwierdzenia linia 'wysylasz' albo
    * konca okna. "Slucham?" to generyczny blad parsera serwera (~250x
    * rozmaitych komend w jednej sesji logow) - globalna reakcja na nie
-   * łapalaby cudze bledy.
+   * lapalaby cudze bledy.
    */
   let sluchamArmed = false;
   const disarmSlucham = (): void => {
@@ -2233,7 +2233,7 @@ export async function init(api: PluginApi) {
     },
     onCloseLetter: () => ui.closeLetter(),
     // Fala 20e: guardy w handlerach, NIE w refreshBoxes - wewnetrzny
-    // refresh po wysylce/kasowaniu kolejkuje celowo (wołany z wnetrza
+    // refresh po wysylce/kasowaniu kolejkuje celowo (wolany z wnetrza
     // sesji). Klik gracza przy zajetej blokadzie: odmowa z toastem,
     // zero cichego kolejkowania komend (audyt race 2026-10-21).
     onRefreshBox: (box) => {

@@ -530,7 +530,7 @@ export class MailUiStore {
 
   /** Uzbrojenie potwierdzenia usuwania (zgloszenie 2026-10-30). Bez
    *  podbicia revision: to stan czysto UI, nie sygnal nieaktualnosci
-   *  wynikow - guardy sesji usuwania maja zostac nietknięte. */
+   *  wynikow - guardy sesji usuwania maja zostac nietkniete. */
   armDeletionConfirm(): void {
     this.update({ deletion: { ...this.current.deletion, armedAt: Date.now() } });
   }

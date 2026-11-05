@@ -243,7 +243,7 @@ export const STYLES = `
   color: ${FG};
 }
 
-/* Fala 11e: zbiorcze operacje na aktywnej skrzynce (zamiast ↻ per box). */
+/* Fala 11e: zbiorcze operacje na aktywnej skrzynce (zamiast obrotu per box). */
 .arkmail-box-ops { display: flex; flex-wrap: wrap; gap: calc(6px * var(--window-font-scale, 1)); margin-bottom: calc(8px * var(--window-font-scale, 1)); }
 .arkmail-box-ops button { flex: 1 1 calc(140px * var(--window-font-scale, 1)); }
 .arkmail-root button:disabled { opacity: 0.45; cursor: default; }
@@ -277,7 +277,7 @@ export const STYLES = `
   color: ${FG_DIM};
 }
 .arkmail-entry-date { color: ${FG_DIM}; font-size: calc(11px * var(--window-font-scale, 1)); white-space: nowrap; }
-/* Fala 16f: nieprzeczytany wiersz dodatkowo JAŚNIEJSZY (pkt 8: kropka +
+/* Fala 16f: nieprzeczytany wiersz dodatkowo JASNIEJSZY (pkt 8: kropka +
    pogrubienie + rozjasnienie; po odczyciu listing daje *R* i wiersz
    wraca do normalnego). */
 .arkmail-unread { background: ${BG_UNREAD}; box-shadow: inset calc(3px * var(--window-font-scale, 1)) 0 0 ${ACCENT_BRIGHT}; }

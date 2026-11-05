@@ -1922,7 +1922,7 @@ export function mountMailUi(
     addRow.appendChild(addErr);
     // Zgloszenie 2026-11-05: pole nowej osoby z ghost-podpowiedziami
     // (jak pole adresata): kontakty + aliasy, strzalka w prawo wpisuje
-    // kanoniczna forme kandydata. Attach dopiero po podpięciu inputu
+    // kanoniczna forme kandydata. Attach dopiero po podpieciu inputu
     // do rodzica - ghost wrapuje element w miejscu w drzewie.
     attachGhost(doc, addInput, personSource);
     pane.appendChild(addRow);
@@ -2069,8 +2069,8 @@ export function mountMailUi(
       check.addEventListener('change', () => {
         if (check.checked) bookSelection.add(name);
         else bookSelection.delete(name);
-        // Pełny repaint odświeża stan przycisku zbiorczego; zaznaczenie
-        // żyje w stanie modułowym, więc przetrwa repaint.
+        // Pelny repaint odswieza stan przycisku zbiorczego; zaznaczenie
+        // zyje w stanie modulowym, wiec przetrwa repaint.
         store.refresh();
       });
       const nameEl = doc.createElement('span');

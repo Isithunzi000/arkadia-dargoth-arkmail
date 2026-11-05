@@ -79,8 +79,8 @@ const sameNumbers = (a: readonly number[], b: readonly number[]): boolean =>
   a.length === b.length && a.every((n, i) => n === b[i]);
 
 /**
- * Numery z potwierdzenia readera ("Zaznaczono do skasowania: …",
- * "Kasuje: …"). Serwer LACZY numery spojnikiem " i " i rozwija zakresy
+ * Numery z potwierdzenia readera ("Zaznaczono do skasowania: ...",
+ * "Kasuje: ..."). Serwer LACZY numery spojnikiem " i " i rozwija zakresy
  * (log 2026-10-30: "d 1,4" -> "Zaznaczono do skasowania: 1 i 4.",
  * wyjscie -> "Kasuje: 1 i 4."), wiec bierzemy wszystkie liczby z
  * odebranej czesci linii, bez narzucania separatora.

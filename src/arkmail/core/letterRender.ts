@@ -211,7 +211,7 @@ function formatBody(layout: LetterLayout, lines: readonly string[], width: numbe
   }
   const prefixes = splitBodyPattern(layout.bodyPrefix);
   const suffixes = splitBodyPattern(layout.bodySuffix);
-  // Krotsze prefixy sa dopełniane, aby tekst trzymal jedna kolumne
+  // Krotsze prefixy sa dopelniane, aby tekst trzymal jedna kolumne
   const prefixWidth = longestLength(prefixes);
   const framed = prefixWidth > 0 || longestLength(suffixes) > 0;
   return lines.map((line, index) => {
