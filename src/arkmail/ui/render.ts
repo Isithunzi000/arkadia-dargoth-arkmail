@@ -289,6 +289,7 @@ export function mountMailUi(
   // rejestr. Klawisze z napisem dostaja etykiete "Na pewno usunac?",
   // klawisze X zostaja "x" - ich uzbrojenie widac kolorem.
   const GUARD_ARM_MS = 3000;
+  const ERROR_LABEL_MS = 3000;
   interface ArmedButton {
     el: HTMLButtonElement;
     timer: ReturnType<typeof setTimeout> | null;
@@ -610,7 +611,7 @@ export function mountMailUi(
       setButtonLabel(search, message);
       searchErrorTimer = setTimeout(
         () => setButtonLabel(search, SEARCH_GO_LABEL, SEARCH_GO_TITLE),
-        3000,
+        ERROR_LABEL_MS,
       );
     };
     // Jedna akcja dla klawisza i zmiany skrzynki (parzystosc z Listy:
@@ -890,7 +891,7 @@ export function mountMailUi(
         clearTimer = setTimeout(() => {
           clearArmed = false;
           setButtonLabel(clearBtn, 'Wyczysc zapisane dane', clearTitle);
-        }, 3000);
+        }, ERROR_LABEL_MS);
         return;
       }
       if (clearTimer) clearTimeout(clearTimer);
@@ -956,7 +957,7 @@ export function mountMailUi(
     const showSearchError = (message: string): void => {
       if (searchErrorTimer) clearTimeout(searchErrorTimer);
       setButtonLabel(go, message);
-      searchErrorTimer = setTimeout(() => setButtonLabel(go, SEARCH_GO_LABEL, SEARCH_GO_TITLE), 3000);
+      searchErrorTimer = setTimeout(() => setButtonLabel(go, SEARCH_GO_LABEL, SEARCH_GO_TITLE), ERROR_LABEL_MS);
     };
     const fireSearch = () => {
       const osoba = (sOsoba as HTMLInputElement).value.trim();
@@ -1222,7 +1223,7 @@ export function mountMailUi(
           delTimer = setTimeout(() => {
             delArmed = false;
             setButtonLabel(del, 'Usun');
-          }, 3000);
+          }, ERROR_LABEL_MS);
           return;
         }
         if (delTimer) clearTimeout(delTimer);
@@ -1510,7 +1511,7 @@ export function mountMailUi(
       if (validationError) {
         if (sendTimer) clearTimeout(sendTimer);
         setButtonLabel(send, validationError);
-        sendTimer = setTimeout(disarmSend, 3000);
+        sendTimer = setTimeout(disarmSend, ERROR_LABEL_MS);
         return;
       }
       const rendered = renderLetter(input.tresc, st.composeTemplate, st.composeWidth);
@@ -1540,7 +1541,7 @@ export function mountMailUi(
         clearTimer = setTimeout(() => {
           clearArmed = false;
           setButtonLabel(clearCompose, 'Wyczysc');
-        }, 3000);
+        }, ERROR_LABEL_MS);
         return;
       }
       if (clearTimer) clearTimeout(clearTimer);
@@ -2739,7 +2740,7 @@ export function mountMailUi(
         dlTimer = setTimeout(() => {
           dlArmed = false;
           setButtonLabel(dlBtn, 'Pobierz tresci do archiwum');
-        }, 3000);
+        }, ERROR_LABEL_MS);
         return;
       }
       if (dlTimer) clearTimeout(dlTimer);
