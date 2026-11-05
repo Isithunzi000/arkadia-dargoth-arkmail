@@ -212,8 +212,10 @@ export const STYLES = `
 }
 
 /* Fala 11e: zbiorcze operacje na aktywnej skrzynce (zamiast obrotu per box). */
-.arkmail-box-ops { display: flex; flex-wrap: wrap; gap: calc(6px * var(--window-font-scale, 1)); margin-bottom: calc(8px * var(--window-font-scale, 1)); }
-.arkmail-box-ops button { flex: 1 1 calc(140px * var(--window-font-scale, 1)); }
+/* Wydanie 1.30.1 (zgloszenie 1): klawisze operacji naturalnej
+   szerokosci (bez rozciagania), odstep jak miedzy pigulkami skrzynek. */
+.arkmail-box-ops { display: flex; flex-wrap: wrap; gap: calc(8px * var(--window-font-scale, 1)); margin-bottom: calc(8px * var(--window-font-scale, 1)); }
+.arkmail-box-ops button { flex: 0 1 auto; }
 .arkmail-root button:not(.popup-btn):not(.dialog-tab):disabled { opacity: 0.45; cursor: default; }
 .arkmail-root button:not(.popup-btn):not(.dialog-tab):disabled:hover { background: ${BG_RAISED}; }
 

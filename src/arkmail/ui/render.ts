@@ -742,13 +742,13 @@ const nativeFieldClass = (el: HTMLElement): void => {
     const selectionOps = doc.createElement('div');
     selectionOps.className = 'arkmail-deletion-selection-ops';
     const selectAll = doc.createElement('button');
-    selectAll.className = 'arkmail-deletion-select-all';
+    selectAll.className = 'arkmail-deletion-select-all popup-btn popup-btn--control';
     selectAll.textContent = 'Zaznacz wszystkie';
     if (entries.length === 0) selectAll.setAttribute('disabled', '');
     selectAll.addEventListener('click', () => store.selectAllDeletionEntries());
     selectionOps.appendChild(selectAll);
     const clearSelection = doc.createElement('button');
-    clearSelection.className = 'arkmail-deletion-clear-selection';
+    clearSelection.className = 'arkmail-deletion-clear-selection popup-btn popup-btn--control';
     clearSelection.textContent = 'Odznacz wszystkie';
     if (state.deletion.selected.length === 0) clearSelection.setAttribute('disabled', '');
     clearSelection.addEventListener('click', () => store.clearDeletionSelection());
@@ -1142,7 +1142,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
       // W podziale lista jest zawsze widoczna po lewej - zamiast przycisku
       // powrotu ("Zamknij list") jest Zamknij czyszczace podglad.
       const close = doc.createElement('button');
-      close.className = 'arkmail-letter-close';
+      close.className = 'arkmail-letter-close popup-btn popup-btn--control';
       close.textContent = 'Zamknij';
       close.addEventListener('click', () => handlers.onCloseLetter());
       head.appendChild(close);
@@ -1187,12 +1187,12 @@ const nativeFieldClass = (el: HTMLElement): void => {
       store.setTab('napisz');
     };
     const reply = doc.createElement('button');
-    reply.className = 'arkmail-reply';
+    reply.className = 'arkmail-reply popup-btn popup-btn--control';
     reply.textContent = 'Odpowiedz';
     reply.addEventListener('click', () => replyTo(false));
     ops.appendChild(reply);
     const replyAll = doc.createElement('button');
-    replyAll.className = 'arkmail-reply-all';
+    replyAll.className = 'arkmail-reply-all popup-btn popup-btn--control';
     replyAll.textContent = 'Odpowiedz wszystkim';
     replyAll.addEventListener('click', () => replyTo(true));
     ops.appendChild(replyAll);
@@ -1204,7 +1204,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     // oryginalna tresc, "---". Przy liscie bez tresci przycisk
     // nieaktywny - nie ma czego cytowac.
     const replyQuote = doc.createElement('button');
-    replyQuote.className = 'arkmail-reply-quote';
+    replyQuote.className = 'arkmail-reply-quote popup-btn popup-btn--control';
     replyQuote.textContent = 'Odpowiedz z cytowaniem';
     if (l.body.some((line) => line.trim() !== '')) {
       replyQuote.addEventListener('click', () => {
@@ -1258,7 +1258,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     ops.appendChild(fwdInput);
     attachGhost(doc, fwdInput, personSource);
     const fwd = doc.createElement('button');
-    fwd.className = 'arkmail-fwd';
+    fwd.className = 'arkmail-fwd popup-btn popup-btn--control';
     fwd.textContent = 'Przekaz';
     if (source) {
       fwd.addEventListener('click', () => {
@@ -1274,7 +1274,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     // Operacja lokalna (dane z cache widoku) - bez dwukliku. Na koncu
     // paska: pin kolejnosci rezerwuje poczatek dla Odpowiedz/Usun.
     const exp = doc.createElement('button');
-    exp.className = 'arkmail-export-letter';
+    exp.className = 'arkmail-export-letter popup-btn popup-btn--control';
     exp.textContent = 'Zapisz list TXT';
     exp.addEventListener('click', () => handlers.onExportLetter?.());
     ops.appendChild(exp);
@@ -1328,7 +1328,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
   /** Przycisk otwierajacy pelnoekranowy podglad compose (Fala 12d). */
   const previewOpenBtn = (): HTMLElement => {
     const btn = doc.createElement('button');
-    btn.className = 'arkmail-preview-open';
+    btn.className = 'arkmail-preview-open popup-btn popup-btn--control';
     btn.textContent = 'Pelne okno';
     btn.addEventListener('click', () => {
       previewFull = true;
@@ -1352,7 +1352,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     lab.textContent = 'Podglad wysylanego listu';
     bar.appendChild(lab);
     const close = doc.createElement('button');
-    close.className = 'arkmail-preview-close';
+    close.className = 'arkmail-preview-close popup-btn popup-btn--control';
     close.textContent = 'Zamknij podglad';
     close.addEventListener('click', () => {
       previewFull = false;
@@ -1623,6 +1623,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     filterInput.setAttribute('title', 'Pokazuje tylko grupy z nazwa zawierajaca wpisany fragment.');
     filterInput.value = groupFilter;
     const filterClear = doc.createElement('button');
+    filterClear.className = 'popup-btn popup-btn--control';
     filterClear.textContent = 'Wyczysc filtr';
     filterClear.setAttribute('data-group-filter-clear', '');
     filterClear.setAttribute('title', 'Czysci filtr grup - znowu wszystkie grupy.');
@@ -1664,7 +1665,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
       // czytelna bez otwartych formularzy.
       const expanded = expandedGroups.has(group.name);
       const toggle = doc.createElement('button');
-      toggle.className = 'arkmail-group-toggle';
+      toggle.className = 'arkmail-group-toggle popup-btn popup-btn--control popup-btn--sm';
       toggle.setAttribute('data-group-toggle', '');
       toggle.textContent = `${expanded ? 'v' : '>'} ${group.name} (${group.members.length})`;
       toggle.setAttribute(
@@ -1689,6 +1690,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
       rename.value = group.name;
       rename.setAttribute('title', 'Nazwa grupy - zapisz obok.');
       const renameOk = doc.createElement('button');
+      renameOk.className = 'popup-btn popup-btn--control';
       renameOk.textContent = 'Zapisz nazwe';
       renameOk.setAttribute('data-group-rename-ok', '');
       renameOk.setAttribute('title', 'Zapisuje nowa nazwe grupy.');
@@ -1721,6 +1723,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
       // Fala UI-2 krok 5: pisanie do calej grupy jednym klikiem.
       // Pusta grupa = brak adresatow - przycisk wylaczony.
       const write = doc.createElement('button');
+      write.className = 'popup-btn popup-btn--control';
       write.textContent = 'Napisz do grupy';
       write.setAttribute('data-group-write', '');
       if (group.members.length === 0) {
@@ -1769,6 +1772,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
       addMember.setAttribute('placeholder', 'Dodaj osobe');
       attachGhost(doc, addMember, personSource);
       const addMemberOk = doc.createElement('button');
+      addMemberOk.className = 'popup-btn popup-btn--control';
       addMemberOk.textContent = 'Dodaj';
       addMemberOk.setAttribute('data-member-add-ok', '');
       addMemberOk.setAttribute('title', 'Dodaje osobe do grupy (podpowiedz: strzalka w prawo).');
@@ -1932,6 +1936,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     filterInput.setAttribute('title', 'Pokazuje tylko imiona zawierajace wpisany fragment.');
     filterInput.value = bookFilter;
     const filterClear = doc.createElement('button');
+    filterClear.className = 'popup-btn popup-btn--control';
     filterClear.textContent = 'Wyczysc filtr';
     filterClear.setAttribute('data-book-filter-clear', '');
     filterClear.setAttribute('title', 'Czysci filtr imion - znowu cala ksiazka adresowa.');
@@ -2027,7 +2032,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
       row.appendChild(remove);
       // Fala UI-2 krok 5: pisanie bez przepisywania - prefill adresata.
       const write = doc.createElement('button');
-      write.className = 'arkmail-book-write';
+      write.className = 'arkmail-book-write popup-btn popup-btn--control';
       write.setAttribute('data-book-write', '');
       write.textContent = 'Napisz';
       write.setAttribute('title', `Otwiera zakladke Napisz z adresem: ${name}.`);
@@ -2062,7 +2067,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     // (zero nowych kolorow); stan lokalny jak filtr/sort - repaint
     // renderuje tylko wybrany podpanel.
     const subRow = doc.createElement('div');
-    subRow.className = 'arkmail-boxes arkmail-subpills';
+    subRow.className = 'arkmail-boxes';
     const SUBPILLS: Array<[typeof contactView.sub, string]> = [
       ['ksiazka', 'Ksiazka adresowa'],
       ['aliasy', 'Aliasy Pocztowe'],
@@ -2127,7 +2132,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
         // Serwer sam rozwija aliasy przy wysylce, wiec na linie idzie
         // sama nazwa aliasu (jak w polu adresata).
         const write = doc.createElement('button');
-        write.className = 'arkmail-book-write';
+        write.className = 'arkmail-book-write popup-btn popup-btn--control';
         write.setAttribute('data-alias-write', '');
         write.textContent = 'Napisz';
         write.setAttribute('title', `Otwiera zakladke Napisz z adresem: ${alias.name}.`);
@@ -2208,7 +2213,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     ];
     for (const [kind, label, title] of IMPORT_BTNS) {
       const btn = doc.createElement('button');
-      btn.className = 'arkmail-import-btn';
+      btn.className = 'arkmail-import-btn popup-btn popup-btn--control';
       btn.setAttribute('data-import', kind);
       btn.textContent = label;
       btn.setAttribute('title', title);
@@ -2283,6 +2288,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     groupAddInput.setAttribute('data-group-add', '');
     groupAddInput.setAttribute('placeholder', 'Nazwa nowej grupy');
     const groupAddBtn = doc.createElement('button');
+    groupAddBtn.className = 'popup-btn popup-btn--control';
     groupAddBtn.textContent = 'Utworz grupe';
     groupAddBtn.setAttribute('data-group-create', '');
     groupAddBtn.setAttribute('title', 'Tworzy pusta grupe. Czlonkow dolaczysz po utworzeniu.');
@@ -2319,7 +2325,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     impLabel.className = 'popup-btn popup-btn--control';
     impLabel.textContent = 'Importuj ksiazke ';
     const modeRow = doc.createElement('div');
-    modeRow.className = 'arkmail-boxes arkmail-subpills';
+    modeRow.className = 'arkmail-boxes';
     modeRow.setAttribute('data-book-import-mode', '');
     const MODES: Array<[ImportMode, string, string]> = [
       [
