@@ -75,7 +75,10 @@ test('style: zakaz przezroczystego tla i dziedziczenia koloru', () => {
 // Fala 11a: szukajka w wersji stosowej - 2 kolumny zamiast 5 w linii;
 // w waskiej kolumnie splitu pola tekstowe maja sensowna szerokosc.
 test('style: szukajka uklada sie stosowo, Szukaj na calej szerokosci', () => {
-  const row = ruleBody(/\.arkmail-search-row\s/);
+  // Ancja do linii: po zwrocie ".arkmail-listy > .arkmail-search-row"
+  // (1.30.2, Etap 4) wielolinijkowy ruleBody zlapalby regule flex: none.
+  const rowM = STYLES.match(/^\.arkmail-search-row\s*\{([^}]*)\}/m);
+  const row = rowM ? rowM[1] : null;
   assert.ok(row, 'regula .arkmail-search-row istnieje');
   assert.match(row!, /grid-template-columns:\s*1fr\s+1fr/, 'dwie kolumny (osoba|temat, od|do)');
   const go = ruleBody(/\.arkmail-search-row\s+\.arkmail-search-go\b/);
@@ -273,8 +276,8 @@ test('style F5: swiadome wyjatki bez zmian', () => {
   const send = ruleBody(/\.arkmail-send\b/);
   assert.match(send!, /padding:\s*calc\(6px \* var\(--window-font-scale, 1\)\) calc\(18px \* var\(--window-font-scale, 1\)\)/,
     'padding wysylki 18px zostaje');
-  const occ = ruleBody(/\.arkmail-arch-occ-list/);
-  assert.match(occ!, /18px/, 'wciecie arch-occ-list 18px zostaje');
+  // 1.30.2 (Etap 4): arch-occ-list usuniety (martwy selektor po
+  // przejsciu Archiwum na chipsy) - pin wciecia 18px odpada.
   assert.match(STYLES, /scrollbar-thumb \{ background:\s*var\(--popup-border\); border-radius:\s*calc\(4px/,
     'promien scrollbara 4px zostaje');
   const track = ruleBody(/\.arkmail-busy-track/);

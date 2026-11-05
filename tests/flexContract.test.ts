@@ -28,10 +28,11 @@ test('flex: kolumna Listy/Ksiazki nie kurczy bezposrednich klawiszy', () => {
 });
 
 test('flex: dywizy-naglowki kolumny maja twarde flex: none', () => {
-  // Naglowek (skrzynki, operacje, szukajka, filtr ksiazki) stoi na
-  // stale; dzis chroni je domyslne min-height: auto, kontrakt ma byc
-  // jawnie twardy.
-  for (const cls of ['arkmail-boxes', 'arkmail-search-row', 'arkmail-book-filter']) {
+  // Naglowek (skrzynki, operacje, szukajka) stoi na stale; dzis chroni
+  // je domyslne min-height: auto, kontrakt ma byc jawnie twardy.
+  // 1.30.2 (Etap 4): filtr ksiazki mieszka wewnatrz .arkmail-list-scroll
+  // (bezpieczny div), selektor bezposredniego dziecka byl martwy.
+  for (const cls of ['arkmail-boxes', 'arkmail-search-row']) {
     const body = ruleBody(new RegExp(`\\.arkmail-listy\\s*>\\s*\\.${cls}\\b`));
     assert.ok(body, `istnieje regula .arkmail-listy > .${cls}`);
     assert.match(body!, /flex:\s*none/, `.${cls} ma flex: none`);

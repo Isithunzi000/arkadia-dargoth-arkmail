@@ -25,14 +25,10 @@ const FG = 'var(--popup-text)'; // tekst glowny
 const FG_DIM = 'var(--popup-text-dim)'; // tekst przytlumiony
 const BORDER = 'var(--popup-border)'; // obramowania
 const ACCENT = 'var(--popup-accent)'; // akcent (aktywne, wysylka, kropki, obwodki)
-const ACCENT_SOFT = 'var(--popup-accent)'; // tekst akcentowy
-const ACCENT_DEEP = 'var(--popup-accent)'; // tlo klawisza glownego (solid)
 const ACCENT_FG = 'var(--popup-bg)'; // tekst na wypelnieniu akcentu (konwencja klienta)
 const DANGER_TEXT = 'var(--popup-danger)'; // tekst bledow na panelu
 const BG_UNREAD = 'var(--popup-accent-subtle-bg)'; // tlo wiersza nieprzeczytanego
-const ACCENT_BRIGHT = 'var(--popup-accent)'; // wyroznienia na nieprzeczytanym
 const HOVER_BASE = 'var(--popup-control-hover-bg)';
-const HOVER_RESET = 'var(--popup-control-hover-bg)';
 
 export const STYLES = `
 .arkmail-root {
@@ -79,12 +75,12 @@ export const STYLES = `
   min-height: calc(26px * var(--window-font-scale, 1));
 }
 .arkmail-root button:not(.popup-btn):not(.dialog-tab):hover { background: ${HOVER_BASE}; }
-.arkmail-root button:not(.popup-btn):not(.dialog-tab):not([data-armed="1"]):active { background: ${HOVER_RESET}; }
+.arkmail-root button:not(.popup-btn):not(.dialog-tab):not([data-armed="1"]):active { background: ${HOVER_BASE}; }
 .arkmail-root button:not(.popup-btn):focus-visible,
 .arkmail-root .arkmail-tab:focus-visible,
 .arkmail-root .arkmail-box:focus-visible,
 .arkmail-root .arkmail-contact-dir:focus-visible,
-.arkmail-root .arkmail-contact-addbook:focus-visible { outline: calc(2px * var(--window-font-scale, 1)) solid ${ACCENT_BRIGHT}; outline-offset: calc(1px * var(--window-font-scale, 1)); }
+.arkmail-root .arkmail-contact-addbook:focus-visible { outline: calc(2px * var(--window-font-scale, 1)) solid ${ACCENT}; outline-offset: calc(1px * var(--window-font-scale, 1)); }
 
 /* Zgloszenie 2026-11-05 (A3): poziomy przyciskow to klasy natywnego
  * UI klienta (popup-btn--control/solid/danger/ghost) - zero wlasnych
@@ -179,8 +175,7 @@ export const STYLES = `
    flex: none; caly skurcz idzie w .arkmail-list-scroll. */
 .arkmail-listy > button,
 .arkmail-listy > .arkmail-boxes,
-.arkmail-listy > .arkmail-search-row,
-.arkmail-listy > .arkmail-book-filter { flex: none; }
+.arkmail-listy > .arkmail-search-row { flex: none; }
 .arkmail-pane::-webkit-scrollbar,
 .arkmail-list-scroll::-webkit-scrollbar { width: calc(8px * var(--window-font-scale, 1)); }
 .arkmail-pane::-webkit-scrollbar-thumb,
@@ -197,12 +192,12 @@ export const STYLES = `
 }
 .arkmail-root button.arkmail-box:hover { color: ${FG}; background: ${BG_RAISED}; }
 .arkmail-root button.arkmail-box-active {
-  background: ${ACCENT_DEEP};
-  border-color: ${ACCENT_DEEP};
+  background: ${ACCENT};
+  border-color: ${ACCENT};
   color: ${ACCENT_FG};
   font-weight: 600;
 }
-.arkmail-root button.arkmail-box-active:hover { background: ${ACCENT_DEEP}; color: ${ACCENT_FG}; }
+.arkmail-root button.arkmail-box-active:hover { background: ${ACCENT}; color: ${ACCENT_FG}; }
 /* Fala 16f: trwaly akcent (obwodka) na skrzynce z licznikiem > 0 -
    Nieprzeczytane/Niewyslane widac z daleka (zgloszenie pkt 5/8). */
 .arkmail-root button.arkmail-box-attention {
@@ -249,7 +244,7 @@ export const STYLES = `
 /* Fala 16f: nieprzeczytany wiersz dodatkowo JASNIEJSZY (pkt 8: kropka +
    pogrubienie + rozjasnienie; po odczyciu listing daje *R* i wiersz
    wraca do normalnego). */
-.arkmail-unread { background: ${BG_UNREAD}; box-shadow: inset calc(3px * var(--window-font-scale, 1)) 0 0 ${ACCENT_BRIGHT}; }
+.arkmail-unread { background: ${BG_UNREAD}; box-shadow: inset calc(3px * var(--window-font-scale, 1)) 0 0 ${ACCENT}; }
 .arkmail-unread .arkmail-entry-party, .arkmail-unread .arkmail-entry-subject {
   color: ${FG};
   font-weight: 700;
@@ -260,7 +255,7 @@ export const STYLES = `
   width: calc(7px * var(--window-font-scale, 1));
   height: calc(7px * var(--window-font-scale, 1));
   border-radius: 50%;
-  background: ${ACCENT_BRIGHT};
+  background: ${ACCENT};
   flex: none;
 }
 
@@ -438,7 +433,7 @@ export const STYLES = `
   font-size: calc(11px * var(--window-font-scale, 1));
   cursor: pointer;
 }
-.arkmail-root button.arkmail-contact-dir:hover, .arkmail-root button.arkmail-contact-addbook:hover { background: ${HOVER_BASE}; border-color: ${ACCENT_SOFT}; color: ${ACCENT_FG}; }
+.arkmail-root button.arkmail-contact-dir:hover, .arkmail-root button.arkmail-contact-addbook:hover { background: ${HOVER_BASE}; border-color: ${ACCENT}; color: ${ACCENT_FG}; }
 /* Fala UI-2 krok 4: naglowek zwijanego panelu "Osoby z listow". */
 /* Zgloszenie 2026-11-05 (A1): rozwineta lista osob scrolluje sie
  * wlasnym kontenerem - dluga ksiazka osob nie pcha calej zakladki
@@ -469,10 +464,6 @@ export const STYLES = `
   gap: calc(6px * var(--window-font-scale, 1));
 }
 .arkmail-contact-stats, .arkmail-arch-meta { color: ${FG_DIM}; font-size: calc(12px * var(--window-font-scale, 1)); }
-.arkmail-arch-expand { margin-left: calc(8px * var(--window-font-scale, 1)); }
-.arkmail-arch-occ-list { margin: calc(2px * var(--window-font-scale, 1)) 0 calc(6px * var(--window-font-scale, 1)) calc(18px * var(--window-font-scale, 1)); }
-.arkmail-arch-occ { color: ${FG_DIM}; font-size: calc(12px * var(--window-font-scale, 1)); cursor: pointer; }
-.arkmail-arch-occ:hover { color: ${FG}; }
 .arkmail-contact-controls {
   display: flex;
   flex-wrap: wrap;
@@ -570,7 +561,7 @@ export const STYLES = `
    Kontrakt uiStyles: jawne hex (bez transparent/inherit). */
 @keyframes arkmailFlash {
   0%, 100% { background: ${BG_RAISED}; color: ${FG}; }
-  50% { background: ${ACCENT_DEEP}; color: ${ACCENT_FG}; }
+  50% { background: ${ACCENT}; color: ${ACCENT_FG}; }
 }
 .arkmail-root .arkmail-flash {
   animation: arkmailFlash 0.6s ease-in-out 5;
