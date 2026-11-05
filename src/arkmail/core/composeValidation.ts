@@ -20,6 +20,10 @@ function validRecipients(value: string, required: boolean): boolean {
   if (/[^a-zA-Z, ]/.test(value)) return false;
   return trimmed.split(',').every((part) => {
     const names = part.trim();
+    // Wolne slowo "i" nie jest imieniem - skladnia listingow ("A, B i C")
+    // na linie do gry trafia jako jeden bezsensowny odbiorca i serwer
+    // odrzuca cala wysylke. Na linie ida wylacznie przecinki.
+    if (/(?:^|\s)i(?:\s|$)/i.test(names)) return false;
     return /^[a-zA-Z]+(?: +[a-zA-Z]+)*$/.test(names);
   });
 }

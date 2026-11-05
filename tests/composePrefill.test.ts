@@ -9,11 +9,12 @@
  *    adresata samym imieniem, temat i tresc puste;
  *  - pasek zbiorczy ma przycisk "Napisz list do zaznaczonych (N)"
  *    [data-book-write-checked] - wylaczony przy N=0, adresat =
- *    zaznaczeni w kolejnosci listy A-Z, format "A, B i C" (skladnia
- *    zgodna z splitParty i listingami gry); zaznaczenie kasuje sie
+ *    zaznaczeni w kolejnosci listy A-Z, format "A, B, C" (przecinki
+ *    na linie do gry - zgodnie z PROTOCOL.md; spojnik " i " zostaje
+ *    wylacznie dla parsowania listingow); zaznaczenie kasuje sie
  *    po uzyciu (powrot do Kontaktow nie trzyma starego stanu);
  *  - naglowek grupy ma przycisk "Napisz do grupy" [data-group-write] -
- *    adresat = czlonkowie w formacie "A, B i C"; pusta grupa =
+ *    adresat = czlonkowie w formacie "A, B, C"; pusta grupa =
  *    wylaczony z tooltip.
  * Imiona syntetyczne (Fred/Grault/Corge/Waldo - dozwolone przez guardy).
  */
@@ -106,7 +107,7 @@ test('ksiazka: Napisz list do zaznaczonych sklada adresata w formacie gry', () =
   assert.match(bulk.textContent, /Napisz list do zaznaczonych \(3\)/, 'etykieta z licznikiem');
   click(bulk);
   assert.equal(s.state.tab, 'napisz', 'przejscie na Napisz');
-  assert.equal(fieldValue(container, 'adresat'), 'Corge, Fred i Grault', 'format A, B i C');
+  assert.equal(fieldValue(container, 'adresat'), 'Corge, Fred, Grault', 'format przecinkowy');
 });
 
 test('ksiazka: po uzyciu zbiorczego Napisz zaznaczenie jest zerowane', () => {
@@ -183,7 +184,7 @@ test('grupy: Napisz do grupy sklada adresata z czlonkow', () => {
   assert.ok(write, 'przycisk w naglowku grupy');
   click(write);
   assert.equal(s.state.tab, 'napisz', 'przejscie na Napisz');
-  assert.equal(fieldValue(container, 'adresat'), 'Corge, Fred i Grault', 'czlonkowie A, B i C');
+  assert.equal(fieldValue(container, 'adresat'), 'Corge, Fred, Grault', 'czlonkowie po przecinku');
 });
 
 test('grupy: Napisz do grupy wylaczone dla pustej grupy', () => {

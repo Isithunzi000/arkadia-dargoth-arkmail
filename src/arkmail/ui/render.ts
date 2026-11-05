@@ -1289,13 +1289,12 @@ export function mountMailUi(
     composeDraft.tresc = '';
     store.setTab('napisz');
   };
-  // Format listy adresatow zgodny z listingami gry: "A, B i C"
-  // (splitParty rozbija party po ", " i " i "). Jedna osoba = samo
-  // imie. Pusta lista nie wystepuje - przyciski sa wylaczone.
-  const partyLabel = (names: readonly string[]): string =>
-    names.length <= 1
-      ? (names[0] ?? '')
-      : `${names.slice(0, -1).join(', ')} i ${names[names.length - 1]}`;
+  // Format listy adresatow na linie do gry: "A, B, C" (przecinki -
+  // zgodnie z PROTOCOL.md; serwer rozbija odbiorcow po przecinkach).
+  // Spojnik " i " zostaje wylacznie dla parsowania listingow
+  // (splitParty). Jedna osoba = samo imie. Pusta lista nie wystepuje -
+  // przyciski sa wylaczone.
+  const partyLabel = (names: readonly string[]): string => names.join(', ');
 
   // Fala 11d: podglad compose w wide to OSOBNY prawy panel (jak /list
   // w kliencie), wiec <pre> zyje poza formularzem - referencja i repaint

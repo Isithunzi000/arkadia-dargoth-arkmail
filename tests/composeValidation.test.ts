@@ -202,7 +202,7 @@ test('ui: wielu adresatow i wiele DW przechodzi bez zmiany tekstu', () => {
 });
 
 test('ui: adresat odrzuca znaki spoza a-zA-Z i puste elementy listy', () => {
-  const invalid = ['Foo1', 'Foo;', 'Foo#', 'Foo-Bar', 'Żoo', '\tFoo', 'Foo\tBar', 'Foo,', ',Foo', 'Foo,,Bar', 'Foo, ,Bar'];
+  const invalid = ['Foo1', 'Foo;', 'Foo#', 'Foo-Bar', 'Żoo', '\tFoo', 'Foo\tBar', 'Foo,', ',Foo', 'Foo,,Bar', 'Foo, ,Bar', 'Foo i Bar', 'Foo, Bar i Baz'];
   for (const adresat of invalid) {
     const s = new MailUiStore();
     const { container, calls, off } = mount(s);
@@ -222,7 +222,7 @@ test('ui: adresat odrzuca znaki spoza a-zA-Z i puste elementy listy', () => {
 });
 
 test('ui: DW odrzuca znaki spoza a-zA-Z i puste elementy listy', () => {
-  const invalid = ['Bar2', 'Bar;', 'Bar#', 'Bar_Baz', 'Łuk', '\tBar', 'Bar\tBaz', 'Bar,', ',Bar', 'Bar,,Baz', 'Bar, ,Baz'];
+  const invalid = ['Bar2', 'Bar;', 'Bar#', 'Bar_Baz', 'Łuk', '\tBar', 'Bar\tBaz', 'Bar,', ',Bar', 'Bar,,Baz', 'Bar, ,Baz', 'Bar i Baz'];
   for (const dw of invalid) {
     const s = new MailUiStore();
     const { container, calls, off } = mount(s);

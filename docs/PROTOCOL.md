@@ -244,6 +244,10 @@ odpowiedzi z cytowaniem (Fala 28c) temat przenoszony doslownie:
 
 Pola adresat i DW przyjmują wyłącznie litery A-Z i a-z, przecinki i spacje.
 Każde z nich może zawierać kilka nazw lub aliasów rozdzielonych przecinkami.
+Na linię do gry (i do tych pól) idzie wyłącznie format przecinkowy —
+spójnik ` i ` z sekcji o listingach dotyczy wyłącznie parsowania
+odpowiedzi serwera, nigdy wysyłki; wolne słowo `i` jest odrzucane
+przy walidacji.
 Adresat jest wymagany, a DW może pozostać puste.
 
 Temat i treść nie mogą zawierać znaków `;` ani `#`. Oba pola są wymagane.
