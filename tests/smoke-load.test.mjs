@@ -35,6 +35,19 @@ function makeElement(tag) {
     createElement: (t) => makeElement(t),
     createTextNode: (t) => ({ textContent: t }),
   };
+  // Zgloszenie 2026-11-05 (F4c): plugin doklada natywne klasy pol
+  // przez classList (jak w prawdziwym DOM klienta) - atrapka musi
+  // umiec add/contains, inaczej smoke nie odpala renderu.
+  el.classList = {
+    add(...cs) {
+      const set = new Set(el.className.split(' ').filter(Boolean));
+      cs.forEach((c) => set.add(c));
+      el.className = [...set].join(' ');
+    },
+    contains(c) {
+      return el.className.split(' ').includes(c);
+    },
+  };
   return el;
 }
 
