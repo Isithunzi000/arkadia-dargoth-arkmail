@@ -214,6 +214,13 @@ export function mountMailUi(
   handlers: MailUiHandlers,
 ): () => void {
   const doc = container.ownerDocument;
+// Zgloszenie 2026-11-05 (F4c): pola tekstowe na natywnych klasach klienta
+// (popup-input popup-input--control) - wyglad, fokus i placeholder pilnuje
+// motyw klienta. Checkboxy i radioboxy z wyjatkiem (accent-color u nas).
+const nativeFieldClass = (el: HTMLElement): void => {
+  el.classList.add('popup-input', 'popup-input--control');
+};
+
   const style = doc.createElement('style');
   style.textContent = STYLES;
   container.appendChild(style);
@@ -537,12 +544,12 @@ export function mountMailUi(
 
   const renderTabs = (state: MailUiState): HTMLElement => {
     const bar = doc.createElement('div');
-    bar.className = 'arkmail-tabs';
+    bar.className = 'arkmail-tabs dialog-tabs';
     for (const [id, label] of TABS) {
       const btn = doc.createElement('button');
       btn.className =
-        'arkmail-tab' +
-        (state.tab === id ? ' arkmail-tab-active' : '') +
+        'arkmail-tab dialog-tab' +
+        (state.tab === id ? ' is-active' : '') +
         // Fala 14b: flash po odlozeniu listu w niewyslanych (compose
         // poza poczta zawsze kolejkuje) - gracz widzi, gdzie kliknac.
         (state.unsentFlash && id === 'listy' ? ' arkmail-flash' : '');
@@ -594,6 +601,7 @@ export function mountMailUi(
     const controls = doc.createElement('div');
     controls.className = 'arkmail-deletion-controls';
     const box = doc.createElement('select');
+    nativeFieldClass(box);
     box.className = 'arkmail-deletion-box';
     box.setAttribute('title', 'Wybierz skrzynke');
     for (const [id, label] of BOXES) {
@@ -692,6 +700,7 @@ export function mountMailUi(
       caption.textContent = label;
       wrap.appendChild(caption);
       const field = doc.createElement('input');
+    nativeFieldClass(field);
       field.type = key === 'odDaty' || key === 'doDaty' ? 'date' : 'text';
       field.value = deletionDraft[key];
       field.setAttribute('data-deletion-filter', key);
@@ -927,6 +936,7 @@ export function mountMailUi(
     searchRow.className = 'arkmail-search-row';
     const mkSearch = (key: string, placeholder: string, type = 'text') => {
       const input = doc.createElement('input');
+    nativeFieldClass(input);
       input.setAttribute('data-search', key);
       input.setAttribute('type', type);
       input.setAttribute('placeholder', placeholder);
@@ -1241,6 +1251,7 @@ export function mountMailUi(
     }
     ops.appendChild(del);
     const fwdInput = doc.createElement('input');
+    nativeFieldClass(fwdInput);
     fwdInput.setAttribute('data-field', 'forward');
     fwdInput.setAttribute('placeholder', 'Przekaz do (gracz lub alias)');
     if (!source) fwdInput.setAttribute('disabled', '');
@@ -1408,6 +1419,7 @@ export function mountMailUi(
       lab.textContent = label;
       pane.appendChild(lab);
       const input = doc.createElement('input');
+    nativeFieldClass(input);
       input.setAttribute('data-field', field);
       input.value = composeDraft[field as 'adresat' | 'temat' | 'dw'];
       input.addEventListener('input', () => {
@@ -1425,6 +1437,7 @@ export function mountMailUi(
     labSz.textContent = 'Szablon';
     pane.appendChild(labSz);
     const sel = doc.createElement('select');
+    nativeFieldClass(sel);
     sel.setAttribute('data-field', 'szablon');
     for (const [value, label] of TEMPLATES) {
       const opt = doc.createElement('option');
@@ -1442,6 +1455,7 @@ export function mountMailUi(
     labW.textContent = 'Szerokosc linii (20-120)';
     pane.appendChild(labW);
     const width = doc.createElement('input');
+    nativeFieldClass(width);
     width.setAttribute('data-field', 'szerokosc');
     width.value = String(state.composeWidth);
     width.addEventListener('change', () => {
@@ -1456,6 +1470,7 @@ export function mountMailUi(
     lab.textContent = 'Tresc';
     pane.appendChild(lab);
     const tresc = doc.createElement('textarea');
+    nativeFieldClass(tresc);
     tresc.setAttribute('data-field', 'tresc');
     tresc.value = composeDraft.tresc;
     pane.appendChild(tresc);
@@ -1602,6 +1617,7 @@ export function mountMailUi(
     const filterRow = doc.createElement('div');
     filterRow.className = 'arkmail-group-filter';
     const filterInput = doc.createElement('input');
+    nativeFieldClass(filterInput);
     filterInput.setAttribute('data-group-filter', '');
     filterInput.setAttribute('placeholder', 'Filtruj grupy');
     filterInput.setAttribute('title', 'Pokazuje tylko grupy z nazwa zawierajaca wpisany fragment.');
@@ -1668,6 +1684,7 @@ export function mountMailUi(
       const head = doc.createElement('div');
       head.className = 'arkmail-group-head';
       const rename = doc.createElement('input');
+    nativeFieldClass(rename);
       rename.setAttribute('data-group-rename', '');
       rename.value = group.name;
       rename.setAttribute('title', 'Nazwa grupy - zapisz obok.');
@@ -1747,6 +1764,7 @@ export function mountMailUi(
       // Dokladanie czlonka z bazy osob (ghost: strzalka w prawo
       // wpisuje kanoniczna forme z kontaktow i importow).
       const addMember = doc.createElement('input');
+    nativeFieldClass(addMember);
       addMember.setAttribute('data-member-add', '');
       addMember.setAttribute('placeholder', 'Dodaj osobe');
       attachGhost(doc, addMember, personSource);
@@ -1908,6 +1926,7 @@ export function mountMailUi(
     const filterRow = doc.createElement('div');
     filterRow.className = 'arkmail-book-filter';
     const filterInput = doc.createElement('input');
+    nativeFieldClass(filterInput);
     filterInput.setAttribute('data-book-filter', '');
     filterInput.setAttribute('placeholder', 'Filtruj imiona');
     filterInput.setAttribute('title', 'Pokazuje tylko imiona zawierajace wpisany fragment.');
@@ -2053,7 +2072,7 @@ export function mountMailUi(
     for (const [sub, label] of SUBPILLS) {
       const pill = doc.createElement('button');
       pill.className =
-        'arkmail-box arkmail-subpill' + (contactView.sub === sub ? ' arkmail-box-active' : '');
+        'arkmail-subpill dialog-tab' + (contactView.sub === sub ? ' is-active' : '');
       pill.textContent = label;
       pill.addEventListener('click', () => {
         contactView.sub = sub;
@@ -2205,6 +2224,7 @@ export function mountMailUi(
     const bookAddRow = doc.createElement('div');
     bookAddRow.className = 'arkmail-book-add';
     const addInput = doc.createElement('input');
+    nativeFieldClass(addInput);
     addInput.setAttribute('data-book-new', '');
     addInput.setAttribute('placeholder', 'Imie nowej osoby');
     const addBtn = doc.createElement('button');
@@ -2259,6 +2279,7 @@ export function mountMailUi(
     const groupAddRow = doc.createElement('div');
     groupAddRow.className = 'arkmail-group-add';
     const groupAddInput = doc.createElement('input');
+    nativeFieldClass(groupAddInput);
     groupAddInput.setAttribute('data-group-add', '');
     groupAddInput.setAttribute('placeholder', 'Nazwa nowej grupy');
     const groupAddBtn = doc.createElement('button');
@@ -2327,6 +2348,7 @@ export function mountMailUi(
       modeRow.appendChild(lab);
     }
     const impInput = doc.createElement('input');
+    nativeFieldClass(impInput);
     impInput.setAttribute('type', 'file');
     impInput.setAttribute('data-book-import', '');
     impInput.setAttribute('accept', '.json,application/json');
@@ -2424,12 +2446,12 @@ export function mountMailUi(
     const controls = doc.createElement('div');
     controls.className = 'arkmail-contact-controls';
     const input = doc.createElement('input');
-    input.className = 'arkmail-contact-filter';
+    input.className = 'arkmail-contact-filter popup-input popup-input--control';
     input.setAttribute('data-filter', 'kontakty');
     input.setAttribute('placeholder', 'Filtr: nazwa lub alias');
     input.value = contactView.filter;
     const sel = doc.createElement('select');
-    sel.className = 'arkmail-contact-sort';
+    sel.className = 'arkmail-contact-sort popup-input popup-input--control';
     const SORT_OPTS: Array<[ContactSort, string]> = [
       ['nazwa', 'Nazwa A-Z'],
       ['liczba', 'Liczba listow'],
@@ -2582,6 +2604,7 @@ export function mountMailUi(
     controls.className = 'arkmail-arch-controls';
     const mkText = (key: 'osoba' | 'temat' | 'tresc' | 'odDaty' | 'doDaty', placeholder: string, type = 'text') => {
       const input = doc.createElement('input');
+    nativeFieldClass(input);
       input.setAttribute('data-filter', key);
       input.setAttribute('type', type);
       input.setAttribute('placeholder', placeholder);
@@ -2596,6 +2619,7 @@ export function mountMailUi(
     controls.appendChild(aOsoba);
     attachGhost(doc, aOsoba, personSource);
     const skr = doc.createElement('select');
+    nativeFieldClass(skr);
     skr.setAttribute('data-filter', 'skrzynka');
     const SKR_OPTS: Array<[MailBox | '', string]> = [
       ['', 'Wszystkie skrzynki'],

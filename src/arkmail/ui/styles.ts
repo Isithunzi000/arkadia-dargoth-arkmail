@@ -63,7 +63,7 @@ export const STYLES = `
 }
 
 /* --- kontrolki bazowe: JAWNE kolory (bug bialy-na-bialym) --- */
-.arkmail-root button:not(.popup-btn) {
+.arkmail-root button:not(.popup-btn):not(.dialog-tab) {
   background: ${BG_RAISED};
   color: ${FG};
   border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
@@ -80,8 +80,8 @@ export const STYLES = `
   justify-content: center;
   min-height: calc(26px * var(--window-font-scale, 1));
 }
-.arkmail-root button:not(.popup-btn):hover { background: ${HOVER_BASE}; }
-.arkmail-root button:not(.popup-btn):not([data-armed="1"]):active { background: ${HOVER_RESET}; }
+.arkmail-root button:not(.popup-btn):not(.dialog-tab):hover { background: ${HOVER_BASE}; }
+.arkmail-root button:not(.popup-btn):not(.dialog-tab):not([data-armed="1"]):active { background: ${HOVER_RESET}; }
 .arkmail-root button:not(.popup-btn):focus-visible,
 .arkmail-root .arkmail-tab:focus-visible,
 .arkmail-root .arkmail-box:focus-visible,
@@ -103,50 +103,15 @@ export const STYLES = `
   outline: calc(2px * var(--window-font-scale, 1)) solid var(--popup-danger-border);
   outline-offset: calc(1px * var(--window-font-scale, 1));
 }
-.arkmail-root input, .arkmail-root textarea, .arkmail-root select {
-  background: ${BG_INPUT};
-  color: ${FG};
-  border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
-  border-radius: calc(6px * var(--window-font-scale, 1));
-  padding: calc(5px * var(--window-font-scale, 1)) calc(8px * var(--window-font-scale, 1));
-  font: inherit;
-}
-.arkmail-root input:focus, .arkmail-root textarea:focus, .arkmail-root select:focus {
-  outline: none;
-  border-color: ${ACCENT};
-}
+/* Zgloszenie 2026-11-05 (F4c): pola tekstowe uzywaja natywnych klas
+ * klienta (popup-input popup-input--control) - tlo, obwodka, fokus
+ * i placeholder pilnuje motyw klienta. Zostaja tylko checkboxy. */
 .arkmail-root input[type='checkbox'] { accent-color: ${ACCENT}; }
-.arkmail-root input::placeholder, .arkmail-root textarea::placeholder {
-  color: ${FG_DIM};
-  font-size: calc(12px * var(--window-font-scale, 1));
-  opacity: 1;
-}
 
 /* --- zakladki: segmentowana belka --- */
-.arkmail-tabs {
-  display: flex;
-  gap: calc(2px * var(--window-font-scale, 1));
-  flex-wrap: wrap;
-  background: ${BG_PANEL};
-  border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
-  border-radius: calc(8px * var(--window-font-scale, 1));
-  padding: calc(3px * var(--window-font-scale, 1));
-}
-.arkmail-root .arkmail-tab {
-  border: calc(1px * var(--window-font-scale, 1)) solid ${BG_PANEL};
-  border-radius: calc(6px * var(--window-font-scale, 1));
-  background: ${BG_PANEL};
-  color: ${FG_DIM};
-  padding: calc(4px * var(--window-font-scale, 1)) calc(12px * var(--window-font-scale, 1));
-}
-.arkmail-root .arkmail-tab:hover { color: ${FG}; background: ${BG_RAISED}; }
-.arkmail-root .arkmail-tab-active {
-  background: ${ACCENT_DEEP};
-  border-color: ${ACCENT_DEEP};
-  color: ${ACCENT_FG};
-  font-weight: 600;
-}
-.arkmail-root .arkmail-tab-active:hover { background: ${ACCENT_DEEP}; color: ${ACCENT_FG}; }
+/* Zgloszenie 2026-11-05 (F4c): belka zakladek to klasy natywnego UI
+ * klienta (dialog-tabs / dialog-tab + is-active) - segment, kolory
+ * i hover pilnuje motyw klienta. */
 
 /* --- pasek operacji --- */
 .arkmail-busy {
@@ -243,8 +208,8 @@ export const STYLES = `
 /* Fala 11e: zbiorcze operacje na aktywnej skrzynce (zamiast obrotu per box). */
 .arkmail-box-ops { display: flex; flex-wrap: wrap; gap: calc(6px * var(--window-font-scale, 1)); margin-bottom: calc(8px * var(--window-font-scale, 1)); }
 .arkmail-box-ops button { flex: 1 1 calc(140px * var(--window-font-scale, 1)); }
-.arkmail-root button:not(.popup-btn):disabled { opacity: 0.45; cursor: default; }
-.arkmail-root button:not(.popup-btn):disabled:hover { background: ${BG_RAISED}; }
+.arkmail-root button:not(.popup-btn):not(.dialog-tab):disabled { opacity: 0.45; cursor: default; }
+.arkmail-root button:not(.popup-btn):not(.dialog-tab):disabled:hover { background: ${BG_RAISED}; }
 
 /* --- wiersze listow: nadawca | temat | data --- */
 .arkmail-entry {

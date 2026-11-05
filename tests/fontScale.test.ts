@@ -48,17 +48,12 @@ test('style: podglad compose uzywa czcionki wyjscia okna', () => {
   assert.match(body!, /font-size:\s*var\(--output-font-size/, 'rozmiar czcionki z ustawien okna');
 });
 
-test('style: wysokosci kontrolek formularza skaluja sie ze skala okna', () => {
-  // Regula wspolna pol wpisu: wysokosci sa opakowane w calc ze skala
-  // okna, wiec kontrolka rosnie z czcionka zamiast ucinac tekst.
-  const body = ruleBody(/\.arkmail-root\s+input,\s*\.arkmail-root\s+textarea,\s*\.arkmail-root\s+select\s*/);
-  assert.ok(body, 'regula wspolna pol formularza istnieje');
-  const heights = body!.match(/(?:min-|max-)?height:\s*([^;]+);/g) ?? [];
-  for (const h of heights) {
-    assert.match(
-      h,
-      /calc\(\d+px \* var\(--window-font-scale, 1\)\)/,
-      `wysokosc skalowana: ${h.trim()}`,
-    );
-  }
+test('style: pola formularza bez wlasnych wysokosci (skalowanie w kliencie)', () => {
+  // Zgloszenie 2026-11-05 (F4c): pola uzywaja natywnych klas klienta
+  // (popup-input popup-input--control) - wysokosc i jej skalowanie ze
+  // skala okna pilnuje zmienna --ui-ctrl z arkusza klienta. Plugin
+  // nie wolno miec wlasnych regulek wysokosci dla pol.
+  const body = ruleBody(/\.arkmail-root\s+input,\s*\.arkmail-root\s+textarea/);
+  assert.equal(body, null, 'brak catch-all z wysokosciami pol');
+  assert.doesNotMatch(STYLES, /\.arkmail-form input[^}]*height:/, 'form bez wlasnych wysokosci');
 });

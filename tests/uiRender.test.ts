@@ -86,7 +86,7 @@ test('render: piec zakladek z polskimi etykietami, bez List', () => {
     tabs.map((t) => t.textContent),
     ['Listy', 'Napisz list', 'Kontakty', 'Archiwum', 'Usuwanie listow'],
   );
-  assert.equal(container.querySelector('.arkmail-tab-active')?.getAttribute('data-tab'), 'listy');
+  assert.equal(container.querySelector('.arkmail-tab.is-active')?.getAttribute('data-tab'), 'listy');
   off();
 });
 
@@ -100,7 +100,7 @@ test('render: czytanie listu na waskim bez aktywnej zakladki na pasku', () => {
   const { container, off } = mount(s);
   assert.equal(s.state.tab, 'list');
   assert.ok(!container.querySelector('[data-tab="list"]'), 'brak zakladki List');
-  assert.ok(!container.querySelector('.arkmail-tab-active'), 'zadna zakladka nie aktywna');
+  assert.ok(!container.querySelector('.arkmail-tab.is-active'), 'zadna zakladka nie aktywna');
   off();
 });
 
@@ -110,7 +110,7 @@ test('render: klik zakladki zmienia stan, aktywna ma klase', () => {
   const napisz = container.querySelector('[data-tab="napisz"]')!;
   click(napisz);
   assert.equal(s.state.tab, 'napisz');
-  assert.equal(container.querySelector('.arkmail-tab-active')?.getAttribute('data-tab'), 'napisz');
+  assert.equal(container.querySelector('.arkmail-tab.is-active')?.getAttribute('data-tab'), 'napisz');
   off();
 });
 

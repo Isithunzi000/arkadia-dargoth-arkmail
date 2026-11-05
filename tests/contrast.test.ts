@@ -57,12 +57,14 @@ test('style: kropka nieprzeczytania w kolorze akcentu', () => {
   assert.match(m![1]!, /background:\s*var\(--popup-accent\)/, 'kropka akcentowa');
 });
 
-test('style: aktywna zakladka na wypelnieniu akcentu', () => {
-  const b = ruleBody('tab-active');
-  assert.match(b, /background:\s*var\(--popup-accent\)/, 'tlo akcentu');
-  assert.match(b, /border-color:\s*var\(--popup-accent\)/, 'obwodka akcentu');
-  const h = hoverBody('tab-active');
-  assert.match(h, /background:\s*var\(--popup-accent\)/, 'hover akcentu');
+// Aktywna zakladka: klasy dialog-tabs/dialog-tab/is-active z arkusza
+// klienta (zgloszenie 2026-11-05 F4c); zero wlasnych regul zakladek.
+// Kontrakt DOM: tests/nativeUi.test.ts.
+
+test('style: zero wlasnych regul kolorow zakladek', () => {
+  assert.doesNotMatch(STYLES, /\.arkmail-tab\s*\{[^}]*background:/, 'zakladki bez wlasnego tla');
+  assert.doesNotMatch(STYLES, /\.arkmail-tab-active/, 'zero regul klasy tab-active');
+  assert.doesNotMatch(STYLES, /\.arkmail-tabs\s*\{/, 'belka zakladek z arkusza klienta');
 });
 
 test('style: aktywna skrzynka na wypelnieniu akcentu', () => {

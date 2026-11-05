@@ -125,7 +125,7 @@ test('integracja: klik w archiwum pokazuje list, Zamknij list wraca do archiwum'
     );
     assert.ok(
       (h.content.querySelector('[data-tab="archiwum"]') as { className: string }).className.includes(
-        'arkmail-tab-active',
+        'is-active',
       ),
       'zakladka archiwum aktywna po zamknieciu',
     );

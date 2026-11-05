@@ -101,7 +101,7 @@ test('layout: wide z listem - podglad po prawej, Zamknij w naglowku, bez Zamknij
   assert.ok(q(c, '.arkmail-letter-close'), 'przycisk Zamknij w podgladzie');
   assert.ok(!hasButton(c, 'Zamknij list'), 'w wide nie ma przycisku Zamknij list');
   const tab = q(c, '[data-tab="listy"]') as { classList: { contains(s: string): boolean } };
-  assert.ok(tab.classList.contains('arkmail-tab-active'), 'klik w list nie zmienia zakladki');
+  assert.ok(tab.classList.contains('is-active'), 'klik w list nie zmienia zakladki');
 });
 
 test('layout: Zamknij w wide czysci podglad - wraca placeholder', () => {
