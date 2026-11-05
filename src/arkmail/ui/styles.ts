@@ -217,6 +217,9 @@ export const STYLES = `
 /* Zgloszenie 2026-11-05: klawisze natywne klienta (popup-btn) tez
  * gasna po wylaczeniu - bez reguly wygladaja na aktywne. */
 .arkmail-root .popup-btn:disabled { opacity: 0.45; cursor: default; }
+/* Zgloszenie 2026-11-05 (Etap 9): wybor pliku importu otwiera klawisz
+ * - sama kontrolka pliku jest niewidoczna. */
+.arkmail-root input[data-book-import] { display: none; }
 /* Zgloszenie 2026-11-05: poziome linie oddzielajace sekcje w tokenach
  * obramowania (wczesniej domyslny styl klienta/browsera). */
 .arkmail-root hr { border: none; border-top: calc(1px * var(--window-font-scale, 1)) solid ${BORDER}; margin: calc(8px * var(--window-font-scale, 1)) 0; }

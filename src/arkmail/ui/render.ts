@@ -2307,9 +2307,8 @@ const nativeFieldClass = (el: HTMLElement): void => {
     pane.appendChild(expBtn);
 
     // Import: tryb dolacz/zastap (stan lokalny jak dotad).
-    const impLabel = doc.createElement('label');
-    impLabel.className = 'popup-btn popup-btn--control';
-    impLabel.textContent = 'Importuj ksiazke ';
+    // Zgloszenie 2026-11-05 (Etap 9): import to prawdziwy klawisz;
+    // pole wyboru pliku jest niewidoczne i otwiera je klawisz.
     const modeRow = doc.createElement('div');
     modeRow.className = 'arkmail-boxes';
     modeRow.setAttribute('data-book-import-mode', '');
@@ -2363,8 +2362,17 @@ const nativeFieldClass = (el: HTMLElement): void => {
         })
         .catch(() => showError('Nie udalo sie odczytac pliku.'));
     });
-    impLabel.appendChild(impInput);
-    pane.appendChild(impLabel);
+    const impBtn = doc.createElement('button');
+    impBtn.className = 'popup-btn popup-btn--control';
+    impBtn.textContent = 'Importuj ksiazke';
+    impBtn.setAttribute('data-book-import-trigger', '');
+    impBtn.setAttribute(
+      'title',
+      'Wybiera plik JSON z imionami i grupami, a potem wczytuje go w wybranym trybie.',
+    );
+    impBtn.addEventListener('click', () => impInput.click());
+    pane.appendChild(impBtn);
+    pane.appendChild(impInput);
     pane.appendChild(modeRow);
     pane.appendChild(error);
     pane.appendChild(doc.createElement('hr'));
