@@ -62,7 +62,7 @@ export function parseMailDate(raw: string): MailDate | null {
 // z liczba (komentarz w poczta.ts klienta), stad luzne "pierwsz".
 const LISTING_HEADER_RE = /^(?:Wybrane )?[Ll]isty (nieprzeczytane|odebrane|wyslane|niewyslane)(?: \(([^)]*)\))?:$/;
 const LISTING_LIMIT_RE = /\bpierwsz\w*\s+(\d+)\b/;
-const SERVER_LISTING_LIMIT = 50;
+export const SERVER_LISTING_LIMIT = 50;
 
 export function parseListingHeader(text: string): ListingHeader | null {
   const m = text.match(LISTING_HEADER_RE);

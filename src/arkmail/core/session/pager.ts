@@ -20,6 +20,10 @@ import { isEchoLine, isPromptLine } from './lines.js';
 import { clearPagerOrphan, suspectPagerOrphan } from './orphanPager.js';
 import type { ProtoLine, Transport } from './transport.js';
 import type { SessionOptions } from './mailbox.js';
+import { DEFAULT_IDLE_FLUSH_MS, LISTS_LOADING_RETRY_MS } from './mailbox.js';
+
+/** Minimalny czas grace przy zamykaniu sesji pagera (ms). */
+const CLOSE_GRACE_MS = 400;
 
 export interface LetterContent {
   number: number;
@@ -275,7 +279,7 @@ export class PagerSession {
       /** Kolejne proby advance po ciszy; zeruje kazda linia body albo
        *  prompt pagera (serwer odpowiada = strona nie czeka). */
       let advances = 0;
-      const idleMs = this.opts.idleMs ?? 600;
+      const idleMs = this.opts.idleMs ?? DEFAULT_IDLE_FLUSH_MS;
       let idleTimer: ReturnType<typeof setTimeout> | null = null;
       let quietTimer: ReturnType<typeof setTimeout> | null = null;
       let graceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -411,7 +415,7 @@ export class PagerSession {
           suspectPagerOrphan();
           cleanup();
           reject(new Error(`timeout: pager session list ${numer}`));
-        }, Math.max(idleMs, 400));
+        }, Math.max(idleMs, CLOSE_GRACE_MS));
       }, this.opts.timeoutMs);
 
       const enterClosing = () => {
@@ -488,7 +492,7 @@ export class PagerSession {
               if (!done && state === 'letter') {
                 this.transport.send(`przeczytaj list ${numer}`);
               }
-            }, 2000);
+            }, LISTS_LOADING_RETRY_MS);
             return;
           }
           const mailErr = parseMailError(line.text);

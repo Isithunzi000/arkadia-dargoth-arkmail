@@ -1,14 +1,7 @@
 import type { MailboxEntry } from './session/mailbox.js';
+import { entryKey } from './session/mailbox.js';
 import type { MailBox } from './protocol/types.js';
 import { contentKeyOf, fromMailboxEntry, type ArchiveLetter } from './archive.js';
-
-const entryKey = (entry: MailboxEntry): string =>
-  [
-    entry.party,
-    entry.subject,
-    entry.forwarded ? 'f' : '',
-    entry.date?.raw ?? '',
-  ].join('|');
 
 const compressRange = (numbers: readonly number[]): string => {
   const parts: string[] = [];

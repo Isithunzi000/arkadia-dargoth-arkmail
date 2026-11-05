@@ -1,7 +1,11 @@
 import { nextDay, olderListingCommand } from './protocol/commands.js';
+import { SERVER_LISTING_LIMIT } from './protocol/parser.js';
 import type { MailBox } from './protocol/types.js';
 import type { MailboxEntry, MailboxResult } from './session/mailbox.js';
+import { entryKey } from './session/mailbox.js';
 import { fnv1a } from './archive.js';
+
+export { entryKey };
 
 
 export const PAGE_PACE_MS = 400;
@@ -42,9 +46,6 @@ export interface PageScanOptions {
   onGap?: (day: string) => void;
 }
 
-export const entryKey = (entry: MailboxEntry): string =>
-  [entry.party, entry.subject, entry.forwarded ? 'f' : '', entry.date?.raw ?? ''].join('|');
-
 export function oldestEntry(entries: readonly MailboxEntry[]): MailboxEntry | null {
   let oldest: MailboxEntry | null = null;
   for (const entry of entries) {
@@ -70,7 +71,7 @@ const oneDayOf = (entries: readonly MailboxEntry[]): string | null => {
 };
 
 const gapReason = (day: string): string =>
-  `ponad 50 listow z dnia ${day} - serwer nie pokazuje reszty`;
+  `ponad ${SERVER_LISTING_LIMIT} listow z dnia ${day} - serwer nie pokazuje reszty`;
 
 /**
  * Wspolne pobieranie starszych stron. Powtorzenia strony najpierw sa

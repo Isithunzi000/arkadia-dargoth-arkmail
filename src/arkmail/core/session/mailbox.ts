@@ -30,6 +30,11 @@ import type { ProtoLine, Transport } from './transport.js';
 /** Linie-bledy serwera przerywajace transakcje (log 2026-10-17/18). */
 const MAIL_ERROR_RE = /^Data zostala podana w zlym formacie\./;
 
+/** Retry po komunikacie "Listy sa w tej chwili ladowane." (ms). */
+export const LISTS_LOADING_RETRY_MS = 2000;
+/** Domyslny idle-flush gdy opts.idleMs nie podano (ms). */
+export const DEFAULT_IDLE_FLUSH_MS = 600;
+
 export interface SessionOptions {
   timeoutMs: number;
   /** Idle-flush po ciszy; bezpiecznik, gdy prompt nie dociera. */
@@ -72,6 +77,10 @@ export interface MailboxEntry extends ListingEntry {
   archiveId?: string;
 }
 
+/** Klucz deduplikacji wpisu: strona, temat, przekaz, surowa data. */
+export const entryKey = (entry: MailboxEntry): string =>
+  [entry.party, entry.subject, entry.forwarded ? 'f' : '', entry.date?.raw ?? ''].join('|');
+
 export type MailboxResult =
   | { kind: 'lista'; header: ListingHeader; entries: MailboxEntry[] }
   | { kind: 'pusta'; box: MailBox; reason: 'puste' | 'filtr' };
@@ -103,7 +112,7 @@ export class MailboxSession {
        *  komende. Powtorka promptu = pager przetrwal "q" - blad. */
       let pagerRetried = false;
       let awaitingPromptAfterQ = false;
-      const idleMs = this.opts.idleMs ?? 600;
+      const idleMs = this.opts.idleMs ?? DEFAULT_IDLE_FLUSH_MS;
       let idleTimer: ReturnType<typeof setTimeout> | null = null;
       let cancelUnsub: () => void = () => {};
 
@@ -166,7 +175,7 @@ export class MailboxSession {
           loadRetried = true;
           loadRetryTimer = setTimeout(() => {
             if (!done) this.transport.send(cmd);
-          }, 2000);
+          }, LISTS_LOADING_RETRY_MS);
           return;
         }
 
