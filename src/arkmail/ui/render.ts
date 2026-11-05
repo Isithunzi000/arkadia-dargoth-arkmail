@@ -1644,8 +1644,14 @@ const nativeFieldClass = (el: HTMLElement): void => {
     pane.appendChild(filterRow);
 
     // --- lista grup
+    // Zgloszenie 2026-11-05 (Etap 8): lista scrolluje sie wlasnym
+    // kontenerem (jak w Ksiazce) - naglowek sekcji stoi na stale.
     const list = doc.createElement('div');
-    pane.appendChild(list);
+    const groupScroll = doc.createElement('div');
+    groupScroll.className = 'arkmail-list-scroll';
+    groupScroll.setAttribute('data-pane-key', 'kontakty:grupy');
+    groupScroll.appendChild(list);
+    pane.appendChild(groupScroll);
     const paintGroups = (): void => {
       const needle = groupFilter.trim().toLowerCase();
       const shown = needle
@@ -2115,7 +2121,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     // (jak w zakladce Listy) - panel w trybie kolumnowym, scrolluje
     // sie wylacznie kontener listy.
     pane.className =
-      'arkmail-pane' + (contactView.sub === 'ksiazka' ? ' arkmail-listy' : '');
+      'arkmail-pane' + (contactView.sub === 'ksiazka' || contactView.sub === 'grupy' ? ' arkmail-listy' : '');
     pane.setAttribute('data-pane-key', 'kontakty');
     // Fala UI-2 krok 3: sub-pigulki; krok 4: zostaly dwie (pigulka
     // "Osoby" - indeks osob zebranych z listow - przeniesiona do
