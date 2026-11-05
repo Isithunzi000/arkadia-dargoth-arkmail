@@ -125,10 +125,10 @@ test('scroll: Ksiazka adresowa - naglowek staly, lista w kontenerze scrolla', ()
       isInside(cq('[data-pane-key="kontakty"]') as unknown as El, scroll as unknown as El),
     'scroll wewnatrz panelu Kontakty',
   );
-  // Zgloszenie 2026-11-05 (K7): dodawanie imion i importy przeniesione
-  // do pigulki Import-Eksport - w Ksiazce zostaja same imiona, filtr
-  // i klawisze zbiorcze.
-  assert.ok(!cq('[data-book-new]'), 'dodawanie imion NIE w Ksiazce (przeniesione do Import-Eksport)');
+  // Wydanie 1.30.1 (zgloszenie pkt 4): reczne dodawanie mieszka w
+  // Ksiazce (w naglowku, nad scrollem), importy zostaly w Import-Eksport.
+  const addRow = cq('[data-book-new]');
+  assert.ok(addRow && !isInside(scroll as unknown as El, addRow as unknown as El), 'dodawanie imion w naglowku, NIE w scrollu');
   assert.ok(!cq('[data-import]'), 'importy NIE w Ksiazce (przeniesione do Import-Eksport)');
   const bulk = cq('[data-book-delete-checked]');
   assert.ok(bulk && !isInside(scroll as unknown as El, bulk as unknown as El), 'klawisze zbiorcze NIE w scrollu');
@@ -136,12 +136,13 @@ test('scroll: Ksiazka adresowa - naglowek staly, lista w kontenerze scrolla', ()
   assert.ok(row && isInside(scroll as unknown as El, row as unknown as El), 'wiersze imion WEWNATRZ scrolla');
   const filter = cq('[data-book-filter]');
   assert.ok(filter && isInside(scroll as unknown as El, filter as unknown as El), 'filtr WEWNATRZ scrolla');
-  // W pigulce Import-Eksport operacje budowy ksiazki sa obecne.
+  // Ostatnia kliknieta pigulka to Import-Eksport: czysty import/eksport
+  // bez pol recznego dodawania (zgloszenia 4/5).
   for (const pill of Array.from(
     container.querySelectorAll('.arkmail-subpill') as unknown as Array<{ click(): void }>,
   )) {
     pill.click();
   }
-  assert.ok(cq('[data-book-new]'), 'dodawanie imion w pigulce Import-Eksport');
+  assert.equal(cq('[data-book-new]'), null, 'dodawanie imion NIE w pigulce Import-Eksport');
   assert.ok(cq('[data-import]'), 'importy w pigulce Import-Eksport');
 });

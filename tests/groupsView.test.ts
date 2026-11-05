@@ -159,31 +159,34 @@ test('grupy: cztery sub-pigulki (Osoby w Archiwum)', () => {
     'Grupy',
     'Import-Eksport',
   ]);
-  // Zgloszenie 2026-11-05 (K7): budowa ksiazki (dodawanie imion i grup,
-  // importy z gry) mieszka w pigulce Import-Eksport.
-  assert.ok(!q(container, '[data-book-new]'), 'domyslnie Ksiazka: bez formularza dodawania');
+  // Wydanie 1.30.1 (zgloszenia 4/5): reczne dodawanie mieszka w
+  // Ksiazce i Grupach; importy z gry zostaja w Import-Eksport.
+  assert.ok(q(container, '[data-book-new]'), 'domyslnie Ksiazka: formularz dodawania widoczny');
   assert.ok(!q(container, '[data-import]'), 'domyslnie Ksiazka: bez przyciskow importu');
-  assert.ok(!q(container, '[data-group-add]'), 'domyslnie Grupy: formularz ukryty');
+  assert.ok(!q(container, '[data-group-add]'), 'domyslnie Grupy: formularz grupy ukryty');
   switchToImportEksport(container);
-  assert.ok(q(container, '[data-book-new]'), 'Import-Eksport: formularz dodawania widoczny');
+  assert.ok(!q(container, '[data-book-new]'), 'Import-Eksport: bez formularza dodawania');
   assert.ok(q(container, '[data-import]'), 'Import-Eksport: przyciski importu z gry widoczne');
-  assert.ok(q(container, '[data-group-add]'), 'Import-Eksport: tworzenie grupy widoczne');
+  assert.ok(!q(container, '[data-group-add]'), 'Import-Eksport: bez tworzenia grupy');
+  switchToGrupy(container);
+  assert.ok(q(container, '[data-group-add]'), 'Grupy: tworzenie grupy widoczne');
 });
 
 test('grupy: przełączanie sub-pigulek', () => {
   const s = new MailUiStore({ tab: 'kontakty' });
   const { container } = mount(s);
   switchToGrupy(container);
-  assert.ok(!q(container, '[data-group-add]'), 'Grupy: tylko lista grup, bez formularza');
+  assert.ok(q(container, '[data-group-add]'), 'Grupy: formularz tworzenia grupy');
   switchToKsiazka(container);
-  assert.ok(!q(container, '[data-book-new]'), 'Ksiazka: tylko lista imion, bez formularza');
+  assert.ok(q(container, '[data-book-new]'), 'Ksiazka: formularz dodawania imion');
   assert.ok(!q(container, '[data-import]'), 'Ksiazka: bez przyciskow importu z gry');
 });
 
 test('grupy: dodanie grupy wywoluje zapis, pusta nazwa odrzucana', () => {
   const s = new MailUiStore({ tab: 'kontakty' });
   const { container, calls } = mount(s);
-  switchToImportEksport(container);
+  // Wydanie 1.30.1 (pkt 5): tworzenie grupy mieszka w Grupach.
+  switchToGrupy(container);
   type(q(container, '[data-group-add]'), '   ');
   click(q(container, '[data-group-create]'));
   assert.equal(calls.groups.length, 0, 'pusta nazwa: bez zapisu');

@@ -1607,9 +1607,39 @@ const nativeFieldClass = (el: HTMLElement): void => {
         (g) => g.name !== ignore && g.name.toLowerCase() === name.toLowerCase(),
       );
 
-    // Tworzenie grupy mieszka w pigulce Import-Eksport (zgloszenie
-    // 2026-11-05, K7) - ta pigulka to lista grup i ich czlonkow.
+    // Zgloszenie 2026-11-05 pkt 5: reczne tworzenie grupy mieszka
+    // w Grupach (ponizej komunikatu bledu); ta pigulka to lista grup
+    // i ich czlonkow.
     pane.appendChild(error);
+
+    // --- tworzenie grupy
+    const groupAddRow = doc.createElement('div');
+    groupAddRow.className = 'arkmail-group-add';
+    const groupAddInput = doc.createElement('input');
+    nativeFieldClass(groupAddInput);
+    groupAddInput.setAttribute('data-group-add', '');
+    groupAddInput.setAttribute('placeholder', 'Nazwa nowej grupy');
+    const groupAddBtn = doc.createElement('button');
+    groupAddBtn.className = 'popup-btn popup-btn--control';
+    groupAddBtn.textContent = 'Utworz grupe';
+    groupAddBtn.setAttribute('data-group-create', '');
+    groupAddBtn.setAttribute('title', 'Tworzy pusta grupe. Czlonkow dolaczysz po utworzeniu.');
+    groupAddBtn.addEventListener('click', () => {
+      const name = groupAddInput.value.trim();
+      if (!name) {
+        showError('Podaj nazwe grupy.');
+        return;
+      }
+      if (state.groups.some((g) => g.name.toLowerCase() === name.toLowerCase())) {
+        showError(`Grupa "${name}" juz istnieje.`);
+        return;
+      }
+      groupAddInput.value = '';
+      handlers.onSaveGroups?.([...state.groups, { name, members: [] }]);
+    });
+    groupAddRow.appendChild(groupAddInput);
+    groupAddRow.appendChild(groupAddBtn);
+    pane.appendChild(groupAddRow);
 
     // --- filtr nazw grup z przyciskiem czyszczenia
     // Zgloszenie 2026-11-05. Repaint dotyka tylko listy - pole filtra
@@ -1840,9 +1870,10 @@ const nativeFieldClass = (el: HTMLElement): void => {
     }
     const save = (people: string[]): void => handlers.onSavePeople?.(people);
 
-    // Import z gry, dodawanie imion i tworzenie grup mieszkaja w
-    // pigulce Import-Eksport (zgloszenie 2026-11-05, K7): jedno
-    // miejsce budowy ksiazki. Ta pigulka to czysta lista imion.
+    // Zgloszenie 2026-11-05 pkt 4: reczne dodawanie imion mieszka w
+    // Ksiazce (ponizej klawiszy zbiorczych); import z gry i eksport
+    // zostaly w pigulce Import-Eksport. Ta pigulka to lista imion
+    // z operacjami zbiorczymi i filtrem.
 
     // --- usuwanie zaznaczonych (uzbrojony dwuklik, jak w Grupy)
     // Zgloszenie 2026-11-05: poziom danger - kazde usuwanie danych
@@ -1923,6 +1954,65 @@ const nativeFieldClass = (el: HTMLElement): void => {
       store.refresh();
     });
     pane.appendChild(deselectAllBtn);
+
+    // --- reczne dodawanie imienia (zgloszenie 2026-11-05 pkt 4:
+    // mieszka w Ksiazce, nie w Import-Eksport). Pole z ghost-
+    // podpowiedziami (jak pole adresata): kontakty + aliasy,
+    // strzalka w prawo wpisuje kanoniczna forme kandydata.
+    // --- dodawanie imienia do ksiazki
+    const bookAddRow = doc.createElement('div');
+    bookAddRow.className = 'arkmail-book-add';
+    const addInput = doc.createElement('input');
+    nativeFieldClass(addInput);
+    addInput.setAttribute('data-book-new', '');
+    addInput.setAttribute('placeholder', 'Imie nowej osoby');
+    const addBtn = doc.createElement('button');
+    addBtn.className = 'popup-btn popup-btn--control';
+    addBtn.textContent = 'Dodaj';
+    addBtn.setAttribute('data-book-add', '');
+    addBtn.setAttribute('title', 'Dodaje imie do ksiazki adresowej.');
+    const addErr = doc.createElement('span');
+    addErr.className = 'arkmail-group-error';
+    const showAddError = (msg: string): void => {
+      addErr.textContent = msg;
+      addErr.setAttribute('data-book-error', '');
+    };
+    const clearAddError = (): void => {
+      addErr.textContent = '';
+      addErr.removeAttribute('data-book-error');
+    };
+    const tryAdd = (): void => {
+      const name = addInput.value.trim();
+      if (!name) {
+        showAddError('Podaj imie.');
+        return;
+      }
+      if (!/^[A-Za-z]+$/.test(name)) {
+        showAddError('Imie: tylko litery.');
+        return;
+      }
+      if (state.people.some((p) => p.toLowerCase() === name.toLowerCase())) {
+        showAddError('To imie juz jest w ksiazce.');
+        return;
+      }
+      clearAddError();
+      addInput.value = '';
+      // Dopisanie na koniec; deduplikacje robi savePeople w index.ts.
+      handlers.onSavePeople?.([...state.people, name]);
+    };
+    addBtn.addEventListener('click', tryAdd);
+    addInput.addEventListener('keydown', (ev) => {
+      if ((ev as KeyboardEvent).key === 'Enter') tryAdd();
+    });
+    bookAddRow.appendChild(addInput);
+    bookAddRow.appendChild(addBtn);
+    bookAddRow.appendChild(addErr);
+    // Pole nowej osoby z ghost-podpowiedziami (jak pole adresata):
+    // kontakty + aliasy, strzalka w prawo wpisuje kanoniczna forme
+    // kandydata. Attach dopiero po podpieciu inputu do rodzica - ghost
+    // wrapuje element w miejscu w drzewie.
+    attachGhost(doc, addInput, personSource);
+    pane.appendChild(bookAddRow);
 
     // --- filtr listy imion z przyciskiem czyszczenia
     // Zgloszenie 2026-11-05. Repaint dotyka tylko listy - pole filtra
@@ -2225,89 +2315,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     }
     pane.appendChild(importRow);
 
-    // --- dodawanie imienia (przeniesione z pigulki Ksiazka, K7)
-    const bookAddRow = doc.createElement('div');
-    bookAddRow.className = 'arkmail-book-add';
-    const addInput = doc.createElement('input');
-    nativeFieldClass(addInput);
-    addInput.setAttribute('data-book-new', '');
-    addInput.setAttribute('placeholder', 'Imie nowej osoby');
-    const addBtn = doc.createElement('button');
-    addBtn.className = 'popup-btn popup-btn--control';
-    addBtn.textContent = 'Dodaj';
-    addBtn.setAttribute('data-book-add', '');
-    addBtn.setAttribute('title', 'Dodaje imie do ksiazki adresowej.');
-    const addErr = doc.createElement('span');
-    addErr.className = 'arkmail-group-error';
-    const showAddError = (msg: string): void => {
-      addErr.textContent = msg;
-      addErr.setAttribute('data-book-error', '');
-    };
-    const clearAddError = (): void => {
-      addErr.textContent = '';
-      addErr.removeAttribute('data-book-error');
-    };
-    const tryAdd = (): void => {
-      const name = addInput.value.trim();
-      if (!name) {
-        showAddError('Podaj imie.');
-        return;
-      }
-      if (!/^[A-Za-z]+$/.test(name)) {
-        showAddError('Imie: tylko litery.');
-        return;
-      }
-      if (state.people.some((p) => p.toLowerCase() === name.toLowerCase())) {
-        showAddError('To imie juz jest w ksiazce.');
-        return;
-      }
-      clearAddError();
-      addInput.value = '';
-      // Dopisanie na koniec; deduplikacje robi savePeople w index.ts.
-      handlers.onSavePeople?.([...state.people, name]);
-    };
-    addBtn.addEventListener('click', tryAdd);
-    addInput.addEventListener('keydown', (ev) => {
-      if ((ev as KeyboardEvent).key === 'Enter') tryAdd();
-    });
-    bookAddRow.appendChild(addInput);
-    bookAddRow.appendChild(addBtn);
-    bookAddRow.appendChild(addErr);
-    // Pole nowej osoby z ghost-podpowiedziami (jak pole adresata):
-    // kontakty + aliasy, strzalka w prawo wpisuje kanoniczna forme
-    // kandydata. Attach dopiero po podpieciu inputu do rodzica - ghost
-    // wrapuje element w miejscu w drzewie.
-    attachGhost(doc, addInput, personSource);
-    pane.appendChild(bookAddRow);
 
-    // --- tworzenie grupy (przeniesione z pigulki Grupy, K7)
-    const groupAddRow = doc.createElement('div');
-    groupAddRow.className = 'arkmail-group-add';
-    const groupAddInput = doc.createElement('input');
-    nativeFieldClass(groupAddInput);
-    groupAddInput.setAttribute('data-group-add', '');
-    groupAddInput.setAttribute('placeholder', 'Nazwa nowej grupy');
-    const groupAddBtn = doc.createElement('button');
-    groupAddBtn.className = 'popup-btn popup-btn--control';
-    groupAddBtn.textContent = 'Utworz grupe';
-    groupAddBtn.setAttribute('data-group-create', '');
-    groupAddBtn.setAttribute('title', 'Tworzy pusta grupe. Czlonkow dolaczysz po utworzeniu.');
-    groupAddBtn.addEventListener('click', () => {
-      const name = groupAddInput.value.trim();
-      if (!name) {
-        showError('Podaj nazwe grupy.');
-        return;
-      }
-      if (state.groups.some((g) => g.name.toLowerCase() === name.toLowerCase())) {
-        showError(`Grupa "${name}" juz istnieje.`);
-        return;
-      }
-      groupAddInput.value = '';
-      handlers.onSaveGroups?.([...state.groups, { name, members: [] }]);
-    });
-    groupAddRow.appendChild(groupAddInput);
-    groupAddRow.appendChild(groupAddBtn);
-    pane.appendChild(groupAddRow);
     pane.appendChild(doc.createElement('hr'));
 
     // Eksport: imiona + grupy do pliku JSON (aliasy nie wchodza -

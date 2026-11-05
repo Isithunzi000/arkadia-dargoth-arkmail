@@ -267,15 +267,14 @@ test('ghost: szukajka osoby nie ma podpowiedzi, a Przekaz ja zachowuje', () => {
   type(input(c2, '[data-field="forward"]'), 'cor');
   assert.equal(ghostRest(c2, '[data-field="forward"]'), 'ge');
 });
-test('ghost: pole nowej osoby w sekcji Import-Eksport podpowiada kontakt', () => {
+test('ghost: pole nowej osoby w sekcji Ksiazka podpowiada kontakt', () => {
   // Zgloszenie 2026-11-05: pole "Imie nowej osoby" dostaje te same
   // podpowiedzi co pole adresata (kontakty + aliasy), strzalka w prawo
-  // wpisuje kanoniczna forme. K7: pole przeniesione z Ksiazki do
-  // pigulki Import-Eksport.
+  // wpisuje kanoniczna forme. Wydanie 1.30.1 (pkt 4): pole wraca do
+  // Ksiazki (domyslny sub - bez przełaczania).
   const s = new MailUiStore({ tab: 'kontakty', people: [] });
   s.setContacts([contact('Corge', 200)]);
   const c = mount(s);
-  switchToImportEksport(c);
   const el = input(c, '[data-book-new]');
   type(el, 'co');
   assert.equal(ghostRest(c, '[data-book-new]'), 'rge');

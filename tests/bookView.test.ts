@@ -135,8 +135,7 @@ test('ksiazka: krzyzyk usuwa imie przez onSavePeople - dwuklik z guardem', () =>
 test('ksiazka: dodanie imienia wywoluje zapis i czysci pole', () => {
   const s = new MailUiStore({ tab: 'kontakty', people: ['Fred'] });
   const { container, calls } = mount(s);
-  // Zgloszenie 2026-11-05 (K7): dodawanie mieszka w Import-Eksport.
-  switchToImportEksport(container);
+  // Zgloszenie 2026-11-05 pkt 4 (1.30.1): dodawanie mieszka w Ksiazce.
   type(q(container, '[data-book-new]'), 'Grault');
   click(q(container, '[data-book-add]'));
   assert.deepEqual(calls.saves, [['Fred', 'Grault']], 'dopisanie na koniec');
@@ -147,7 +146,6 @@ test('ksiazka: dodanie imienia wywoluje zapis i czysci pole', () => {
 test('ksiazka: walidacja - puste, cyfry, duplikat', () => {
   const s = new MailUiStore({ tab: 'kontakty', people: ['Fred'] });
   const { container, calls } = mount(s);
-  switchToImportEksport(container);
   const add = () => click(q(container, '[data-book-add]'));
   const err = () => text(q(container, '[data-book-error]'));
 
