@@ -176,6 +176,14 @@ export const STYLES = `
   min-height: 0;
   overflow: auto;
 }
+/* Wydanie 1.30.1 (zgloszenia 2/3): klient daje natywnym kontrolkom
+   min-height: 0, wiec jako dzieci kolumny o ograniczonej wysokosci
+   kurcza sie do zera (etykiety nakladaja sie). Naglowek ma twarde
+   flex: none; caly skurcz idzie w .arkmail-list-scroll. */
+.arkmail-listy > button,
+.arkmail-listy > .arkmail-boxes,
+.arkmail-listy > .arkmail-search-row,
+.arkmail-listy > .arkmail-book-filter { flex: none; }
 .arkmail-pane::-webkit-scrollbar,
 .arkmail-list-scroll::-webkit-scrollbar { width: calc(8px * var(--window-font-scale, 1)); }
 .arkmail-pane::-webkit-scrollbar-thumb,
@@ -359,6 +367,12 @@ export const STYLES = `
 }
 .arkmail-preview-bar label { margin: 0; }
 .arkmail-split-compose .arkmail-pane { display: flex; flex-direction: column; }
+/* Wydanie 1.30.1: ta sama ochrona co w .arkmail-listy - pola klienta
+   (min-height: 0) nie moga sie skurczyc do zera w kolumnie compose. */
+.arkmail-split-compose .arkmail-pane > input,
+.arkmail-split-compose .arkmail-pane > textarea,
+.arkmail-split-compose .arkmail-pane > select,
+.arkmail-split-compose .arkmail-pane > button { flex: none; }
 .arkmail-split-compose .arkmail-preview { flex: 1; max-height: none; }
 .arkmail-preview-full-pane { display: flex; flex-direction: column; }
 .arkmail-preview-full-pane .arkmail-preview { flex: 1; max-height: none; }
