@@ -263,12 +263,29 @@ test('aliasy: sekcja read-only z nota', () => {
   assert.ok(section, 'sekcja aliasow istnieje w pigulce Aliasy Pocztowe');
   assert.ok(
     text(section).includes(
-      'Aliasy pocztowe z gry - tylko odczyt, nie sa zapisywane do pliku. Alias usuwasz w grze.',
+      'Aliasy pocztowe z gry - tylko odczyt, nie sa zapisywane do pliku. Aliasy edytujesz i uswasz w grze.',
     ),
   );
   assert.ok(text(section).includes('zgromadzenie'), 'nazwa aliasu widoczna');
   assert.ok(text(section).includes('Fred'), 'adresat aliasu widoczny');
   assert.equal(qa(section as unknown as HTMLElement, 'input, textarea').length, 0, 'zero pol edycji');
+  // Zgloszenie 2026-11-05: pisanie do aliasu jednym klikiem (serwer sam
+  // rozwija aliasy przy wysylce).
+  const write = q(section, '[data-alias-write]') as unknown as {
+    click(): void;
+    getAttribute(n: string): string | null;
+  };
+  assert.ok(write, 'klawisz Napisz przy aliasie');
+  assert.equal(
+    write.getAttribute('title'),
+    'Otwiera zakladke Napisz z adresem: zgromadzenie.',
+  );
+  click(write);
+  assert.equal(s.state.tab, 'napisz', 'przejscie na Napisz');
+  const adresat = q(container, '[data-pane-key="napisz"] [data-field="adresat"]') as unknown as {
+    value: string;
+  };
+  assert.equal(adresat.value, 'zgromadzenie', 'alias jako adresat');
 });
 
 test('aliasy: bez aliasow sekcja pokazuje nota o pustym stanie', () => {

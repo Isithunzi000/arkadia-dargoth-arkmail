@@ -2181,7 +2181,7 @@ export function mountMailUi(
     const aliasNote = doc.createElement('div');
     aliasNote.className = 'arkmail-dim';
     aliasNote.textContent =
-      'Aliasy pocztowe z gry - tylko odczyt, nie sa zapisywane do pliku. Alias usuwasz w grze.';
+      'Aliasy pocztowe z gry - tylko odczyt, nie sa zapisywane do pliku. Aliasy edytujesz i uswasz w grze.';
     aliasSec.appendChild(aliasNote);
     if (state.importedAliases.length === 0) {
       aliasSec.appendChild(dim('Brak aliasow - aliasy pobiera sie z gry.'));
@@ -2190,6 +2190,16 @@ export function mountMailUi(
         const row = doc.createElement('div');
         row.className = 'arkmail-book-alias';
         row.textContent = `${alias.name} -> ${alias.targets.join(', ')}`;
+        // Zgloszenie 2026-11-05: pisanie do aliasu jednym klikiem.
+        // Serwer sam rozwija aliasy przy wysylce, wiec na linie idzie
+        // sama nazwa aliasu (jak w polu adresata).
+        const write = doc.createElement('button');
+        write.className = 'arkmail-book-write';
+        write.setAttribute('data-alias-write', '');
+        write.textContent = 'Napisz';
+        write.setAttribute('title', `Otwiera zakladke Napisz z adresem: ${alias.name}.`);
+        write.addEventListener('click', () => writeTo(alias.name));
+        row.appendChild(write);
         aliasSec.appendChild(row);
       }
     }
