@@ -28,6 +28,7 @@ const ACCENT_FG = '#ffffff';
 const DANGER = '#b04a42'; // tlo btn-danger (bialy 5.38)
 const DANGER_TEXT = '#d4736c'; // tekst bledow na panelu (4.58)
 const BG_UNREAD = '#313a4e'; // tlo wiersza nieprzeczytanego
+const ACCENT_BRIGHT = '#6b93ea'; // wyroznienia na BG_UNREAD (3.79)
 
 export const STYLES = `
 .arkmail-root {
@@ -88,13 +89,13 @@ export const STYLES = `
   border: calc(1px * var(--window-font-scale, 1)) solid ${ACCENT};
   color: ${ACCENT_SOFT};
 }
-.arkmail-root .arkmail-btn-action:hover { background: #454a58; border-color: #6b93ea; color: #6b93ea; }
+.arkmail-root .arkmail-btn-action:hover { background: #454a58; border-color: ${ACCENT_SOFT}; color: #ffffff; }
 .arkmail-root .arkmail-btn-danger {
   background: ${DANGER};
   border-color: ${DANGER};
   color: ${ACCENT_FG};
 }
-.arkmail-root .arkmail-btn-danger:hover { background: #c2564d; border-color: #c2564d; }
+.arkmail-root .arkmail-btn-danger:hover { background: #c04a40; border-color: #c04a40; }
 /* Zgloszenie 2026-11-05: uzbrojony guard dwukliku (pierwszy klik)
    dostaje czerwone tlo niezaleznie od bazowej klasy klawisza - stan
    "drugi klik kasuje" widac z daleka, bez zmiany szerokosci przycisku. */
@@ -143,12 +144,12 @@ export const STYLES = `
 }
 .arkmail-root .arkmail-tab:hover { color: ${FG}; background: ${BG_RAISED}; }
 .arkmail-root .arkmail-tab-active {
-  background: ${ACCENT};
-  border-color: ${ACCENT};
+  background: ${ACCENT_DEEP};
+  border-color: ${ACCENT_DEEP};
   color: ${ACCENT_FG};
   font-weight: 600;
 }
-.arkmail-root .arkmail-tab-active:hover { background: ${ACCENT}; color: ${ACCENT_FG}; }
+.arkmail-root .arkmail-tab-active:hover { background: ${ACCENT_DEEP}; color: ${ACCENT_FG}; }
 
 /* --- pasek operacji --- */
 .arkmail-busy {
@@ -229,12 +230,12 @@ export const STYLES = `
 }
 .arkmail-root .arkmail-box:hover { color: ${FG}; background: ${BG_RAISED}; }
 .arkmail-root .arkmail-box-active {
-  background: ${ACCENT};
-  border-color: ${ACCENT};
+  background: ${ACCENT_DEEP};
+  border-color: ${ACCENT_DEEP};
   color: ${ACCENT_FG};
   font-weight: 600;
 }
-.arkmail-root .arkmail-box-active:hover { background: ${ACCENT}; color: ${ACCENT_FG}; }
+.arkmail-root .arkmail-box-active:hover { background: ${ACCENT_DEEP}; color: ${ACCENT_FG}; }
 /* Fala 16f: trwaly akcent (obwodka) na skrzynce z licznikiem > 0 -
    Nieprzeczytane/Niewyslane widac z daleka (zgloszenie pkt 5/8). */
 .arkmail-root .arkmail-box-attention {
@@ -279,7 +280,7 @@ export const STYLES = `
 /* Fala 16f: nieprzeczytany wiersz dodatkowo JAŚNIEJSZY (pkt 8: kropka +
    pogrubienie + rozjasnienie; po odczyciu listing daje *R* i wiersz
    wraca do normalnego). */
-.arkmail-unread { background: ${BG_UNREAD}; box-shadow: inset calc(3px * var(--window-font-scale, 1)) 0 0 ${ACCENT}; }
+.arkmail-unread { background: ${BG_UNREAD}; box-shadow: inset calc(3px * var(--window-font-scale, 1)) 0 0 ${ACCENT_BRIGHT}; }
 .arkmail-unread .arkmail-entry-party, .arkmail-unread .arkmail-entry-subject {
   color: ${FG};
   font-weight: 700;
@@ -290,7 +291,7 @@ export const STYLES = `
   width: calc(7px * var(--window-font-scale, 1));
   height: calc(7px * var(--window-font-scale, 1));
   border-radius: 50%;
-  background: ${ACCENT};
+  background: ${ACCENT_BRIGHT};
   flex: none;
 }
 
@@ -366,7 +367,7 @@ export const STYLES = `
   border-color: ${DANGER};
   color: ${ACCENT_FG};
 }
-.arkmail-root .arkmail-del:hover { background: #c2564d; }
+.arkmail-root .arkmail-del:hover { background: #c04a40; border-color: #c04a40; }
 .arkmail-fwd { flex: none; }
 
 /* --- formularz compose --- */
@@ -406,12 +407,12 @@ export const STYLES = `
 .arkmail-root .arkmail-send {
   margin-top: calc(10px * var(--window-font-scale, 1));
   padding: calc(6px * var(--window-font-scale, 1)) calc(18px * var(--window-font-scale, 1));
-  background: ${ACCENT};
-  border-color: ${ACCENT};
+  background: ${ACCENT_DEEP};
+  border-color: ${ACCENT_DEEP};
   color: ${ACCENT_FG};
   font-weight: 600;
 }
-.arkmail-root .arkmail-send:hover { background: #5a8ae6; }
+.arkmail-root .arkmail-send:hover { background: ${ACCENT_DEEPER}; border-color: ${ACCENT_DEEPER}; }
 
 /* --- usuwanie listow --- */
 .arkmail-deletion-intro, .arkmail-deletion-message, .arkmail-deletion-summary,
@@ -596,7 +597,7 @@ export const STYLES = `
    Kontrakt uiStyles: jawne hex (bez transparent/inherit). */
 @keyframes arkmailFlash {
   0%, 100% { background: ${BG_RAISED}; color: ${FG}; }
-  50% { background: ${ACCENT}; color: ${ACCENT_FG}; }
+  50% { background: ${ACCENT_DEEP}; color: ${ACCENT_FG}; }
 }
 .arkmail-root .arkmail-flash {
   animation: arkmailFlash 0.6s ease-in-out 5;
