@@ -38,7 +38,7 @@ release'ow), zero zmian w kodzie, jeden commit dokumentacyjny dla ZASADY.md.
 Standard obowiazujacy od wydania 1.29.0 w tym repo (docelowo wspolny dla
 wszystkich projektow):
 
-- Nazwa release: "ArkMail X.Y.Z" — wylacznie nazwa produktu i numer
+- Nazwa release: "ArkMail vX.Y.Z" — wylacznie nazwa produktu i numer
   wersji. Tag: vX.Y.Z. Asset: dokladnie jeden, arkmail_X_Y_Z.zip.
 - Opis release: jeden krotki akapit prostym jezykiem — co sie zmienilo
   i po co; zakaz: zargonu ("fala", "RED/GREEN", "higiena"), dat sesji,
@@ -49,8 +49,9 @@ wszystkich projektow):
 
 Kroki:
 
-1. Audyt nazw 43 istniejacych release'ow ArkMaila: wszystkie juz w formie
-   "ArkMail X.Y.Z" (poprawnych 43/43) — nazwy bez zmian.
+1. Nazwy 43 istniejacych release'ow: dopisanie litery "v" do numeru
+   (np. "ArkMail 1.28.0" -> "ArkMail v1.28.0") — 43/43 przez API PATCH,
+   w jednym przebiegu razem z opisem.
 2. Przepisanie opisow wszystkich 43 release'ow do standardu (API PATCH,
    po jednym akapicie, wylacznie fakty o funkcjach, po polsku).
 3. docs/ZASADY.md: dopisanie konwencji nazewnictwa wydan i commitow
@@ -189,7 +190,7 @@ accent width 3px, brak 4px i 18px, focus-visible, :active).
    datę wydania. plugin.json: oba pola wersji.
 3. Pełny zestaw lokalnie na zielono (szacunek: około 820 testów).
 4. Jeden commit, CI zielone.
-5. Tag `v1.29.0`; release o nazwie „ArkMail 1.29.0", opis zwykłym
+5. Tag `v1.29.0`; release o nazwie „ArkMail v1.29.0", opis zwykłym
    językiem użytkownika wg standardu z F0b (jeden akapit, zakaz żargonu:
    bez numerów przebiegów CI, identyfikatorów commitów, haseł typu
    red→green, sha, znaczków).
