@@ -1,4 +1,4 @@
-// ERROR_LABEL_MS: jedna nazwana stala zamiast siedmiu literallow 3000
+// ERROR_LABEL_MS: jedna nazwana stala zamiast literalow 3000
 // na etykietach bledu w render.ts. Timer flasha w index.ts zostaje
 // z literalem (poza zakresem), GUARD_ARM_MS zostaje bez zmian.
 import test from "node:test";
@@ -13,9 +13,9 @@ test("stala ERROR_LABEL_MS zdefiniowana dokladnie raz", () => {
   assert.equal(defs.length, 1, `oczekiwano 1 definicji, znaleziono ${defs.length}`);
 });
 
-test("siedem uzyc ERROR_LABEL_MS zamiast literallow", () => {
+test("trzy uzycia ERROR_LABEL_MS zamiast literallow", () => {
   const uses = render.match(/ERROR_LABEL_MS/g) || [];
-  assert.equal(uses.length, 8, `oczekiwano 1 definicji + 7 uzyc, znaleziono ${uses.length}`);
+  assert.equal(uses.length, 4, `oczekiwano 1 definicji + 3 uzyc, znaleziono ${uses.length}`);
 });
 
 test("poza stalymi pozostaje wylacznie GUARD_ARM_MS", () => {

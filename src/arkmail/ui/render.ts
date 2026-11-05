@@ -313,10 +313,8 @@ const nativeFieldClass = (el: HTMLElement): void => {
     if (g.timer !== null) clearTimeout(g.timer);
     g.timer = null;
     g.el.removeAttribute('data-armed');
-    if (g.el.isConnected) {
-      g.el.textContent = g.baseText;
-      g.el.setAttribute('title', g.baseTitle);
-    }
+    g.el.textContent = g.baseText;
+    g.el.setAttribute('title', g.baseTitle);
     armedButtons.delete(g);
   };
   const disarmAllButtons = (): void => {
@@ -898,22 +896,11 @@ const nativeFieldClass = (el: HTMLElement): void => {
     // wisualnie zasmiecal kazda skrzynke).
     const clearTitle = 'Kasuje lokalnie listy, archiwum, kontakty i indeksy. Na serwerze Arkadii nic nie znika - skrzynki pobierzesz od nowa. Ustawienia, grupy i ksiazka adresowa zostaja. Aliasy pobierzesz z gry ponownie.';
     clearBtn.setAttribute('title', clearTitle);
-    let clearArmed = false;
-    let clearTimer: ReturnType<typeof setTimeout> | null = null;
-    clearBtn.addEventListener('click', () => {
-      if (!clearArmed) {
-        clearArmed = true;
-        setButtonLabel(clearBtn, 'Na pewno? Kliknij ponownie');
-        clearTimer = setTimeout(() => {
-          clearArmed = false;
-          setButtonLabel(clearBtn, 'Wyczysc zapisane dane', clearTitle);
-        }, ERROR_LABEL_MS);
-        return;
-      }
-      if (clearTimer) clearTimeout(clearTimer);
-      clearArmed = false;
-      setButtonLabel(clearBtn, 'Wyczysc zapisane dane', clearTitle);
-      handlers.onClearCache?.();
+    // 1.30.2 (Etap 5): wspolny guard - uzbrojenie widac kolorem
+    // (data-armed), ESC rozbraja (disarmAllButtons na dokumencie).
+    guardDeleteButton(clearBtn, () => handlers.onClearCache?.(), {
+      armedLabel: 'Na pewno? Kliknij ponownie',
+      armedTitle: 'Kliknij ponownie, aby wyczyscic zapisane dane.',
     });
     ops.appendChild(clearBtn);
     pane.appendChild(ops);
@@ -1227,26 +1214,12 @@ const nativeFieldClass = (el: HTMLElement): void => {
     del.className = 'arkmail-del popup-btn popup-btn--control popup-btn--danger popup-btn--ghost';
     del.textContent = 'Usun';
     if (source) {
-      // Fala 14e: kasowanie z dwuklikowym potwierdzeniem (uzbrojenie
-      // wygasa po 3 s, wzorzec jak "Wyczysc zapisane dane") -
-      // pojedynczy przypadkowy klik nie kasuje listu (zgloszenie
-      // 2026-10-19, pkt 7).
-      let delArmed = false;
-      let delTimer: ReturnType<typeof setTimeout> | null = null;
-      del.addEventListener('click', () => {
-        if (!delArmed) {
-          delArmed = true;
-          setButtonLabel(del, 'Na pewno? Kliknij ponownie');
-          delTimer = setTimeout(() => {
-            delArmed = false;
-            setButtonLabel(del, 'Usun');
-          }, ERROR_LABEL_MS);
-          return;
-        }
-        if (delTimer) clearTimeout(delTimer);
-        delArmed = false;
-        setButtonLabel(del, 'Usun');
-        handlers.onDeleteLetter(l.box, source);
+      // Fala 14e: kasowanie z dwuklikowym potwierdzeniem (zgloszenie
+      // 2026-10-19, pkt 7). 1.30.2 (Etap 5): wspolny guard - jawny
+      // title przed uzbrojeniem, zeby rozbrojenie nie gubilo podpowiedzi.
+      del.setAttribute('title', 'Usun ten list. Tej operacji nie mozna cofnac.');
+      guardDeleteButton(del, () => handlers.onDeleteLetter(l.box, source), {
+        armedLabel: 'Na pewno? Kliknij ponownie',
       });
     } else {
       del.setAttribute('disabled', '');
@@ -1553,21 +1526,9 @@ const nativeFieldClass = (el: HTMLElement): void => {
     const clearCompose = doc.createElement('button');
     clearCompose.className = 'arkmail-compose-clear popup-btn popup-btn--control popup-btn--danger popup-btn--ghost';
     clearCompose.textContent = 'Wyczysc';
-    let clearArmed = false;
-    let clearTimer: ReturnType<typeof setTimeout> | null = null;
-    clearCompose.addEventListener('click', () => {
-      if (!clearArmed) {
-        clearArmed = true;
-        setButtonLabel(clearCompose, 'Na pewno? Kliknij ponownie');
-        clearTimer = setTimeout(() => {
-          clearArmed = false;
-          setButtonLabel(clearCompose, 'Wyczysc');
-        }, ERROR_LABEL_MS);
-        return;
-      }
-      if (clearTimer) clearTimeout(clearTimer);
-      clearArmed = false;
-      setButtonLabel(clearCompose, 'Wyczysc');
+    // 1.30.2 (Etap 5): wspolny guard (jak "Wyczysc zapisane dane").
+    clearCompose.setAttribute('title', 'Czysci pola listu: adresat, temat, DW i tresc.');
+    guardDeleteButton(clearCompose, () => {
       composeDraft.adresat = '';
       composeDraft.temat = '';
       composeDraft.dw = '';
@@ -1580,6 +1541,9 @@ const nativeFieldClass = (el: HTMLElement): void => {
         if (el) el.value = '';
       }
       repaintCompose(); // podglad tez sie czysci
+    }, {
+      armedLabel: 'Na pewno? Kliknij ponownie',
+      armedTitle: 'Kliknij ponownie, aby wyczyscic pola listu.',
     });
     pane.appendChild(clearCompose);
     return pane;
@@ -2837,27 +2801,17 @@ const nativeFieldClass = (el: HTMLElement): void => {
     dlBtn.textContent = state.archiveDownload
       ? `Przerwij (${state.archiveDownload.done}/${state.archiveDownload.total})`
       : 'Pobierz tresci do archiwum';
-    let dlArmed = false;
-    let dlTimer: ReturnType<typeof setTimeout> | null = null;
-    dlBtn.addEventListener('click', () => {
-      if (state.archiveDownload) {
-        handlers.onDownloadArchiveBodies?.(); // petla w toku = Przerwij
-        return;
-      }
-      if (!dlArmed) {
-        dlArmed = true;
-        setButtonLabel(dlBtn, 'Pobieranie potrwa dlugo - kliknij ponownie');
-        dlTimer = setTimeout(() => {
-          dlArmed = false;
-          setButtonLabel(dlBtn, 'Pobierz tresci do archiwum');
-        }, ERROR_LABEL_MS);
-        return;
-      }
-      if (dlTimer) clearTimeout(dlTimer);
-      dlArmed = false;
-      setButtonLabel(dlBtn, 'Pobierz tresci do archiwum');
-      handlers.onDownloadArchiveBodies?.();
-    });
+    if (state.archiveDownload) {
+      // Petla w toku = Przerwij (bez uzbrajania, jak dotad).
+      dlBtn.addEventListener('click', () => handlers.onDownloadArchiveBodies?.());
+    } else {
+      // 1.30.2 (Etap 5): wspolny guard - uzbrojenie widac kolorem.
+      dlBtn.setAttribute('title', 'Pobiera brakujace tresci listow do archiwum. Moze potrwac dlugo.');
+      guardDeleteButton(dlBtn, () => handlers.onDownloadArchiveBodies?.(), {
+        armedLabel: 'Pobieranie potrwa dlugo - kliknij ponownie',
+        armedTitle: 'Kliknij ponownie, aby rozpoczac pobieranie.',
+      });
+    }
     downloadStep.appendChild(dlBtn);
     // Fala 17g: eksport calego archiwum do ZIP z TXT per list.
     // Operacja lokalna (tylko listy z trescia w cache) - bez dwukliku.

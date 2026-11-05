@@ -123,7 +123,7 @@ test('podpowiedzi: potwierdzenia zmieniaja title i przywracaja go po czasie', as
   click(compose, '.arkmail-compose-clear');
 
   const archive = mount(new MailUiStore({ tab: 'archiwum' }));
-  cases.push({ container: archive, selector: '.arkmail-arch-download', initial: title(archive, '.arkmail-arch-download'), expected: 'dlugo' });
+  cases.push({ container: archive, selector: '.arkmail-arch-download', initial: title(archive, '.arkmail-arch-download'), expected: 'rozpoczac' });
   click(archive, '.arkmail-arch-download');
 
   for (const item of cases) {
