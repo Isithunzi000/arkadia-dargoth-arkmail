@@ -12,7 +12,9 @@ Dokument roboczy powiazany z `docs/AUDYT_UI_ROBOCZY.md`. Oba dokumenty nalezy za
 
 ## 2. Decyzje zamykajace kwestie otwarte
 
-### 2.1. Czlonkowie grup — T21
+### 2.1. Czlonkowie grup — T21, decyzja zatwierdzona
+
+Uzytkownik zatwierdzil rekomendowany wariant wspolnej walidacji i dopisania nowego czlonka do Ksiazki.
 
 - Reczne dodanie czlonka grupy uzywa tej samej walidacji imienia co dodanie osoby do Ksiazki.
 - Poprawne, nieznane dotad imie zostaje jednoczesnie dopisane do Ksiazki i grupy.
@@ -23,9 +25,9 @@ Dokument roboczy powiazany z `docs/AUDYT_UI_ROBOCZY.md`. Oba dokumenty nalezy za
 
 Decyzja jest zgodna z istniejacym `withGroupMembers()`, ktore juz wymaga obecnosci wszystkich czlonkow grup w Ksiazce.
 
-### 2.2. Duplikaty w imporcie `zastap` — T7
+### 2.2. Duplikaty w imporcie `zastap` — T7, decyzja zatwierdzona
 
-Duplikaty sa scalane deterministycznie, a nie odrzucane jako caly plik:
+Uzytkownik zatwierdzil rekomendowane deterministyczne scalanie. Duplikaty nie sa odrzucane jako caly plik:
 
 - porownanie grup i czlonkow po `trim()` i bez wielkosci liter;
 - pierwsza napotkana pisownia jest kanoniczna;
@@ -53,10 +55,13 @@ Konflikt jest stanem wyliczanym z biezacych grup i biezacego lustra aliasow. Nie
 - Wpisane pola adresatow i zapisane szkice nie sa przepisywane.
 - Nie wolno automatycznie scalac, kasowac, zmieniac nazwy ani odrzucac aliasu.
 
-### 2.4. Pozycje warunkowe
+### 2.4. Reconnect i separatory adresatow — T16 i T22, dowody potwierdzone
 
-- **T16:** najpierw test reconnectu z otwartym pagerem i edytorem. Nie dodawac automatycznie `q` ani `~q`.
-- **T22:** najpierw ustalenie zachowania serwera dla odbiorcy `A B`. Nie zaostrzac walidacji bez tego dowodu.
+- **T16:** rzeczywista proba pelnego ponownego zalogowania zakonczyla sie brakiem aktywnego pagera/edytora po powrocie do gry. Pisanie listu rozpoczeto poza pluginem, polaczenie zostalo przerwane, a po ponownym zalogowaniu zdalny dialog nie byl juz aktywny. Nie dodawac automatycznie `q` ani `~q`; zachowac obecny lokalny cleanup i istniejacy test zakazujacy dodatkowego `q`.
+- **Granica T16:** ta proba rozstrzyga pelne ponowne zalogowanie, nie kazda techniczna odmiane `proxy.session resumed` ani kazdy dialog. Nie wolno przedstawiac jej jako dowodu tych innych przypadkow. Ewentualna zmiana zachowania dla nich wymagalaby osobnego dowodu.
+- **T22:** dwa rzeczywiste, zanonimizowane logi dla analogicznej pary roznych adresatow potwierdzily ten sam wynik przy rozdzieleniu spacja i przy rozdzieleniu przecinkiem. Podstawowa semantyka obu separatorow jest potwierdzona; kolejny log nie jest potrzebny do zaplanowania poprawki.
+- **Zakres T22:** `splitRecipients()` i `unknownRecipients()` maja sprawdzac kazda osobe oddzielnie, a ghost ma segmentowac po ostatnim przecinku albo spacji. Surowa wartosc pol `Do` i `DW` trafia do edytora bez przepisywania, deduplikacji ani zmiany kolejnosci. Generowane rozwiniecie grupy moze pozostac w kanonicznym formacie przecinkowym. Wolny spojnik `i` pozostaje odrzucany.
+- **Granica T22:** logow nie uogolniamy na wszystkie kombinacje duplikatow, mieszanych separatorow ani kolejnosci pol `Do` i `DW`. Takie rozszerzenie zakresu wymagaloby osobnych prob serwera.
 
 ## 3. Staly protokol wykonania kazdego etapu
 
@@ -72,6 +77,14 @@ Dla kazdej zmiany kodu:
 8. Dopiero po pelnym zielonym wyniku scalic etap.
 
 Jezeli zmiana dotyczy wylacznie dokumentacji lub tekstu bez osobnej sciezki wykonania, rowniez musi miec test tresci albo struktury. Nie wolno jedynie podmienic starego oczekiwania bez wykazania, ze nowe oczekiwanie pada na starym kodzie.
+
+Dla scenariuszy przegladarkowych obowiazuje ten sam lokalny dowod RED→GREEN:
+
+1. Nowy scenariusz Playwright najpierw pada na bundle zbudowanym ze starego kodu; zapisac nazwe scenariusza i niespelniona asercje.
+2. Testowany artefakt powstaje z biezacego `npm run bundle`. Testowa paczka ZIP zawiera wynik z `build/arkmail`, nie stary release.
+3. `scripts/build.js` i katalog `releases/` nie moga byc zrodlem kodu pluginu dla testow nowych zmian, poniewaz build release'owy wybiera wczesniej zapisane paczki.
+4. Po poprawce ponownie zbudowac biezacy bundle i uruchomic scenariusz docelowy, sasiedni oraz pelna wymagana macierz.
+5. Mock WebSocket dowodzi zachowania pluginu w prawdziwym kliencie, ale nie dowodzi semantyki prawdziwego serwera Arkadii.
 
 ## 4. Kolejnosc prac i zaleznosci
 
@@ -160,7 +173,7 @@ Jezeli zmiana dotyczy wylacznie dokumentacji lub tekstu bez osobnej sciezki wyko
 
 ### Etap 3 — bledy operacji, reconnect i sprzatanie sesji
 
-**Zakres:** T4, T5, T9, T10, T17 oraz warunkowo T16.
+**Zakres:** T4, T5, T9, T10, T16 i T17.
 
 **Pliki:**
 
@@ -204,13 +217,13 @@ Jezeli zmiana dotyczy wylacznie dokumentacji lub tekstu bez osobnej sciezki wyko
 - wielokrotne sprzatanie jest bezpieczne;
 - reconnect nie wywoluje callbackow zakonczonych importow.
 
-**T16 — brama LIVE przed kodem:**
+**T16 — potwierdzony przypadek i zakres ochronny:**
 
-1. Otworzyc odczyt listu, przekazanie i edytor w osobnych probach.
-2. Wymusic reconnect i wznowienie tej samej sesji serwerowej.
-3. Ustalic, czy zdalny pager/edytor nadal istnieje.
-4. Jesli nie istnieje: nie zmieniac protokolu, zachowac obecny zakaz dodatkowego `q`.
-5. Jesli istnieje: przygotowac osobna, bezpieczna strategie oparta na wyniku testu. Nie wolno automatycznie wysylac `q`, poniewaz moze trafic do nowego kontekstu albo przerwac reczna sesje gracza.
+1. Rzeczywista proba pelnego ponownego zalogowania wykazala, ze zdalny pager/edytor nie byl juz aktywny po powrocie do gry.
+2. Nie zmieniac protokolu dla tego przypadku. Zachowac obecny lokalny cleanup, brak `q` i `~q` oraz `tests/reconnectCancel.test.ts` z asercja, ze reconnect nie wysyla smieciowego `q`.
+3. Test Playwright z mockiem ma sprawdzac lokalne odrzucenie operacji, czyszczenie listenerow, brak komendy `q` i poprawny stan nowej generacji polaczenia. Nie moze byc opisywany jako dowod zdalnego zamkniecia dialogu przez serwer.
+4. Nie dodawac automatycznego `q`, poniewaz moze trafic do nowego kontekstu albo przerwac reczna sesje gracza.
+5. Pelny relog nie jest osobnym dowodem kazdej odmiany `proxy.session resumed`. Jesli przyszla zmiana mialaby zalezec od innej odmiany wznowienia, najpierw potrzebna jest osobna proba serwera; obecny plan jej nie wymaga.
 
 **Warunek zamkniecia:** pelne sprzatanie lokalne bez przenoszenia stanu miedzy sesjami i bez zgadywania stanu zdalnego dialogu.
 
@@ -308,7 +321,7 @@ Dodatkowo:
 
 ### Etap 5 — jednolity model kolizji alias/grupa
 
-**Zakres:** rozdzial 7 raportu, czesc T11, warunkowo T22.
+**Zakres:** rozdzial 7 raportu, czesc T11 oraz model adresatow z T22.
 
 **Pliki:**
 
@@ -346,13 +359,23 @@ Dodatkowo:
 - podsumowanie nowych konfliktow bez powielania komunikatow przy identycznym imporcie;
 - alias pozostaje kandydatem serwerowym, grupa kolidujaca jest pomijana w podpowiedziach.
 
-**T22:**
+**T22 — RED:**
 
-- wykonac kontrolowana probe serwera dla `A B`;
-- jesli serwer traktuje to jako jedno poprawne imie, zachowac walidacje i opisac regule;
-- jesli nie, odrzucac spacje wewnatrz segmentu i kierowac uzytkownika do przecinkow;
-- dopiero wtedy dostosowac S16;
-- nie zmieniac walidacji na podstawie samego wygladu regexu.
+- sparametryzowane testy `splitRecipients()` dla przecinka i spacji: `A,B`, `A, B`, `A B`, wielokrotne spacje i przecinki oraz wartosci puste;
+- `A B` daje dwie osoby, a `A, B` daje identyczna liste; mieszane separatory sa rozbijane deterministycznie na potrzeby lokalnych ostrzezen;
+- `unknownRecipients()` sprawdza kazda osobe oddzielnie i nie zglasza dwoch znanych osob rozdzielonych spacja jako jednego nieznanego adresata;
+- test transportu edytora dowodzi, ze surowe `input.adresat` i `input.dw` pozostaja bajtowo niezmienione;
+- brak automatycznej deduplikacji i zmiany kolejnosci przed wyslaniem;
+- wolny spojnik `i` nadal jest odrzucany;
+- testy uzywaja wylacznie imion syntetycznych.
+
+**T22 — GREEN:**
+
+- rozbijanie lokalne po przecinkach i spacjach, z pominieciem pustych segmentow;
+- walidacja pozostaje w potwierdzonym zakresie liter, przecinkow i spacji; nie ma blednego zaostrzenia do samych przecinkow;
+- komunikat S16 opisuje oba separatory;
+- generowany format rozwiniec moze pozostac przecinkowy, ale reczny wpis nie jest normalizowany przed `transport.send()`;
+- komentarze w `composeValidation.ts`, `ghost.ts` i `render.ts` przestaja twierdzic, ze serwer rozdziela adresatow wylacznie przecinkami.
 
 ### Etap 6 — import pliku bez wyscigow i z potwierdzeniem skutku
 
@@ -395,7 +418,7 @@ Dodatkowo:
 
 ### Etap 7 — podpowiedzi adresatow
 
-**Zakres:** T11, T20 i pozostale reguly rozdzialu 7.6.
+**Zakres:** T11, T20, segmentacja ghostow z T22 i pozostale reguly rozdzialu 7.6.
 
 **Pliki:**
 
@@ -415,7 +438,11 @@ Dodatkowo:
 - pusta grupa nie jest kandydatem;
 - wielkosc liter i `trim()` nie zmieniaja priorytetu;
 - dlugi segment i `scrollLeft > 0` zachowuja wyrownanie sufiksu;
-- akceptacja nie zmienia innych segmentow ani zapisanych szkicow.
+- akceptacja nie zmienia innych segmentow ani zapisanych szkicow;
+- sparametryzowane przypadki po ostatnim przecinku i po ostatniej spacji zmieniaja wylacznie ostatni segment;
+- `A B` oraz `A, B` pozwalaja podpowiedziec druga osobe bez zmiany pierwszej;
+- po akceptacji grupy czlonkowie sa wstawiani w kanonicznym formacie przecinkowym, a alias pozostaje nazwa serwerowa;
+- pusty segment nie pokazuje podpowiedzi.
 
 **GREEN:**
 
@@ -424,9 +451,11 @@ Dodatkowo:
 - stabilna kolejnosc prefiksow;
 - filtrowanie kolidujacych grup przy budowaniu zrodla;
 - synchronizacja poziomego przewiniecia warstwy podpowiedzi przy wpisywaniu, przewinieciu i repaintach;
-- zachowanie obslugi wielu segmentow i kursora na koncu.
+- zachowanie obslugi wielu segmentow i kursora na koncu;
+- granica biezacego segmentu jest wyznaczana po ostatnim przecinku albo spacji, a akceptacja podmienia tylko ten segment;
+- surowa wartosc innych segmentow oraz wartosc pozniej wysylana do edytora nie sa automatycznie przepisywane.
 
-**LIVE:** rzeczywisty layout dlugiej listy odbiorcow, nie tylko `happy-dom`.
+**Playwright:** rzeczywisty layout dlugiej listy odbiorcow w prawdziwym Dargothcie, nie tylko `happy-dom`.
 
 ### Etap 8 — wspolne mechanizmy UI i dostepnosc
 
@@ -456,7 +485,7 @@ Dodatkowo:
 
 - select Usuwania i `Tresc` zachowuja `popup-input popup-input--control`;
 - klasy `arkmail-*` sa dodatkami;
-- testy jasnego i ciemnego motywu w LIVE.
+- testy jasnego i ciemnego motywu w Playwright na prawdziwym Dargothcie.
 
 **T12 — Enter:**
 
@@ -542,7 +571,7 @@ Dodatkowo:
 - sekcja `Import i eksport` zachowuje pozostale importy i eksporty;
 - teksty S24–S27, S33, S37–S43 zgodnie z raportem.
 
-**LIVE:** kilka i setki osob, krotkie i dlugie listy, jasny/ciemny motyw, szerokie i waskie okno.
+**Playwright:** kilka i setki osob, krotkie i dlugie listy, jasny/ciemny motyw, szerokie i waskie okno w prawdziwym Dargothcie.
 
 ### Etap 10 — archiwum, pobieranie i wyniki czesciowe
 
@@ -579,7 +608,7 @@ Dodatkowo:
 - teksty S28–S36 i S46 dokladnie wedlug raportu;
 - zachowac rozroznienie `recordId` i `contentKeyOf` oraz blizniacze listy.
 
-**LIVE:** rzeczywiste pobranie JSON, TXT i ZIP w docelowym kliencie oraz sprawdzenie zawartosci plikow.
+**Playwright:** rzeczywiste pobranie JSON, TXT i ZIP w prawdziwym Dargothcie oraz sprawdzenie nazw i zawartosci pobranych plikow.
 
 ### Etap 11 — pozostale komunikaty i dokumentacja zachowania
 
@@ -607,11 +636,14 @@ Dodatkowo:
 - S14: zachowac obecny jednoznaczny toast czyszczenia Ksiazki;
 - S22: zachowac `Zapisz w niewyslanych`;
 - T25: komentarz importu opisuje dopisywanie, nie zastepowanie;
+- S16: `Adresatow oddziel przecinkami lub spacjami, bez spojnika 'i'. Dozwolone: litery a-z i A-Z.` Analogicznie dla DW;
+- `docs/PROTOCOL.md` opisuje przecinki i spacje jako potwierdzone separatory oraz granice tego dowodu;
+- komentarze w `composeValidation.ts`, `ghost.ts` i `render.ts` opisuja oba separatory i nie przypisuja serwerowi reguly samych przecinkow;
 - teksty i komentarze zrodlowe pozostaja w ASCII.
 
 **Rozjazd toastu czyszczenia Ksiazki:**
 
-Nie zmieniac obecnego zdania na podstawie samej obserwacji. W LIVE zebrac:
+Nie zmieniac obecnego zdania na podstawie samej obserwacji. W Playwright na prawdziwym Dargothcie z biezacym bundle zebrac:
 
 - dokladna tresc komunikatu;
 - wersje pluginu;
@@ -627,13 +659,14 @@ Jezeli test potwierdzi obecny tekst, zamknac obserwacje bez zmiany kodu.
 3. `npm run bundle`.
 4. `npm run build`.
 5. Porownanie wygenerowanego pakietu z oczekiwanym zakresem zmian.
-6. Pelna macierz LIVE.
-7. Przeglad wszystkich T/S/obserwacji pod katem dowodu zamkniecia.
-8. Kontrola braku danych wrazliwych i niedozwolonych tresci.
-9. Dopiero po osobnej zgodzie: commit i push zmian kodu.
-10. Release dopiero po osobnej, jednorazowej zgodzie.
-11. Po zakonczeniu wszystkich prac usunac ten plan oraz `docs/AUDYT_UI_ROBOCZY.md`.
-12. Jesli ktoras pozycje swiadomie odrzucono, najpierw zapisac decyzje i powod w trwalej dokumentacji.
+6. Pelna, izolowana macierz Playwright na prawdziwym Dargothcie z biezacym bundle i przypietym SHA klienta.
+7. Pozostale proby prawdziwego serwera wylacznie dla pytan, ktorych nie rozstrzygaja dotychczasowe logi ani mock; podstawowe T16 i T22 nie wymagaja ponawiania.
+8. Przeglad wszystkich T/S/obserwacji pod katem dowodu zamkniecia.
+9. Kontrola braku danych wrazliwych i niedozwolonych tresci.
+10. Dopiero po osobnej zgodzie: commit i push zmian kodu.
+11. Release dopiero po osobnej, jednorazowej zgodzie.
+12. Po zakonczeniu wszystkich prac usunac ten plan oraz `docs/AUDYT_UI_ROBOCZY.md`.
+13. Jesli ktoras pozycje swiadomie odrzucono, najpierw zapisac decyzje i powod w trwalej dokumentacji.
 
 ## 5. Macierz pokrycia
 
@@ -643,7 +676,7 @@ Jezeli test potwierdzi obecny tekst, zamknac obserwacje bez zmiany kodu.
 | T2, T7, T21 | 2 |
 | T4, T5, T9, T10, T16, T17 | 3 |
 | T8, T18 | 4 |
-| T22 | 5 |
+| T22 | 5, 7 i 11 |
 | T14, T15 | 6 |
 | T11, T20 | 5 i 7 |
 | T3, T6, T12, T13, T23 | 8 |
@@ -652,7 +685,7 @@ Jezeli test potwierdzi obecny tekst, zamknac obserwacje bez zmiany kodu.
 | Obserwacje 4.1–4.8, 4.11 | 9 |
 | Obserwacja 4.9 | 4 |
 | Obserwacja 4.10 | 11 |
-| Obserwacja 4.12 | 11 + LIVE |
+| Obserwacja 4.12 | 11 + Playwright |
 | S1–S15 | 5, 6, 9 i 11 |
 | S16–S23 | 5, 8 i 11 |
 | S24–S27 | 9 |
@@ -677,22 +710,53 @@ Zaden etap nie moze oslabic:
 - lockow, generacji polaczenia i anulowania;
 - potwierdzen destrukcyjnych;
 - wycofania zaznaczenia przy niepewnym usuwaniu;
-- ochrony przed zabiciem recznej sesji poczty gracza.
+- ochrony przed zabiciem recznej sesji poczty gracza;
+- surowej wartosci pol adresatow wysylanej do edytora, bez deduplikacji, zmiany kolejnosci i automatycznej zamiany separatorow.
 
-## 7. Wymagane dowody LIVE przed zamknieciem planu
+## 7. Wymagane dowody z prawdziwego Dargotha i serwera
+
+### 7.1. Istniejacy harness Playwright
+
+Punktem wyjscia jest prywatne repozytorium `Isithunzi000/arkadia-dargoth-testy`. Sprawdzony podczas analizy HEAD to `433496ed8d66a530e5095dc0a15cd2a33fde4df4`; przed implementacja nalezy ponownie odczytac aktualny HEAD. W analizowanym drzewie bylo 952 pliki i nie bylo sciezki zawierajacej `mail`, wiec ArkMail wymaga nowej, izolowanej macierzy.
+
+Istniejacy harness zapewnia:
+
+- prawdziwy build i lokalny preview Dargotha bez logowania na serwer;
+- mock WebSocket, wstrzykiwanie GMCP i tekstu oraz rejestrowanie komend wychodzacych;
+- prawdziwy import paczki pluginu przez menedzer skryptow;
+- uruchomienie pluginu, reload i odtwarzanie stanu z IndexedDB;
+- pomiar DOM i geometrii okien oraz kontrole bledow strony i konsoli.
+
+Macierz ArkMaila ma miec wlasna konfiguracje Playwright, skrypt uruchamiajacy, nieuzywany port, scenariusze, odpowiedzi poczty, artefakty i osobny job CI. Nie wolno zmieniac ani uzalezniac jej od macierzy innych pluginow.
+
+### 7.2. Deterministyczny artefakt i klient
+
+1. Na starcie przebiegu pobrac i zapisac pelny SHA Dargotha w artefaktach.
+2. Ten sam SHA obowiazuje dla instalacji zaleznosci, builda, preview i wszystkich scenariuszy do konca macierzy; nie pobierac „najnowszego” klienta ponownie w trakcie.
+3. ArkMail pochodzi z biezacego `npm run bundle`. Testowa paczka ZIP powstaje z `build/arkmail` i jest instalowana przez prawdziwy menedzer pluginow.
+4. Nie uzywac `scripts/build.js` ani ZIP-ow z `releases/` jako zrodla kodu nowych zmian.
+5. Kazdy scenariusz uzywa osobnego kontekstu przegladarki albo kontrolowanego resetu. Reload i odtworzenie IndexedDB sa testowane jawnie.
+6. Glowny dowod stanowia asercje DOM, stanu, komend, bledow i pobranych plikow. Screenshoty i trace sa materialem pomocniczym.
+
+### 7.3. Scenariusze automatyczne w prawdziwym Dargothcie
 
 - jasny i ciemny motyw pol oraz przyciskow;
-- przewijanie Osob z listow;
-- dlugie pola i poziomo przewiniete podpowiedzi;
-- wszystkie cztery stany naglowka zwierzecia;
-- brak duplikatow naglowka po reconnectach i zmianach postaci;
-- reconnect z otwartym pagerem, przekazaniem i edytorem;
-- rzeczywiste odrzucenie IndexedDB i `api.command.send()`;
-- pobieranie JSON, TXT i ZIP;
-- zachowanie serwera dla `A B`;
-- dokladny toast czyszczenia Ksiazki i wersja pluginu;
+- przewijanie Osob z listow, krotkie i dlugie listy, szerokie i waskie okno;
+- dlugie pola i poziomo przewiniete podpowiedzi po przecinku oraz spacji;
+- wszystkie cztery stany naglowka zwierzecia i brak duplikatow po reconnectach oraz zmianach postaci;
+- lokalne sprzatanie reconnectu, brak `q`, czyszczenie listenerow i izolacja generacji;
+- wstrzykniete odrzucenie IndexedDB i `api.command.send()`;
+- pobieranie JSON, TXT i ZIP wraz z kontrola nazw i zawartosci plikow;
+- dokladny toast czyszczenia Ksiazki, wersja pluginu i kliknieta kontrolka;
 - kolor wynikow List w uzywanym motywie;
-- aliasy na serwerze tylko wtedy, gdy zakres mialby wyjsc poza uzgodnione porownanie `trim()` + wielkosc liter.
+- bledy strony i konsoli po instalacji, dzialaniu, reloadu i ponownej aktywacji.
+
+### 7.4. Granice mocka i pozostale proby serwera
+
+- Mock WebSocket potwierdza zachowanie pluginu w prawdziwym kliencie, nie zachowanie Arkadii. Syntetyczne odpowiedzi poczty musza byc oznaczone jako syntetyczne.
+- **T16:** pelne ponowne zalogowanie zostalo sprawdzone i nie wymaga ponowienia dla obecnego zakresu. Zachowac brak `q` i `~q`. Inne techniczne odmiany wznowienia nie sa rozstrzygniete tym testem, ale tez nie blokuja obecnego planu.
+- **T22:** podstawowa rownowaznosc spacji i przecinka dla dwoch roznych adresatow zostala potwierdzona dwoma logami. Nie sa potrzebne kolejne logi dla tej poprawki. Duplikaty, mieszane separatory i kolejnosc `Do`/`DW` nie sa przez to rozstrzygniete.
+- Semantyke aliasow na serwerze sprawdzac tylko wtedy, gdy zakres mialby wyjsc poza uzgodnione porownanie `trim()` i wielkosc liter.
 
 ## 8. Warunek usuniecia dokumentow roboczych
 
@@ -700,7 +764,7 @@ Plan i raport mozna usunac dopiero po spelnieniu wszystkich warunkow:
 
 1. Zakonczono caly uzgodniony zakres albo zapisano trwale decyzje o swiadomym odrzuceniu poszczegolnych pozycji.
 2. Wszystkie zmiany maja lokalny dowod RED→GREEN i pelny zielony zestaw.
-3. Zakonczono wymagane weryfikacje LIVE.
+3. Zakonczono wymagane scenariusze Playwright i pozostale, rzeczywiscie potrzebne proby serwera.
 4. Nie pozostaja otwarte rozjazdy miedzy kodem, raportem i zachowaniem klienta.
 5. Ostateczny HEAD i wyniki testow zostaly zweryfikowane.
 

@@ -7,8 +7,9 @@ Dokument roboczy do czasu zakończenia poprawek. Po zakończeniu implementacji i
 - Repozytorium: `Isithunzi000/arkadia-dargoth-arkmail`, gałąź `main`.
 - Analizowany stan: `c171285d81ca5cfab1af9e55afafa1872803f92d`, ArkMail 1.30.2.
 - Zakres: UI, przepływy, wprowadzanie danych, klawiatura, dostępność, trwałość, przypadki brzegowe, kolizje grup i aliasów, typy przycisków oraz wszystkie komunikaty widoczne dla użytkownika.
-- Wykonano analizę statyczną kodu. Nie zmieniono kodu ani testów i nie uruchamiano nowego przebiegu testów.
+- Wykonano analizę statyczną kodu. Nie zmieniono kodu ani testów i nie uruchamiano nowego pełnego przebiegu testów.
 - Obserwacje z testu na żywym kliencie są oznaczone jako **LIVE**. Stwierdzenia wynikające wprost z kodu są oznaczone jako **KOD**. Możliwe skutki wymagające odtworzenia są oznaczone jako **RYZYKO**.
+- Uzupełniające dowody obejmują rzeczywistą próbę pełnego ponownego zalogowania dla T16, dwa zanonimizowane logi adresatów dla T22 oraz przegląd istniejącego harnessa Playwright w `Isithunzi000/arkadia-dargoth-testy`. Nie zawierają one nazw ani innych danych wrażliwych z przekazanych logów.
 - Brak polskich diakrytyków w obecnych tekstach źródłowych jest konwencją projektu, nie błędem ortograficznym. Propozycje nowych komunikatów w tym dokumencie również zapisano bez diakrytyków, tak aby można je było przenieść do `src` bez dodatkowej konwersji.
 
 ## 2. Najważniejsze decyzje i wnioski
@@ -20,6 +21,10 @@ Dokument roboczy do czasu zakończenia poprawek. Po zakończeniu implementacji i
 5. Czyszczenie wspólnych filtrów Archiwum i „Osób z listów” ma być dostępne z obu widoków i wykonywać dokładnie tę samą akcję.
 6. Teksty trzeba dostosować do rzeczywistych operacji. Najważniejsze niezgodności: stare „kontakty”, sugestia kasowania aliasów przy czyszczeniu danych poczty, opis importu jako zastępowania zamiast dopisywania, błędna liczba mnoga przy eksporcie ZIP oraz przypisywanie każdego błędu wysyłki adresatowi.
 7. Obserwacja LIVE o ogólnym toaście po czyszczeniu książki nie odpowiada obecnemu kodowi. W analizowanym HEAD komunikat brzmi: `Wyczyszczono cala ksiazke adresowa (imiona, grupy, aliasy).` Nie ustalono przyczyny rozjazdu; potrzebna jest dokładna treść komunikatu i wersja z testu.
+8. **T7 — decyzja zatwierdzona:** duplikaty w `dolacz` i `zastap` są scalane deterministycznie po `trim()` i bez wielkości liter. Pierwsza pisownia i pierwsza kolejność są kanoniczne, kolejne duplikaty grup scalają członków, a powtórzenie importu jest no-op.
+9. **T21 — decyzja zatwierdzona:** ręczny nowy członek grupy przechodzi tę samą walidację co osoba w Książce i jest jednocześnie dopisywany do Książki oraz grupy. Nie powstaje stan członka spoza Książki.
+10. **T16 — podstawowy przypadek potwierdzony:** po przerwaniu połączenia i pełnym ponownym zalogowaniu zdalny pager/edytor nie był już aktywny. Nie dodawać `q` ani `~q`; zachować obecny lokalny cleanup i test zakazujący dodatkowego `q`. Wynik nie rozstrzyga każdej technicznej odmiany `proxy.session resumed`.
+11. **T22 — podstawowa semantyka potwierdzona:** dla analogicznej pary różnych adresatów spacja i przecinek dały ten sam wynik w dwóch rzeczywistych logach. Poprawić lokalne rozbijanie i ghosty, ale nie przepisywać surowej wartości wysyłanej do edytora, nie deduplikować jej i nie zmieniać kolejności.
 
 ## 3. Wersja 1.24.4 i migracja
 
@@ -269,7 +274,7 @@ Docelowa kolejność:
 5. Dla kolizji alias/grupa nie pokazywać dwóch identycznych podpowiedzi. Pokazać alias, a konflikt wyjaśnić w Grupach; samo dopisanie etykiety do dwóch kandydatów nie rozwiązuje wyboru pierwszego.
 6. Puste grupy nadal nie są kandydatami, bo nie mają członków do wstawienia.
 
-Po zaakceptowaniu aliasu w polu może zostać sama nazwa. Po zaakceptowaniu grupy — członkowie po przecinku. Testy muszą obejmować wielkość liter, spacje, dokładną nazwę i dłuższy prefiks.
+Po zaakceptowaniu aliasu w polu może zostać sama nazwa. Po zaakceptowaniu grupy — członkowie w kanonicznym formacie przecinkowym. Bieżący segment jest wyznaczany po ostatnim przecinku albo spacji, a akceptacja zmienia wyłącznie ten segment. Pusty segment nie pokazuje podpowiedzi. Testy muszą obejmować wielkość liter, oba separatory, dokładną nazwę, dłuższy prefiks i zachowanie pozostałych segmentów.
 
 Wykrycie kolizji nie może automatycznie przepisywać tekstu już wpisanego w polu adresatów ani zapisanych szkiców. Po późnym imporcie nie da się wiarygodnie ustalić, czy wcześniejsze `gildia` oznaczało intencję użycia grupy czy aliasu; dane nie mogą zmieniać się w tle.
 
@@ -285,13 +290,13 @@ Wykrycie kolizji nie może automatycznie przepisywać tekstu już wpisanego w po
 | preferowanie grupy przed aliasem | zmiana znaczenia prawidłowej nazwy serwerowej |
 | zachowanie grupy, oznaczenie konfliktu i wyłączenie jej rozwinięcia | rozwiązanie rekomendowane: bez utraty danych i z jednoznacznym adresem serwerowym |
 
-### 7.8. Migracja historyczna i pozostała decyzja
+### 7.8. Migracja historyczna i zatwierdzona relacja grupy z Książką
 
 Nie dodawać migracji historycznych książek, grup ani zapisanej flagi konfliktu dla użytkowników aktualizujących z wersji co najwyżej 1.24.4 — wersje te nie mają książki adresowej ani grup. Ponowne wyliczanie konfliktu z bieżącego lustra i bieżących grup jest zwykłą logiką nowej wersji, a nie osobną migracją danych historycznych. Nie usuwać przy tym istniejącego `migratePeople()`, który dotyczy innych danych.
 
 Ręczne dodanie członka grupy obecnie sprawdza tylko niepustość i duplikat (`1802–1823`). Nie stosuje walidacji imienia z Książki ani nie dopisuje osoby do Książki, mimo że komentarz opisuje grupę jako zbudowaną z bazy osób.
 
-**Do ustalenia przed implementacją:** albo członkiem może być wyłącznie osoba z Książki i należy to wymusić, albo ręczne dodanie nieznanego imienia ma jednocześnie dopisać je do Książki po tej samej walidacji. Nie należy pozostawiać trzeciej, nieopisanej reguły przyjmującej dowolny tekst.
+**Decyzja zatwierdzona:** ręczne dodanie członka używa tej samej walidacji imienia co Książka. Poprawne, nieznane dotąd imię jest jednocześnie dopisywane do Książki i grupy w jednej aktualizacji modelu. Błędne imię nie zmienia żadnych danych, duplikat bez wielkości liter jest no-op, a członek grupy nigdy nie istnieje jako dowolny tekst spoza Książki.
 
 ## 8. Zagregowane ustalenia techniczne
 
@@ -363,7 +368,7 @@ Pozycje T15, T18 i T21–T25 pochodzą z późniejszej, szerszej analizy. Pełna
 - **KOD, błąd pewny:** `cleanGroups()` w `addressBook.ts:78–100` deduplikuje grupy i członków case-sensitive, natomiast walidacja UI (`render.ts:1600–1605`) i scalanie w trybie `dolacz` (`addressBook.ts:199–232`) działają case-insensitive.
 - `applyBookImport()` w `addressBook.ts:244–260` w trybie zastępowania używa `cleanGroups(incoming.groups)` bez późniejszego scalania case-insensitive.
 - **Skutek:** plik może wprowadzić dwie grupy `Rada` i `rada` albo członków `Fred` i `fred`, mimo że użytkownik nie może utworzyć takiej pary ręcznie.
-- **Kierunek:** jedna normalizacja i unikalność dla obu trybów; odrzucić albo deterministycznie scalić zgodnie z jawną regułą, bez zależności od kolejności malowania UI.
+- **Decyzja zatwierdzona:** jedna normalizacja i deterministyczne scalanie dla obu trybów. Porównanie po `trim()` i bez wielkości liter, pierwsza pisownia i kolejność kanoniczna, scalenie wszystkich członków kolejnych duplikatów grupy, brak utraty członków i identyczny wynik po ponownym imporcie.
 
 ### T8. Klik „Wyslij zwierze” bez połączenia uruchamia wizualny lot
 
@@ -423,13 +428,13 @@ Pozycje T15, T18 i T21–T25 pochodzą z późniejszej, szerszej analizy. Pełna
 - **Ryzyko:** po poprawieniu pliku pod tą samą ścieżką ponowny wybór może nie wygenerować zdarzenia `change`.
 - **Kierunek:** reset wartości pola po każdej próbie, także błędnej, bez kasowania aktualnej książki.
 
-### T16. Anulowanie połączenia może zostawić otwarty dialog lub pager serwera
+### T16. Anulowanie połączenia i stan zdalnego dialogu
 
-- **KOD, ryzyko przy wznowieniu tej samej sesji serwerowej, nie błąd pewny:** przy reconnect pager wykonuje tylko opcjonalne `onCancel`, cleanup i reject (`core/session/pager.ts:566–570`); odczyt i przekazanie nie mają własnego `onCancel`.
-- Edytor również kończy się bez wysłania `~q` (`core/session/editor.ts:155–158`). Transport jest najpierw przestawiany offline, więc nawet ewentualne `q` podczas anulowania nie wyszłoby do gry.
-- `tests/reconnectCancel.test.ts:14–25` celowo wymaga, aby reconnect nie wysyłał dodatkowego `q`. Obecne zachowanie jest więc zamierzone i nie wolno go automatycznie „naprawić” przez dodanie tej komendy.
-- **Ryzyko:** przy `proxy.session resumed` serwer może zachować otwarty pager albo edytor. Bez żywej sesji nie ma podstaw do uznania tego za pewny błąd; lokalne sprzątnięcie nie dowodzi zamknięcia zdalnego dialogu.
-- **Kierunek:** najpierw test LIVE wznowionej sesji, potem bezpieczna strategia zakończenia przed odcięciem transportu albo jednoznaczne oznaczenie sesji jako wymagającej odbudowy; testy protokołu dla odczytu, przekazania i edytora.
+- **KOD:** przy reconnect pager wykonuje tylko opcjonalne `onCancel`, cleanup i reject (`core/session/pager.ts:566–570`); odczyt i przekazanie nie mają własnego `onCancel`. Edytor również kończy się bez wysłania `~q` (`core/session/editor.ts:155–158`).
+- `tests/reconnectCancel.test.ts:14–25` celowo wymaga, aby reconnect nie wysyłał dodatkowego `q`. Obecne zachowanie jest zamierzone i nie wolno go automatycznie „naprawić” przez dodanie tej komendy.
+- **LIVE, potwierdzone pełne ponowne zalogowanie:** pisanie listu rozpoczęto poza pluginem, połączenie zostało przerwane, a po ponownym zalogowaniu pager/edytor nie był już aktywny. Dla tego przypadku nie ma podstaw do dodawania `q` ani `~q`; należy zachować obecny lokalny cleanup.
+- **Granica dowodu:** wynik nie jest osobnym dowodem każdej technicznej odmiany `proxy.session resumed` ani każdego dialogu. Nie należy przedstawiać go jako rozstrzygnięcia tych przypadków. Obecny zakres nie wymaga zmiany dla nich; ewentualna nowa strategia wymagałaby osobnej próby serwera.
+- **Kierunek testowy:** Playwright z mockiem ma potwierdzić lokalne odrzucenie operacji, czyszczenie zasobów, brak `q` i izolację nowej generacji połączenia. Nie może dowodzić zdalnego zamknięcia dialogu przez prawdziwy serwer.
 
 ### T17. Globalne podejrzenie sierocego pagera może przetrwać reconnect
 
@@ -461,13 +466,16 @@ Pozycje T15, T18 i T21–T25 pochodzą z późniejszej, szerszej analizy. Pełna
 
 - **KOD:** opis w rozdziale 7.8.
 - **Ryzyko:** dowolny tekst trafia do rozwinięcia adresatów, a Książka nie odzwierciedla członków grupy.
-- **Kierunek:** jedna reguła walidacji i jednoznaczna decyzja o relacji z Książką przed implementacją.
+- **Decyzja zatwierdzona:** jedna reguła walidacji, a nowy poprawny członek jest dopisywany jednocześnie do Książki i grupy. Szczegóły w rozdziale 7.8.
 
-### T22. Walidacja wielu odbiorców dopuszcza segment ze spacjami
+### T22. Spacja i przecinek rozdzielają adresatów, ale lokalne funkcje rozbijają tylko przecinki
 
-- **KOD:** `composeValidation.ts:17–28` akceptuje w jednym segmencie wzorzec `litery + spacje + litery`, np. `A B`. Książka akceptuje natomiast wyłącznie same litery jako jedno imię.
-- **Ryzyko:** `A B` jest traktowane przez pomocnicze funkcje jako jeden odbiorca, mimo że komunikaty mówią o oddzielaniu odbiorców przecinkami. Nie ustalono statycznie, jak serwer zinterpretuje taki zapis.
-- **Kierunek:** przed zmianą potwierdzić protokół; jeśli imiona są jednowyrazowe, odrzucać spacje wewnątrz segmentu i podawać komunikat o przecinkach.
+- **Dowód z rzeczywistych logów:** dwa zanonimizowane logi dla analogicznej pary różnych adresatów wykazały ten sam wynik przy zapisie rozdzielonym spacją i przecinkiem. Podstawowa semantyka obu separatorów jest potwierdzona; nie potrzeba kolejnego logu do tej poprawki.
+- **KOD:** walidacja `composeValidation.ts:17–28` dopuszcza litery, przecinki i spacje, ale `splitRecipients()` rozbija wyłącznie po przecinku. W konsekwencji `unknownRecipients()` może potraktować dwie znane osoby rozdzielone spacją jako jednego nieznanego adresata.
+- **KOD, ghost:** `splitHead()` w `ui/ghost.ts` szuka granicy segmentu wyłącznie po ostatnim przecinku. Po spacji akceptacja może więc zastąpić niewłaściwy zakres zamiast wyłącznie ostatniego segmentu.
+- **Kierunek:** rozbijać lokalnie po przecinkach i spacjach, sprawdzać każdą osobę oddzielnie i segmentować ghosta po ostatnim z obu separatorów. Dodać sparametryzowane testy przecinka i spacji z imionami syntetycznymi.
+- **Ochrona surowej wartości:** `core/session/editor.ts` przekazuje pierwotne `input.adresat` do transportu. Tego nie wolno zmieniać na automatyczną normalizację do przecinków, deduplikację ani zmianę kolejności. Generowane rozwinięcie grupy może nadal używać kanonicznych przecinków. Wolny spójnik `i` pozostaje odrzucany.
+- **Granica dowodu:** logi nie rozstrzygają wszystkich duplikatów, mieszanych separatorów ani kolejności `Do`/`DW`; nie wolno rozszerzać na nie twierdzenia o serwerze bez osobnych prób.
 
 ### T23. Pole szerokości akceptuje częściowy zapis liczby
 
@@ -512,7 +520,7 @@ Przejrzano teksty przycisków, tooltipy, etykiety, stany puste, walidację, stat
 
 | ID | Miejsce | Problem | Proponowany tekst |
 |---|---|---|---|
-| S16 | `composeValidation.ts:36–43` | Komunikat nie wyjaśnia odrzucenia wolnego `i`; zapis `a-zA-Z` jest mało czytelny. | `Adresatow oddziel przecinkami, bez spojnika 'i'. Dozwolone: litery a-z i A-Z oraz spacje.` Analogicznie dla DW; po decyzji z T22 doprecyzować zasady spacji. |
+| S16 | `composeValidation.ts:36–43` | Komunikat nie wyjaśnia odrzucenia wolnego `i`; zapis `a-zA-Z` jest mało czytelny, a sama wzmianka o przecinkach nie opisuje potwierdzonej spacji. | `Adresatow oddziel przecinkami lub spacjami, bez spojnika 'i'. Dozwolone: litery a-z i A-Z.` Analogicznie dla DW. |
 | S17 | `core/protocol/commands.ts:118` | `Osoba: tylko litery a-zA-Z.` jest mało czytelne. | `Osoba: tylko litery a-z i A-Z.` |
 | S18 | `index.ts:2213–2220`, `core/session/editor.ts:76–79` | Timeout i inne błędy dostają `Blad wysylki - sprawdz adresata.`, mimo że adresat nie jest ustaloną przyczyną. | Timeout: `Serwer nie odpowiedzial na czas. Sprobuj ponownie.` Inny znany błąd: właściwy komunikat. Nieznany: `Nie udalo sie wyslac listu. Sprobuj ponownie.` |
 | S19 | `index.ts:2378–2391` | Każda porażka przekazania jest sprowadzana do adresata. | Rozdzielić `brak-adresata`, timeout i inne błędy jak przy wysyłce; fallback `Nie udalo sie przekazac listu. Sprobuj ponownie.` |
@@ -649,7 +657,7 @@ Każda zmiana kodu wymaga najpierw testu, który zawodzi na starym zachowaniu lo
 | Zakładki i skrzynki | podpięte | brak martwych kontrolek |
 | Listy, starsze strony, pełne wczytanie | podpięte, chronione lockiem | ręczny błąd odświeżenia jest cichy |
 | Szukajka List | podpięta; Enter i walidacja działają | pole `Tresc` traci klasy natywne; kontakty nie są przebudowywane |
-| Odczyt listu | podpięty; re-kotwiczenie obecne | anulowanie przy wznowionej sesji wymaga testu LIVE |
+| Odczyt listu | podpięty; re-kotwiczenie obecne | pełny relog zamyka zdalny dialog; zachować brak `q`, inne wznowienia nie są rozstrzygnięte |
 | Odpowiedź, cytowanie, przekazanie, usunięcie, eksport | podpięte | brak Enter przy przekazaniu |
 | Compose, szablon, szerokość, podgląd, wyczyszczenie | podpięte; walidacja przed wysłaniem | braki etykiet dostępności; osobne ustalenia T23 |
 | Kontakty, filtr, sortowanie, kierunki | podpięte | dane mogą być nieaktualne po wyszukiwaniu |
@@ -698,20 +706,38 @@ Pominięty test dotyczy komunikatu commita poza CI i jest pomijany warunkowo. Ni
 
 Pierwotny audyt nie obejmował testów w żywym kliencie Dargoth. Testy `happy-dom`, podmienione pobieranie i transport nie dowodzą rzeczywistego layoutu, motywu, zapisu pliku, zachowania serwera ani odrzucenia zewnętrznych API. Ryzyka oznaczone jako warunkowe nie mogą być przedstawiane jako odtworzone błędy LIVE.
 
-## 15. Pozycje wymagające weryfikacji LIVE przed zamknięciem
+### 14.3. Harness prawdziwego Dargotha
 
-1. Jasny i ciemny motyw dla pól bez klas natywnych, w szczególności select Usuwania i pole `Tresc` z T6.
-2. Rzeczywisty layout długich pól i ghostów, w tym poziome przewinięcie z T20 oraz brak przesuwania kontrolek we wszystkich czterech stanach przycisku zwierzęcia.
-3. Reconnect z otwartym pagerem lub edytorem, szczególnie wznowienie tej samej sesji serwerowej z T16; nie dodawać automatycznie `q` przed ustaleniem rzeczywistego stanu.
-4. Pobieranie plików przez docelową przeglądarkę i rzeczywisty zapis po opóźnionym sprzątaniu adresu z T19.
-5. Rzeczywiste odrzucenie IndexedDB, w szczególności `putLetters()` z T1, oraz `api.command.send()` z T8.
-6. Dokładny toast po czyszczeniu książki i wersja pluginu z testu — kod HEAD ma już komunikat z nazwą książki.
+Do automatycznej weryfikacji należy wykorzystać istniejące prywatne repozytorium `Isithunzi000/arkadia-dargoth-testy`. Sprawdzony podczas analizy HEAD to `433496ed8d66a530e5095dc0a15cd2a33fde4df4`; przed implementacją trzeba ponownie odczytać aktualny HEAD. W analizowanym drzewie było 952 pliki i nie było ścieżki zawierającej `mail`.
+
+Harness uruchamia prawdziwy build Dargotha i lokalny preview, instaluje paczkę pluginu przez prawdziwy menedżer skryptów, obsługuje reload i IndexedDB, rejestruje błędy strony oraz udostępnia mock WebSocket, GMCP, teksty i dziennik komend. Nie loguje się na serwer Arkadii.
+
+Macierz ArkMaila powinna być izolowana: własna konfiguracja, skrypt, port, scenariusze, odpowiedzi poczty, artefakty i osobny job CI. Pełny SHA Dargotha należy pobrać i zapisać na starcie, po czym używać go niezmiennego przez cały przebieg. Testowany plugin musi pochodzić z bieżącego `npm run bundle` i paczki utworzonej z `build/arkmail`; `scripts/build.js` korzysta z ZIP-ów release'owych i nie może dostarczać starego artefaktu do testu nowych zmian.
+
+Asercje DOM, stanu, komend i pobranych plików są głównym dowodem, a screenshoty i trace — pomocniczym. Mock dowodzi zachowania pluginu w prawdziwym kliencie, nie semantyki prawdziwego serwera.
+
+## 15. Wymagana weryfikacja przed zamknięciem
+
+### 15.1. Automatyczna macierz Playwright na prawdziwym Dargothcie
+
+1. Jasny i ciemny motyw pól bez klas natywnych, w szczególności select Usuwania i pole `Tresc` z T6.
+2. Rzeczywisty layout długich pól i ghostów, w tym poziome przewinięcie z T20 oraz segmentacja po przecinku i spacji.
+3. Lokalne sprzątanie reconnectu, brak `q`, czyszczenie listenerów i izolacja generacji połączenia; bez twierdzenia, że mock dowodzi stanu serwera.
+4. Pobieranie plików przez docelową przeglądarkę i kontrola nazwy oraz zawartości pliku po opóźnionym sprzątaniu adresu z T19.
+5. Wstrzyknięte odrzucenie IndexedDB, w szczególności `putLetters()` z T1, oraz `api.command.send()` z T8.
+6. Dokładny toast po czyszczeniu książki, wersja bieżącego bundle'a i kliknięta kontrolka — kod HEAD ma już komunikat z nazwą książki.
 7. Faktyczny kolor `Wyczysc` w wynikach List w używanym motywie — kod HEAD już przypisuje danger ghost.
-8. Układ przewijania Osób po usunięciu sztywnego limitu — obecnie przyczyna jest kodowa, ale docelowy wygląd wymaga sprawdzenia w kliencie.
-9. Zachowanie serwera dla odbiorcy ze spacją `A B` przed zaostrzeniem walidacji z T22.
-10. Semantyka aliasów na serwerze przy dokładnych nazwach, wielkości liter i znakach diakrytycznych, jeśli przyszła implementacja miałaby wykraczać poza porównanie opisane w rozdziale 7.
-11. Nagłówek z przyciskiem zwierzęcia przy rzeczywistych tokenach i szerokościach Dargotha, w tym wąskie okno z `animalFlying=true` i tekstem `W drodze...`; sama makieta nie potwierdza implementacji.
+8. Układ przewijania Osób po usunięciu sztywnego limitu dla kilku i setek pozycji.
+9. Nagłówek z przyciskiem zwierzęcia przy rzeczywistych tokenach i szerokościach Dargotha, w tym wąskie okno z `animalFlying=true` i tekstem `W drodze...`.
+10. Brak błędów strony i konsoli po instalacji, użyciu, reloadu i ponownej aktywacji.
+
+### 15.2. Dowody serwerowe i ich granice
+
+1. **T16:** pełne ponowne zalogowanie zostało wykonane i zamknęło podstawowy przypadek. Nie powtarzać go dla obecnego zakresu i nie dodawać `q` ani `~q`. Nie jest to dowód każdej odmiany `proxy.session resumed`.
+2. **T22:** dwa logi potwierdziły spację i przecinek dla analogicznej pary różnych adresatów. Nie potrzeba kolejnego logu dla podstawowej poprawki. Duplikaty, mieszane separatory i kolejność `Do`/`DW` pozostają poza dowodem.
+3. Semantykę aliasów na serwerze przy dokładnych nazwach, wielkości liter i znakach diakrytycznych sprawdzać tylko wtedy, gdy przyszła implementacja miałaby wykraczać poza porównanie opisane w rozdziale 7.
+4. Nowa próba serwera jest wymagana dopiero wtedy, gdy planowana zmiana zależy od zachowania, którego nie rozstrzygają dotychczasowe dowody. Mock Playwright nie zastępuje takiej próby.
 
 ## 16. Warunek usunięcia dokumentu
 
-Dokument można usunąć dopiero po zakończeniu uzgodnionych poprawek, pełnych testach i zamknięciu punktów wymagających weryfikacji LIVE. Jeżeli któraś pozycja zostanie świadomie odrzucona, decyzję i powód należy najpierw przenieść do trwałej dokumentacji projektu, aby usunięcie tej listy nie usunęło również uzasadnienia decyzji.
+Dokument można usunąć dopiero po zakończeniu uzgodnionych poprawek, pełnych testach, wymaganej macierzy Playwright i pozostałych, rzeczywiście potrzebnych prób serwera. Jeżeli któraś pozycja zostanie świadomie odrzucona, decyzję i powód należy najpierw przenieść do trwałej dokumentacji projektu, aby usunięcie tej listy nie usunęło również uzasadnienia decyzji.

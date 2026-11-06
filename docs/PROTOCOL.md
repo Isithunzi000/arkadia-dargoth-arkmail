@@ -2,9 +2,11 @@
 
 Źródła prawdy: zanonimizowane logi gry (`tests/fixtures/*.json`),
 `arkadia.rpg.pl/help/command/*`, wiki `Poczta`, kod klienta Dargoth
-(`poczta.ts`, `letter.ts` — MIT). Każda reguła poniżej jest przypięta
-testem do fixture'a. Przykładowe tematy, daty i aliasy w dokumencie są
-randomowe — nie pochodzą z żadnej postaci.
+(`poczta.ts`, `letter.ts` — MIT). Reguły odtworzone z historycznych
+fixture'ów są przypięte testami. Nowsze reguły potwierdzone osobnymi
+logami mają opisany zakres dowodu i przed zmianą kodu wymagają własnych
+testów. Przykładowe tematy, daty i aliasy w dokumencie są randomowe —
+nie pochodzą z żadnej postaci.
 
 ## Warstwy protokołu
 
@@ -20,6 +22,18 @@ randomowe — nie pochodzą z żadnej postaci.
 3. **Edytor** — po `napisz list` (i promptach adresat/temat/DW) serwer
    wchodzi w tryb edytora: każda linia to treść listu, `**` kończy,
    `~?` pomoc, `~q` porzuca, `~l` lista linii, `~dw`/`~udw` CC/BCC.
+
+### Reconnect a pager i edytor
+
+- Kontrolowana próba pełnego ponownego zalogowania potwierdziła, że po
+  przerwaniu pisania listu poza pluginem i powrocie do gry zdalny
+  pager/edytor nie był już aktywny.
+- ArkMail wykonuje przy reconnect lokalny cleanup bez dodatkowego `q`
+  ani `~q`. To zachowanie należy zachować; taka komenda mogłaby trafić
+  do nowego kontekstu albo przerwać ręczną sesję gracza.
+- Wynik dotyczy pełnego ponownego zalogowania. Nie jest osobnym dowodem
+  każdej technicznej odmiany `proxy.session resumed` ani każdego dialogu.
+  Test z mockiem WebSocket potwierdza zachowanie pluginu, nie serwera.
 
 ## Klasy gmcp_msgs
 
@@ -243,11 +257,21 @@ odpowiedzi z cytowaniem (Fala 28c) temat przenoszony doslownie:
 ### Walidacja przed wysyłką
 
 Pola adresat i DW przyjmują wyłącznie litery A-Z i a-z, przecinki i spacje.
-Każde z nich może zawierać kilka nazw lub aliasów rozdzielonych przecinkami.
-Na linię do gry (i do tych pól) idzie wyłącznie format przecinkowy —
-spójnik ` i ` z sekcji o listingach dotyczy wyłącznie parsowania
-odpowiedzi serwera, nigdy wysyłki; wolne słowo `i` jest odrzucane
-przy walidacji.
+Każde z nich może zawierać kilka nazw lub aliasów rozdzielonych przecinkami
+albo spacjami. Dwa zanonimizowane logi dla analogicznej pary różnych
+adresatów potwierdziły ten sam wynik dla obu separatorów.
+
+Plugin może generować kanoniczny format przecinkowy, na przykład przy
+rozwijaniu grupy. Ręcznie wpisanej wartości nie przepisuje jednak
+automatycznie przed wysłaniem: surowa wartość trafia do edytora bez
+deduplikacji i bez zmiany kolejności. Spójnik ` i ` z sekcji o listingach
+dotyczy wyłącznie parsowania odpowiedzi serwera, nigdy wysyłki; wolne
+słowo `i` jest odrzucane przy walidacji.
+
+Powyższy dowód nie rozstrzyga wszystkich kombinacji duplikatów,
+mieszanych separatorów ani kolejności pól `Do` i `DW`. Nie należy
+uogólniać go na te przypadki bez osobnych prób serwera.
+
 Adresat jest wymagany, a DW może pozostać puste.
 
 Temat i treść nie mogą zawierać znaków `;` ani `#`. Oba pola są wymagane.
