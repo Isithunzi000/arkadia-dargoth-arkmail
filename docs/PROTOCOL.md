@@ -276,16 +276,27 @@ druga osoba w `Do`, nadawca w `DW`. Kolejność wyświetlona przez serwer
 różniła się od kolejności wpisu, ale nie jest podstawą do zmiany kolejności
 przez plugin.
 
+Niezależnie od tych logów użytkownik wprost potwierdził, że czterech
+poprawnych adresatów można zapisać jako `A B C D`, `A, B, C, D` albo
+`A,B,C,D` i każda z tych form jest poprawna. To potwierdzenie nie jest
+wnioskiem z odrzuconych prób zawierających jedną nieznaną osobę.
+
 W przypadku powtórzenia nadawcy wpisano go dwukrotnie ze spacją. Lista
 niewysłanych pokazała jednego adresata, a w szczegółach listu pole `Do`
 było puste, a `DW` zawierało nadawcę. Jest to pojedyncza obserwacja,
 a nie ogólny dowód deduplikacji serwera ani przenoszenia nadawcy do `DW`.
 
-Plugin może generować kanoniczny format przecinkowy, na przykład przy
-rozwijaniu grupy. Ręcznie wpisanej wartości nie przepisuje jednak
-automatycznie przed wysłaniem: surowa wartość trafia do edytora bez
-deduplikacji, zmiany kolejności, zamiany spacji na przecinki, przepisania
-szkicu ani zmiany podziału między `Do` i `DW` na podstawie własnych założeń.
+Jedynym dozwolonym przekształceniem listy jest rozwinięcie grupy należącej
+do pluginu do jej członków w kanonicznym formacie `A, B, C, D`. Alias
+pozostaje nazwą serwerową. Ręcznie wpisanej wartości plugin nie przepisuje
+automatycznie przed wysłaniem: surowa wartość niepustych pól trafia do
+edytora bez przycinania zewnętrznych spacji przez `trim()`, normalizacji
+separatorów, deduplikacji, zmiany kolejności, zamiany spacji na przecinki,
+przepisania szkicu ani zmiany podziału między `Do` i `DW` na podstawie
+własnych założeń. Pusty albo złożony wyłącznie ze spacji `DW` pozostaje
+nieobecny na podstawie walidacji pola opcjonalnego; nie jest listą adresatów.
+Jeżeli Arkadia przekształca wpis samodzielnie,
+plugin nie wykonuje tych przekształceń za nią i ich nie naśladuje.
 Ostrzeżenia mogą być deduplikowane lokalnie bez deduplikowania danych
 wysyłanych do serwera. Lokalna baza osób nie jest kompletnym źródłem prawdy
 o graczach i aliasach, dlatego advisory guard wyłącznie ostrzega i nie blokuje
@@ -293,18 +304,21 @@ wysyłki; ostateczna walidacja należy do serwera. Spójnik ` i ` z sekcji o
 listingach dotyczy wyłącznie parsowania odpowiedzi serwera, nigdy wysyłki;
 wolne słowo `i` jest odrzucane przy walidacji.
 
-Cztery odrzucone próby z trzema wpisami i jednym błędnym nie są dowodem
-przyjęcia trzech poprawnych adresatów. Nie sprawdzono nieznanej osoby na końcu
-listy, kilku nieznanych osób, duplikatów nieznanych ani wszystkich mieszanych
-separatorów. Przecinek bez spacji ma potwierdzone przejście do tematu, ale nie
-końcowy zapis, listing, kolejność ani podział `Do`/`DW`, ponieważ próbę
-anulowano. Dowody nie rozstrzygają również wszystkich wariantów duplikatów,
+Cztery odrzucone próby z trzema wpisami i jednym błędnym same nie były
+dowodem przyjęcia trzech poprawnych adresatów, ale późniejsze jawne
+potwierdzenie użytkownika rozstrzyga cztery poprawne adresaty we wszystkich
+trzech formach. Nie uogólniamy go bez osobnego dowodu na więcej niż czterech
+poprawnych adresatów. Nie sprawdzono nieznanej osoby na końcu listy, kilku
+nieznanych osób, duplikatów nieznanych ani wszystkich mieszanych separatorów.
+Wcześniejsza próba z przecinkiem bez spacji zakończyła się anulowaniem, więc
+log nie zawierał końcowego listingu, kolejności ani podziału `Do`/`DW`;
+późniejsze potwierdzenie rozstrzyga poprawność formy, ale nie dodaje tych
+szczegółów. Dowody nie rozstrzygają również wszystkich wariantów duplikatów,
 w tym duplikatów osoby innej niż nadawca, par bez nadawcy, odwrotnej kolejności
-wejścia, więcej niż dwóch poprawnych adresatów ani ogólnych zasad kolejności
-i podziału pól `Do` i `DW`. Nie należy uogólniać ich na te przypadki bez
-osobnych prób serwera. Lokalny parser i obsługę błędów można testować również
-dla większej liczby osób i dodatkowych pozycji, ale nie jest to dodatkowy
-dowód zachowania serwera.
+wejścia ani ogólnych zasad kolejności i podziału pól `Do` i `DW`. Nie należy
+uogólniać ich na te przypadki bez osobnych prób serwera. Lokalny parser i
+obsługę błędów można testować również dla większej liczby osób i dodatkowych
+pozycji, ale nie jest to dodatkowy dowód zachowania serwera.
 
 Adresat jest wymagany, a DW może pozostać puste.
 
