@@ -253,10 +253,29 @@ wskazywał wyłącznie nieznaną osobę. Nie zapisano listu, a kolejne `napisz l
 można było wykonać od razu. Po takim błędzie nie należy wysyłać dodatkowego
 `~q`, tematu, treści ani `**`.
 
+W kolejnym przypadku lista zawierała dwie różne nieznane osoby oddzielone
+przecinkami. Serwer przerwał etap adresata przed tematem i wskazał obie w
+jednym komunikacie: `Nie ma takiego adresata (gracza, aliasu): <x> i <y>.`.
+Spójnik `i` jest tutaj elementem odpowiedzi serwera, a nie dowodem jednej
+wielowyrazowej nazwy. Plugin zachowuje cały opis jako nieprzetwarzaną treść
+błędu i toastu; nie dzieli go samodzielnie.
+
 Poprawne pary rozdzielone przecinkiem bez spacji, przecinkiem ze spacją i
 spacją przeszły do etapu tematu. Anulowanie przez `~q` zakończyło każdą z tych
 prób odpowiedzią `Zaniechane.`. Po anulowaniu nie należy wysyłać treści ani `**`;
 plugin kończy operację wynikiem `zaniechany`, bez timeoutu i ogólnego błędu.
+
+W osobnej próbie pierwsza lista miała dwieście segmentów przecinkowych: sto
+dziewięćdziesiąt dziewięć powtórzeń znanej nazwy i ostatni nieznany wpis
+utworzony przez sklejenie dwóch nazw bez separatora. Serwer wskazał sklejony
+wpis i zwrócił zwykły prompt. Następnie dwieście powtórzeń samej znanej nazwy
+wpisano przy zwykłym prompcie, bez aktywnego compose, i serwer odpowiedział
+`Slucham?`. Dopiero po nowym `napisz list` dokładnie ta sama lista wpisana na
+etapie `Adresat` przeszła do `Temat`, po czym anulowano ją przez `~q`.
+`Slucham?` nie jest więc odrzuceniem długiej listy adresatów ani dowodem
+niedeterministyczności. Przypadek potwierdza zamknięcie compose po błędzie i
+przyjęcie dwustu powtórzeń na etapie adresata, ale nie rozstrzyga dwustu
+różnych adresatów, końcowego listingu, deduplikacji ani dostarczenia listu.
 
 Temat `--` to **swiadomie wpisany, literalny temat**, nie znacznik
 pustego tematu — pusty temat jest niemozliwy (serwer go nie przyjmuje;
@@ -280,6 +299,15 @@ Niezależnie od tych logów użytkownik wprost potwierdził, że czterech
 poprawnych adresatów można zapisać jako `A B C D`, `A, B, C, D` albo
 `A,B,C,D` i każda z tych form jest poprawna. To potwierdzenie nie jest
 wnioskiem z odrzuconych prób zawierających jedną nieznaną osobę.
+
+Osobny przypadek potwierdził przejście do tematu dla pary złożonej z nazwy
+jednowyrazowej i znanej nazwy dwuwyrazowej. W późniejszej liście mieszanej
+znana nazwa dwuwyrazowa również nie została zgłoszona jako błędna, mimo
+występowania między wpisami rozdzielonymi spacjami i przecinkami. Log nie
+rozstrzyga, czy jest to nazwa gracza czy alias, ani nie dowodzi akceptacji
+dowolnej nieznanej nazwy wielowyrazowej. Dowodzi natomiast, że spacja nie
+zawsze jest granicą adresata i lokalne advisory nie może dzielić mechanicznie
+każdej spacji bez uwzględnienia znanych nazw i aliasów.
 
 W przypadku powtórzenia nadawcy wpisano go dwukrotnie ze spacją. Lista
 niewysłanych pokazała jednego adresata, a w szczegółach listu pole `Do`
@@ -308,8 +336,13 @@ Cztery odrzucone próby z trzema wpisami i jednym błędnym same nie były
 dowodem przyjęcia trzech poprawnych adresatów, ale późniejsze jawne
 potwierdzenie użytkownika rozstrzyga cztery poprawne adresaty we wszystkich
 trzech formach. Nie uogólniamy go bez osobnego dowodu na więcej niż czterech
-poprawnych adresatów. Nie sprawdzono nieznanej osoby na końcu listy, kilku
-nieznanych osób, duplikatów nieznanych ani wszystkich mieszanych separatorów.
+różnych poprawnych adresatów; dwieście powtórzeń jednej znanej nazwy nie
+zastępuje takiego dowodu. Nowy log rozstrzyga dwie różne nieznane osoby w
+jednej liście, ale nie nieznaną osobę na końcu ani powtórzoną nieznaną osobę.
+Nie sprawdzono również wszystkich mieszanych separatorów. Dwuwyrazowego wpisu
+nie przypisujemy bez dowodu do gracza albo aliasu i nie uogólniamy go na
+dowolną nazwę wielowyrazową. Przypadek dwustu powtórzeń nie rozstrzyga
+końcowego listingu, deduplikacji ani dostarczenia.
 Wcześniejsza próba z przecinkiem bez spacji zakończyła się anulowaniem, więc
 log nie zawierał końcowego listingu, kolejności ani podziału `Do`/`DW`;
 późniejsze potwierdzenie rozstrzyga poprawność formy, ale nie dodaje tych
