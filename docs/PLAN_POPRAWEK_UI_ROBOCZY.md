@@ -68,6 +68,18 @@ Konflikt jest stanem wyliczanym z biezacych grup i biezacego lustra aliasow. Nie
 - **Zakres obslugi bledu i anulowania:** obecny `parseMailError()` rozpoznaje `brak-adresata`, `EditorSession` konczy wtedy operacje i nie kontynuuje kolejnych etapow, a `Zaniechane.` daje wynik `zaniechany`. Dla bledu na poczatkowym etapie `Adresat` oznacza to brak tematu, tresci, `**` i dodatkowego `~q`; przy pozniejszym bledzie nie wolno cofac komend juz poprawnie wyslanych przed bledem. Nie ma podstaw do zmiany tych regul. Po bledzie i anulowaniu formularz pozostaje do poprawy, cleanup musi umozliwic natychmiastowe ponowienie, a konkretny blad adresata ma trafic do wlasciwego toastu. Advisory guard pozostaje nieblokujacy: lokalna baza nie jest kompletnym zrodlem prawdy o graczach i aliasach, a ostateczna walidacja nalezy do serwera.
 - **Granica T22:** cztery odrzucone proby z trzema wpisami i jednym blednym same nie byly dowodem przyjecia trzech poprawnych adresatow, ale pozniejsze jawne potwierdzenie uzytkownika rozstrzyga cztery poprawne adresaty we wszystkich trzech formach. Nie uogolniamy go bez osobnego dowodu na wiecej niz czterech poprawnych adresatow. Nie sprawdzono nieznanej osoby na koncu listy, kilku nieznanych osob, duplikatow nieznanych ani wszystkich mieszanych separatorow. Logow nie uogolniamy rowniez na wszystkie kombinacje duplikatow, w tym duplikaty osoby innej niz nadawca, pary bez nadawcy, odwrotna kolejnosc wejscia ani ogolne zasady kolejnosci i podzialu pol `Do` i `DW`. Takie rozszerzenie zakresu wymagaloby osobnych prob serwera. Lokalny parser i obsluge bledow mozna testowac dla wiekszej liczby osob i dodatkowych pozycji, ale nie wolno przedstawiac tych testow jako dodatkowego dowodu zachowania serwera.
 
+#### Kontrola zgodnosci zbioru decyzji
+
+Porownano wszystkie 227 wierszy przekazanego zbioru z aktualnym planem, audytem i protokolem. Decyzje T7 i T21, pelny zakres T16, wszystkie pozniejsze dowody T22, lokalne rozbijanie i advisory, podpowiedzi, testy RED→GREEN, nazwa `tests/reconnectCancel.test.ts`, fundament E2E, wlasciwy artefakt oraz macierze danych, protokolu, UI i plikow sa uwzglednione.
+
+Trzy starsze zapisy zostaly domkniete nowszymi ustaleniami i nie moga byc przywrocone jako reguly:
+
+- granica „wiecej niz dwoch adresatow” zostala zawezona przez jawne potwierdzenie czterech poprawnych adresatow we wszystkich trzech formach; nadal nie jest to dowod dla wiecej niz czterech;
+- kanoniczne rozwiniecie grupy pluginu nie jest dowolnym dodatkowym formatem, lecz jedynym dozwolonym przeksztalceniem listy; reczny wpis pozostaje surowy, a plugin nie powtarza przeksztalcen Arkadii;
+- dawniej zakladany zielony test surowego transportu nie opisuje calej obecnej sciezki: `EditorSession` przekazuje wartosc dalej, ale wczesniejsze `trim()` w `index.ts` zmienia niepuste pola, dlatego ten przypadek wymaga RED→GREEN.
+
+Zdanie o braku zmian plikow bylo opisem stanu tamtej historycznej analizy, nie aktualnym stanem repozytorium. Jedynym wykrytym brakiem redakcyjnym bylo niedoprecyzowanie, ze na starcie macierzy nalezy pobrac najnowsze w tej chwili zrodla Dargotha, a dopiero potem zapisac i przypiac ich pelny SHA. Uzupelniono rozdzial 7.2 i odpowiadajacy fragment audytu; kod, testy i protokol nie wymagaly zmian.
+
 ### 2.5. Zamkniecie decyzji produktowych
 
 Nie pozostaja decyzje produktowe blokujace implementacje. Podstawowe T16 i T22 nie wymagaja kolejnych logow. Pozostaja dowody wykonawcze: jeden pelny zielony przebieg wyjsciowy, rzeczywisty wyglad po zmianach, zgodnosc z przypietym SHA Dargotha, zachowanie przy wymuszonych awariach, wyjasnienie wczesniejszych rozjazdow toastu i koloru oraz pelna macierz przegladarkowa po implementacji.
@@ -773,7 +785,7 @@ Macierz ArkMaila ma miec wlasna konfiguracje Playwright, skrypt uruchamiajacy, n
 
 ### 7.2. Deterministyczny artefakt i klient
 
-1. Na starcie przebiegu pobrac i zapisac pelny SHA Dargotha w artefaktach.
+1. Na starcie przebiegu pobrac najnowsze w tej chwili zrodla Dargotha, odczytac ich pelny SHA i zapisac go w artefaktach oraz koncowym raporcie.
 2. Ten sam SHA obowiazuje dla instalacji zaleznosci, builda, preview i wszystkich scenariuszy do konca macierzy; nie pobierac „najnowszego” klienta ponownie w trakcie.
 3. ArkMail pochodzi z biezacego `npm run bundle`. Testowa paczka ZIP powstaje z `build/arkmail` i jest instalowana przez prawdziwy menedzer pluginow.
 4. Nie uzywac `scripts/build.js` ani ZIP-ow z `releases/` jako zrodla kodu nowych zmian.
