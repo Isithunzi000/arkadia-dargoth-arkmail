@@ -260,6 +260,17 @@ Spójnik `i` jest tutaj elementem odpowiedzi serwera, a nie dowodem jednej
 wielowyrazowej nazwy. Plugin zachowuje cały opis jako nieprzetwarzaną treść
 błędu i toastu; nie dzieli go samodzielnie.
 
+Dwa kolejne przypadki pokazały powtórzoną nieznaną osobę na końcu i na początku
+listy. W obu serwer wskazał ją dwukrotnie jako `x i x` i przerwał compose przed
+tematem. Drugi przypadek zawierał również znaną nazwę wielowyrazową po błędnych
+wpisach. Pełny opis `x i x` pozostaje niezmieniony: plugin nie deduplikuje go,
+nie dzieli po `i` i nie zmienia kolejności.
+
+Mieszany przypadek `A, B C,D` połączył przecinek ze spacją, znaną nazwę
+wielowyrazową i przecinek bez spacji. Lista przeszła do `Temat`, a `~q` zakończyło
+próbę przez `Zaniechane.`. Potwierdza to poprawność mieszanych separatorów między
+niepustymi nazwami bez rozbijania znanej nazwy wielowyrazowej.
+
 Poprawne pary rozdzielone przecinkiem bez spacji, przecinkiem ze spacją i
 spacją przeszły do etapu tematu. Anulowanie przez `~q` zakończyło każdą z tych
 prób odpowiedzią `Zaniechane.`. Po anulowaniu nie należy wysyłać treści ani `**`;
@@ -274,8 +285,10 @@ wpisano przy zwykłym prompcie, bez aktywnego compose, i serwer odpowiedział
 etapie `Adresat` przeszła do `Temat`, po czym anulowano ją przez `~q`.
 `Slucham?` nie jest więc odrzuceniem długiej listy adresatów ani dowodem
 niedeterministyczności. Przypadek potwierdza zamknięcie compose po błędzie i
-przyjęcie dwustu powtórzeń na etapie adresata, ale nie rozstrzyga dwustu
-różnych adresatów, końcowego listingu, deduplikacji ani dostarczenia listu.
+przyjęcie dwustu powtórzeń na etapie adresata. Jawne potwierdzenie użytkownika
+rozstrzyga również poprawność dwustu różnych adresatów i deduplikację po stronie
+Arkadii. Plugin nie replikuje deduplikacji, końcowego listingu ani dostarczenia
+listu.
 
 Temat `--` to **swiadomie wpisany, literalny temat**, nie znacznik
 pustego tematu — pusty temat jest niemozliwy (serwer go nie przyjmuje;
@@ -297,8 +310,11 @@ przez plugin.
 
 Niezależnie od tych logów użytkownik wprost potwierdził, że czterech
 poprawnych adresatów można zapisać jako `A B C D`, `A, B, C, D` albo
-`A,B,C,D` i każda z tych form jest poprawna. To potwierdzenie nie jest
-wnioskiem z odrzuconych prób zawierających jedną nieznaną osobę.
+`A,B,C,D` i każda z tych form jest poprawna. Potwierdził również akceptację
+więcej niż czterech różnych oraz dwustu różnych poprawnych adresatów, wykrywanie
+nieznanych osób niezależnie od pozycji i powtórzeń, poprawność mieszanych
+separatorów oraz deduplikację wykonywaną przez Arkadię. Nie ma podstaw do
+wprowadzania lokalnego limitu liczby adresatów ani replikowania deduplikacji.
 
 Osobny przypadek potwierdził przejście do tematu dla pary złożonej z nazwy
 jednowyrazowej i znanej nazwy dwuwyrazowej. W późniejszej liście mieszanej
@@ -311,8 +327,9 @@ każdej spacji bez uwzględnienia znanych nazw i aliasów.
 
 W przypadku powtórzenia nadawcy wpisano go dwukrotnie ze spacją. Lista
 niewysłanych pokazała jednego adresata, a w szczegółach listu pole `Do`
-było puste, a `DW` zawierało nadawcę. Jest to pojedyncza obserwacja,
-a nie ogólny dowód deduplikacji serwera ani przenoszenia nadawcy do `DW`.
+było puste, a `DW` zawierało nadawcę. Deduplikację serwera potwierdził
+użytkownik; ta pojedyncza obserwacja nie uogólnia natomiast reguł przenoszenia
+nadawcy do `DW`, których plugin i tak nie replikuje.
 
 Jedynym dozwolonym przekształceniem listy jest rozwinięcie grupy należącej
 do pluginu do jej członków w kanonicznym formacie `A, B, C, D`. Alias
@@ -332,26 +349,16 @@ wysyłki; ostateczna walidacja należy do serwera. Spójnik ` i ` z sekcji o
 listingach dotyczy wyłącznie parsowania odpowiedzi serwera, nigdy wysyłki;
 wolne słowo `i` jest odrzucane przy walidacji.
 
-Cztery odrzucone próby z trzema wpisami i jednym błędnym same nie były
-dowodem przyjęcia trzech poprawnych adresatów, ale późniejsze jawne
-potwierdzenie użytkownika rozstrzyga cztery poprawne adresaty we wszystkich
-trzech formach. Nie uogólniamy go bez osobnego dowodu na więcej niż czterech
-różnych poprawnych adresatów; dwieście powtórzeń jednej znanej nazwy nie
-zastępuje takiego dowodu. Nowy log rozstrzyga dwie różne nieznane osoby w
-jednej liście, ale nie nieznaną osobę na końcu ani powtórzoną nieznaną osobę.
-Nie sprawdzono również wszystkich mieszanych separatorów. Dwuwyrazowego wpisu
-nie przypisujemy bez dowodu do gracza albo aliasu i nie uogólniamy go na
-dowolną nazwę wielowyrazową. Przypadek dwustu powtórzeń nie rozstrzyga
-końcowego listingu, deduplikacji ani dostarczenia.
-Wcześniejsza próba z przecinkiem bez spacji zakończyła się anulowaniem, więc
-log nie zawierał końcowego listingu, kolejności ani podziału `Do`/`DW`;
-późniejsze potwierdzenie rozstrzyga poprawność formy, ale nie dodaje tych
-szczegółów. Dowody nie rozstrzygają również wszystkich wariantów duplikatów,
-w tym duplikatów osoby innej niż nadawca, par bez nadawcy, odwrotnej kolejności
-wejścia ani ogólnych zasad kolejności i podziału pól `Do` i `DW`. Nie należy
-uogólniać ich na te przypadki bez osobnych prób serwera. Lokalny parser i
-obsługę błędów można testować również dla większej liczby osób i dodatkowych
-pozycji, ale nie jest to dodatkowy dowód zachowania serwera.
+Logi i jawne potwierdzenia użytkownika zamykają kwestie liczby różnych
+adresatów, pozycji i powtórzeń nieznanych osób, mieszanych separatorów oraz
+deduplikacji. Więcej niż czterech różnych i dwieście różnych poprawnych adresatów
+są akceptowani. Powtórzona nieznana osoba jest wykrywana na początku i na końcu,
+a opis `x i x` zachowuje oba wystąpienia. Mieszane separatory między niepustymi
+nazwami są poprawne. Deduplikację wykonuje Arkadia, nie plugin. Końcowy listing,
+kolejność i podział pól nie są podstawą do przepisywania danych przez plugin.
+Przypisanie dwuwyrazowego wpisu do gracza albo aliasu nie wpływa na jego działanie.
+Testy lokalne sprawdzają obsługę nazwanych przypadków przez plugin, ale ogólne reguły
+serwera pochodzą z logów i jawnych potwierdzeń użytkownika, nie z mocków.
 
 Adresat jest wymagany, a DW może pozostać puste.
 

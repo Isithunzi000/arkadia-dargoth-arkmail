@@ -1,4 +1,4 @@
-# ArkMail — roboczy plan napraw, poprawek i ulepszen
+# ArkMail - roboczy plan napraw, poprawek i ulepszen
 
 Dokument roboczy powiazany z `docs/AUDYT_UI_ROBOCZY.md`. Oba dokumenty nalezy zachowac do zakonczenia calego uzgodnionego zakresu i pelnej weryfikacji. Dopiero wtedy mozna je usunac z repozytorium. Implementacja planu wymaga osobnej jawnej zgody.
 
@@ -6,13 +6,13 @@ Dokument roboczy powiazany z `docs/AUDYT_UI_ROBOCZY.md`. Oba dokumenty nalezy za
 
 - Repozytorium: `Isithunzi000/arkadia-dargoth-arkmail`, galaz `main`.
 - Punkt odniesienia analizy: `c171285d81ca5cfab1af9e55afafa1872803f92d`, ArkMail 1.30.2.
-- Plan obejmuje wszystkie pozycje T1–T25, S1–S46, dwanascie obserwacji LIVE, kolizje alias/grupa, cztery stany przycisku zwierzecia oraz wymagane testy.
+- Plan obejmuje wszystkie pozycje T1-T25, S1-S46, dwanascie obserwacji LIVE, kolizje alias/grupa, cztery stany przycisku zwierzecia oraz wymagane testy.
 - Dokument nie jest zgoda na implementacje, commit zmian kodu, release ani publikacje.
 - Teksty UI i komentarze w `src` pozostaja w ASCII bez polskich diakrytykow.
 
 ## 2. Decyzje zamykajace kwestie otwarte
 
-### 2.1. Czlonkowie grup — T21, decyzja zatwierdzona
+### 2.1. Czlonkowie grup - T21, decyzja zatwierdzona
 
 Uzytkownik zatwierdzil rekomendowany wariant wspolnej walidacji i dopisania nowego czlonka do Ksiazki.
 
@@ -21,11 +21,11 @@ Uzytkownik zatwierdzil rekomendowany wariant wspolnej walidacji i dopisania nowe
 - Operacja jest jedna aktualizacja modelu, bez stanu posredniego, w ktorym czlonek istnieje tylko w grupie.
 - Duplikat bez wielkosci liter nie powoduje zmiany.
 - Bledne imie nie zmienia ani Ksiazki, ani grupy.
-- Nie powstaje trzecia semantyka „dowolny tekst wylacznie w grupie”.
+- Nie powstaje trzecia semantyka "dowolny tekst wylacznie w grupie".
 
 Decyzja jest zgodna z istniejacym `withGroupMembers()`, ktore juz wymaga obecnosci wszystkich czlonkow grup w Ksiazce.
 
-### 2.2. Duplikaty w imporcie `zastap` — T7, decyzja zatwierdzona
+### 2.2. Duplikaty w imporcie `zastap` - T7, decyzja zatwierdzona
 
 Uzytkownik zatwierdzil rekomendowane deterministyczne scalanie. Duplikaty nie sa odrzucane jako caly plik:
 
@@ -55,31 +55,32 @@ Konflikt jest stanem wyliczanym z biezacych grup i biezacego lustra aliasow. Nie
 - Wpisane pola adresatow i zapisane szkice nie sa przepisywane.
 - Nie wolno automatycznie scalac, kasowac, zmieniac nazwy ani odrzucac aliasu.
 
-### 2.4. Reconnect, separatory i bledy adresatow — T16 i T22, dowody potwierdzone
+### 2.4. Reconnect, separatory i bledy adresatow - T16 i T22, dowody potwierdzone
 
 - **T16:** rzeczywista proba pelnego ponownego zalogowania zakonczyla sie brakiem aktywnego pagera/edytora po powrocie do gry. Pisanie listu rozpoczeto poza pluginem, polaczenie zostalo przerwane, a po ponownym zalogowaniu zdalny dialog nie byl juz aktywny. Nie dodawac automatycznie `q` ani `~q`; zachowac obecny lokalny cleanup, reject i istniejacy test zakazujacy dodatkowego `q`. Dla przetestowanej sciezki nie jest potrzebna poprawka zdalnego zamykania dialogu.
 - **Granica T16:** ta proba rozstrzyga pelne ponowne zalogowanie, nie kazda techniczna odmiane `proxy.session resumed` ani kazdy dialog. Nie wolno przedstawiac jej jako dowodu tych innych przypadkow. Ewentualna zmiana zachowania dla nich wymagalaby osobnego dowodu. Playwright moze sprawdzic lokalne sprzatanie pluginu, ale nie zastapi dowodu o zdalnym stanie serwera.
-- **T22, powtorzenie nadawcy:** nadawce wpisano dwukrotnie ze spacja. Lista niewyslanych pokazala jednego adresata, a w szczegolach listu pole `Do` bylo puste, a `DW` zawieralo nadawce. Jest to pojedyncza obserwacja, a nie dowod ogolnej deduplikacji serwera ani ogolnej reguly przenoszenia nadawcy do `DW`. Nie jest podstawa do zmiany surowej wartosci wpisanej przez uzytkownika.
+- **T22, powtorzenie nadawcy:** nadawce wpisano dwukrotnie ze spacja. Lista niewyslanych pokazala jednego adresata, a w szczegolach listu pole `Do` bylo puste, a `DW` zawieralo nadawce. Deduplikacje serwera potwierdzil uzytkownik; ta pojedyncza obserwacja nie uogolnia natomiast regul przenoszenia nadawcy do `DW`, ktorych plugin nie replikuje. Nie jest podstawa do zmiany surowej wartosci wpisanej przez uzytkownika.
 - **T22, porownanie dwoch przypadkow:** nadawce i druga osobe podano w tej samej kolejnosci, raz ze spacja i raz z przecinkiem. W obu przypadkach lista niewyslanych przedstawila ten sam zestaw w kolejnosci `druga osoba, nadawca`, a szczegoly listu mialy identyczny podzial: druga osoba w `Do`, nadawca w `DW`. Kolejnosc wyswietlona przez serwer roznila sie od kolejnosci wpisu. Jest to obserwacja dla tej pary i tej roli nadawcy; nie jest podstawa do zmiany kolejnosci przez plugin. Podstawowa semantyka obu separatorow jest potwierdzona; kolejny log nie jest potrzebny do zaplanowania poprawki.
 - **T22, jawne potwierdzenie czterech poprawnych adresatow:** uzytkownik wprost potwierdzil, ze czterech poprawnych adresatow mozna zapisac jako `A B C D`, `A, B, C, D` albo `A,B,C,D` i kazda z tych form jest poprawna. To niezalezne potwierdzenie uzupelnia wczesniejsze logi; nie jest wnioskiem z odrzuconych prob, ktore zawieraly jedna nieznana osobe.
 - **T22, odrzucenie nieznanej osoby:** cztery kolejne proby zawieraly trzy wpisy: dwie osoby rozpoznane przez serwer i jedna nieznana. Nieznana osoba wystapila na poczatku albo w srodku listy, a wpisy rozdzielono samymi spacjami, przecinkami ze spacjami albo przecinkami bez spacji. Kazda proba zostala przerwana przed etapem tematu, komunikat wskazal wylacznie nieznana osobe, a znane osoby nie zostaly zgloszone jako bledne. Nastapil powrot do zwyklego promptu i nie zapisano listu. Nowe `napisz list` mozna bylo wykonac od razu, bez dodatkowego `~q` po bledzie.
-- **T22, poprawne pary i anulowanie:** trzy poprawne pary rozdzielone odpowiednio przecinkiem bez spacji, przecinkiem ze spacja i spacja przeszly do etapu tematu. Wszystkie trzy proby anulowano przez `~q`, a serwer odpowiedzial `Zaniechane.`. Wczesniejsze logi nie zawieraly dla nich koncowego listingu, kolejnosci ani podzialu `Do`/`DW`. Pozniejsze jawne potwierdzenie rozstrzyga poprawnosc wszystkich trzech form dla czterech poprawnych adresatow, ale nie dodaje osobnego dowodu o tych szczegolach listingu.
-- **T22, dwie nieznane osoby:** lista zawierala powtorzone znane wpisy, znana dwuwyrazowa nazwe lub alias oraz dwie rozne nieznane osoby oddzielone przecinkami. Serwer przerwal etap adresata przed tematem i w jednym komunikacie wskazal obie nieznane osoby, polaczone spojnikiem `i`. To rozstrzyga przypadek dwoch roznych nieznanych osob, ale nie powtorzonej nieznanej osoby. Parser ma zachowac caly fragment zgloszony przez serwer jako nieprzetwarzana tresc bledu; nie wolno dzielic go po `i` ani przedstawiac jako jednej nazwy wlasnej.
+- **T22, poprawne pary i anulowanie:** trzy poprawne pary rozdzielone odpowiednio przecinkiem bez spacji, przecinkiem ze spacja i spacja przeszly do etapu tematu. Wszystkie trzy proby anulowano przez `~q`, a serwer odpowiedzial `Zaniechane.`. Wczesniejsze logi nie zawieraly dla nich koncowego listingu, kolejnosci ani podzialu `Do`/`DW`. Pozniejsze jawne potwierdzenia uzytkownika zamykaja poprawnosc roznych liczb i form adresatow. Koncowy listing nie jest przeksztalcany ani wykorzystywany przez plugin.
+- **T22, dwie nieznane osoby:** lista zawierala powtorzone znane wpisy, znana dwuwyrazowa nazwe lub alias oraz dwie rozne nieznane osoby oddzielone przecinkami. Serwer przerwal etap adresata przed tematem i w jednym komunikacie wskazal obie nieznane osoby, polaczone spojnikiem `i`. Kolejne logi pokazuja rowniez powtorzona nieznana osobe na koncu i na poczatku listy. W obu przypadkach serwer wskazal ja dwukrotnie jako `x i x`; nie zdeduplikowal opisu bledu. Parser ma zachowac caly fragment zgloszony przez serwer jako nieprzetwarzana tresc bledu; nie wolno dzielic go po `i`, deduplikowac ani przedstawiac jako jednej nazwy wlasnej.
 - **T22, dwuwyrazowa znana nazwa lub alias:** para zlozona z nazwy jednowyrazowej i znanej nazwy dwuwyrazowej przeszla do tematu. W pozniejszej liscie mieszanej znana nazwa dwuwyrazowa rowniez nie zostala zgloszona jako bledna, mimo wystepowania miedzy wpisami rozdzielonymi spacjami i przecinkami. Log nie rozstrzyga, czy jest to nazwa gracza czy alias, ani nie dowodzi akceptacji dowolnej nieznanej nazwy wielowyrazowej. Dowodzi natomiast, ze spacja nie zawsze jest granica adresata i lokalne rozbijanie musi uwzgledniac znane nazwy wielowyrazowe.
-- **T22, dwiescie powtorzen i zwykly prompt:** pierwsza lista miala dwiescie segmentow przecinkowych: sto dziewiecdziesiat dziewiec powtorzen znanej nazwy i ostatni nieznany wpis powstaly przez sklejenie dwoch nazw bez separatora. Serwer wskazal ten sklejony wpis i zwrocil zwykly prompt. Nastepnie identyczna lista zlozona z dwustu powtorzen samej znanej nazwy zostala wpisana przy zwyklym prompcie, bez aktywnego compose, i otrzymala `Slucham?`. Dopiero po nowym `napisz list` dokladnie ta sama lista wpisana na etapie `Adresat` przeszla do `Temat`, po czym anulowano ja przez `~q`. `Slucham?` nie jest wiec odrzuceniem dlugiej listy adresatow ani dowodem niedeterministycznosci. Przypadek potwierdza zamkniecie compose po bledzie i brak malego limitu liczby powtorzen w tej probie, ale nie rozstrzyga dwustu roznych adresatow, koncowego listingu, deduplikacji ani dostarczenia listu.
+- **T22, dwiescie powtorzen i zwykly prompt:** pierwsza lista miala dwiescie segmentow przecinkowych: sto dziewiecdziesiat dziewiec powtorzen znanej nazwy i ostatni nieznany wpis powstaly przez sklejenie dwoch nazw bez separatora. Serwer wskazal ten sklejony wpis i zwrocil zwykly prompt. Nastepnie identyczna lista zlozona z dwustu powtorzen samej znanej nazwy zostala wpisana przy zwyklym prompcie, bez aktywnego compose, i otrzymala `Slucham?`. Dopiero po nowym `napisz list` dokladnie ta sama lista wpisana na etapie `Adresat` przeszla do `Temat`, po czym anulowano ja przez `~q`. `Slucham?` nie jest wiec odrzuceniem dlugiej listy adresatow ani dowodem niedeterministycznosci. Przypadek potwierdza zamkniecie compose po bledzie i brak malego limitu liczby powtorzen w tej probie. Jawne potwierdzenie uzytkownika rozstrzyga rowniez poprawnosc dwustu roznych adresatow i deduplikacje po stronie Arkadii. Plugin nie replikuje deduplikacji, koncowego listingu ani dostarczenia listu.
 - **Zakres T22:** `splitRecipients()` i `unknownRecipients()` maja analizowac liste lokalnie z uzyciem bazy znanych nazw i aliasow. Wewnatrz kazdego segmentu przecinkowego skanowanie od lewej do prawej ma wybierac najdluzsza znana nazwe lub alias pasujaca do biezacej pozycji, bez rozrozniania wielkosci liter; dopiero niedopasowany wyraz staje sie lokalnym nieznanym kandydatem do ostrzezenia. Ta deterministyczna heurystyka zapobiega dzieleniu znanej nazwy wielowyrazowej i nie moze byc przedstawiana jako replika parsera serwera. Ghost nie moze zmieniac segmentu wylacznie po ostatnim przecinku albo spacji: ma wybrac najdluzszy suffix po ktorejs z tych granic, ktory jest prefiksem co najmniej jednego kandydata, i podmienic wylacznie ten suffix. Dzieki temu obslugiwane sa zarowno kolejne nazwy jednowyrazowe, jak i kandydaci wielowyrazowi, a poprzedni tekst pozostaje nietkniety. Surowa wartosc recznie wpisanych pol `Do` i `DW` trafia do edytora bez przepisywania, normalizacji separatorow, deduplikacji ani zmiany kolejnosci. Nie wolno zmieniac podzialu miedzy `Do` i `DW` na podstawie wlasnych zalozen ani nasladowac przeksztalcen, ktore Arkadia wykonuje samodzielnie. Ostrzezenia moga byc deduplikowane lokalnie bez deduplikowania danych wysylanych do serwera. Jedynym dozwolonym przeksztalceniem listy jest rozwiniecie grupy nalezacej do pluginu do jej czlonkow w kanonicznym formacie `A, B, C, D`; alias pozostaje nazwa serwerowa. Z `index.ts` nalezy usunac `trim()` dla niepustych wartosci przekazywanych do `editor.send()`, poniewaz obecne przycinanie zewnetrznych spacji rowniez jest przeksztalceniem recznego wpisu. Pusty albo zlozony wylacznie ze spacji `DW` pozostaje nieobecny na podstawie walidacji pola opcjonalnego; nie jest lista adresatow. Wolny spojnik `i` pozostaje odrzucany.
 - **Zakres obslugi bledu i anulowania:** obecny `parseMailError()` rozpoznaje `brak-adresata`, `EditorSession` konczy wtedy operacje i nie kontynuuje kolejnych etapow, a `Zaniechane.` daje wynik `zaniechany`. Dla bledu na poczatkowym etapie `Adresat` oznacza to brak tematu, tresci, `**` i dodatkowego `~q`; przy pozniejszym bledzie nie wolno cofac komend juz poprawnie wyslanych przed bledem. Nie ma podstaw do zmiany tych regul. Po bledzie i anulowaniu formularz pozostaje do poprawy, cleanup musi umozliwic natychmiastowe ponowienie, a konkretny blad adresata ma trafic do wlasciwego toastu. Dla dwoch nieznanych osob parser i toast maja zachowac pelny zgloszony przez serwer opis jako jedna nieprzetwarzana wartosc; nie wolno traktowac spojnika `i` w odpowiedzi serwera jako dowodu jednej wielowyrazowej nazwy ani samodzielnie rozbijac tego opisu. Advisory guard pozostaje nieblokujacy: lokalna baza nie jest kompletnym zrodlem prawdy o graczach i aliasach, a ostateczna walidacja nalezy do serwera.
-- **Granica T22:** cztery odrzucone proby z trzema wpisami i jednym blednym same nie byly dowodem przyjecia trzech poprawnych adresatow, ale pozniejsze jawne potwierdzenie uzytkownika rozstrzyga cztery poprawne adresaty we wszystkich trzech formach. Nie uogolniamy go bez osobnego dowodu na wiecej niz czterech roznych poprawnych adresatow; przyjecie dwustu powtorzen jednej znanej nazwy nie zastepuje takiego dowodu. Nowy log rozstrzyga dwie rozne nieznane osoby w jednej liscie, ale nie nieznana osobe na koncu ani powtorzona nieznana osobe. Nie sprawdzono rowniez wszystkich mieszanych separatorow ani wszystkich kombinacji duplikatow, w tym duplikatow osoby innej niz nadawca, par bez nadawcy, odwrotnej kolejnosci wejscia i ogolnych zasad kolejnosci oraz podzialu pol `Do` i `DW`. Dwuwyrazowy znany wpis nie jest rozstrzygniety jako gracz albo alias i nie dowodzi poprawnosci dowolnej nazwy wielowyrazowej. Logow nie uogolniamy na ostateczny listing, deduplikacje dwustu powtorzen ani dostarczenie listu. Takie rozszerzenie zakresu wymagaloby osobnych prob serwera. Lokalny parser i obsluge bledow mozna testowac dla wiekszej liczby osob i dodatkowych pozycji, ale nie wolno przedstawiac tych testow jako dodatkowego dowodu zachowania serwera.
+- **T22, powtorzona nieznana osoba i mieszane separatory:** dwa nowe przypadki z `x i x` dowodza wykrywania powtorzonej nieznanej osoby na koncu i na poczatku; drugi zawiera tez znana nazwe wielowyrazowa po blednych wpisach. Oba komunikaty zachowuja dwa wystapienia nieznanej nazwy i koncza compose przed tematem. Trzeci przypadek `A, B C,D` laczy przecinek ze spacja, znana nazwe wielowyrazowa i przecinek bez spacji, po czym przechodzi do `Temat`; `~q` konczy go przez `Zaniechane.`.
+- **Rozstrzygniecia T22:** uzytkownik jawnie potwierdzil, ze wiecej niz czterech roznych oraz dwiescie roznych poprawnych adresatow sa akceptowani, nieznane osoby sa wykrywane niezaleznie od pozycji i powtorzen, mieszane separatory miedzy niepustymi nazwami sa poprawne, a deduplikacje wykonuje Arkadia. Te ustalenia zamykaja wczesniejsze pytania o liczbe roznych adresatow, pozycje i powtorzenia blednych osob, mieszane separatory, koncowy listing oraz deduplikacje. Plugin nie replikuje deduplikacji, listingu ani innych przeksztalcen serwera. Przypisanie dwuwyrazowego wpisu do gracza albo aliasu nie wplywa na dzialanie pluginu. Testy lokalne sprawdzaja obsluge tych przypadkow przez plugin, ale zrodlem ogolnych regul serwera pozostaja logi i jawne potwierdzenie uzytkownika.
 
 #### Kontrola zgodnosci zbioru decyzji
 
-Porownano wszystkie 227 wierszy przekazanego zbioru z aktualnym planem, audytem i protokolem. Decyzje T7 i T21, pelny zakres T16, wszystkie pozniejsze dowody T22, lokalne rozbijanie i advisory, podpowiedzi, testy RED→GREEN, nazwa `tests/reconnectCancel.test.ts`, fundament E2E, wlasciwy artefakt oraz macierze danych, protokolu, UI i plikow sa uwzglednione.
+Porownano wszystkie 227 wierszy przekazanego zbioru z aktualnym planem, audytem i protokolem. Decyzje T7 i T21, pelny zakres T16, wszystkie pozniejsze dowody T22, lokalne rozbijanie i advisory, podpowiedzi, testy RED->GREEN, nazwa `tests/reconnectCancel.test.ts`, fundament E2E, wlasciwy artefakt oraz macierze danych, protokolu, UI i plikow sa uwzglednione.
 
 Trzy starsze zapisy zostaly domkniete nowszymi ustaleniami i nie moga byc przywrocone jako reguly:
 
-- granica „wiecej niz dwoch adresatow” zostala zawezona przez jawne potwierdzenie czterech poprawnych adresatow we wszystkich trzech formach; nadal nie jest to dowod dla wiecej niz czterech roznych adresatow, a pozniejsze dwiescie powtorzen jednej nazwy rowniez go nie zastepuje;
+- jawne potwierdzenie uzytkownika zamyka poprawnosc wiecej niz czterech roznych oraz dwustu roznych adresatow; dwiescie powtorzen jednej nazwy jest dodatkowym przypadkiem logu, a nie granica liczby adresatow;
 - kanoniczne rozwiniecie grupy pluginu nie jest dowolnym dodatkowym formatem, lecz jedynym dozwolonym przeksztalceniem listy; reczny wpis pozostaje surowy, a plugin nie powtarza przeksztalcen Arkadii;
-- dawniej zakladany zielony test surowego transportu nie opisuje calej obecnej sciezki: `EditorSession` przekazuje wartosc dalej, ale wczesniejsze `trim()` w `index.ts` zmienia niepuste pola, dlatego ten przypadek wymaga RED→GREEN.
+- dawniej zakladany zielony test surowego transportu nie opisuje calej obecnej sciezki: `EditorSession` przekazuje wartosc dalej, ale wczesniejsze `trim()` w `index.ts` zmienia niepuste pola, dlatego ten przypadek wymaga RED->GREEN.
 
 Zdanie o braku zmian plikow bylo opisem stanu tamtej historycznej analizy, nie aktualnym stanem repozytorium. Jedynym wykrytym brakiem redakcyjnym bylo niedoprecyzowanie, ze na starcie macierzy nalezy pobrac najnowsze w tej chwili zrodla Dargotha, a dopiero potem zapisac i przypiac ich pelny SHA. Uzupelniono rozdzial 7.2 i odpowiadajacy fragment audytu; kod, testy i protokol nie wymagaly zmian.
 
@@ -109,7 +110,7 @@ Testy nalezy rozdzielac na dwie kategorie:
 
 W zestawie sparametryzowanym RED musi wykazac co najmniej wariant odpowiadajacy nowej poprawce. Wariant juz obslugiwany moze pozostac zielony i sluzyc jako kontrola regresji.
 
-Dla scenariuszy przegladarkowych obowiazuje ten sam lokalny dowod RED→GREEN:
+Dla scenariuszy przegladarkowych obowiazuje ten sam lokalny dowod RED->GREEN:
 
 1. Nowa asercja majaca wykryc poprawke najpierw pada na bundle zbudowanym ze starego kodu; zapisac nazwe scenariusza i niespelniona asercje. Asercje ochronne maja byc zielone przed i po zmianie.
 2. Testowany artefakt powstaje z biezacego `npm run bundle`. Testowa paczka ZIP zawiera wynik z `build/arkmail`, nie stary release.
@@ -119,7 +120,7 @@ Dla scenariuszy przegladarkowych obowiazuje ten sam lokalny dowod RED→GREEN:
 
 ## 4. Kolejnosc prac i zaleznosci
 
-### Etap 0 — potwierdzenie punktu wyjscia
+### Etap 0 - potwierdzenie punktu wyjscia
 
 **Zakres:** caly projekt.
 
@@ -131,7 +132,7 @@ Dla scenariuszy przegladarkowych obowiazuje ten sam lokalny dowod RED→GREEN:
 
 **Warunek przejscia:** jeden pelny zielony punkt odniesienia. Jesli HEAD ma regresje, najpierw nalezy ja oddzielic od planowanych zmian.
 
-### Etap 1 — trwaly zapis listow
+### Etap 1 - trwaly zapis listow
 
 **Zakres:** T1.
 
@@ -163,7 +164,7 @@ Dla scenariuszy przegladarkowych obowiazuje ten sam lokalny dowod RED→GREEN:
 
 **Warunek zamkniecia:** blad zapisu nie powoduje utraty nowych danych po restarcie, a starsza operacja nigdy nie wygrywa z nowszym stanem.
 
-### Etap 2 — bezpieczny i jednolity model Ksiazki
+### Etap 2 - bezpieczny i jednolity model Ksiazki
 
 **Zakres:** T2, T7, T21, podstawa pod S5 i pozniejsze kolizje.
 
@@ -202,7 +203,7 @@ Dla scenariuszy przegladarkowych obowiazuje ten sam lokalny dowod RED→GREEN:
 
 **Warunek zamkniecia:** zadna sciezka importu nie moze wprowadzic modelu niedostepnego do uzyskania przez poprawne operacje UI.
 
-### Etap 3 — bledy operacji, reconnect i sprzatanie sesji
+### Etap 3 - bledy operacji, reconnect i sprzatanie sesji
 
 **Zakres:** T4, T5, T9, T10, T16 i T17.
 
@@ -220,7 +221,7 @@ Dla scenariuszy przegladarkowych obowiazuje ten sam lokalny dowod RED→GREEN:
 - `tests/characterLifecycle.test.ts`
 - testy wyszukiwania i odswiezania w `tests/harness.ts` oraz testach integracyjnych
 
-**T4 — RED→GREEN:**
+**T4 - RED->GREEN:**
 
 - blad recznego odswiezenia pokazuje blad i nie przedstawia starych danych jako swiezych;
 - anulowanie nie jest zglaszane jako awaria;
@@ -228,27 +229,27 @@ Dla scenariuszy przegladarkowych obowiazuje ten sam lokalny dowod RED→GREEN:
 - `finally` nadal konczy stan zajetosci;
 - rozroznic zrodlo wywolania reczne i automatyczne zamiast wspolnego pustego `catch`.
 
-**T5 — RED→GREEN:**
+**T5 - RED->GREEN:**
 
 - wyszukanie nowej osoby natychmiast przebudowuje `contacts`;
 - `Dodaj wszystkie do ksiazki` widzi osoby znalezione w ostatnim wyszukiwaniu;
 - powtorzenie wyszukania nie duplikuje osob ani rekordow;
 - wspolna finalizacja zmiany archiwum wykonuje zapis i przebudowe osob.
 
-**T9 i T17 — RED→GREEN:**
+**T9 i T17 - RED->GREEN:**
 
-- reconnect → identyczna pierwsza ramka GMCP jest przetwarzana jako pierwsza ramka nowej sesji;
+- reconnect -> identyczna pierwsza ramka GMCP jest przetwarzana jako pierwsza ramka nowej sesji;
 - duplikat w obrebie tej samej sesji pozostaje odfiltrowany;
 - podejrzenie sierocego pagera nie przechodzi do nowej generacji polaczenia ani postaci;
 - reset nie wylacza ochrony przed zabijaniem recznej sesji gracza.
 
-**T10 — RED→GREEN:**
+**T10 - RED->GREEN:**
 
 - sukces, blad, anulowanie i blad `transport.send()` zdejmuja dokladnie jedna rejestracje anulowania;
 - wielokrotne sprzatanie jest bezpieczne;
 - reconnect nie wywoluje callbackow zakonczonych importow.
 
-**T16 — potwierdzony przypadek i zakres ochronny:**
+**T16 - potwierdzony przypadek i zakres ochronny:**
 
 1. Rzeczywista proba pelnego ponownego zalogowania wykazala, ze zdalny pager/edytor nie byl juz aktywny po powrocie do gry.
 2. Nie zmieniac protokolu dla tego przypadku. Zachowac obecny lokalny cleanup, brak `q` i `~q` oraz `tests/reconnectCancel.test.ts` z asercja, ze reconnect nie wysyla smieciowego `q`.
@@ -258,7 +259,7 @@ Dla scenariuszy przegladarkowych obowiazuje ten sam lokalny dowod RED→GREEN:
 
 **Warunek zamkniecia:** pelne sprzatanie lokalne bez przenoszenia stanu miedzy sesjami i bez zgadywania stanu zdalnego dialogu.
 
-### Etap 4 — transport, echo i przycisk zwierzecia
+### Etap 4 - transport, echo i przycisk zwierzecia
 
 **Zakres:** T8, T18, obserwacja 4.9, cztery stany przycisku, S45.
 
@@ -350,7 +351,7 @@ Dodatkowo:
 - zmiana szerokosci podczas lotu zachowuje lot;
 - koniec lotu przywraca wlasciwy tekst spoczynku.
 
-### Etap 5 — jednolity model kolizji alias/grupa
+### Etap 5 - jednolity model kolizji alias/grupa
 
 **Zakres:** rozdzial 7 raportu, czesc T11 oraz model adresatow z T22.
 
@@ -390,7 +391,7 @@ Dodatkowo:
 - podsumowanie nowych konfliktow bez powielania komunikatow przy identycznym imporcie;
 - alias pozostaje kandydatem serwerowym, grupa kolidujaca jest pomijana w podpowiedziach.
 
-**T22 — RED:**
+**T22 - RED:**
 
 - sparametryzowane testy `splitRecipients(value, known)` dla przecinka i spacji: `A B C D`, `A, B, C, D`, `A,B,C,D`, krotsze listy, wielokrotne spacje i przecinki oraz wartosci puste; zbior `known` jest czescia wejscia, bo bez niego nie mozna rozstrzygac znanych nazw wielowyrazowych;
 - kazda z trzech jawnie potwierdzonych form czterech adresatow daje liste `A`, `B`, `C`, `D`, gdy wszystkie cztery nazwy sa znane; `A B` daje dwie osoby, a `A, B` daje identyczna liste; mieszane separatory sa rozbijane deterministycznie na potrzeby lokalnych ostrzezen;
@@ -404,14 +405,17 @@ Dodatkowo:
 - nowy test handlera przekazuje do `editor.send()` niepuste `adresat` i `DW` z zewnetrznymi spacjami bajtowo identycznie jak w formularzu; obecne `input.adresat.trim()` i `input.dw.trim()` maja wykazac RED. Pusty albo zlozony wylacznie ze spacji `DW` pozostaje nieobecny i jest osobna kontrola regresji;
 - testy uzywaja wylacznie imion syntetycznych.
 
-**T22 — testy ochronne (GREEN przed i po):**
+**T22 - testy ochronne (GREEN przed i po):**
 
 - test transportu edytora dowodzi, ze surowe `input.adresat` i `input.dw` pozostaja bajtowo niezmienione, w tym dla `A B C D`, `A, B, C, D` i `A,B,C,D`;
 - przed wyslaniem nie ma automatycznej deduplikacji, zmiany kolejnosci, zamiany spacji na przecinki, przepisania szkicu ani zmiany podzialu miedzy `Do` i `DW`;
 - lokalne ostrzezenia moga byc deduplikowane, ale ta operacja nie zmienia danych wysylanych do serwera;
-- dwiescie powtorzen znanej nazwy nie wywoluje lokalnego ostrzezenia, a surowa komenda pozostaje identyczna; obecny parser przecinkowy spelnia juz ten przypadek, wiec jest to ochrona przed regresja, nie dowod dwustu roznych adresatow ani dostarczenia;
+- dwiescie powtorzen znanej nazwy nie wywoluje lokalnego ostrzezenia, a surowa komenda pozostaje identyczna; obecny parser przecinkowy spelnia juz ten przypadek, wiec jest to ochrona przed regresja;
+- dwiescie roznych znanych nazw syntetycznych daje dwiescie segmentow, brak advisory i bajtowo identyczna surowa komende; test potwierdza brak lokalnego limitu i prawidlowa obsluge duzej listy, natomiast akceptacje przez serwer rozstrzyga jawne potwierdzenie uzytkownika;
+- przypadek `A, B C,D` rozpoznaje `A`, znana nazwe `B C` i `D`, bez blednego advisory, a surowy wpis pozostaje niezmieniony; mieszane separatory sa potwierdzone logiem i jawnym potwierdzeniem uzytkownika;
 - znana nazwa dwuwyrazowa po przecinku pozostaje jednym kandydatem advisory i ghosta przed oraz po zmianie; ten juz dzialajacy przypadek chroni sie przed naiwna segmentacja po ostatniej spacji;
 - odpowiedz `brak-adresata` wskazujaca dwie rozne nieznane osoby polaczone spojnikiem `i` zachowuje caly opis serwera jako nieprzetwarzana wartosc bledu i toastu, bez dzielenia go na nazwy;
+- odpowiedzi dla powtorzonej nieznanej osoby na koncu i na poczatku zachowuja pelny opis `x i x`, bez deduplikacji, rozbijania po `i` i zmiany kolejnosci; oba przypadki koncza compose przed tematem, bez tresci, `**` i dodatkowego `~q`;
 - wolny spojnik `i` nadal jest odrzucany;
 - jedynym dozwolonym przeksztalceniem jest rozwiniecie grupy pluginu do czlonkow w formacie `A, B, C, D`; alias pozostaje nazwa serwerowa, a reczny wpis nie jest normalizowany. Plugin nie nasladuje zadnych przeksztalcen wykonywanych samodzielnie przez Arkadie;
 - sparametryzowane odpowiedzi `brak-adresata` na poczatkowym etapie `Adresat`, dla nieznanej osoby na poczatku i w srodku trzyelementowej listy oraz dla spacji, przecinka ze spacja i przecinka bez spacji, zwracaja `blad` z dokladnie ta nieznana osoba; dodatkowy lokalny wariant z osoba na koncu nie jest przedstawiany jako dowod serwera;
@@ -420,7 +424,7 @@ Dodatkowo:
 - sparametryzowane anulowanie poprawnych par przez `~q` dla trzech form separatorow konczy sie `Zaniechane.` i wynikiem `zaniechany`, bez timeoutu, ogolnego bledu, tematu po anulowaniu, tresci, `**` i dodatkowych komend; formularz pozostaje, a cleanup umozliwia ponowienie;
 - powyzsze testy obslugi bledu i anulowania maja pozostac zielone przed i po poprawce parsera list. Jezeli nowa asercja padnie na starym kodzie, nalezy ja sklasyfikowac jako wykryta usterke i objac minimalna poprawka, zamiast sztucznie wymuszac GREEN.
 
-**T22 — GREEN:**
+**T22 - GREEN:**
 
 - rozbijanie lokalne dzieli najpierw segmenty przecinkowe, a w ich obrebie wybiera od lewej do prawej najdluzsze znane nazwy lub aliasy bez wzgledu na wielkosc liter; puste segmenty sa pomijane, a wszystkie trzy formy `A B C D`, `A, B, C, D` i `A,B,C,D` daja cztery osoby przy czterech znanych nazwach jednowyrazowych;
 - znana nazwa wielowyrazowa nie jest rozbijana, takze miedzy innymi wpisami rozdzielonymi spacjami; niedopasowane wyrazy pozostaja wylacznie lokalnymi kandydatami do advisory i nie zmieniaja transportu;
@@ -433,9 +437,9 @@ Dodatkowo:
 - advisory guard nadal tylko ostrzega i nie blokuje wysylki;
 - komentarze w `composeValidation.ts`, `ghost.ts` i `render.ts` przestaja twierdzic, ze serwer rozdziela adresatow wylacznie przecinkami.
 
-### Etap 6 — import pliku bez wyscigow i z potwierdzeniem skutku
+### Etap 6 - import pliku bez wyscigow i z potwierdzeniem skutku
 
-**Zakres:** T14, T15, potwierdzenie `zastap`, importowe czesci S5, S7–S9 i S13.
+**Zakres:** T14, T15, potwierdzenie `zastap`, importowe czesci S5, S7-S9 i S13.
 
 **Pliki:**
 
@@ -472,7 +476,7 @@ Dodatkowo:
 - wynik importu zawiera deterministyczne statystyki potrzebne do S5;
 - wszystkie konflikty z aktualnymi aliasami sa wymienione.
 
-### Etap 7 — podpowiedzi adresatow
+### Etap 7 - podpowiedzi adresatow
 
 **Zakres:** T11, T20, segmentacja ghostow z T22 i pozostale reguly rozdzialu 7.6.
 
@@ -521,7 +525,7 @@ Dodatkowo:
 
 **Playwright:** rzeczywisty layout dlugiej listy odbiorcow w prawdziwym Dargothcie, nie tylko `happy-dom`.
 
-### Etap 8 — wspolne mechanizmy UI i dostepnosc
+### Etap 8 - wspolne mechanizmy UI i dostepnosc
 
 **Zakres:** T3, T6, T12, T13, T23 oraz wspolne potwierdzenia z macierzy przyciskow.
 
@@ -538,20 +542,20 @@ Dodatkowo:
 - `tests/dateFilters.test.ts`
 - `tests/deletionRender.test.ts`
 
-**T3 — fokus:**
+**T3 - fokus:**
 
 - RED dla nazw z `"`, `\`, `[`, `]` i innymi znakami specjalnymi;
 - nie interpolowac surowej nazwy do selektora;
 - wyszukiwac element po atrybucie i porownywac jego wartosc bez budowania selektora z danych uzytkownika;
 - zachowac fokus, karetke, wartosci pol, checkboxy i scroll.
 
-**T6 — klasy pol:**
+**T6 - klasy pol:**
 
 - select Usuwania i `Tresc` zachowuja `popup-input popup-input--control`;
 - klasy `arkmail-*` sa dodatkami;
 - testy jasnego i ciemnego motywu w Playwright na prawdziwym Dargothcie.
 
-**T12 — Enter:**
+**T12 - Enter:**
 
 - wspolny helper uruchamiajacy glowna akcje formularza;
 - tworzenie grupy, zmiana nazwy, dodanie czlonka, przekazanie i filtry Usuwania;
@@ -560,7 +564,7 @@ Dodatkowo:
 - Enter nie wysyla listu;
 - jedno nacisniecie powoduje jedna operacje.
 
-**T13 — dostepnosc:**
+**T13 - dostepnosc:**
 
 - powiazane `label`/`for` i identyfikatory pol compose;
 - `tablist`, `tab`, `aria-selected`, `aria-controls`, panele i wlasciwy `tabindex`;
@@ -570,7 +574,7 @@ Dodatkowo:
 - tekstowe ogloszenie uzbrojenia ikonowego przycisku;
 - zachowac poprawne klikalne wiersze z Enter i Spacja.
 
-**T23 — szerokosc:**
+**T23 - szerokosc:**
 
 - walidowac caly zapis, nie `parseInt`;
 - `60abc`, pusta wartosc, ulamki i wartosci poza zakresem nie moga zostac po cichu obciete;
@@ -580,14 +584,14 @@ Dodatkowo:
 **Wspolne potwierdzenia:**
 
 - rozdzielic mechanike od stylu danger;
-- wariant destrukcyjny: danger ghost → pelne danger;
+- wariant destrukcyjny: danger ghost -> pelne danger;
 - wariant dlugiej operacji: neutralny w obu krokach;
 - ESC anuluje, repaint nie wykonuje odroczonej akcji;
 - drugi klik wykonuje operacje dokladnie raz.
 
-### Etap 9 — filtry, przyciski i uklady widokow
+### Etap 9 - filtry, przyciski i uklady widokow
 
-**Zakres:** obserwacje 4.1–4.8 i 4.11, S24–S27, S33, S37–S43.
+**Zakres:** obserwacje 4.1-4.8 i 4.11, S24-S27, S33, S37-S43.
 
 **Pliki:**
 
@@ -633,13 +637,13 @@ Dodatkowo:
 - bez dodatkowego przewijanego kontenera tylko dla pozycjonowania;
 - przeniesc import aliasow do `Aliasy pocztowe`;
 - sekcja `Import i eksport` zachowuje pozostale importy i eksporty;
-- teksty S24–S27, S33, S37–S43 zgodnie z raportem.
+- teksty S24-S27, S33, S37-S43 zgodnie z raportem.
 
 **Playwright:** kilka i setki osob, krotkie i dlugie listy, jasny/ciemny motyw, szerokie i waskie okno w prawdziwym Dargothcie.
 
-### Etap 10 — archiwum, pobieranie i wyniki czesciowe
+### Etap 10 - archiwum, pobieranie i wyniki czesciowe
 
-**Zakres:** T19, T24, S28–S36 i S46.
+**Zakres:** T19, T24, S28-S36 i S46.
 
 **Pliki:**
 
@@ -669,14 +673,14 @@ Dodatkowo:
 - poziom powiadomienia zalezny od rzeczywistego wyniku;
 - opoznione jednorazowe uniewaznienie URL z kontrolowanym timerem;
 - `true` oznacza rozpoczecie pobierania, nie gwarantowany zapis na dysku;
-- teksty S28–S36 i S46 dokladnie wedlug raportu;
+- teksty S28-S36 i S46 dokladnie wedlug raportu;
 - zachowac rozroznienie `recordId` i `contentKeyOf` oraz blizniacze listy.
 
 **Playwright:** rzeczywiste pobranie JSON, TXT i ZIP w prawdziwym Dargothcie oraz sprawdzenie nazw i zawartosci pobranych plikow.
 
-### Etap 11 — pozostale komunikaty i dokumentacja zachowania
+### Etap 11 - pozostale komunikaty i dokumentacja zachowania
 
-**Zakres:** S1–S23, S44, T25 oraz wszystkie teksty nieobjete wczesniejszymi etapami.
+**Zakres:** S1-S23, S44, T25 oraz wszystkie teksty nieobjete wczesniejszymi etapami.
 
 **Pliki:**
 
@@ -689,13 +693,13 @@ Dodatkowo:
 
 **Zasady:**
 
-- przeniesc teksty z tabel S1–S46 bez zgadywania nowych przyczyn bledow;
+- przeniesc teksty z tabel S1-S46 bez zgadywania nowych przyczyn bledow;
 - timeout wysylki i przekazania nie wspomina adresata;
 - `brak-adresata` pozostaje osobnym, rozpoznanym przypadkiem;
 - fallback dotyczy nieznanego bledu, nie konkretnej przyczyny;
 - zero nowych osob: `info`, nie `success`;
 - aliasy zawsze opisywane jako lokalne lustro;
-- „Osoby z listow” nie sa nazywane ogolnie „kontaktami”;
+- "Osoby z listow" nie sa nazywane ogolnie "kontaktami";
 - dynamiczne liczby uzywaja konstrukcji `Liczba ...: N`;
 - S14: zachowac obecny jednoznaczny toast czyszczenia Ksiazki;
 - S22: zachowac `Zapisz w niewyslanych`;
@@ -716,7 +720,7 @@ Nie zmieniac obecnego zdania na podstawie samej obserwacji. W Playwright na praw
 
 Jezeli test potwierdzi obecny tekst, zamknac obserwacje bez zmiany kodu.
 
-### Etap 12 — pelna weryfikacja i zamkniecie
+### Etap 12 - pelna weryfikacja i zamkniecie
 
 1. Pelny `npm test` w jednym przebiegu.
 2. `npm run typecheck`.
@@ -746,16 +750,16 @@ Jezeli test potwierdzi obecny tekst, zamknac obserwacje bez zmiany kodu.
 | T3, T6, T12, T13, T23 | 8 |
 | T19, T24 | 10 |
 | T25 | 11 |
-| Obserwacje 4.1–4.8, 4.11 | 9 |
+| Obserwacje 4.1-4.8, 4.11 | 9 |
 | Obserwacja 4.9 | 4 |
 | Obserwacja 4.10 | 11 |
 | Obserwacja 4.12 | 11 + Playwright |
-| S1–S15 | 5, 6, 9 i 11 |
-| S16–S23 | 5, 8 i 11 |
-| S24–S27 | 9 |
-| S28–S36 | 10 |
-| S37–S43 | 9 |
-| S44–S45 | 4 i 11 |
+| S1-S15 | 5, 6, 9 i 11 |
+| S16-S23 | 5, 8 i 11 |
+| S24-S27 | 9 |
+| S28-S36 | 10 |
+| S37-S43 | 9 |
+| S44-S45 | 4 i 11 |
 | S46 | 10 |
 | Kolizje alias/grupa | 2, 5, 6 i 7 |
 | Cztery stany zwierzecia | 4 |
@@ -798,7 +802,7 @@ Macierz ArkMaila ma miec wlasna konfiguracje Playwright, skrypt uruchamiajacy, n
 ### 7.2. Deterministyczny artefakt i klient
 
 1. Na starcie przebiegu pobrac najnowsze w tej chwili zrodla Dargotha, odczytac ich pelny SHA i zapisac go w artefaktach oraz koncowym raporcie.
-2. Ten sam SHA obowiazuje dla instalacji zaleznosci, builda, preview i wszystkich scenariuszy do konca macierzy; nie pobierac „najnowszego” klienta ponownie w trakcie.
+2. Ten sam SHA obowiazuje dla instalacji zaleznosci, builda, preview i wszystkich scenariuszy do konca macierzy; nie pobierac "najnowszego" klienta ponownie w trakcie.
 3. ArkMail pochodzi z biezacego `npm run bundle`. Testowa paczka ZIP powstaje z `build/arkmail` i jest instalowana przez prawdziwy menedzer pluginow.
 4. Nie uzywac `scripts/build.js` ani ZIP-ow z `releases/` jako zrodla kodu nowych zmian.
 5. Kazdy scenariusz uzywa osobnego kontekstu przegladarki albo kontrolowanego resetu. Reload i odtworzenie IndexedDB sa testowane jawnie.
@@ -822,7 +826,9 @@ Macierz ArkMaila ma miec wlasna konfiguracje Playwright, skrypt uruchamiajacy, n
 - sparametryzowane scenariusze dla pol `adresat` i `DW`: wpisanie adresatow, rozbicie lokalne, brak ostrzezenia dla znanych osob i wskazanie wylacznie rzeczywiscie nieznanej osoby;
 - wpisanie czterech znanych adresatow w formach `A B C D`, `A, B, C, D` i `A,B,C,D` daje cztery lokalne segmenty, brak ostrzezenia i identyczna surowa komende jak wpisana;
 - znana nazwa `B C` w polach `A B C D` oraz `A, B C, D` nie jest rozbijana ani zglaszana jako nieznana, a podpowiedz i akceptacja obejmuja cala nazwe wielowyrazowa bez zmiany wczesniejszego tekstu;
-- dwiescie powtorzen znanej nazwy daje brak advisory i bajtowo identyczna surowa komende; jest to kontrola wydajnosci i regresji lokalnej obslugi, nie test semantyki dwustu roznych adresatow;
+- dwiescie powtorzen znanej nazwy daje brak advisory i bajtowo identyczna surowa komende; jest to kontrola wydajnosci i regresji lokalnej obslugi;
+- dwiescie roznych znanych nazw syntetycznych daje dwiescie segmentow, brak advisory i niezmieniona surowa komende; nie wprowadzamy lokalnego limitu, a zgodnosc z serwerem potwierdza uzytkownik;
+- mieszany przypadek `A, B C,D` zachowuje znana nazwe wielowyrazowa, trzy lokalne segmenty i surowy transport;
 - nowa asercja dla niepustych pol z zewnetrznymi spacjami sprawdza bajtowo identyczna komende i najpierw pada na starym bundle z `trim()`; pusty albo zlozony wylacznie ze spacji `DW` pozostaje nieobecny;
 - listy trzyelementowe z dwiema znanymi i jedna nieznana osoba obejmuja lokalnie pozycje poczatkowa, srodkowa i koncowa oraz spacje, przecinki ze spacjami i przecinki bez spacji; pozycja koncowa i kombinacje nieobecne w logu sa wylacznie syntetycznymi testami pluginu;
 - podpowiedz uzupelnia tylko najdluzszy suffix pasujacy do kandydata, takze wielowyrazowego; grupa pluginu rozwija sie do czlonkow w formacie `A, B, C, D` jako jedyne przeksztalcenie listy, alias pozostaje nazwa serwerowa, a wczesniejsi adresaci pozostaja bez zmian;
@@ -863,7 +869,7 @@ Macierz ArkMaila ma miec wlasna konfiguracje Playwright, skrypt uruchamiajacy, n
 
 - Mock WebSocket potwierdza zachowanie pluginu w prawdziwym kliencie, nie zachowanie Arkadii. Syntetyczne odpowiedzi poczty musza byc oznaczone jako syntetyczne.
 - **T16:** pelne ponowne zalogowanie zostalo sprawdzone i nie wymaga ponowienia dla obecnego zakresu. Zachowac brak `q` i `~q`. Inne techniczne odmiany wznowienia nie sa rozstrzygniete tym testem, ale tez nie blokuja obecnego planu.
-- **T22:** podstawowa rownowaznosc spacji i przecinka dla tej samej pary dwoch roznych adresatow zostala potwierdzona dwoma przypadkami. W obu przypadkach druga osoba trafila do `Do`, a nadawca do `DW`; kolejnosc wyswietlona przez serwer roznila sie od kolejnosci wpisu. Dodatkowe cztery proby z dwiema znanymi i jedna nieznana osoba potwierdzily odrzucenie calego compose przed tematem dla nieznanej osoby na poczatku i w srodku oraz dla spacji, przecinkow ze spacjami i przecinkow bez spacji. Trzy poprawne pary przeszly do tematu dla wszystkich trzech form separatorow, ale zostaly anulowane przez `~q` i zakonczyly sie `Zaniechane.`. Po bledzie na poczatkowym etapie `Adresat` nie wysylac dodatkowego `~q`, tematu, tresci ani `**`. Niezaleznie od logow uzytkownik jawnie potwierdzil cztery poprawne adresaty w formach `A B C D`, `A, B, C, D` i `A,B,C,D`. Nowszy log potwierdza znana nazwe dwuwyrazowa, dwie rozne nieznane osoby w jednym komunikacie oraz przyjecie dwustu powtorzen jednej znanej nazwy na etapie adresata. Odpowiedz `Slucham?` dla identycznej listy wystapila przy zwyklym prompcie po zakonczeniu compose i nie jest dowodem limitu ani niedeterministycznosci. Nie sa potrzebne kolejne logi dla zaplanowanej poprawki lokalnego rozbijania z uzyciem znanych nazw. Nie jest to ogolny dowod deduplikacji, przenoszenia nadawcy do `DW`, zmiany kolejnosci, wiecej niz czterech roznych poprawnych adresatow, dwustu roznych adresatow, zachowania nieznanej osoby na koncu lub powtorzonej, ostatecznego listingu dwustu powtorzen ani szczegolowego podzialu `Do`/`DW` dla przecinka bez spacji. Dwuwyrazowego wpisu nie przypisujemy bez dowodu do gracza albo aliasu. Mock nie moze narzucac tych regul. Syntetyczna odpowiedz moze odwzorowac jawnie nazwany przypadek i sprawdzic plugin, ale nie dowodzi innych wariantow duplikatow, nieznanych osob, rol adresatow, separatorow ani kolejnosci.
+- **T22:** spacje i przecinki sa separatorami miedzy niepustymi nazwami, a znane nazwy wielowyrazowe pozostaja caloscia. Logi potwierdzaja poprawne pary, cztery formy list, dwiescie powtorzen znanej nazwy, dwie rozne nieznane osoby, powtorzona nieznana osobe na poczatku i koncu oraz mieszane separatory z nazwa wielowyrazowa. Komunikat `x i x` zachowuje oba wystapienia. `Slucham?` dotyczylo zwyklego promptu, nie aktywnego compose. Uzytkownik jawnie potwierdzil ponadto wiecej niz czterech roznych i dwiescie roznych poprawnych adresatow, wykrywanie nieznanych osob niezaleznie od pozycji i powtorzen, poprawnosc mieszanych separatorow oraz deduplikacje wykonywana przez Arkadie. Te kwestie sa zamkniete i nie blokuja implementacji. Plugin przekazuje reczny wpis bez przeksztalcen poza rozwinieciem grupy, zachowuje pelny opis bledu i nie replikuje deduplikacji, listingu, kolejnosci ani podzialu pol serwera. Mock sprawdza wylacznie reakcje pluginu na nazwany scenariusz, nie jest zrodlem regul serwera.
 - Semantyke aliasow na serwerze sprawdzac tylko wtedy, gdy zakres mialby wyjsc poza uzgodnione porownanie `trim()` i wielkosc liter.
 
 ## 8. Warunek usuniecia dokumentow roboczych
@@ -871,7 +877,7 @@ Macierz ArkMaila ma miec wlasna konfiguracje Playwright, skrypt uruchamiajacy, n
 Plan i raport mozna usunac dopiero po spelnieniu wszystkich warunkow:
 
 1. Zakonczono caly uzgodniony zakres albo zapisano trwale decyzje o swiadomym odrzuceniu poszczegolnych pozycji.
-2. Wszystkie zmiany maja lokalny dowod RED→GREEN i pelny zielony zestaw.
+2. Wszystkie zmiany maja lokalny dowod RED->GREEN i pelny zielony zestaw.
 3. Zakonczono wymagane scenariusze Playwright i pozostale, rzeczywiscie potrzebne proby serwera.
 4. Nie pozostaja otwarte rozjazdy miedzy kodem, raportem i zachowaniem klienta.
 5. Ostateczny HEAD i wyniki testow zostaly zweryfikowane.
