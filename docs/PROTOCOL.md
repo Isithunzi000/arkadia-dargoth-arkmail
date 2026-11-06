@@ -246,7 +246,17 @@ Wyniki: `List zostal pomyslnie wyslany.` (urząd pocztowy) albo
 fizyczna wysyłka na poczcie lub `wyslij zwierze`).
 
 Błąd adresata na starcie: `Adresat: Nie ma takiego adresata (gracza, aliasu): thud.`
-— compose przerywa się, wraca zwykły prompt `> `.
+— compose przerywa się, wraca zwykły prompt `> `. W zanonimizowanych
+próbach jedna nieznana osoba na początku albo w środku trzyelementowej listy
+z dwiema znanymi osobami przerywała cały compose przed etapem tematu. Komunikat
+wskazywał wyłącznie nieznaną osobę. Nie zapisano listu, a kolejne `napisz list`
+można było wykonać od razu. Po takim błędzie nie należy wysyłać dodatkowego
+`~q`, tematu, treści ani `**`.
+
+Poprawne pary rozdzielone przecinkiem bez spacji, przecinkiem ze spacją i
+spacją przeszły do etapu tematu. Anulowanie przez `~q` zakończyło każdą z tych
+prób odpowiedzią `Zaniechane.`. Po anulowaniu nie należy wysyłać treści ani `**`;
+plugin kończy operację wynikiem `zaniechany`, bez timeoutu i ogólnego błędu.
 
 Temat `--` to **swiadomie wpisany, literalny temat**, nie znacznik
 pustego tematu — pusty temat jest niemozliwy (serwer go nie przyjmuje;
@@ -277,17 +287,24 @@ automatycznie przed wysłaniem: surowa wartość trafia do edytora bez
 deduplikacji, zmiany kolejności, zamiany spacji na przecinki, przepisania
 szkicu ani zmiany podziału między `Do` i `DW` na podstawie własnych założeń.
 Ostrzeżenia mogą być deduplikowane lokalnie bez deduplikowania danych
-wysyłanych do serwera. Spójnik ` i ` z sekcji o listingach dotyczy wyłącznie
-parsowania odpowiedzi serwera, nigdy wysyłki; wolne słowo `i` jest odrzucane
-przy walidacji.
+wysyłanych do serwera. Lokalna baza osób nie jest kompletnym źródłem prawdy
+o graczach i aliasach, dlatego advisory guard wyłącznie ostrzega i nie blokuje
+wysyłki; ostateczna walidacja należy do serwera. Spójnik ` i ` z sekcji o
+listingach dotyczy wyłącznie parsowania odpowiedzi serwera, nigdy wysyłki;
+wolne słowo `i` jest odrzucane przy walidacji.
 
-Powyższy dowód nie rozstrzyga wszystkich wariantów duplikatów, w tym
-duplikatów osoby innej niż nadawca, par bez nadawcy, odwrotnej kolejności
-wejścia, nietypowych mieszanych sekwencji separatorów, więcej niż dwóch
-adresatów na serwerze ani ogólnych zasad kolejności i podziału pól `Do` i `DW`.
-Nie należy uogólniać go na te przypadki bez osobnych prób serwera. Lokalny
-parser można testować również dla większej liczby osób, ale nie jest to
-dodatkowy dowód zachowania serwera.
+Cztery odrzucone próby z trzema wpisami i jednym błędnym nie są dowodem
+przyjęcia trzech poprawnych adresatów. Nie sprawdzono nieznanej osoby na końcu
+listy, kilku nieznanych osób, duplikatów nieznanych ani wszystkich mieszanych
+separatorów. Przecinek bez spacji ma potwierdzone przejście do tematu, ale nie
+końcowy zapis, listing, kolejność ani podział `Do`/`DW`, ponieważ próbę
+anulowano. Dowody nie rozstrzygają również wszystkich wariantów duplikatów,
+w tym duplikatów osoby innej niż nadawca, par bez nadawcy, odwrotnej kolejności
+wejścia, więcej niż dwóch poprawnych adresatów ani ogólnych zasad kolejności
+i podziału pól `Do` i `DW`. Nie należy uogólniać ich na te przypadki bez
+osobnych prób serwera. Lokalny parser i obsługę błędów można testować również
+dla większej liczby osób i dodatkowych pozycji, ale nie jest to dodatkowy
+dowód zachowania serwera.
 
 Adresat jest wymagany, a DW może pozostać puste.
 

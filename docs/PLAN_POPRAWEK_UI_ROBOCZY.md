@@ -55,14 +55,17 @@ Konflikt jest stanem wyliczanym z biezacych grup i biezacego lustra aliasow. Nie
 - Wpisane pola adresatow i zapisane szkice nie sa przepisywane.
 - Nie wolno automatycznie scalac, kasowac, zmieniac nazwy ani odrzucac aliasu.
 
-### 2.4. Reconnect i separatory adresatow — T16 i T22, dowody potwierdzone
+### 2.4. Reconnect, separatory i bledy adresatow — T16 i T22, dowody potwierdzone
 
 - **T16:** rzeczywista proba pelnego ponownego zalogowania zakonczyla sie brakiem aktywnego pagera/edytora po powrocie do gry. Pisanie listu rozpoczeto poza pluginem, polaczenie zostalo przerwane, a po ponownym zalogowaniu zdalny dialog nie byl juz aktywny. Nie dodawac automatycznie `q` ani `~q`; zachowac obecny lokalny cleanup, reject i istniejacy test zakazujacy dodatkowego `q`. Dla przetestowanej sciezki nie jest potrzebna poprawka zdalnego zamykania dialogu.
 - **Granica T16:** ta proba rozstrzyga pelne ponowne zalogowanie, nie kazda techniczna odmiane `proxy.session resumed` ani kazdy dialog. Nie wolno przedstawiac jej jako dowodu tych innych przypadkow. Ewentualna zmiana zachowania dla nich wymagalaby osobnego dowodu. Playwright moze sprawdzic lokalne sprzatanie pluginu, ale nie zastapi dowodu o zdalnym stanie serwera.
 - **T22, powtorzenie nadawcy:** nadawce wpisano dwukrotnie ze spacja. Lista niewyslanych pokazala jednego adresata, a w szczegolach listu pole `Do` bylo puste, a `DW` zawieralo nadawce. Jest to pojedyncza obserwacja, a nie dowod ogolnej deduplikacji serwera ani ogolnej reguly przenoszenia nadawcy do `DW`. Nie jest podstawa do zmiany surowej wartosci wpisanej przez uzytkownika.
 - **T22, porownanie dwoch przypadkow:** nadawce i druga osobe podano w tej samej kolejnosci, raz ze spacja i raz z przecinkiem. W obu przypadkach lista niewyslanych przedstawila ten sam zestaw w kolejnosci `druga osoba, nadawca`, a szczegoly listu mialy identyczny podzial: druga osoba w `Do`, nadawca w `DW`. Kolejnosc wyswietlona przez serwer roznila sie od kolejnosci wpisu. Jest to obserwacja dla tej pary i tej roli nadawcy; nie jest podstawa do zmiany kolejnosci przez plugin. Podstawowa semantyka obu separatorow jest potwierdzona; kolejny log nie jest potrzebny do zaplanowania poprawki.
+- **T22, odrzucenie nieznanej osoby:** cztery kolejne proby zawieraly trzy wpisy: dwie osoby rozpoznane przez serwer i jedna nieznana. Nieznana osoba wystapila na poczatku albo w srodku listy, a wpisy rozdzielono samymi spacjami, przecinkami ze spacjami albo przecinkami bez spacji. Kazda proba zostala przerwana przed etapem tematu, komunikat wskazal wylacznie nieznana osobe, a znane osoby nie zostaly zgloszone jako bledne. Nastapil powrot do zwyklego promptu i nie zapisano listu. Nowe `napisz list` mozna bylo wykonac od razu, bez dodatkowego `~q` po bledzie.
+- **T22, poprawne pary i anulowanie:** trzy poprawne pary rozdzielone odpowiednio przecinkiem bez spacji, przecinkiem ze spacja i spacja przeszly do etapu tematu. Wszystkie trzy proby anulowano przez `~q`, a serwer odpowiedzial `Zaniechane.`. Dla przecinka bez spacji potwierdzono przejscie walidacji adresatow, ale nie koncowy zapis, listing, kolejnosc ani podzial `Do`/`DW`, poniewaz probe anulowano.
 - **Zakres T22:** `splitRecipients()` i `unknownRecipients()` maja sprawdzac kazda osobe oddzielnie, a ghost ma segmentowac po ostatnim przecinku albo spacji. Surowa wartosc pol `Do` i `DW` trafia do edytora bez przepisywania, deduplikacji ani zmiany kolejnosci. Nie wolno zmieniac podzialu miedzy `Do` i `DW` na podstawie wlasnych zalozen. Ostrzezenia moga byc deduplikowane lokalnie bez deduplikowania danych wysylanych do serwera. Generowane rozwiniecie grupy moze pozostac w kanonicznym formacie przecinkowym. Wolny spojnik `i` pozostaje odrzucany.
-- **Granica T22:** logow nie uogolniamy na wszystkie kombinacje duplikatow, w tym duplikaty osoby innej niz nadawca, pary bez nadawcy, odwrotna kolejnosc wejscia, nietypowe mieszane sekwencje separatorow, wiecej niz dwoch adresatow na serwerze ani ogolne zasady kolejnosci i podzialu pol `Do` i `DW`. Takie rozszerzenie zakresu wymagaloby osobnych prob serwera. Lokalny parser mozna testowac rowniez dla wiekszej liczby osob, ale nie wolno przedstawiac tych testow jako dodatkowego dowodu zachowania serwera.
+- **Zakres obslugi bledu i anulowania:** obecny `parseMailError()` rozpoznaje `brak-adresata`, `EditorSession` konczy wtedy operacje i nie kontynuuje kolejnych etapow, a `Zaniechane.` daje wynik `zaniechany`. Dla bledu na poczatkowym etapie `Adresat` oznacza to brak tematu, tresci, `**` i dodatkowego `~q`; przy pozniejszym bledzie nie wolno cofac komend juz poprawnie wyslanych przed bledem. Nie ma podstaw do zmiany tych regul. Po bledzie i anulowaniu formularz pozostaje do poprawy, cleanup musi umozliwic natychmiastowe ponowienie, a konkretny blad adresata ma trafic do wlasciwego toastu. Advisory guard pozostaje nieblokujacy: lokalna baza nie jest kompletnym zrodlem prawdy o graczach i aliasach, a ostateczna walidacja nalezy do serwera.
+- **Granica T22:** cztery odrzucone proby z trzema wpisami i jednym blednym nie sa dowodem przyjecia trzech poprawnych adresatow. Nie sprawdzono nieznanej osoby na koncu listy, kilku nieznanych osob, duplikatow nieznanych ani wszystkich mieszanych separatorow. Logow nie uogolniamy rowniez na wszystkie kombinacje duplikatow, w tym duplikaty osoby innej niz nadawca, pary bez nadawcy, odwrotna kolejnosc wejscia, wiecej niz dwoch poprawnych adresatow ani ogolne zasady kolejnosci i podzialu pol `Do` i `DW`. Takie rozszerzenie zakresu wymagaloby osobnych prob serwera. Lokalny parser i obsluge bledow mozna testowac dla wiekszej liczby osob i dodatkowych pozycji, ale nie wolno przedstawiac tych testow jako dodatkowego dowodu zachowania serwera.
 
 ### 2.5. Zamkniecie decyzji produktowych
 
@@ -375,9 +378,10 @@ Dodatkowo:
 
 - sparametryzowane testy `splitRecipients()` dla przecinka i spacji: `A,B`, `A, B`, `A B`, wielokrotne spacje i przecinki oraz wartosci puste;
 - `A B` daje dwie osoby, a `A, B` daje identyczna liste; mieszane separatory sa rozbijane deterministycznie na potrzeby lokalnych ostrzezen;
+- listy trzyelementowe z dwiema znanymi i jedna nieznana osoba sa rozbijane na trzy osoby dla kazdego separatora; nieznana osoba jest sprawdzana lokalnie na poczatku, w srodku i na koncu, przy czym przypadek koncowy jest wylacznie testem parsera, nie dowodem serwera;
 - `unknownRecipients()` sprawdza kazda osobe oddzielnie i nie zglasza dwoch znanych osob rozdzielonych spacja jako jednego nieznanego adresata;
-- przypadek mieszany, w ktorym wystepuje znana osoba i rzeczywiscie nieznana osoba, wskazuje w ostrzezeniu wylacznie te nieznana osobe;
-- testy rozbijania i ostrzezen sa sparametryzowane jednakowo dla pol `adresat` i `DW` oraz dla obu separatorow; RED jest wymagany dla wariantow wykrywajacych poprawke, a nie dla juz dzialajacego wariantu przecinkowego;
+- przypadek mieszany, w ktorym wystepuja znane osoby i rzeczywiscie nieznana osoba, wskazuje w ostrzezeniu wylacznie te nieznana osobe, niezaleznie od jej pozycji;
+- testy rozbijania i ostrzezen sa sparametryzowane jednakowo dla pol `adresat` i `DW` oraz dla wszystkich trzech form separatorow; RED jest wymagany dla wariantow wykrywajacych poprawke, a nie dla juz dzialajacych wariantow przecinkowych;
 - komunikat S16 oraz analogiczny komunikat dla `DW` opisuja oba separatory i zakaz wolnego spojnika `i`; test tresci pada na starym komunikacie;
 - testy uzywaja wylacznie imion syntetycznych.
 
@@ -387,7 +391,12 @@ Dodatkowo:
 - przed wyslaniem nie ma automatycznej deduplikacji, zmiany kolejnosci, zamiany spacji na przecinki, przepisania szkicu ani zmiany podzialu miedzy `Do` i `DW`;
 - lokalne ostrzezenia moga byc deduplikowane, ale ta operacja nie zmienia danych wysylanych do serwera;
 - wolny spojnik `i` nadal jest odrzucany;
-- generowane rozwiniecia grup moga pozostac w kanonicznym formacie przecinkowym, bez normalizowania recznego wpisu.
+- generowane rozwiniecia grup moga pozostac w kanonicznym formacie przecinkowym, bez normalizowania recznego wpisu;
+- sparametryzowane odpowiedzi `brak-adresata` na poczatkowym etapie `Adresat`, dla nieznanej osoby na poczatku i w srodku trzyelementowej listy oraz dla spacji, przecinka ze spacja i przecinka bez spacji, zwracaja `blad` z dokladnie ta nieznana osoba; dodatkowy lokalny wariant z osoba na koncu nie jest przedstawiany jako dowod serwera;
+- po takim bledzie transport zawiera wylacznie komendy wymagane do rozpoczecia compose i przekazania surowej listy adresatow: nie ma tematu, tresci, `**`, dodatkowego `~q` ani innych prob kontynuacji;
+- blad adresata wykonuje cleanup, pokazuje konkretny toast, pozostawia formularz do poprawy i umozliwia natychmiastowe ponowienie compose bez timeoutu i bez ogolnego komunikatu bledu;
+- sparametryzowane anulowanie poprawnych par przez `~q` dla trzech form separatorow konczy sie `Zaniechane.` i wynikiem `zaniechany`, bez timeoutu, ogolnego bledu, tematu po anulowaniu, tresci, `**` i dodatkowych komend; formularz pozostaje, a cleanup umozliwia ponowienie;
+- powyzsze testy obslugi bledu i anulowania maja pozostac zielone przed i po poprawce parsera list. Jezeli nowa asercja padnie na starym kodzie, nalezy ja sklasyfikowac jako wykryta usterke i objac minimalna poprawka, zamiast sztucznie wymuszac GREEN.
 
 **T22 — GREEN:**
 
@@ -396,6 +405,8 @@ Dodatkowo:
 - walidacja pozostaje w potwierdzonym zakresie liter, przecinkow i spacji; nie ma blednego zaostrzenia do samych przecinkow;
 - komunikat S16 opisuje oba separatory;
 - generowany format rozwiniec moze pozostac przecinkowy, ale reczny wpis nie jest normalizowany przed `transport.send()`;
+- `brak-adresata` i `Zaniechane.` zachowuja obecna obsluge bez dodatkowego `~q`, z poprawnym cleanup, tostem lub wynikiem oraz mozliwoscia ponowienia;
+- advisory guard nadal tylko ostrzega i nie blokuje wysylki;
 - komentarze w `composeValidation.ts`, `ghost.ts` i `render.ts` przestaja twierdzic, ze serwer rozdziela adresatow wylacznie przecinkami.
 
 ### Etap 6 — import pliku bez wyscigow i z potwierdzeniem skutku
@@ -782,9 +793,12 @@ Macierz ArkMaila ma miec wlasna konfiguracje Playwright, skrypt uruchamiajacy, n
 **Compose dla obu separatorow:**
 
 - sparametryzowane scenariusze dla pol `adresat` i `DW`: wpisanie adresatow, rozbicie lokalne, brak ostrzezenia dla znanych osob i wskazanie wylacznie rzeczywiscie nieznanej osoby;
+- listy trzyelementowe z dwiema znanymi i jedna nieznana osoba obejmuja lokalnie pozycje poczatkowa, srodkowa i koncowa oraz spacje, przecinki ze spacjami i przecinki bez spacji; pozycja koncowa i kombinacje nieobecne w logu sa wylacznie syntetycznymi testami pluginu;
 - podpowiedz uzupelnia tylko ostatni segment, grupa rozwija sie do czlonkow, alias pozostaje nazwa serwerowa, a wczesniejsi adresaci pozostaja bez zmian;
 - kontrola surowych komend wychodzacych potwierdza brak normalizacji separatorow, deduplikacji, zmiany kolejnosci i zmiany podzialu miedzy `Do` i `DW`;
-- mock potwierdza obsluge obu wariantow przez plugin w rzeczywistym kliencie, a nie semantyke serwera.
+- syntetyczny `brak-adresata` na poczatkowym etapie `Adresat` ma sparametryzowane przypadki nieznanej osoby na poczatku i w srodku dla wszystkich form separatorow; asercje obejmuja konkretny toast, wynik i cleanup, zachowanie formularza, brak tematu, tresci, `**`, dodatkowego `~q` i mozliwosc natychmiastowego ponowienia;
+- syntetyczne `Zaniechane.` po `~q` dla poprawnych par z trzema formami separatorow daje wynik `zaniechany`, bez timeoutu, ogolnego bledu, tresci i `**`, z zachowaniem formularza i mozliwoscia ponowienia;
+- mock potwierdza obsluge wariantow przez plugin w rzeczywistym kliencie, a nie semantyke serwera. Nie wolno przedstawiac syntetycznych list trzyelementowych jako dowodu przyjecia trzech poprawnych adresatow przez Arkadie.
 
 **UI i klawiatura:**
 
@@ -818,7 +832,7 @@ Macierz ArkMaila ma miec wlasna konfiguracje Playwright, skrypt uruchamiajacy, n
 
 - Mock WebSocket potwierdza zachowanie pluginu w prawdziwym kliencie, nie zachowanie Arkadii. Syntetyczne odpowiedzi poczty musza byc oznaczone jako syntetyczne.
 - **T16:** pelne ponowne zalogowanie zostalo sprawdzone i nie wymaga ponowienia dla obecnego zakresu. Zachowac brak `q` i `~q`. Inne techniczne odmiany wznowienia nie sa rozstrzygniete tym testem, ale tez nie blokuja obecnego planu.
-- **T22:** podstawowa rownowaznosc spacji i przecinka dla tej samej pary dwoch roznych adresatow zostala potwierdzona dwoma przypadkami. Nie sa potrzebne kolejne logi dla tej poprawki. W obu przypadkach druga osoba trafila do `Do`, a nadawca do `DW`; kolejnosc wyswietlona przez serwer roznila sie od kolejnosci wpisu. Nie jest to ogolny dowod deduplikacji, przenoszenia nadawcy do `DW` ani zmiany kolejnosci. Mock nie moze narzucac ogolnej deduplikacji, przenoszenia nadawcy do `DW` ani zmiany kolejnosci. Syntetyczna odpowiedz moze odwzorowac wylacznie jawnie nazwany przypadek i nie dowodzi innych wariantow duplikatow, rol adresatow, separatorow ani kolejnosci.
+- **T22:** podstawowa rownowaznosc spacji i przecinka dla tej samej pary dwoch roznych adresatow zostala potwierdzona dwoma przypadkami. W obu przypadkach druga osoba trafila do `Do`, a nadawca do `DW`; kolejnosc wyswietlona przez serwer roznila sie od kolejnosci wpisu. Dodatkowe cztery proby z dwiema znanymi i jedna nieznana osoba potwierdzily odrzucenie calego compose przed tematem dla nieznanej osoby na poczatku i w srodku oraz dla spacji, przecinkow ze spacjami i przecinkow bez spacji. Trzy poprawne pary przeszly do tematu dla wszystkich trzech form separatorow, ale zostaly anulowane przez `~q` i zakonczyly sie `Zaniechane.`. Po bledzie na poczatkowym etapie `Adresat` nie wysylac dodatkowego `~q`, tematu, tresci ani `**`. Nie sa potrzebne kolejne logi dla zaplanowanej poprawki lokalnego rozbijania. Nie jest to ogolny dowod deduplikacji, przenoszenia nadawcy do `DW`, zmiany kolejnosci, przyjecia trzech poprawnych adresatow, zachowania nieznanej osoby na koncu ani koncowego zapisu dla przecinka bez spacji. Mock nie moze narzucac tych regul. Syntetyczna odpowiedz moze odwzorowac jawnie nazwany przypadek i sprawdzic plugin, ale nie dowodzi innych wariantow duplikatow, nieznanych osob, rol adresatow, separatorow ani kolejnosci.
 - Semantyke aliasow na serwerze sprawdzac tylko wtedy, gdy zakres mialby wyjsc poza uzgodnione porownanie `trim()` i wielkosc liter.
 
 ## 8. Warunek usuniecia dokumentow roboczych
