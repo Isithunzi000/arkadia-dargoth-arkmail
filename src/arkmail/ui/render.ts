@@ -364,10 +364,30 @@ const nativeFieldClass = (el: HTMLElement): void => {
     caret: [number, number] | null;
     scroll: Record<string, number>;
   }
+  // Zgloszenie 2026-11-05 (Etap 10): klikalny wiersz dziala tez z
+  // klawiatury - role, tabindex i Enter/Spacja jak przy klawiszu.
+  const makeClickable = (el: HTMLElement, onActivate: () => void): void => {
+    el.setAttribute('role', 'button');
+    el.setAttribute('tabindex', '0');
+    el.addEventListener('click', onActivate);
+    el.addEventListener('keydown', (ev: KeyboardEvent) => {
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        onActivate();
+      }
+    });
+  };
   const focusKeyOf = (el: Element | null): string | null => {
     if (!el || typeof (el as HTMLElement).getAttribute !== 'function') return null;
     if (!root.contains(el)) return null;
-    for (const attr of ['data-search', 'data-field', 'data-filter', 'data-deletion-filter']) {
+    for (const attr of [
+      'data-search',
+      'data-field',
+      'data-filter',
+      'data-deletion-filter',
+      'data-deletion-number',
+      'data-book-check',
+    ]) {
       const v = (el as HTMLElement).getAttribute(attr);
       if (v !== null) return `[${attr}="${v}"]`;
     }
@@ -379,8 +399,14 @@ const nativeFieldClass = (el: HTMLElement): void => {
     const key = focusKeyOf(active);
     if (key) {
       snap.focusKey = key;
-      snap.focusValue = (active as HTMLInputElement).value ?? null;
       const inp = active as HTMLInputElement;
+      // Etap 10: checkbox oddaje stan zaznaczenia, pole - wpisana wartosc.
+      snap.focusValue =
+        inp.getAttribute('type') === 'checkbox'
+          ? inp.checked
+            ? '1'
+            : '0'
+          : ((active as HTMLInputElement).value ?? null);
       try {
         if (typeof inp.selectionStart === 'number') {
           snap.caret = [inp.selectionStart, inp.selectionEnd ?? inp.selectionStart];
@@ -405,7 +431,11 @@ const nativeFieldClass = (el: HTMLElement): void => {
     if (snap.focusKey) {
       const el = root.querySelector(snap.focusKey) as HTMLInputElement | null;
       if (el) {
-        if (snap.focusValue !== null) el.value = snap.focusValue;
+        if (el.getAttribute('type') === 'checkbox') {
+          el.checked = snap.focusValue === '1';
+        } else if (snap.focusValue !== null) {
+          el.value = snap.focusValue;
+        }
         el.focus();
         if (snap.caret) {
           try {
@@ -1092,7 +1122,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
       date.className = 'arkmail-entry-date';
       date.textContent = e.date ? e.date.raw : '';
       row.appendChild(date);
-      row.addEventListener('click', () => handlers.onOpenLetter(state.activeBox, e));
+      makeClickable(row, () => handlers.onOpenLetter(state.activeBox, e));
       scroll.appendChild(row);
     }
     if (searchMode) {
@@ -2068,6 +2098,8 @@ const nativeFieldClass = (el: HTMLElement): void => {
       row.setAttribute('data-book-row', '');
       const check = doc.createElement('input');
       check.setAttribute('type', 'checkbox');
+      // Etap 10: klucz fokusu - zaznaczenie wraca po repaint.
+      check.setAttribute('data-book-check', name);
       check.checked = bookSelection.has(name);
       check.addEventListener('change', () => {
         if (check.checked) bookSelection.add(name);
@@ -2500,7 +2532,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
           };
           // Klik w imie = kierunek domyslny: odebrane, gdy sa.
           name.setAttribute('title', 'Pokaz listy tej osoby w archiwum (domyslnie: odebrane)');
-          name.addEventListener('click', () => {
+          makeClickable(name, () => {
             if (c.lettersReceived > 0) jumpTo('odebrane');
             else if (c.lettersSent > 0) jumpTo('wyslane');
           });
@@ -2902,7 +2934,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
           row.appendChild(meta);
           // Fala 16h: archiwum klikalne (zgloszenie pkt 9) - tresc
           // z cache albo doczyt z serwera po re-kotwicy (index.ts).
-          row.addEventListener('click', () => handlers.onOpenArchiveLetter?.(l));
+          makeClickable(row, () => handlers.onOpenArchiveLetter?.(l));
           return [row];
         }),
       );
