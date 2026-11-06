@@ -731,7 +731,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
       caption.textContent = label;
       wrap.appendChild(caption);
       const field = doc.createElement('input');
-    nativeFieldClass(field);
+      nativeFieldClass(field);
       field.type = key === 'odDaty' || key === 'doDaty' ? 'date' : 'text';
       field.value = deletionDraft[key];
       field.setAttribute('data-deletion-filter', key);
@@ -956,7 +956,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     searchRow.className = 'arkmail-search-row';
     const mkSearch = (key: string, placeholder: string, type = 'text') => {
       const input = doc.createElement('input');
-    nativeFieldClass(input);
+      nativeFieldClass(input);
       input.setAttribute('data-search', key);
       input.setAttribute('type', type);
       input.setAttribute('placeholder', placeholder);
@@ -1425,7 +1425,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
       lab.textContent = label;
       pane.appendChild(lab);
       const input = doc.createElement('input');
-    nativeFieldClass(input);
+      nativeFieldClass(input);
       input.setAttribute('data-field', field);
       input.value = composeDraft[field as 'adresat' | 'temat' | 'dw'];
       input.addEventListener('input', () => {
@@ -1718,7 +1718,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
       const head = doc.createElement('div');
       head.className = 'arkmail-group-head';
       const rename = doc.createElement('input');
-    nativeFieldClass(rename);
+      nativeFieldClass(rename);
       rename.setAttribute('data-group-rename', '');
       rename.value = group.name;
       rename.setAttribute('title', 'Nazwa grupy - zapisz obok.');
@@ -1800,7 +1800,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
       // Dokladanie czlonka z bazy osob (ghost: strzalka w prawo
       // wpisuje kanoniczna forme z kontaktow i importow).
       const addMember = doc.createElement('input');
-    nativeFieldClass(addMember);
+      nativeFieldClass(addMember);
       addMember.setAttribute('data-member-add', '');
       addMember.setAttribute('placeholder', 'Dodaj osobe');
       const addMemberOk = doc.createElement('button');
@@ -2020,8 +2020,8 @@ const nativeFieldClass = (el: HTMLElement): void => {
     pane.appendChild(bookAddRow);
 
     // --- filtr listy imion z przyciskiem czyszczenia
-    // Zgloszenie 2026-11-05. Repaint dotyka tylko listy - pole filtra
-    // zachowuje fokus i wpisana wartosc.
+    // Zgloszenie 2026-11-05. Filtr jest czescia .arkmail-list-scroll:
+    // repaint listy nie odbiera mu fokusu ani wpisanej wartosci.
     const filterRow = doc.createElement('div');
     filterRow.className = 'arkmail-book-filter';
     const filterInput = doc.createElement('input');
@@ -2648,7 +2648,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     controls.className = 'arkmail-arch-controls';
     const mkText = (key: 'osoba' | 'temat' | 'tresc' | 'odDaty' | 'doDaty', placeholder: string, type = 'text') => {
       const input = doc.createElement('input');
-    nativeFieldClass(input);
+      nativeFieldClass(input);
       input.setAttribute('data-filter', key);
       input.setAttribute('type', type);
       input.setAttribute('placeholder', placeholder);
