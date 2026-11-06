@@ -57,11 +57,16 @@ Konflikt jest stanem wyliczanym z biezacych grup i biezacego lustra aliasow. Nie
 
 ### 2.4. Reconnect i separatory adresatow — T16 i T22, dowody potwierdzone
 
-- **T16:** rzeczywista proba pelnego ponownego zalogowania zakonczyla sie brakiem aktywnego pagera/edytora po powrocie do gry. Pisanie listu rozpoczeto poza pluginem, polaczenie zostalo przerwane, a po ponownym zalogowaniu zdalny dialog nie byl juz aktywny. Nie dodawac automatycznie `q` ani `~q`; zachowac obecny lokalny cleanup i istniejacy test zakazujacy dodatkowego `q`.
-- **Granica T16:** ta proba rozstrzyga pelne ponowne zalogowanie, nie kazda techniczna odmiane `proxy.session resumed` ani kazdy dialog. Nie wolno przedstawiac jej jako dowodu tych innych przypadkow. Ewentualna zmiana zachowania dla nich wymagalaby osobnego dowodu.
-- **T22:** dwa rzeczywiste, zanonimizowane logi dla analogicznej pary roznych adresatow potwierdzily ten sam wynik przy rozdzieleniu spacja i przy rozdzieleniu przecinkiem. Podstawowa semantyka obu separatorow jest potwierdzona; kolejny log nie jest potrzebny do zaplanowania poprawki.
-- **Zakres T22:** `splitRecipients()` i `unknownRecipients()` maja sprawdzac kazda osobe oddzielnie, a ghost ma segmentowac po ostatnim przecinku albo spacji. Surowa wartosc pol `Do` i `DW` trafia do edytora bez przepisywania, deduplikacji ani zmiany kolejnosci. Generowane rozwiniecie grupy moze pozostac w kanonicznym formacie przecinkowym. Wolny spojnik `i` pozostaje odrzucany.
-- **Granica T22:** logow nie uogolniamy na wszystkie kombinacje duplikatow, mieszanych separatorow ani kolejnosci pol `Do` i `DW`. Takie rozszerzenie zakresu wymagaloby osobnych prob serwera.
+- **T16:** rzeczywista proba pelnego ponownego zalogowania zakonczyla sie brakiem aktywnego pagera/edytora po powrocie do gry. Pisanie listu rozpoczeto poza pluginem, polaczenie zostalo przerwane, a po ponownym zalogowaniu zdalny dialog nie byl juz aktywny. Nie dodawac automatycznie `q` ani `~q`; zachowac obecny lokalny cleanup, reject i istniejacy test zakazujacy dodatkowego `q`. Dla przetestowanej sciezki nie jest potrzebna poprawka zdalnego zamykania dialogu.
+- **Granica T16:** ta proba rozstrzyga pelne ponowne zalogowanie, nie kazda techniczna odmiane `proxy.session resumed` ani kazdy dialog. Nie wolno przedstawiac jej jako dowodu tych innych przypadkow. Ewentualna zmiana zachowania dla nich wymagalaby osobnego dowodu. Playwright moze sprawdzic lokalne sprzatanie pluginu, ale nie zastapi dowodu o zdalnym stanie serwera.
+- **T22, pierwszy log:** dwie rozne nazwy wpisane ze spacja zostaly przyjete jako dwoch adresatow. Powtorzenie tej samej nazwy nie dalo dwoch roznych adresatow w tym konkretnym przypadku. Jest to pojedyncza obserwacja, a nie dowod ogolnej deduplikacji serwera ani podstawa do zmiany surowej wartosci wpisanej przez uzytkownika.
+- **T22, porownanie dwoch logow:** te sama pare roznych adresatow podano w tej samej kolejnosci, raz ze spacja i raz z przecinkiem. W obu przypadkach lista niewyslanych przedstawila ten sam zestaw adresatow, a szczegoly listu mialy identyczny podzial pol `Do` i `DW`. Podstawowa semantyka obu separatorow jest potwierdzona; kolejny log nie jest potrzebny do zaplanowania poprawki.
+- **Zakres T22:** `splitRecipients()` i `unknownRecipients()` maja sprawdzac kazda osobe oddzielnie, a ghost ma segmentowac po ostatnim przecinku albo spacji. Surowa wartosc pol `Do` i `DW` trafia do edytora bez przepisywania, deduplikacji ani zmiany kolejnosci. Nie wolno zmieniac podzialu miedzy `Do` i `DW` na podstawie wlasnych zalozen. Ostrzezenia moga byc deduplikowane lokalnie bez deduplikowania danych wysylanych do serwera. Generowane rozwiniecie grupy moze pozostac w kanonicznym formacie przecinkowym. Wolny spojnik `i` pozostaje odrzucany.
+- **Granica T22:** logow nie uogolniamy na wszystkie kombinacje duplikatow, nietypowe mieszane sekwencje separatorow, wiecej niz dwoch adresatow na serwerze ani ogolne zasady kolejnosci i podzialu pol `Do` i `DW`. Takie rozszerzenie zakresu wymagaloby osobnych prob serwera. Lokalny parser mozna testowac rowniez dla wiekszej liczby osob, ale nie wolno przedstawiac tych testow jako dodatkowego dowodu zachowania serwera.
+
+### 2.5. Zamkniecie decyzji produktowych
+
+Nie pozostaja decyzje produktowe blokujace implementacje. Podstawowe T16 i T22 nie wymagaja kolejnych logow. Pozostaja dowody wykonawcze: jeden pelny zielony przebieg wyjsciowy, rzeczywisty wyglad po zmianach, zgodnosc z przypietym SHA Dargotha, zachowanie przy wymuszonych awariach, wyjasnienie wczesniejszych rozjazdow toastu i koloru oraz pelna macierz przegladarkowa po implementacji.
 
 ## 3. Staly protokol wykonania kazdego etapu
 
@@ -78,9 +83,16 @@ Dla kazdej zmiany kodu:
 
 Jezeli zmiana dotyczy wylacznie dokumentacji lub tekstu bez osobnej sciezki wykonania, rowniez musi miec test tresci albo struktury. Nie wolno jedynie podmienic starego oczekiwania bez wykazania, ze nowe oczekiwanie pada na starym kodzie.
 
+Testy nalezy rozdzielac na dwie kategorie:
+
+- **wykrywajace poprawke:** nowa asercja najpierw pada lokalnie na starym kodzie, a po minimalnej implementacji przechodzi;
+- **ochronne juz poprawnego zachowania:** maja byc zielone przed i po zmianie. Nie wolno wymagac dla nich RED, psuc kodu w celu ich zalamania ani przedstawiac ich jako dowodu nowej poprawki.
+
+W zestawie sparametryzowanym RED musi wykazac co najmniej wariant odpowiadajacy nowej poprawce. Wariant juz obslugiwany moze pozostac zielony i sluzyc jako kontrola regresji.
+
 Dla scenariuszy przegladarkowych obowiazuje ten sam lokalny dowod RED→GREEN:
 
-1. Nowy scenariusz Playwright najpierw pada na bundle zbudowanym ze starego kodu; zapisac nazwe scenariusza i niespelniona asercje.
+1. Nowa asercja majaca wykryc poprawke najpierw pada na bundle zbudowanym ze starego kodu; zapisac nazwe scenariusza i niespelniona asercje. Asercje ochronne maja byc zielone przed i po zmianie.
 2. Testowany artefakt powstaje z biezacego `npm run bundle`. Testowa paczka ZIP zawiera wynik z `build/arkmail`, nie stary release.
 3. `scripts/build.js` i katalog `releases/` nie moga byc zrodlem kodu pluginu dla testow nowych zmian, poniewaz build release'owy wybiera wczesniej zapisane paczki.
 4. Po poprawce ponownie zbudowac biezacy bundle i uruchomic scenariusz docelowy, sasiedni oraz pelna wymagana macierz.
@@ -364,14 +376,23 @@ Dodatkowo:
 - sparametryzowane testy `splitRecipients()` dla przecinka i spacji: `A,B`, `A, B`, `A B`, wielokrotne spacje i przecinki oraz wartosci puste;
 - `A B` daje dwie osoby, a `A, B` daje identyczna liste; mieszane separatory sa rozbijane deterministycznie na potrzeby lokalnych ostrzezen;
 - `unknownRecipients()` sprawdza kazda osobe oddzielnie i nie zglasza dwoch znanych osob rozdzielonych spacja jako jednego nieznanego adresata;
-- test transportu edytora dowodzi, ze surowe `input.adresat` i `input.dw` pozostaja bajtowo niezmienione;
-- brak automatycznej deduplikacji i zmiany kolejnosci przed wyslaniem;
-- wolny spojnik `i` nadal jest odrzucany;
+- przypadek mieszany, w ktorym wystepuje znana osoba i rzeczywiscie nieznana osoba, wskazuje w ostrzezeniu wylacznie te nieznana osobe;
+- testy rozbijania i ostrzezen sa sparametryzowane jednakowo dla pol `adresat` i `DW` oraz dla obu separatorow; RED jest wymagany dla wariantow wykrywajacych poprawke, a nie dla juz dzialajacego wariantu przecinkowego;
+- komunikat S16 oraz analogiczny komunikat dla `DW` opisuja oba separatory i zakaz wolnego spojnika `i`; test tresci pada na starym komunikacie;
 - testy uzywaja wylacznie imion syntetycznych.
+
+**T22 — testy ochronne (GREEN przed i po):**
+
+- test transportu edytora dowodzi, ze surowe `input.adresat` i `input.dw` pozostaja bajtowo niezmienione;
+- przed wyslaniem nie ma automatycznej deduplikacji, zmiany kolejnosci, zamiany spacji na przecinki, przepisania szkicu ani zmiany podzialu miedzy `Do` i `DW`;
+- lokalne ostrzezenia moga byc deduplikowane, ale ta operacja nie zmienia danych wysylanych do serwera;
+- wolny spojnik `i` nadal jest odrzucany;
+- generowane rozwiniecia grup moga pozostac w kanonicznym formacie przecinkowym, bez normalizowania recznego wpisu.
 
 **T22 — GREEN:**
 
 - rozbijanie lokalne po przecinkach i spacjach, z pominieciem pustych segmentow;
+- `unknownRecipients()` sprawdza kazda osobe oddzielnie, nie zglasza znanych osob i wskazuje wylacznie rzeczywiscie nieznane;
 - walidacja pozostaje w potwierdzonym zakresie liter, przecinkow i spacji; nie ma blednego zaostrzenia do samych przecinkow;
 - komunikat S16 opisuje oba separatory;
 - generowany format rozwiniec moze pozostac przecinkowy, ale reczny wpis nie jest normalizowany przed `transport.send()`;
@@ -433,16 +454,21 @@ Dodatkowo:
 
 - dokladna `gildia` wygrywa z wczesniejsza `gildia-rada`;
 - przy kolizji istnieje jeden kandydat: alias, nie dwie identyczne podpowiedzi;
-- niekolidujaca grupa rozwija sie do czlonkow;
-- alias pozostaje nazwa serwerowa;
 - pusta grupa nie jest kandydatem;
 - wielkosc liter i `trim()` nie zmieniaja priorytetu;
 - dlugi segment i `scrollLeft > 0` zachowuja wyrownanie sufiksu;
 - akceptacja nie zmienia innych segmentow ani zapisanych szkicow;
 - sparametryzowane przypadki po ostatnim przecinku i po ostatniej spacji zmieniaja wylacznie ostatni segment;
 - `A B` oraz `A, B` pozwalaja podpowiedziec druga osobe bez zmiany pierwszej;
-- po akceptacji grupy czlonkowie sa wstawiani w kanonicznym formacie przecinkowym, a alias pozostaje nazwa serwerowa;
-- pusty segment nie pokazuje podpowiedzi.
+- pusty segment nie pokazuje podpowiedzi;
+- scenariusze podpowiedzi i rozwijania grup sa sparametryzowane jednakowo dla pol `adresat` i `DW` oraz dla obu separatorow; RED jest wymagany dla nowej segmentacji po spacji, nie dla juz dzialajacych przypadkow ochronnych.
+
+**Testy ochronne (GREEN przed i po):**
+
+- niekolidujaca grupa rozwija sie do czlonkow;
+- alias pozostaje nazwa serwerowa;
+- po akceptacji grupy czlonkowie sa wstawiani w kanonicznym formacie przecinkowym, a wczesniejsi adresaci i szkice pozostaja bez zmian;
+- nowe przypadki po spacji moga wykazac RED z powodu blednej segmentacji, ale sama semantyka grupy i aliasu na dotychczas obslugiwanym przecinku nie moze byc wymuszana jako RED.
 
 **GREEN:**
 
@@ -722,12 +748,14 @@ Punktem wyjscia jest prywatne repozytorium `Isithunzi000/arkadia-dargoth-testy`.
 Istniejacy harness zapewnia:
 
 - prawdziwy build i lokalny preview Dargotha bez logowania na serwer;
-- mock WebSocket, wstrzykiwanie GMCP i tekstu oraz rejestrowanie komend wychodzacych;
-- prawdziwy import paczki pluginu przez menedzer skryptow;
-- uruchomienie pluginu, reload i odtwarzanie stanu z IndexedDB;
-- pomiar DOM i geometrii okien oraz kontrole bledow strony i konsoli.
+- mock WebSocket, wstrzykiwanie GMCP i tekstu oraz rejestrowanie i liczenie komend wychodzacych; mock WebSocket jest instalowany przed startem klienta;
+- niezalezne konteksty przegladarki, uruchomienie pluginu, reload i odtwarzanie stanu z IndexedDB;
+- instalacje pluginu z URL przez prawdziwy menedzer skryptow oraz import ZIP przez prawdziwy edytor pluginow;
+- pomiar DOM i geometrii okien, screenshoty, kontrole bledow strony i konsoli oraz testy szerokiego i waskiego okna.
 
-Macierz ArkMaila ma miec wlasna konfiguracje Playwright, skrypt uruchamiajacy, nieuzywany port, scenariusze, odpowiedzi poczty, artefakty i osobny job CI. Nie wolno zmieniac ani uzalezniac jej od macierzy innych pluginow.
+Nie kopiowac calego harnessa. Nalezy ponownie uzyc wspolnych mockow i wzorca instalacji, a ArkMailowi dostarczyc tylko specyficzne odpowiedzi: listingi, tresci listow, pager, edytor, importy osob, aliasy, wyszukiwanie, usuwanie, `GMCP mail.state`, bledy, timeouty i reconnect.
+
+Macierz ArkMaila ma miec wlasna konfiguracje Playwright, skrypt uruchamiajacy, nieuzywany port, scenariusze, odpowiedzi poczty, artefakty i osobny job CI. Nie wolno zmieniac ani uzalezniac jej od macierzy innych pluginow. Instalacja z URL moze byc dodatkowa sciezka diagnostyczna, ale nie zastepuje koncowej proby importu paczki ZIP przygotowanej z biezacego bundle przez prawdziwy edytor pluginow.
 
 ### 7.2. Deterministyczny artefakt i klient
 
@@ -740,13 +768,48 @@ Macierz ArkMaila ma miec wlasna konfiguracje Playwright, skrypt uruchamiajacy, n
 
 ### 7.3. Scenariusze automatyczne w prawdziwym Dargothcie
 
-- jasny i ciemny motyw pol oraz przyciskow;
-- przewijanie Osob z listow, krotkie i dlugie listy, szerokie i waskie okno;
+**Dane i protokol:**
+
+- pusta i zapelniona skrzynka;
+- blizniacze listy oraz zachowanie odrebnosci `recordId` i `contentKeyOf`;
+- stronicowanie i wyszukiwanie;
+- reconnect, identyczna pierwsza ramka GMCP, lokalne sprzatanie, brak `q`, czyszczenie listenerow i izolacja generacji;
+- bledy, timeouty i anulowanie;
+- adresaci rozdzieleni spacja oraz przecinkiem;
+- grupy i aliasy, w tym wszystkie konflikty;
+- importy i powtarzane operacje.
+
+**Compose dla obu separatorow:**
+
+- sparametryzowane scenariusze dla pol `adresat` i `DW`: wpisanie adresatow, rozbicie lokalne, brak ostrzezenia dla znanych osob i wskazanie wylacznie rzeczywiscie nieznanej osoby;
+- podpowiedz uzupelnia tylko ostatni segment, grupa rozwija sie do czlonkow, alias pozostaje nazwa serwerowa, a wczesniejsi adresaci pozostaja bez zmian;
+- kontrola surowych komend wychodzacych potwierdza brak normalizacji separatorow, deduplikacji, zmiany kolejnosci i zmiany podzialu miedzy `Do` i `DW`;
+- mock potwierdza obsluge obu wariantow przez plugin w rzeczywistym kliencie, a nie semantyke serwera.
+
+**UI i klawiatura:**
+
+- wszystkie zakladki i podzakladki;
+- fokus, karetka, checkboxy i scroll;
+- Enter, ESC, strzalki, Home i End;
+- jasny i ciemny motyw pol oraz przyciskow, takze natywne klasy pol i przyciskow;
+- szerokie i waskie okno, krotkie i bardzo dlugie dane oraz rzeczywiste przewijanie;
+- przewijanie Osob z listow, krotkie i dlugie listy;
 - dlugie pola i poziomo przewiniete podpowiedzi po przecinku oraz spacji;
-- wszystkie cztery stany naglowka zwierzecia i brak duplikatow po reconnectach oraz zmianach postaci;
-- lokalne sprzatanie reconnectu, brak `q`, czyszczenie listenerow i izolacja generacji;
+- dolne strefy destrukcyjne;
+- wszystkie cztery stany naglowka zwierzecia i brak duplikatow naglowka po reload, reconnectach oraz zmianach postaci.
+
+**Dane trwale i pliki:**
+
+- zapis i odczyt po reload;
+- wymuszony blad zapisu i ponowienie;
+- brak wskrzeszenia usunietych rekordow;
+- ponowny import tego samego pliku i wyscigi odczytow;
+- potwierdzenie `zastap`;
+- rzeczywiste pobranie JSON, TXT i ZIP wraz z kontrola nazw i zawartosci plikow.
+
+**Dodatkowe kontrole z audytu:**
+
 - wstrzykniete odrzucenie IndexedDB i `api.command.send()`;
-- pobieranie JSON, TXT i ZIP wraz z kontrola nazw i zawartosci plikow;
 - dokladny toast czyszczenia Ksiazki, wersja pluginu i kliknieta kontrolka;
 - kolor wynikow List w uzywanym motywie;
 - bledy strony i konsoli po instalacji, dzialaniu, reloadu i ponownej aktywacji.
@@ -755,7 +818,7 @@ Macierz ArkMaila ma miec wlasna konfiguracje Playwright, skrypt uruchamiajacy, n
 
 - Mock WebSocket potwierdza zachowanie pluginu w prawdziwym kliencie, nie zachowanie Arkadii. Syntetyczne odpowiedzi poczty musza byc oznaczone jako syntetyczne.
 - **T16:** pelne ponowne zalogowanie zostalo sprawdzone i nie wymaga ponowienia dla obecnego zakresu. Zachowac brak `q` i `~q`. Inne techniczne odmiany wznowienia nie sa rozstrzygniete tym testem, ale tez nie blokuja obecnego planu.
-- **T22:** podstawowa rownowaznosc spacji i przecinka dla dwoch roznych adresatow zostala potwierdzona dwoma logami. Nie sa potrzebne kolejne logi dla tej poprawki. Duplikaty, mieszane separatory i kolejnosc `Do`/`DW` nie sa przez to rozstrzygniete.
+- **T22:** podstawowa rownowaznosc spacji i przecinka dla tej samej pary dwoch roznych adresatow zostala potwierdzona dwoma logami. Nie sa potrzebne kolejne logi dla tej poprawki. Wszystkie warianty duplikatow, nietypowe mieszane separatory, wiecej niz dwoch adresatow na serwerze oraz ogolne zasady kolejnosci i podzialu `Do`/`DW` nie sa przez to rozstrzygniete. Pojedyncza obserwacja powtorzenia nazwy nie jest ogolnym dowodem deduplikacji serwera.
 - Semantyke aliasow na serwerze sprawdzac tylko wtedy, gdy zakres mialby wyjsc poza uzgodnione porownanie `trim()` i wielkosc liter.
 
 ## 8. Warunek usuniecia dokumentow roboczych

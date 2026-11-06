@@ -25,6 +25,7 @@ Dokument roboczy do czasu zakończenia poprawek. Po zakończeniu implementacji i
 9. **T21 — decyzja zatwierdzona:** ręczny nowy członek grupy przechodzi tę samą walidację co osoba w Książce i jest jednocześnie dopisywany do Książki oraz grupy. Nie powstaje stan członka spoza Książki.
 10. **T16 — podstawowy przypadek potwierdzony:** po przerwaniu połączenia i pełnym ponownym zalogowaniu zdalny pager/edytor nie był już aktywny. Nie dodawać `q` ani `~q`; zachować obecny lokalny cleanup i test zakazujący dodatkowego `q`. Wynik nie rozstrzyga każdej technicznej odmiany `proxy.session resumed`.
 11. **T22 — podstawowa semantyka potwierdzona:** dla analogicznej pary różnych adresatów spacja i przecinek dały ten sam wynik w dwóch rzeczywistych logach. Poprawić lokalne rozbijanie i ghosty, ale nie przepisywać surowej wartości wysyłanej do edytora, nie deduplikować jej i nie zmieniać kolejności.
+12. **Decyzje produktowe są zamknięte:** T7 i T21 są zatwierdzone, T16 nie wymaga zmiany zdalnego zamykania dla przetestowanego pełnego ponownego zalogowania, a podstawowe T22 ma potwierdzoną semantykę. Nie pozostają decyzje produktowe blokujące implementację. Pozostają dowody wykonawcze i pełna weryfikacja po zmianach, nie potrzeba kolejnych logów dla podstawowych T16 i T22.
 
 ## 3. Wersja 1.24.4 i migracja
 
@@ -470,12 +471,15 @@ Pozycje T15, T18 i T21–T25 pochodzą z późniejszej, szerszej analizy. Pełna
 
 ### T22. Spacja i przecinek rozdzielają adresatów, ale lokalne funkcje rozbijają tylko przecinki
 
-- **Dowód z rzeczywistych logów:** dwa zanonimizowane logi dla analogicznej pary różnych adresatów wykazały ten sam wynik przy zapisie rozdzielonym spacją i przecinkiem. Podstawowa semantyka obu separatorów jest potwierdzona; nie potrzeba kolejnego logu do tej poprawki.
+- **Dowód z pierwszego logu:** dwie różne nazwy wpisane ze spacją zostały przyjęte jako dwóch adresatów. Powtórzenie tej samej nazwy nie dało dwóch różnych adresatów w tym konkretnym przypadku. To pojedyncza obserwacja, nie ogólna reguła deduplikacji serwera. Kolejności i podziału między `Do` i `DW` z jednego logu nie wolno przekształcać w nową ogólną regułę.
+- **Dowód porównawczy z dwóch logów:** dla tej samej pary różnych adresatów, podanej w tej samej kolejności, zapis ze spacją i zapis z przecinkiem dały dwóch adresatów. Lista niewysłanych przedstawiła ten sam zestaw adresatów, a szczegóły listu miały identyczny podział pól `Do` i `DW`. Podstawowa semantyka obu separatorów jest potwierdzona; nie potrzeba kolejnego logu do tej poprawki.
 - **KOD:** walidacja `composeValidation.ts:17–28` dopuszcza litery, przecinki i spacje, ale `splitRecipients()` rozbija wyłącznie po przecinku. W konsekwencji `unknownRecipients()` może potraktować dwie znane osoby rozdzielone spacją jako jednego nieznanego adresata.
 - **KOD, ghost:** `splitHead()` w `ui/ghost.ts` szuka granicy segmentu wyłącznie po ostatnim przecinku. Po spacji akceptacja może więc zastąpić niewłaściwy zakres zamiast wyłącznie ostatniego segmentu.
-- **Kierunek:** rozbijać lokalnie po przecinkach i spacjach, sprawdzać każdą osobę oddzielnie i segmentować ghosta po ostatnim z obu separatorów. Dodać sparametryzowane testy przecinka i spacji z imionami syntetycznymi.
-- **Ochrona surowej wartości:** `core/session/editor.ts` przekazuje pierwotne `input.adresat` do transportu. Tego nie wolno zmieniać na automatyczną normalizację do przecinków, deduplikację ani zmianę kolejności. Generowane rozwinięcie grupy może nadal używać kanonicznych przecinków. Wolny spójnik `i` pozostaje odrzucany.
-- **Granica dowodu:** logi nie rozstrzygają wszystkich duplikatów, mieszanych separatorów ani kolejności `Do`/`DW`; nie wolno rozszerzać na nie twierdzenia o serwerze bez osobnych prób.
+- **Kierunek:** rozbijać lokalnie po przecinkach i spacjach, sprawdzać każdą osobę oddzielnie i segmentować ghosta po ostatnim z obu separatorów. Dodać sparametryzowane testy przecinka i spacji z imionami syntetycznymi, jednakowo dla pól `adresat` i `DW`.
+- **Wymagane RED:** rozbicie `A B` na dwie osoby, mieszane przecinki i powtarzane spacje, brak ostrzeżenia dla dwóch znanych osób, wskazanie wyłącznie rzeczywiście nieznanej osoby w przypadku mieszanym, uzupełnienie wyłącznie ostatniego segmentu po spacji oraz komunikaty pomocy opisujące oba separatory.
+- **Testy ochronne, zielone przed i po:** identyczna surowa wartość wysłana do edytora, odrzucenie wolnego `i`, rozwijanie grupy do członków i pozostawienie aliasu jako nazwy serwerowej. Nie wolno wymuszać dla nich RED.
+- **Ochrona surowej wartości:** `core/session/editor.ts` przekazuje pierwotne `input.adresat` do transportu. Analogicznie należy chronić `input.dw`. Nie wolno automatycznie normalizować separatorów, deduplikować, zmieniać kolejności, przepisywać szkicu ani zmieniać podziału między `Do` i `DW` na podstawie własnych założeń. Ostrzeżenia mogą być deduplikowane lokalnie bez deduplikowania danych wysyłanych do serwera. Generowane rozwinięcie grupy może nadal używać kanonicznych przecinków. Wolny spójnik `i` pozostaje odrzucany.
+- **Granica dowodu:** logi nie rozstrzygają wszystkich wariantów duplikatów, nietypowych mieszanych sekwencji separatorów, więcej niż dwóch adresatów na serwerze ani ogólnych zasad kolejności i podziału `Do`/`DW`. Lokalny parser można testować dla większej liczby osób, ale nie jest to dodatkowy dowód zachowania serwera.
 
 ### T23. Pole szerokości akceptuje częściowy zapis liczby
 
@@ -710,9 +714,11 @@ Pierwotny audyt nie obejmował testów w żywym kliencie Dargoth. Testy `happy-d
 
 Do automatycznej weryfikacji należy wykorzystać istniejące prywatne repozytorium `Isithunzi000/arkadia-dargoth-testy`. Sprawdzony podczas analizy HEAD to `433496ed8d66a530e5095dc0a15cd2a33fde4df4`; przed implementacją trzeba ponownie odczytać aktualny HEAD. W analizowanym drzewie było 952 pliki i nie było ścieżki zawierającej `mail`.
 
-Harness uruchamia prawdziwy build Dargotha i lokalny preview, instaluje paczkę pluginu przez prawdziwy menedżer skryptów, obsługuje reload i IndexedDB, rejestruje błędy strony oraz udostępnia mock WebSocket, GMCP, teksty i dziennik komend. Nie loguje się na serwer Arkadii.
+Harness uruchamia prawdziwy build Dargotha i lokalny preview bez logowania na serwer Arkadii. Udostępnia mock WebSocket, GMCP, teksty oraz rejestrowanie i liczenie komend wychodzących; mock WebSocket jest instalowany przed startem klienta. Obsługuje niezależne konteksty przeglądarki, reload i IndexedDB, instalację z URL przez prawdziwy menedżer skryptów oraz import ZIP przez prawdziwy edytor pluginów. Rejestruje błędy strony i konsoli, mierzy geometrię okien oraz umożliwia screenshoty i testy szerokiego i wąskiego okna.
 
-Macierz ArkMaila powinna być izolowana: własna konfiguracja, skrypt, port, scenariusze, odpowiedzi poczty, artefakty i osobny job CI. Pełny SHA Dargotha należy pobrać i zapisać na starcie, po czym używać go niezmiennego przez cały przebieg. Testowany plugin musi pochodzić z bieżącego `npm run bundle` i paczki utworzonej z `build/arkmail`; `scripts/build.js` korzysta z ZIP-ów release'owych i nie może dostarczać starego artefaktu do testu nowych zmian.
+Nie należy kopiować całego harnessa. Trzeba ponownie użyć wspólnych mocków i wzorca instalacji, a ArkMailowi dostarczyć wyłącznie specyficzne odpowiedzi: listingi, treści listów, pager, edytor, importy osób, aliasy, wyszukiwanie, usuwanie, `GMCP mail.state`, błędy, timeouty i reconnect.
+
+Macierz ArkMaila powinna być izolowana: własna konfiguracja, skrypt, port, scenariusze, odpowiedzi poczty, artefakty i osobny job CI. Pełny SHA Dargotha należy pobrać i zapisać na starcie, po czym używać go niezmiennego przez cały przebieg. Testowany plugin musi pochodzić z bieżącego `npm run bundle` i paczki utworzonej z `build/arkmail`; `scripts/build.js` korzysta z ZIP-ów release'owych i nie może dostarczać starego artefaktu do testu nowych zmian. Instalacja z URL może być dodatkową ścieżką diagnostyczną, ale końcowy dowod wymaga importu paczki ZIP z bieżącego bundle przez prawdziwy edytor pluginów.
 
 Asercje DOM, stanu, komend i pobranych plików są głównym dowodem, a screenshoty i trace — pomocniczym. Mock dowodzi zachowania pluginu w prawdziwym kliencie, nie semantyki prawdziwego serwera.
 
@@ -730,11 +736,15 @@ Asercje DOM, stanu, komend i pobranych plików są głównym dowodem, a screensh
 8. Układ przewijania Osób po usunięciu sztywnego limitu dla kilku i setek pozycji.
 9. Nagłówek z przyciskiem zwierzęcia przy rzeczywistych tokenach i szerokościach Dargotha, w tym wąskie okno z `animalFlying=true` i tekstem `W drodze...`.
 10. Brak błędów strony i konsoli po instalacji, użyciu, reloadu i ponownej aktywacji.
+11. **Dane i protokół:** pusta i zapełniona skrzynka, bliźniacze listy, stronicowanie, wyszukiwanie, reconnect z identyczną pierwszą ramką GMCP, błędy i anulowanie, grupy i aliasy ze wszystkimi konfliktami oraz importy i powtarzane operacje.
+12. **Compose dla obu separatorów:** sparametryzowane scenariusze dla pól `adresat` i `DW`, lokalne ostrzeżenia, podpowiedzi, rozwinięcia grup, zachowanie aliasów oraz kontrola surowych komend bez normalizacji, deduplikacji, zmiany kolejności i zmiany podziału `Do`/`DW`. Mock dowodzi obsługi przez plugin, nie semantyki serwera.
+13. **UI i klawiatura:** wszystkie zakładki i podzakładki, fokus, karetka, checkboxy i scroll, Enter, ESC, strzałki, Home i End, krótkie i bardzo długie dane, rzeczywiste przewijanie, dolne strefy destrukcyjne, natywne klasy pól i przycisków oraz brak duplikatów nagłówka po reload i reconnect.
+14. **Dane trwałe i pliki:** zapis i odczyt po reload, wymuszony błąd zapisu i ponowienie, brak wskrzeszenia usuniętych rekordów, ponowny import tego samego pliku, wyścigi odczytów, potwierdzenie `zastap` oraz rzeczywiste pobranie JSON, TXT i ZIP z kontrolą zawartości.
 
 ### 15.2. Dowody serwerowe i ich granice
 
 1. **T16:** pełne ponowne zalogowanie zostało wykonane i zamknęło podstawowy przypadek. Nie powtarzać go dla obecnego zakresu i nie dodawać `q` ani `~q`. Nie jest to dowód każdej odmiany `proxy.session resumed`.
-2. **T22:** dwa logi potwierdziły spację i przecinek dla analogicznej pary różnych adresatów. Nie potrzeba kolejnego logu dla podstawowej poprawki. Duplikaty, mieszane separatory i kolejność `Do`/`DW` pozostają poza dowodem.
+2. **T22:** dwa logi potwierdziły spację i przecinek dla tej samej pary dwóch różnych adresatów. Nie potrzeba kolejnego logu dla podstawowej poprawki. Wszystkie warianty duplikatów, nietypowe mieszane separatory, więcej niż dwóch adresatów na serwerze oraz ogólne zasady kolejności i podziału `Do`/`DW` pozostają poza dowodem. Pojedyncza obserwacja powtórzenia nazwy nie jest ogólnym dowodem deduplikacji serwera.
 3. Semantykę aliasów na serwerze przy dokładnych nazwach, wielkości liter i znakach diakrytycznych sprawdzać tylko wtedy, gdy przyszła implementacja miałaby wykraczać poza porównanie opisane w rozdziale 7.
 4. Nowa próba serwera jest wymagana dopiero wtedy, gdy planowana zmiana zależy od zachowania, którego nie rozstrzygają dotychczasowe dowody. Mock Playwright nie zastępuje takiej próby.
 

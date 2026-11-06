@@ -258,19 +258,32 @@ odpowiedzi z cytowaniem (Fala 28c) temat przenoszony doslownie:
 
 Pola adresat i DW przyjmują wyłącznie litery A-Z i a-z, przecinki i spacje.
 Każde z nich może zawierać kilka nazw lub aliasów rozdzielonych przecinkami
-albo spacjami. Dwa zanonimizowane logi dla analogicznej pary różnych
-adresatów potwierdziły ten sam wynik dla obu separatorów.
+albo spacjami. Dwa zanonimizowane logi dla tej samej pary różnych adresatów,
+podanej w tej samej kolejności, potwierdziły ten sam wynik dla obu
+separatorów. Lista niewysłanych przedstawiła ten sam zestaw adresatów,
+a szczegóły listu miały identyczny podział pól `Do` i `DW`.
+
+W pierwszym logu dwie różne nazwy wpisane ze spacją zostały przyjęte jako
+dwóch adresatów. Powtórzenie tej samej nazwy nie dało dwóch różnych
+adresatów w tym konkretnym przypadku. Jest to pojedyncza obserwacja,
+a nie ogólny dowód deduplikacji serwera.
 
 Plugin może generować kanoniczny format przecinkowy, na przykład przy
 rozwijaniu grupy. Ręcznie wpisanej wartości nie przepisuje jednak
 automatycznie przed wysłaniem: surowa wartość trafia do edytora bez
-deduplikacji i bez zmiany kolejności. Spójnik ` i ` z sekcji o listingach
-dotyczy wyłącznie parsowania odpowiedzi serwera, nigdy wysyłki; wolne
-słowo `i` jest odrzucane przy walidacji.
+deduplikacji, zmiany kolejności, zamiany spacji na przecinki, przepisania
+szkicu ani zmiany podziału między `Do` i `DW` na podstawie własnych założeń.
+Ostrzeżenia mogą być deduplikowane lokalnie bez deduplikowania danych
+wysyłanych do serwera. Spójnik ` i ` z sekcji o listingach dotyczy wyłącznie
+parsowania odpowiedzi serwera, nigdy wysyłki; wolne słowo `i` jest odrzucane
+przy walidacji.
 
-Powyższy dowód nie rozstrzyga wszystkich kombinacji duplikatów,
-mieszanych separatorów ani kolejności pól `Do` i `DW`. Nie należy
-uogólniać go na te przypadki bez osobnych prób serwera.
+Powyższy dowód nie rozstrzyga wszystkich wariantów duplikatów, nietypowych
+mieszanych sekwencji separatorów, więcej niż dwóch adresatów na serwerze
+ani ogólnych zasad kolejności i podziału pól `Do` i `DW`. Nie należy
+uogólniać go na te przypadki bez osobnych prób serwera. Lokalny parser można
+testować również dla większej liczby osób, ale nie jest to dodatkowy dowód
+zachowania serwera.
 
 Adresat jest wymagany, a DW może pozostać puste.
 
