@@ -394,3 +394,32 @@ test('uklad CSS: alias lamie tekst, a waski widok przenosi akcje nizej', () => {
   const importRow = ruleBody(/\.arkmail-alias-import\s*/);
   assert.match(importRow!, /margin-top:\s*calc\(12px/);
 });
+
+
+test('uklad CSS: Grupa jest karta z bezpieczna nazwa, odseparowana trescia i chipsami', () => {
+  const card = ruleBody(/^\.arkmail-group(?![\w-])\s*/);
+  assert.ok(card, 'karta grupy istnieje');
+  assert.match(card!, /border:\s*calc\(1px/);
+  assert.match(card!, /border-radius:\s*calc\(8px/);
+  assert.match(card!, /padding:\s*calc\(8px/);
+  assert.match(card!, /margin-bottom:\s*calc\(10px/);
+  assert.match(card!, /min-width:\s*0/);
+  const header = ruleBody(/\.arkmail-group-header\s*/);
+  assert.ok(header, 'naglowek grupy istnieje');
+  assert.match(header!, /display:\s*flex/);
+  assert.match(header!, /min-width:\s*0/);
+  const toggle = ruleBody(/\.arkmail-group-header\s+\.arkmail-group-toggle\s*/);
+  assert.match(toggle!, /min-width:\s*0/);
+  assert.match(toggle!, /max-width:\s*100%/);
+  assert.match(toggle!, /overflow:\s*hidden/);
+  assert.match(toggle!, /text-overflow:\s*ellipsis/);
+  const body = ruleBody(/\.arkmail-group-body\s*/);
+  assert.match(body!, /margin-top:\s*calc\(8px/);
+  assert.match(body!, /border-top:\s*calc\(1px/);
+  const members = ruleBody(/\.arkmail-group-members\s*/);
+  assert.match(members!, /display:\s*flex/);
+  assert.match(members!, /flex-wrap:\s*wrap/);
+  const chip = ruleBody(/^\.arkmail-group-member(?![\w-])\s*/);
+  assert.match(chip!, /max-width:\s*100%/);
+  assert.match(chip!, /overflow-wrap:\s*anywhere/);
+});

@@ -3,8 +3,8 @@
  * sekcji Grupy. Regresja A2: attachGhost wywolywany PRZED podpięciem
  * inputu do rodzica - wrap z ghostem zostawal odlaczony od drzewa i
  * podpowiedzi (strzalka w prawo) nie dzialaly. Kontrakt: wrap
- * .arkmail-ghost-wrap mieszka wewnatrz .arkmail-group-members i zawiera
- * input [data-member-add].
+ * .arkmail-ghost-wrap mieszka w osobnym .arkmail-group-member-add pod
+ * lista czlonkow i zawiera input [data-member-add].
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -50,7 +50,7 @@ const switchSub = (container: unknown, label: string): void => {
   assert.fail(`brak sub-pigulki: ${label}`);
 };
 
-test('grupy: pole "Dodaj osobe" ma dzialajacy wrap ghosta w liscie czlonkow', () => {
+test('grupy: pole "Dodaj osobe" ma dzialajacy wrap ghosta pod lista czlonkow', () => {
   const store = new MailUiStore({
     tab: 'kontakty',
     groups: [{ name: 'Gildia', members: ['Fred'] }],
@@ -59,8 +59,8 @@ test('grupy: pole "Dodaj osobe" ma dzialajacy wrap ghosta w liscie czlonkow', ()
   const container = mount(store);
   switchSub(container, 'Grupy');
   click(q(container, '[data-group-toggle]'));
-  const wrap = q(container, '.arkmail-group-members .arkmail-ghost-wrap');
-  assert.ok(wrap, 'wrap ghosta wewnatrz .arkmail-group-members');
+  const wrap = q(container, '.arkmail-group-member-add .arkmail-ghost-wrap');
+  assert.ok(wrap, 'wrap ghosta wewnatrz osobnego wiersza dodawania');
   const input = q(wrap, '[data-member-add]');
   assert.ok(input, 'input dodawania czlonka zyje w wrapie (ghost podpiety)');
 });
@@ -74,8 +74,8 @@ test('grupy: wrap ghosta nie jest osierocony poza drzewem', () => {
   switchSub(container, 'Grupy');
   click(q(container, '[data-group-toggle]'));
   // Osierocony wrap (bug A2): input w drzewie, wrap z ghostem poza nim.
-  const wrap = q(container, '.arkmail-group-members .arkmail-ghost-wrap') as unknown;
-  assert.ok(wrap, 'wrap istnieje w .arkmail-group-members');
+  const wrap = q(container, '.arkmail-group-member-add .arkmail-ghost-wrap') as unknown;
+  assert.ok(wrap, 'wrap istnieje w .arkmail-group-member-add');
   assert.ok(
     (container as { contains(n: unknown): boolean }).contains(wrap),
     'wrap jest podpiety do drzewa kontenera, nie wezlem odlaczonym',

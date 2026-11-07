@@ -378,6 +378,39 @@ export const STYLES = `
 .arkmail-root:not(.arkmail-wide) .arkmail-book-alias > button { align-self: flex-start; }
 .arkmail-alias-import { margin-top: calc(12px * var(--window-font-scale, 1)); }
 
+.arkmail-group {
+  min-width: 0;
+  max-width: 100%;
+  margin-bottom: calc(10px * var(--window-font-scale, 1));
+  padding: calc(8px * var(--window-font-scale, 1));
+  background: ${BG_RAISED};
+  border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
+  border-radius: calc(8px * var(--window-font-scale, 1));
+}
+.arkmail-group-header { display: flex; align-items: center; min-width: 0; max-width: 100%; }
+.arkmail-group-header .arkmail-group-toggle {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.arkmail-group-body {
+  margin-top: calc(8px * var(--window-font-scale, 1));
+  padding-top: calc(8px * var(--window-font-scale, 1));
+  border-top: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
+}
+.arkmail-group-actions { margin-top: calc(8px * var(--window-font-scale, 1)); }
+.arkmail-group-members {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(6px * var(--window-font-scale, 1));
+  margin-top: calc(8px * var(--window-font-scale, 1));
+}
+.arkmail-group-member { max-width: 100%; overflow-wrap: anywhere; }
+.arkmail-group-member-add { margin-top: calc(8px * var(--window-font-scale, 1)); }
+
 /* --- widok listu --- */
 .arkmail-letter-head {
   position: relative;

@@ -152,3 +152,38 @@ test('uklad: Import i eksport ma dwa wiersze oraz jeden akcent', () => {
   assert.equal(file.nextElementSibling, panel.querySelector('[data-book-import-mode]'));
   off();
 });
+
+
+test('uklad: rozwineta Grupa ma osobny naglowek, edycje, akcje, chipsy i dodawanie', () => {
+  const store = new MailUiStore({
+    tab: 'kontakty',
+    groups: [{ name: `Grupa${'G'.repeat(80)}`, members: ['CelA', 'CelB'] }],
+  });
+  const { container, off } = mount(store);
+  openContactTab(container, 'grupy');
+  assert.ok(container.querySelector('.arkmail-group-add.arkmail-field-action'));
+  assert.ok(container.querySelector('.arkmail-group-filter.arkmail-field-action'));
+  (container.querySelector('[data-group-toggle]') as HTMLElement).click();
+  const group = container.querySelector('.arkmail-group')!;
+  const header = group.querySelector('.arkmail-group-header')!;
+  assert.ok(header.querySelector('[data-group-toggle]'));
+  const body = group.querySelector('.arkmail-group-body')!;
+  assert.ok(!body.contains(header));
+  const rename = body.querySelector('.arkmail-group-head.arkmail-group-rename.arkmail-field-action')!;
+  assert.ok(rename.querySelector('[data-group-rename]'));
+  assert.ok(rename.querySelector('[data-group-rename-ok]'));
+  assert.equal(rename.querySelector('[data-group-delete]'), null);
+  assert.equal(rename.querySelector('[data-group-write]'), null);
+  const actions = body.querySelector('.arkmail-group-actions.arkmail-action-row')!;
+  assert.ok(actions.querySelector('[data-group-delete]'));
+  assert.ok(actions.querySelector('[data-group-write]'));
+  const members = body.querySelector('.arkmail-group-members')!;
+  assert.equal(members.querySelectorAll('.arkmail-group-member').length, 2);
+  assert.equal(members.querySelector('[data-member-add]'), null);
+  const add = body.querySelector('.arkmail-group-member-add.arkmail-field-action')!;
+  assert.equal(members.nextElementSibling, add);
+  assert.ok(add.querySelector('[data-member-add]'));
+  assert.ok(add.querySelector('.arkmail-ghost-wrap'));
+  assert.ok(add.querySelector('[data-member-add-ok]'));
+  off();
+});

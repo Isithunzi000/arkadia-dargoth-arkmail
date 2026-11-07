@@ -1775,7 +1775,7 @@ const filterClearClass = (viewClass?: string): string =>
 
     // --- tworzenie grupy
     const groupAddRow = doc.createElement('div');
-    groupAddRow.className = 'arkmail-group-add';
+    groupAddRow.className = 'arkmail-group-add arkmail-field-action';
     const groupAddInput = doc.createElement('input');
     nativeFieldClass(groupAddInput);
     groupAddInput.setAttribute('data-group-add', '');
@@ -1811,7 +1811,7 @@ const filterClearClass = (viewClass?: string): string =>
     // Zgloszenie 2026-11-05. Repaint dotyka tylko listy - pole filtra
     // zachowuje fokus i wpisana wartosc.
     const filterRow = doc.createElement('div');
-    filterRow.className = 'arkmail-group-filter';
+    filterRow.className = 'arkmail-group-filter arkmail-field-action';
     const filterInput = doc.createElement('input');
     nativeFieldClass(filterInput);
     filterInput.setAttribute('data-group-filter', '');
@@ -1881,7 +1881,10 @@ const filterClearClass = (viewClass?: string): string =>
         else expandedGroups.add(group.name);
         store.refresh();
       });
-      row.appendChild(toggle);
+      const groupHeader = doc.createElement('div');
+      groupHeader.className = 'arkmail-group-header';
+      groupHeader.appendChild(toggle);
+      row.appendChild(groupHeader);
 
       if (groupAliasConflict(group.name, state.importedAliases)) {
         const warning = doc.createElement('div');
@@ -1891,8 +1894,13 @@ const filterClearClass = (viewClass?: string): string =>
       }
 
       if (expanded) {
+      const body = doc.createElement('div');
+      body.className = 'arkmail-group-body';
+      row.appendChild(body);
       const head = doc.createElement('div');
-      head.className = 'arkmail-group-head';
+      head.className = 'arkmail-group-head arkmail-group-rename arkmail-field-action';
+      const groupActions = doc.createElement('div');
+      groupActions.className = 'arkmail-group-actions arkmail-action-row';
       const rename = doc.createElement('input');
       nativeFieldClass(rename);
       rename.setAttribute('data-group-rename', group.name);
@@ -1937,7 +1945,7 @@ const filterClearClass = (viewClass?: string): string =>
       );
       head.appendChild(rename);
       head.appendChild(renameOk);
-      head.appendChild(del);
+      groupActions.appendChild(del);
       // Fala UI-2 krok 5: pisanie do calej grupy jednym klikiem.
       // Pusta grupa = brak adresatow - przycisk wylaczony.
       const write = doc.createElement('button');
@@ -1951,8 +1959,9 @@ const filterClearClass = (viewClass?: string): string =>
         write.setAttribute('title', 'Otwiera zakladke Napisz list z czlonkami grupy jako adresatami.');
         write.addEventListener('click', () => writeTo(partyLabel(group.members)));
       }
-      head.appendChild(write);
-      row.appendChild(head);
+      groupActions.appendChild(write);
+      body.appendChild(head);
+      body.appendChild(groupActions);
 
       const members = doc.createElement('div');
       members.className = 'arkmail-group-members';
@@ -1982,8 +1991,11 @@ const filterClearClass = (viewClass?: string): string =>
         chip.appendChild(x);
         members.appendChild(chip);
       }
+      body.appendChild(members);
       // Dokladanie czlonka z bazy osob (ghost: strzalka w prawo
       // wpisuje kanoniczna forme z kontaktow i importow).
+      const addMemberRow = doc.createElement('div');
+      addMemberRow.className = 'arkmail-group-member-add arkmail-field-action';
       const addMember = doc.createElement('input');
       nativeFieldClass(addMember);
       addMember.setAttribute('data-member-add', group.name);
@@ -2010,10 +2022,10 @@ const filterClearClass = (viewClass?: string): string =>
       submitOnEnter(addMember, () => addMemberOk.click());
       // 1.30.2 (Etap 2): attachGhost dopiero po podpieciu inputu do
       // rodzica - wrap liczy na parentNode (jak w Ksiazce, bookAddRow).
-      members.appendChild(addMember);
+      addMemberRow.appendChild(addMember);
       attachGhost(doc, addMember, personSource);
-      members.appendChild(addMemberOk);
-      row.appendChild(members);
+      addMemberRow.appendChild(addMemberOk);
+      body.appendChild(addMemberRow);
       }
       list.appendChild(row);
       }
