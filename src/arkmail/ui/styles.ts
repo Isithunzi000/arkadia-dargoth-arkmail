@@ -537,11 +537,48 @@ export const STYLES = `
   border-radius: calc(6px * var(--window-font-scale, 1));
   border-bottom: calc(1px * var(--window-font-scale, 1)) solid ${BG};
 }
+.arkmail-contact {
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+}
+.arkmail-arch-entry {
+  flex-wrap: wrap;
+  align-items: center;
+  min-width: 0;
+}
 /* Fala 12c: klikalne jest IMIE (kierunek domyslny) + przyciski kierunku. */
 .arkmail-contact:hover, .arkmail-arch-entry:hover { background: ${BG_RAISED}; }
-.arkmail-contact-name { color: ${FG}; font-weight: 600; cursor: pointer; }
+.arkmail-contact-name {
+  flex: 1 0 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: ${FG};
+  font-weight: 600;
+  cursor: pointer;
+}
+.arkmail-wide .arkmail-contact .arkmail-contact-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .arkmail-contact-name:hover { text-decoration: underline; }
-.arkmail-contact-dirs { margin-left: auto; display: flex; gap: calc(4px * var(--window-font-scale, 1)); }
+.arkmail-contact-dirs {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  gap: calc(4px * var(--window-font-scale, 1));
+  max-width: 100%;
+  margin-left: auto;
+}
+.arkmail-contact-dirs > button,
+.arkmail-contact > .arkmail-contact-addbook {
+  flex: 0 1 auto;
+  width: auto;
+  max-width: 100%;
+}
 /* Rodzina mini: kompaktowy wariant poziomu action (jeden jezyk przyciskow). */
 .arkmail-root button.arkmail-contact-dir, .arkmail-root button.arkmail-contact-addbook {
   background: ${BG_RAISED};
@@ -589,6 +626,29 @@ export const STYLES = `
   gap: calc(6px * var(--window-font-scale, 1));
 }
 .arkmail-contact-stats, .arkmail-arch-meta { color: ${FG_DIM}; font-size: calc(12px * var(--window-font-scale, 1)); }
+.arkmail-contact-stats {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.arkmail-arch-subject {
+  flex: 1 0 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.arkmail-wide .arkmail-arch-entry .arkmail-arch-subject {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.arkmail-arch-meta {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
 .arkmail-contact-controls {
   display: flex;
   flex-wrap: wrap;
@@ -604,6 +664,8 @@ export const STYLES = `
 }
 .arkmail-archive-step {
   position: relative;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
   padding: calc(10px * var(--window-font-scale, 1));
   border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
@@ -619,21 +681,41 @@ export const STYLES = `
   font-size: calc(12px * var(--window-font-scale, 1));
   line-height: 1.4;
 }
-.arkmail-archive-step button { width: 100%; margin: 0; }
+.arkmail-archive-step button { width: 100%; margin: 0; margin-top: auto; }
 .arkmail-step-active { border-left-color: ${ACCENT}; }
 .arkmail-step-done { border-left-color: var(--popup-success); }
 .arkmail-step-warning, .arkmail-step-incomplete { border-left-color: var(--popup-warning); }
 .arkmail-arch-controls {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: calc(6px * var(--window-font-scale, 1));
   margin-bottom: calc(8px * var(--window-font-scale, 1));
 }
-.arkmail-arch-controls .arkmail-arch-clear { grid-column: 1 / -1; }
+.arkmail-wide .arkmail-arch-controls {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.arkmail-arch-controls > * { min-width: 0; }
+.arkmail-arch-controls .arkmail-arch-clear {
+  grid-column: 1 / -1;
+  justify-self: start;
+  width: auto;
+  max-width: 100%;
+}
 .arkmail-arch-controls input[type='date'] { color-scheme: light dark; }
-.arkmail-root .arkmail-contact-filter { flex: 1 1 calc(140px * var(--window-font-scale, 1)); min-width: 0; }
+.arkmail-contact-controls > .arkmail-ghost-wrap {
+  flex: 1 1 calc(140px * var(--window-font-scale, 1));
+  min-width: 0;
+}
+.arkmail-root .arkmail-contact-filter { min-width: 0; }
 .arkmail-root .arkmail-contact-sort { max-width: 100%; }
-.arkmail-contact-last { color: ${FG_DIM}; font-size: calc(11px * var(--window-font-scale, 1)); white-space: nowrap; }
+.arkmail-contact-last {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  color: ${FG_DIM};
+  font-size: calc(11px * var(--window-font-scale, 1));
+}
 
 .arkmail-notify-toggle { margin-right: calc(4px * var(--window-font-scale, 1)); }
 .arkmail-dim { color: ${FG_DIM}; }

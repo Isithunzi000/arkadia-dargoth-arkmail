@@ -3145,7 +3145,7 @@ const filterClearClass = (viewClass?: string): string =>
       // 1.30.2 (Etap 5): wspolny guard - uzbrojenie widac kolorem.
       dlBtn.setAttribute('title', 'Pobiera brakujace tresci listow do archiwum. Moze potrwac dlugo.');
       guardDeleteButton(dlBtn, () => handlers.onDownloadArchiveBodies?.(), {
-        armedLabel: 'Pobieranie potrwa dlugo - kliknij ponownie',
+        armedLabel: 'Potwierdz dlugie pobieranie',
         armedTitle: 'Kliknij ponownie, aby rozpoczac pobieranie.',
       });
     }
@@ -3212,6 +3212,8 @@ const filterClearClass = (viewClass?: string): string =>
           const row = doc.createElement('div');
           row.className = 'arkmail-arch-entry';
           const subj = doc.createElement('span');
+          subj.className = 'arkmail-arch-subject';
+          subj.setAttribute('title', l.subject);
           // Numer wyswietlany ciagly (Fala 9a) - numer z listingu serwera
           // jest kontekstowy i po scaleniu stron nic nie znaczy.
           subj.textContent = `${idx + 1}. ${l.subject}`;

@@ -5,11 +5,16 @@ import { Window } from 'happy-dom';
 
 import { mountMailUi, type MailUiHandlers } from '../src/arkmail/ui/render';
 import { MailUiStore } from '../src/arkmail/ui/store';
+import type { ArchiveLetter } from '../src/arkmail/core/archive';
+import type { Contact } from '../src/arkmail/core/contacts';
 
 const window = new Window();
 const document = window.document;
 
-function mount(store: MailUiStore): { container: HTMLElement; off: () => void } {
+function mount(
+  store: MailUiStore,
+  handlers: Partial<MailUiHandlers> = {},
+): { container: HTMLElement; off: () => void } {
   const container = document.createElement('div') as unknown as HTMLElement;
   const off = mountMailUi(container, store, {
     onOpenLetter: () => undefined,
@@ -22,6 +27,7 @@ function mount(store: MailUiStore): { container: HTMLElement; off: () => void } 
     onClearSearch: () => undefined,
     onDeleteLetter: () => undefined,
     onForwardLetter: () => undefined,
+    ...handlers,
   } as unknown as MailUiHandlers);
   return { container, off };
 }
@@ -185,5 +191,80 @@ test('uklad: rozwineta Grupa ma osobny naglowek, edycje, akcje, chipsy i dodawan
   assert.ok(add.querySelector('[data-member-add]'));
   assert.ok(add.querySelector('.arkmail-ghost-wrap'));
   assert.ok(add.querySelector('[data-member-add-ok]'));
+  off();
+});
+
+
+function archiveLetter(over: Partial<ArchiveLetter> = {}): ArchiveLetter {
+  return {
+    id: 'arch-layout-1',
+    box: 'odebrane',
+    number: 7,
+    party: 'NadawcaTest',
+    subject: `Bardzo dlugi temat ${'X'.repeat(180)}`,
+    dateRaw: null,
+    sortKey: 'syntetyczny-czas-archiwum',
+    read: true,
+    body: [],
+    ...over,
+  };
+}
+
+test('uklad: rekord Archiwum ma osobny temat i pelny tekst w title', () => {
+  const store = new MailUiStore({ tab: 'archiwum' });
+  const letter = archiveLetter();
+  store.setArchive([letter]);
+  const { container, off } = mount(store);
+  const subject = container.querySelector('.arkmail-arch-entry .arkmail-arch-subject')!;
+  assert.equal(subject.textContent, `1. ${letter.subject}`);
+  assert.equal(subject.getAttribute('title'), letter.subject);
+  off();
+});
+
+test('uklad: dlugie pobieranie Archiwum wymaga dwukliku i ma krotka etykiete', () => {
+  const store = new MailUiStore({ tab: 'archiwum' });
+  let downloads = 0;
+  const { container, off } = mount(store, {
+    onDownloadArchiveBodies: () => {
+      downloads += 1;
+    },
+  });
+  const button = container.querySelector('.arkmail-arch-download') as HTMLButtonElement;
+  button.click();
+  assert.equal(button.textContent, 'Potwierdz dlugie pobieranie');
+  assert.equal(button.getAttribute('data-armed'), '1');
+  assert.equal(button.getAttribute('title'), 'Kliknij ponownie, aby rozpoczac pobieranie.');
+  assert.equal(downloads, 0, 'pierwszy klik tylko uzbraja');
+  button.click();
+  assert.equal(downloads, 1, 'drugi klik uruchamia pobieranie');
+  off();
+});
+
+test('uklad: Osoby maja elastyczny wrapper filtra oraz osobna akcje Do ksiazki', () => {
+  const store = new MailUiStore({ tab: 'archiwum' });
+  const contact: Contact = {
+    name: `Osoba${'D'.repeat(80)}`,
+    sources: ['korespondencja'],
+    lettersReceived: 123,
+    lettersSent: 45,
+    lastContactRaw: 'syntetyczny-czas-kontaktu',
+  };
+  store.setContacts([contact]);
+  const { container, off } = mount(store);
+  (container.querySelector('[data-archive-tab="osoby"]') as HTMLElement).click();
+  const controls = container.querySelector('[data-arch-people] .arkmail-contact-controls')!;
+  const input = controls.querySelector('.arkmail-contact-filter')!;
+  const wrapper = input.parentElement!;
+  assert.ok(wrapper.classList.contains('arkmail-ghost-wrap'));
+  assert.equal(wrapper.parentElement, controls);
+  const row = container.querySelector('[data-arch-people] .arkmail-contact')!;
+  const dirs = row.querySelector('.arkmail-contact-dirs')!;
+  assert.deepEqual(
+    Array.from(dirs.querySelectorAll('button')).map((button) => button.textContent),
+    ['Odebrane', 'Wyslane'],
+  );
+  const addBook = row.querySelector('[data-arch-add-book]')!;
+  assert.equal(addBook.parentElement, row);
+  assert.equal(dirs.contains(addBook), false);
   off();
 });

@@ -118,10 +118,10 @@ test('style: filtr i sortowanie kontaktow mieszcza sie w waskim panelu', () => {
   assert.ok(controls, 'regula paska kontaktow istnieje');
   assert.match(controls!, /flex-wrap:\s*wrap/, 'kontrolki moga przejsc do kolejnego rzedu');
 
-  const filter = ruleBody(/\.arkmail-root\s+\.arkmail-contact-filter\s*/);
-  assert.ok(filter, 'regula filtra kontaktow istnieje');
-  assert.match(filter!, /flex:\s*1\s+1\s+calc\(\d+px \* var\(--window-font-scale, 1\)\)/, 'filtr ma elastyczna podstawe szerokosci');
-  assert.match(filter!, /min-width:\s*0/, 'filtr moze zmniejszyc sie bez przepelnienia');
+  const filter = ruleBody(/\.arkmail-contact-controls\s*>\s*\.arkmail-ghost-wrap\s*/);
+  assert.ok(filter, 'elastycznym dzieckiem flexa jest wrapper ghost, nie sam input');
+  assert.match(filter!, /flex:\s*1\s+1\s+calc\(\d+px \* var\(--window-font-scale, 1\)\)/, 'wrapper ma elastyczna podstawe szerokosci');
+  assert.match(filter!, /min-width:\s*0/, 'wrapper moze zmniejszyc sie bez przepelnienia');
 
   const sort = ruleBody(/\.arkmail-root\s+\.arkmail-contact-sort\s*/);
   assert.ok(sort, 'regula sortowania kontaktow istnieje');
@@ -422,4 +422,64 @@ test('uklad CSS: Grupa jest karta z bezpieczna nazwa, odseparowana trescia i chi
   const chip = ruleBody(/^\.arkmail-group-member(?![\w-])\s*/);
   assert.match(chip!, /max-width:\s*100%/);
   assert.match(chip!, /overflow-wrap:\s*anywhere/);
+});
+
+
+test('uklad CSS: karty i filtry Archiwum maja responsywna siatke oraz naturalne czyszczenie', () => {
+  const card = ruleBody(/^\.arkmail-archive-step(?![\w-])\s*/);
+  assert.ok(card, 'karta kroku Archiwum istnieje');
+  assert.match(card!, /display:\s*flex/);
+  assert.match(card!, /flex-direction:\s*column/);
+  const cardButton = ruleBody(/\.arkmail-archive-step\s+button\s*/);
+  assert.match(cardButton!, /width:\s*100%/, 'pelna szerokosc przycisku karty zostaje');
+  assert.match(cardButton!, /margin-top:\s*auto/, 'przycisk jest wyrownywany do dolu karty');
+
+  const controls = ruleBody(/^\.arkmail-arch-controls\s*/);
+  assert.match(controls!, /grid-template-columns:\s*minmax\(0,\s*1fr\)/, 'waski widok ma jedna kolumne');
+  const wideControls = ruleBody(/\.arkmail-wide\s+\.arkmail-arch-controls\s*/);
+  assert.ok(wideControls, 'szeroki widok filtrów ma osobna regule');
+  assert.match(wideControls!, /grid-template-columns:\s*repeat\(3,\s*minmax\(0,\s*1fr\)\)/);
+  const clear = ruleBody(/\.arkmail-arch-controls\s+\.arkmail-arch-clear\b/);
+  assert.match(clear!, /grid-column:\s*1\s*\/\s*-1/);
+  assert.match(clear!, /justify-self:\s*start/);
+  assert.match(clear!, /width:\s*auto/);
+});
+
+test('uklad CSS: rekord Archiwum skraca temat na szeroko i lamie go na wasko', () => {
+  const row = ruleBody(/^\.arkmail-arch-entry\s*/);
+  assert.ok(row, 'rekord Archiwum ma wlasna regule');
+  assert.match(row!, /flex-wrap:\s*wrap/);
+  const subject = ruleBody(/^\.arkmail-arch-subject\s*/);
+  assert.ok(subject, 'temat rekordu ma wlasna regule');
+  assert.match(subject!, /flex:\s*1\s+0\s+100%/, 'waski rekord ma dwa wiersze');
+  assert.match(subject!, /min-width:\s*0/);
+  assert.match(subject!, /overflow-wrap:\s*anywhere/);
+  const wide = ruleBody(/\.arkmail-wide\s+\.arkmail-arch-entry\s+\.arkmail-arch-subject\s*/);
+  assert.ok(wide, 'szeroki rekord ma osobny wariant tematu');
+  assert.match(wide!, /flex:\s*1\s+1\s+auto/);
+  assert.match(wide!, /overflow:\s*hidden/);
+  assert.match(wide!, /text-overflow:\s*ellipsis/);
+  assert.match(wide!, /white-space:\s*nowrap/);
+});
+
+test('uklad CSS: wiersz osoby zawija sie, a akcje maja naturalna szerokosc', () => {
+  const rowMatch = STYLES.match(/^\.arkmail-contact\s*\{([^}]*)\}/m);
+  const row = rowMatch ? rowMatch[1] : null;
+  assert.ok(row, 'wiersz osoby ma wlasna regule');
+  assert.match(row!, /flex-wrap:\s*wrap/);
+  assert.match(row!, /align-items:\s*center/);
+  const name = ruleBody(/^\.arkmail-contact-name\s*/);
+  assert.match(name!, /min-width:\s*0/);
+  const wideName = ruleBody(/\.arkmail-wide\s+\.arkmail-contact\s+\.arkmail-contact-name\s*/);
+  assert.ok(wideName, 'szeroka nazwa ma osobny wariant');
+  assert.match(wideName!, /text-overflow:\s*ellipsis/);
+  assert.match(wideName!, /white-space:\s*nowrap/);
+  const dirs = ruleBody(/^\.arkmail-contact-dirs\s*/);
+  assert.match(dirs!, /display:\s*flex/);
+  assert.match(dirs!, /flex-wrap:\s*wrap/);
+  const buttons = ruleBody(/\.arkmail-contact-dirs\s*>\s*button\s*,/);
+  assert.ok(buttons, 'oba typy akcji osoby maja wspolna naturalna szerokosc');
+  assert.match(buttons!, /flex:\s*0\s+1\s+auto/);
+  assert.match(buttons!, /width:\s*auto/);
+  assert.match(buttons!, /max-width:\s*100%/);
 });

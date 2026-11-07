@@ -152,9 +152,10 @@ test('archiwum: pobieranie tresci - uzbrojenie, petla, podsumowanie, cache', asy
     const base = f.sent.length;
     assert.equal(downloadBtn(h).textContent, 'Pobierz tresci do archiwum');
     clickDownload(h);
-    assert.ok(
-      downloadBtn(h).textContent.includes('dlugo'),
-      'ostrzezenie o dlugim czasie po pierwszym kliku',
+    assert.equal(
+      downloadBtn(h).textContent,
+      'Potwierdz dlugie pobieranie',
+      'krotka etykieta potwierdzenia po pierwszym kliku',
     );
     assert.equal(f.sent.length, base, 'uzbrojenie nie wysyla komend');
 

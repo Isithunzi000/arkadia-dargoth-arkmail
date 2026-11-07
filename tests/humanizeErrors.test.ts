@@ -180,7 +180,7 @@ test('stringi klasa B: poprawione, naturalne polskie (ASCII)', () => {
   assert.ok(render.includes('Wszystkie skrzynki zapisane'), 'komplet po ludzku');
   assert.ok(render.includes('Jeszcze nie zaczeto.'), 'jasny opis niezaczetej indeksacji');
   assert.ok(render.includes('Indeksuj wszystkie skrzynki'), 'jedna wersja przycisku indeksacji');
-  assert.ok(render.includes('Pobieranie potrwa dlugo - kliknij ponownie'), 'nowy tekst uzbrojenia');
+  assert.ok(render.includes('Potwierdz dlugie pobieranie'), 'krotka etykieta uzbrojenia pobierania');
   assert.ok(render.includes('Archiwum jest puste albo zaden list nie pasuje do filtra.'), 'nowe puste archiwum');
   assert.ok(render.includes('Zadna osoba nie pasuje do filtra.'), 'nowy pusty filtr kontaktow');
 });
