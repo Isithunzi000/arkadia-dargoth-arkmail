@@ -10,6 +10,8 @@
  * Wydanie 1.30.2 (Etap 1): skan twardy - className musi nalezec do
  * TEJ zmiennej przycisku (dziura: 14-liniowe okno lapalo className
  * sasiedniego elementu, np. labelu, i wpuszczalo przycisk bez klas).
+ * Wydanie 1.30.4: skan rozpoznaje wspolny konstruktor klas filtrow,
+ * ale tylko gdy jego definicja zawiera wymagane klasy natywne.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -25,6 +27,13 @@ const ALLOWED = ['arkmail-box', 'arkmail-contact-dir', 'arkmail-contact-addbook'
 
 test('render: kazdy przycisk ma klasy natywne klienta', () => {
   const lines = SRC.split('\n');
+  const helperStart = lines.findIndex((line) => line.includes('const filterClearClass ='));
+  const filterClearNative =
+    helperStart >= 0 &&
+    lines
+      .slice(helperStart, helperStart + 3)
+      .join('\n')
+      .includes('arkmail-filter-clear popup-btn popup-btn--control popup-btn--ghost');
   const violations: string[] = [];
   for (let i = 0; i < lines.length; i++) {
     const mCreate = lines[i].match(/const\s+(\w+)\s*=\s*doc\.createElement\('button'\)/);
@@ -36,6 +45,10 @@ test('render: kazdy przycisk ma klasy natywne klienta', () => {
     const window = lines.slice(i + 1, i + 15).join('\n');
     const m = window.match(new RegExp(`${varName}\\.className\\s*=\\s*'([^']*)'`));
     const cls = m ? m[1] : null;
+    const usesFilterClear = new RegExp(
+      `${varName}\\.className\\s*=\\s*filterClearClass\\(`,
+    ).test(window);
+    if (cls === null && usesFilterClear && filterClearNative) continue;
     if (cls === null) {
       violations.push(`linia ${i + 1}: ${varName} bez className`);
       continue;

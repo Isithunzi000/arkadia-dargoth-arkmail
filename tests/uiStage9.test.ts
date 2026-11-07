@@ -124,7 +124,13 @@ test('4.1/4.11: oba widoki maja ten sam przycisk, tooltip i domyslnie stan wylac
   assert.equal(peopleClear.textContent, 'Wyczysc filtry');
   assert.equal(peopleClear.getAttribute('title'), CLEAR_TITLE);
   assert.equal(peopleClear.getAttribute('disabled'), '1');
-  hasClasses(peopleClear, ['popup-btn', 'popup-btn--control', 'popup-btn--danger', 'popup-btn--ghost']);
+  hasClasses(peopleClear, [
+    'arkmail-filter-clear',
+    'popup-btn',
+    'popup-btn--control',
+    'popup-btn--ghost',
+  ]);
+  assert.equal(peopleClear.classList.contains('popup-btn--danger'), false);
 });
 
 test('4.11: czyszczenie z Osob resetuje oba widoki i nie zmienia podzakladki', () => {
@@ -210,21 +216,33 @@ test('4.1/4.11: kazde odstepstwo od domyslnego stanu aktywuje oba przyciski', ()
   assert.equal(q(container, '[data-arch-people-clear]').getAttribute('disabled'), null);
 });
 
-test('4.3/4.8: filtry Grup i Ksiazki maja danger ghost oraz jeden klik', () => {
+test('4.3/4.8: filtry Grup i Ksiazki maja neutralny ghost oraz jeden klik', () => {
   const store = new MailUiStore({ tab: 'kontakty', people: ['Corge'] });
   store.setGroups([{ name: 'Patrol', members: [] }]);
   const { container } = mount(store);
   openContactSub(container, 'Grupy');
   setInput(q(container, '[data-group-filter]'), 'Pat');
   const groupClear = q(container, '[data-group-filter-clear]');
-  hasClasses(groupClear, ['popup-btn--danger', 'popup-btn--ghost']);
+  hasClasses(groupClear, [
+    'arkmail-filter-clear',
+    'popup-btn',
+    'popup-btn--control',
+    'popup-btn--ghost',
+  ]);
+  assert.equal(groupClear.classList.contains('popup-btn--danger'), false);
   click(groupClear);
   assert.equal(q(container, '[data-group-filter]').value, '');
   assert.equal(groupClear.getAttribute('data-armed'), null);
   openContactSub(container, 'Ksiazka adresowa');
   setInput(q(container, '[data-book-filter]'), 'Cor');
   const bookClear = q(container, '[data-book-filter-clear]');
-  hasClasses(bookClear, ['popup-btn--danger', 'popup-btn--ghost']);
+  hasClasses(bookClear, [
+    'arkmail-filter-clear',
+    'popup-btn',
+    'popup-btn--control',
+    'popup-btn--ghost',
+  ]);
+  assert.equal(bookClear.classList.contains('popup-btn--danger'), false);
   click(bookClear);
   assert.equal(q(container, '[data-book-filter]').value, '');
   assert.equal(bookClear.getAttribute('data-armed'), null);
@@ -240,7 +258,13 @@ test('4.7/S39/S22: wyniki List i compose maja jednoznaczne etykiety', () => {
     clear.getAttribute('title'),
     'Usuwa wyniki szukania, czysci wszystkie pola i przywraca pelny widok skrzynki.',
   );
-  hasClasses(clear, ['popup-btn--danger', 'popup-btn--ghost']);
+  hasClasses(clear, [
+    'arkmail-filter-clear',
+    'popup-btn',
+    'popup-btn--control',
+    'popup-btn--ghost',
+  ]);
+  assert.equal(clear.classList.contains('popup-btn--danger'), false);
   click(clear);
   assert.equal(clear.getAttribute('data-armed'), null);
   assert.equal(calls.filter((call) => call.name === 'clear-search').length, 1);

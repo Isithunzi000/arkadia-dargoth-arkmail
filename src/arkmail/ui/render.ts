@@ -340,6 +340,10 @@ const nativeFieldClass = (el: HTMLElement): void => {
   // klawisze X zostaja "x" - ich uzbrojenie widac kolorem.
   const GUARD_ARM_MS = 3000;
   const ERROR_LABEL_MS = 3000;
+
+// Wspolny neutralny wariant wylacznie dla czyszczenia filtrow.
+const filterClearClass = (viewClass?: string): string =>
+  `${viewClass ? `${viewClass} ` : ''}arkmail-filter-clear popup-btn popup-btn--control popup-btn--ghost`;
   interface ArmedButton {
     el: HTMLButtonElement;
     timer: ReturnType<typeof setTimeout> | null;
@@ -810,7 +814,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     controls.appendChild(search);
 
     const clearFilters = doc.createElement('button');
-    clearFilters.className = 'arkmail-deletion-clear-filters popup-btn popup-btn--control popup-btn--danger popup-btn--ghost';
+    clearFilters.className = filterClearClass('arkmail-deletion-clear-filters');
     clearFilters.textContent = 'Wyczysc filtry';
     clearFilters.addEventListener('click', () => {
       for (const key of ['osoba', 'temat', 'tresc', 'odDaty', 'doDaty'] as const) {
@@ -1169,7 +1173,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
       banner.className = 'arkmail-search-banner';
       banner.appendChild(doc.createTextNode(`Wyniki szukania: ${searchMode.label}`));
       const clear = doc.createElement('button');
-      clear.className = 'arkmail-search-clear popup-btn popup-btn--control popup-btn--danger popup-btn--ghost';
+      clear.className = filterClearClass('arkmail-search-clear');
       clear.textContent = 'Wyczysc wyniki i filtry';
       clear.setAttribute(
         'title',
@@ -1791,7 +1795,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     filterInput.setAttribute('title', 'Pokazuje tylko grupy z nazwa zawierajaca wpisany fragment.');
     filterInput.value = groupFilter;
     const filterClear = doc.createElement('button');
-    filterClear.className = 'popup-btn popup-btn--control popup-btn--danger popup-btn--ghost';
+    filterClear.className = filterClearClass();
     filterClear.textContent = 'Wyczysc filtr';
     filterClear.setAttribute('data-group-filter-clear', '');
     filterClear.setAttribute('title', 'Czysci filtr grup i pokazuje wszystkie grupy.');
@@ -2190,7 +2194,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     filterInput.setAttribute('title', 'Pokazuje tylko imiona zawierajace wpisany fragment.');
     filterInput.value = bookFilter;
     const filterClear = doc.createElement('button');
-    filterClear.className = 'popup-btn popup-btn--control popup-btn--danger popup-btn--ghost';
+    filterClear.className = filterClearClass();
     filterClear.textContent = 'Wyczysc filtr';
     filterClear.setAttribute('data-book-filter-clear', '');
     filterClear.setAttribute('title', 'Czysci filtr imion i pokazuje cala ksiazke adresowa.');
@@ -2718,8 +2722,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     controls.appendChild(input);
     controls.appendChild(sel);
     const clearFilters = doc.createElement('button');
-    clearFilters.className =
-      'arkmail-arch-clear popup-btn popup-btn--control popup-btn--danger popup-btn--ghost';
+    clearFilters.className = filterClearClass('arkmail-arch-clear');
     clearFilters.setAttribute('data-arch-people-clear', '');
     const syncClear = wireArchiveClearButton(clearFilters);
     controls.appendChild(clearFilters);
@@ -2968,8 +2971,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     // Fala 16g: czyszczenie wszystkich filtrow archiwum jednym klikiem
     // (zgloszenie pkt 11). Niedestrukcyjne (dane zostaja) - bez dwukliku.
     const clearFilters = doc.createElement('button');
-    clearFilters.className =
-      'arkmail-arch-clear popup-btn popup-btn--control popup-btn--danger popup-btn--ghost';
+    clearFilters.className = filterClearClass('arkmail-arch-clear');
     syncClear = wireArchiveClearButton(clearFilters);
     controls.appendChild(clearFilters);
 

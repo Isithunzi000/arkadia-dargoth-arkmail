@@ -10,12 +10,10 @@
  *    Wyslij, Zapisz ZIP);
  *  - action: dlugie flow (Indeksuj, Pobierz, Wyslij zwierze,
  *    Wczytaj starsze/wszystkie);
- *  - danger: kazde kasowanie/usuwanie danych - nieodwracalne (Usun)
- *    i odwracalne pobraniem od nowa (Wyczysc zapisane dane, Wyczysc
- *    filtry, Wyczysc [compose]) - jedna czerwona klasa, decyzja
- *    2026-11-02: szary reset zlewal sie z panelem i bylo niewidoczne;
- *  - reset: klasa pozostaje w styles.ts dla kompatybilnosci, zaden
- *    przycisk jej juz nie uzywa.
+ *  - danger: kazde kasowanie/usuwanie danych lub tresci (Usun,
+ *    Wyczysc zapisane dane, Wyczysc [compose]) - jedna czerwona klasa;
+ *  - czyszczenie samych filtrow: wspolny neutralny wariant ghost,
+ *    identyczny w kazdym widoku i bez klasy danger.
  *
  * Ten plik to dowod RED: klasy poziomow nie istnieja.
  */
@@ -101,7 +99,7 @@ const TIERS: Array<{ tab: string; selector: string; tier: string }> = [
   { tab: 'listy', selector: '.arkmail-older-all', tier: 'popup-btn--control' },
   { tab: 'listy-full', selector: '.arkmail-older', tier: 'popup-btn--control' },
   { tab: 'listy', selector: '.arkmail-cache-clear', tier: 'popup-btn--danger' },
-  { tab: 'listy', selector: '.arkmail-search-clear', tier: 'popup-btn--danger' },
+  { tab: 'listy', selector: '.arkmail-search-clear', tier: 'popup-btn--ghost' },
   { tab: 'list', selector: '.arkmail-del', tier: 'popup-btn--danger' },
   { tab: 'napisz', selector: '.arkmail-send', tier: 'popup-btn--solid' },
   { tab: 'napisz', selector: '.arkmail-compose-clear', tier: 'popup-btn--danger' },
@@ -110,15 +108,29 @@ const TIERS: Array<{ tab: string; selector: string; tier: string }> = [
   { tab: 'archiwum', selector: '.arkmail-index-all', tier: 'popup-btn--control' },
   { tab: 'archiwum', selector: '.arkmail-arch-download', tier: 'popup-btn--control' },
   { tab: 'archiwum', selector: '.arkmail-arch-export', tier: 'popup-btn--solid' },
-  { tab: 'archiwum', selector: '.arkmail-arch-clear', tier: 'popup-btn--danger' },
+  { tab: 'archiwum', selector: '.arkmail-arch-clear', tier: 'popup-btn--ghost' },
   { tab: 'usuwanie', selector: '.arkmail-deletion-search', tier: 'popup-btn--solid' },
   { tab: 'usuwanie', selector: '.arkmail-deletion-delete', tier: 'popup-btn--danger' },
-  { tab: 'usuwanie', selector: '.arkmail-deletion-clear-filters', tier: 'popup-btn--danger' },
+  { tab: 'usuwanie', selector: '.arkmail-deletion-clear-filters', tier: 'popup-btn--ghost' },
+  { tab: 'grupy', selector: '[data-group-filter-clear]', tier: 'popup-btn--ghost' },
+  { tab: 'ksiazka', selector: '[data-book-filter-clear]', tier: 'popup-btn--ghost' },
+  { tab: 'osoby', selector: '[data-arch-people-clear]', tier: 'popup-btn--ghost' },
 ];
 
 function mountedTabs(): Record<string, { querySelector(s: string): unknown; querySelectorAll(s: string): unknown }> {
   const kontakty = new MailUiStore({ tab: 'kontakty' });
   kontakty.setContacts([contact()]);
+  const grupy = mount(new MailUiStore({
+    tab: 'kontakty',
+    groups: [{ name: 'Testgroup', members: ['Testalpha'] }],
+  }));
+  (grupy.querySelector('[data-contact-tab="grupy"]') as { click(): void }).click();
+  const ksiazka = mount(new MailUiStore({ tab: 'kontakty', people: ['Testalpha'] }));
+  (ksiazka.querySelector('[data-contact-tab="ksiazka"]') as { click(): void }).click();
+  const osobyStore = new MailUiStore({ tab: 'archiwum' });
+  osobyStore.setContacts([contact()]);
+  const osoby = mount(osobyStore);
+  (osoby.querySelector('[data-archive-tab="osoby"]') as { click(): void }).click();
   return {
     // search-clear renderuje sie tylko w trybie wynikow szukania
     // (banner z zapytaniem) - fixture musi ten tryb aktywowac.
@@ -127,6 +139,9 @@ function mountedTabs(): Record<string, { querySelector(s: string): unknown; quer
     list: mount(openLetter(withBox(new MailUiStore()))),
     napisz: mount(new MailUiStore({ tab: 'napisz' })),
     kontakty: mount(kontakty),
+    grupy,
+    ksiazka,
+    osoby,
     archiwum: mount(new MailUiStore({ tab: 'archiwum' })),
     usuwanie: mount(new MailUiStore({ tab: 'usuwanie' })),
   };
@@ -156,21 +171,38 @@ test('tiers: primary max 2 na zakladke - wyroznienie nie zlewa sie', () => {
   }
 });
 
-test('tiers: wszystkie przyciski czyszczenia dziela poziom danger z Usun', () => {
+test('tiers: wszystkie czyszczenia filtrow maja jeden neutralny wariant', () => {
   const tabs = mountedTabs();
   for (const [tab, selector] of [
-    ['listy', '.arkmail-cache-clear'],
     ['listy', '.arkmail-search-clear'],
-    ['napisz', '.arkmail-compose-clear'],
+    ['grupy', '[data-group-filter-clear]'],
+    ['ksiazka', '[data-book-filter-clear]'],
+    ['osoby', '[data-arch-people-clear]'],
     ['archiwum', '.arkmail-arch-clear'],
     ['usuwanie', '.arkmail-deletion-clear-filters'],
   ] as const) {
     const el = tabs[tab]!.querySelector(selector) as { className: string } | null;
     assert.ok(el, `${tab} ${selector} istnieje`);
-    assert.ok(
-      el.className.split(' ').includes('popup-btn--danger'),
-      `${tab} ${selector} ma poziom danger`,
-    );
+    const classes = el.className.split(' ');
+    for (const expected of ['arkmail-filter-clear', 'popup-btn', 'popup-btn--control', 'popup-btn--ghost']) {
+      assert.ok(classes.includes(expected), `${tab} ${selector} ma ${expected}`);
+    }
+    assert.ok(!classes.includes('popup-btn--danger'), `${tab} ${selector} nie kasuje danych`);
+  }
+});
+
+test('tiers: czyszczenie danych i tresci zachowuje poziom danger', () => {
+  const tabs = mountedTabs();
+  for (const [tab, selector] of [
+    ['listy', '.arkmail-cache-clear'],
+    ['napisz', '.arkmail-compose-clear'],
+    ['ksiazka', '[data-book-delete-checked]'],
+    ['usuwanie', '.arkmail-deletion-delete'],
+  ] as const) {
+    const el = tabs[tab]!.querySelector(selector) as { className: string } | null;
+    assert.ok(el, `${tab} ${selector} istnieje`);
+    assert.ok(el.className.split(' ').includes('popup-btn--danger'), `${tab} ${selector} ma danger`);
+    assert.ok(!el.className.split(' ').includes('arkmail-filter-clear'), `${tab} ${selector} nie jest filtrem`);
   }
 });
 

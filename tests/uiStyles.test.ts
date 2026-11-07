@@ -149,6 +149,7 @@ test('style: przyciski spojne wysokoscia; box-ops wolny od margin-top paginacji'
   assert.ok(boxOps, 'regula box-ops dla Wczytaj-wszystkie istnieje');
   assert.match(boxOps!, /margin-top:\s*0/, 'box-ops bez margin-top paginacji');
   assert.match(boxOps!, /width:\s*auto/, 'box-ops bez width 100%');
+  assert.match(boxOps!, /flex:\s*0\s+1\s+auto/, 'box-ops bez rozciagania przez flex');
 });
 
 // Audyt etykiet (Fala 16k): kazda statyczna etykieta w render.ts musi

@@ -331,7 +331,7 @@ export const STYLES = `
 /* Fala 17e: "Wczytaj wszystkie" w box-ops - regula paginacji wyzej
  * (margin-top: 8px; width: 100%) lapala go specyficznoscia 0,2,1 i
  * przycisk odjezdzal od sasiadow (zgloszenie pkt 1). */
-.arkmail-box-ops button.arkmail-older-all { margin-top: 0; width: auto; }
+.arkmail-box-ops button.arkmail-older-all { margin-top: 0; width: auto; flex: 0 1 auto; }
 
 /* --- widok listu --- */
 .arkmail-letter-head {
