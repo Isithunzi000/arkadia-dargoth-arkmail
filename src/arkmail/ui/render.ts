@@ -2067,6 +2067,13 @@ const filterClearClass = (viewClass?: string): string =>
     // zostaly w pigulce Import i eksport. Ta pigulka to lista imion
     // z operacjami zbiorczymi i filtrem.
 
+    const selectionActions = doc.createElement('div');
+    selectionActions.className = 'arkmail-book-selection-actions arkmail-action-row';
+    pane.appendChild(selectionActions);
+    const checkedActions = doc.createElement('div');
+    checkedActions.className = 'arkmail-book-checked-actions arkmail-action-row';
+    pane.appendChild(checkedActions);
+
     // --- usuwanie zaznaczonych (uzbrojony dwuklik, jak w Grupy)
     // Zgloszenie 2026-11-05: poziom danger - kazde usuwanie danych
     // dzieli jedna kolorystyke w calym UI.
@@ -2084,7 +2091,7 @@ const filterClearClass = (viewClass?: string): string =>
       () => save(state.people.filter((p) => !bookSelection.has(p))),
       { armedLabel: `Na pewno usunac zaznaczone (${bookSelection.size})?` },
     );
-    pane.appendChild(bulk);
+    checkedActions.appendChild(bulk);
 
     // --- lista imion A-Z (bez wielkosci liter, stabilnie)
     const sorted = [...state.people].sort((a, b) => {
@@ -2119,7 +2126,7 @@ const filterClearClass = (viewClass?: string): string =>
       bookSelection.clear();
       writeTo(party);
     });
-    pane.appendChild(writeBulk);
+    checkedActions.appendChild(writeBulk);
     // Zgloszenie 2026-11-05 pkt 1: zaznaczanie zbiorcze jednym klikiem
     // (precedens: zakladka Usuwanie). Zaznacz wszystkie = cala lista
     // A-Z; odznacz wszystkie czysci zaznaczenie. Niedestrukcyjne -
@@ -2134,7 +2141,7 @@ const filterClearClass = (viewClass?: string): string =>
       for (const p of visible) bookSelection.add(p);
       store.refresh();
     });
-    pane.appendChild(selectAllBtn);
+    selectionActions.appendChild(selectAllBtn);
     const deselectAllBtn = doc.createElement('button');
     deselectAllBtn.className = 'popup-btn popup-btn--control';
     deselectAllBtn.textContent = 'Odznacz wszystkie';
@@ -2145,7 +2152,7 @@ const filterClearClass = (viewClass?: string): string =>
       bookSelection.clear();
       store.refresh();
     });
-    pane.appendChild(deselectAllBtn);
+    selectionActions.appendChild(deselectAllBtn);
 
     // --- reczne dodawanie imienia (zgloszenie 2026-11-05 pkt 4:
     // mieszka w Ksiazce, nie w Import i eksport). Pole z ghost-
@@ -2153,7 +2160,7 @@ const filterClearClass = (viewClass?: string): string =>
     // strzalka w prawo wpisuje kanoniczna forme kandydata.
     // --- dodawanie imienia do ksiazki
     const bookAddRow = doc.createElement('div');
-    bookAddRow.className = 'arkmail-book-add';
+    bookAddRow.className = 'arkmail-book-add arkmail-field-action';
     const addInput = doc.createElement('input');
     nativeFieldClass(addInput);
     addInput.setAttribute('data-book-new', '');
@@ -2210,7 +2217,7 @@ const filterClearClass = (viewClass?: string): string =>
     // Zgloszenie 2026-11-05. Filtr jest czescia .arkmail-list-scroll:
     // repaint listy nie odbiera mu fokusu ani wpisanej wartosci.
     const filterRow = doc.createElement('div');
-    filterRow.className = 'arkmail-book-filter';
+    filterRow.className = 'arkmail-book-filter arkmail-field-action';
     const filterInput = doc.createElement('input');
     nativeFieldClass(filterInput);
     filterInput.setAttribute('data-book-filter', '');
@@ -2424,7 +2431,10 @@ const filterClearClass = (viewClass?: string): string =>
       for (const alias of state.importedAliases) {
         const row = doc.createElement('div');
         row.className = 'arkmail-book-alias';
-        row.textContent = `${alias.name} -> ${alias.targets.join(', ')}`;
+        const text = doc.createElement('span');
+        text.className = 'arkmail-book-alias-text';
+        text.textContent = `${alias.name} -> ${alias.targets.join(', ')}`;
+        row.appendChild(text);
         // Zgloszenie 2026-11-05: pisanie do aliasu jednym klikiem.
         // Serwer sam rozwija aliasy przy wysylce, wiec na linie idzie
         // sama nazwa aliasu (jak w polu adresata).
@@ -2438,6 +2448,8 @@ const filterClearClass = (viewClass?: string): string =>
         aliasSec.appendChild(row);
       }
     }
+    const importRow = doc.createElement('div');
+    importRow.className = 'arkmail-alias-import arkmail-action-row';
     const importAliases = doc.createElement('button');
     importAliases.className = 'arkmail-import-btn popup-btn popup-btn--control';
     importAliases.setAttribute('data-import', 'aliasy');
@@ -2447,7 +2459,8 @@ const filterClearClass = (viewClass?: string): string =>
       'Pobiera z gry aliasy pocztowe i dopisuje ich odbiorcow do ksiazki. W ArkMailu aliasy sa tylko do odczytu; edytujesz i usuwasz je w grze. Rozwija je serwer.',
     );
     importAliases.addEventListener('click', () => handlers.onImportAliases?.());
-    aliasSec.appendChild(importAliases);
+    importRow.appendChild(importAliases);
+    aliasSec.appendChild(importRow);
     pane.appendChild(aliasSec);
     const zone = doc.createElement('div');
     zone.className = 'arkmail-box-ops arkmail-destructive-zone';
@@ -2483,6 +2496,9 @@ const filterClearClass = (viewClass?: string): string =>
       error.textContent = msg;
     };
 
+    const importRow = doc.createElement('div');
+    importRow.className = 'arkmail-import-row arkmail-book-import-people arkmail-action-row';
+
     // Dopisanie wszystkich osob zebranych z listow (dedup robi
     // handler w index.ts przez unionPeople).
     const addAll = doc.createElement('button');
@@ -2495,15 +2511,13 @@ const filterClearClass = (viewClass?: string): string =>
     );
     if (state.contacts.length === 0) addAll.setAttribute('disabled', '1');
     addAll.addEventListener('click', () => handlers.onAddAllContacts?.());
-    pane.appendChild(addAll);
+    importRow.appendChild(addAll);
 
     // --- import bazy osob z gry (Fala UI-2 krok 4: przeniesione z
     // sub-pigulki Osoby w Kontaktach - indeks osob przeniesiony do
     // panelu Archiwum, a import jest czynnoscia ksiazki adresowej).
     // Import DOPISUJE nowe osoby do istniejacej puli, nie tworzy grup -
     // z bazy gracz sklada grupy recznie (widok Grupy).
-    const importRow = doc.createElement('div');
-    importRow.className = 'arkmail-import-row';
     const IMPORT_BTNS: Array<[string, string, string]> = [
       [
         'zapamietani',
@@ -2529,12 +2543,13 @@ const filterClearClass = (viewClass?: string): string =>
     }
     pane.appendChild(importRow);
 
-
     pane.appendChild(doc.createElement('hr'));
 
     // Eksport: imiona + grupy do pliku JSON (aliasy nie wchodza -
     // pobiera sie je z gry). Zgloszenie 2026-11-05: przez handler -
     // pobranie pliku + komunikat robi index.ts (jak eksport listu).
+    const transferActions = doc.createElement('div');
+    transferActions.className = 'arkmail-book-transfer-actions arkmail-action-row';
     const expBtn = doc.createElement('button');
     // 1.30.2 (Etap 1): klasy natywne jak przy kazdym eksporcie akcji
     // (solid - pobranie pliku to operacja glowna sekcji).
@@ -2543,7 +2558,7 @@ const filterClearClass = (viewClass?: string): string =>
     expBtn.setAttribute('data-book-export', '');
     expBtn.setAttribute('title', 'Pobiera plik JSON: imiona i grupy. Aliasy pocztowe nie wchodza do pliku - pobierasz je z gry.');
     expBtn.addEventListener('click', () => handlers.onExportAddressBook?.());
-    pane.appendChild(expBtn);
+    transferActions.appendChild(expBtn);
 
     // Import: tryb dolacz/zastap (stan lokalny jak dotad).
     // Zgloszenie 2026-11-05 (Etap 9): import to prawdziwy klawisz;
@@ -2661,7 +2676,8 @@ const filterClearClass = (viewClass?: string): string =>
       'Wybiera plik JSON z imionami i grupami, a potem wczytuje go w wybranym trybie.',
     );
     impBtn.addEventListener('click', () => impInput.click());
-    pane.appendChild(impBtn);
+    transferActions.appendChild(impBtn);
+    pane.appendChild(transferActions);
     pane.appendChild(impInput);
     pane.appendChild(modeRow);
     pane.appendChild(error);

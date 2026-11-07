@@ -353,6 +353,31 @@ export const STYLES = `
 .arkmail-action-row > button,
 .arkmail-action-group > button { flex: 0 1 auto; width: auto; max-width: 100%; }
 
+/* Pole i akcja: ghost jest bezposrednim elastycznym dzieckiem flexa. */
+.arkmail-field-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(6px * var(--window-font-scale, 1));
+  max-width: 100%;
+}
+.arkmail-field-action > input,
+.arkmail-field-action > .arkmail-ghost-wrap { flex: 1 1 calc(140px * var(--window-font-scale, 1)); min-width: 0; }
+.arkmail-field-action > button { flex: 0 1 auto; width: auto; max-width: 100%; }
+.arkmail-field-action > .arkmail-group-error { flex: 1 0 100%; }
+.arkmail-book-alias {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(6px * var(--window-font-scale, 1));
+  max-width: 100%;
+}
+.arkmail-book-alias-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.arkmail-book-alias > button { flex: 0 0 auto; width: auto; max-width: 100%; }
+.arkmail-root:not(.arkmail-wide) .arkmail-book-alias { flex-direction: column; align-items: stretch; }
+.arkmail-root:not(.arkmail-wide) .arkmail-book-alias > button { align-self: flex-start; }
+.arkmail-alias-import { margin-top: calc(12px * var(--window-font-scale, 1)); }
+
 /* --- widok listu --- */
 .arkmail-letter-head {
   position: relative;

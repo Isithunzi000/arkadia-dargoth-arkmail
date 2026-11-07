@@ -94,3 +94,61 @@ test('uklad: compose ma wspolny wiersz akcji i dwa pola ustawien', () => {
   assert.ok(fields[1].querySelector('#arkmail-compose-szerokosc-error[role="alert"]'));
   off();
 });
+
+
+function openContactTab(container: HTMLElement, tab: string): void {
+  (container.querySelector(`[data-contact-tab="${tab}"]`) as HTMLElement).click();
+}
+
+test('uklad: alias ma osobny tekst, akcje i wiersz importu', () => {
+  const store = new MailUiStore({
+    tab: 'kontakty',
+    importedAliases: [{ name: 'AliasTest', targets: ['CelA', 'CelB'] }],
+  });
+  const { container, off } = mount(store);
+  openContactTab(container, 'aliasy');
+  const row = container.querySelector('.arkmail-book-alias')!;
+  assert.equal(row.querySelector('.arkmail-book-alias-text')?.textContent, 'AliasTest -> CelA, CelB');
+  assert.equal(row.querySelector('[data-alias-write]')?.textContent, 'Napisz');
+  assert.equal(row.children.length, 2);
+  const importRow = container.querySelector('.arkmail-alias-import.arkmail-action-row')!;
+  assert.ok(importRow.querySelector('[data-import="aliasy"]'));
+  off();
+});
+
+test('uklad: Ksiazka ma dwa wiersze akcji i wspolne pola z przyciskami', () => {
+  const store = new MailUiStore({ tab: 'kontakty', people: ['Corge'] });
+  const { container, off } = mount(store);
+  const selection = container.querySelector('.arkmail-book-selection-actions.arkmail-action-row')!;
+  assert.ok(selection.querySelector('[data-book-select-all]'));
+  assert.ok(selection.querySelector('[data-book-deselect-all]'));
+  const checked = container.querySelector('.arkmail-book-checked-actions.arkmail-action-row')!;
+  assert.ok(checked.querySelector('[data-book-write-checked]'));
+  assert.ok(checked.querySelector('[data-book-delete-checked]'));
+  assert.equal(selection.nextElementSibling, checked);
+  for (const selector of ['.arkmail-book-add', '.arkmail-book-filter']) {
+    const row = container.querySelector(`${selector}.arkmail-field-action`)!;
+    assert.ok(Array.from(row.children).some((child) => child.classList.contains('arkmail-ghost-wrap')), selector);
+    assert.ok(row.querySelector('button'));
+  }
+  off();
+});
+
+test('uklad: Import i eksport ma dwa wiersze oraz jeden akcent', () => {
+  const store = new MailUiStore({ tab: 'kontakty' });
+  const { container, off } = mount(store);
+  openContactTab(container, 'importeksport');
+  const people = container.querySelector('.arkmail-book-import-people.arkmail-action-row')!;
+  assert.ok(people.querySelector('[data-book-add-all-contacts]'));
+  assert.ok(people.querySelector('[data-import="zapamietani"]'));
+  assert.ok(people.querySelector('[data-import="przedstawieni"]'));
+  const transfer = container.querySelector('.arkmail-book-transfer-actions.arkmail-action-row')!;
+  assert.ok(transfer.querySelector('[data-book-export].popup-btn--solid'));
+  assert.ok(transfer.querySelector('[data-book-import-trigger]'));
+  const panel = container.querySelector('#arkmail-contact-panel-importeksport')!;
+  assert.equal(panel.querySelectorAll('.popup-btn--solid').length, 1);
+  const file = panel.querySelector('[data-book-import]')!;
+  assert.equal(file.closest('.arkmail-action-row'), null);
+  assert.equal(file.nextElementSibling, panel.querySelector('[data-book-import-mode]'));
+  off();
+});

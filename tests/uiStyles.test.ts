@@ -352,3 +352,45 @@ test('uklad CSS: ustawienia compose maja jedna lub dwie kolumny', () => {
   assert.ok(wide, 'szeroki wariant siatki istnieje');
   assert.match(wide!, /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
 });
+
+
+test('uklad CSS: pola z przyciskiem maja elastyczny wrapper i naturalna akcje', () => {
+  const row = ruleBody(/\.arkmail-field-action\s*/);
+  assert.ok(row, 'wspolny wiersz pola z przyciskiem istnieje');
+  assert.match(row!, /display:\s*flex/);
+  assert.match(row!, /flex-wrap:\s*wrap/);
+  assert.match(row!, /align-items:\s*center/);
+  for (const selector of [
+    /\.arkmail-field-action\s*>\s*input\s*/,
+    /\.arkmail-field-action\s*>\s*\.arkmail-ghost-wrap\s*/,
+  ]) {
+    const field = ruleBody(selector);
+    assert.ok(field, `elastyczne pole: ${selector}`);
+    assert.match(field!, /flex:\s*1\s+1\s+calc\(/);
+    assert.match(field!, /min-width:\s*0/);
+  }
+  const button = ruleBody(/\.arkmail-field-action\s*>\s*button\s*/);
+  assert.match(button!, /flex:\s*0\s+1\s+auto/);
+  assert.match(button!, /width:\s*auto/);
+  const error = ruleBody(/\.arkmail-field-action\s*>\s*\.arkmail-group-error\s*/);
+  assert.match(error!, /flex:\s*1\s+0\s+100%/);
+});
+
+test('uklad CSS: alias lamie tekst, a waski widok przenosi akcje nizej', () => {
+  const row = ruleBody(/\.arkmail-book-alias\s*/);
+  assert.ok(row, 'wiersz aliasu ma regule');
+  assert.match(row!, /display:\s*flex/);
+  assert.match(row!, /flex-wrap:\s*wrap/);
+  const text = ruleBody(/\.arkmail-book-alias-text\s*/);
+  assert.ok(text, 'tekst aliasu jest osobnym elementem');
+  assert.match(text!, /min-width:\s*0/);
+  assert.match(text!, /overflow-wrap:\s*anywhere/);
+  const button = ruleBody(/\.arkmail-book-alias\s*>\s*button\s*/);
+  assert.match(button!, /flex:\s*0\s+0\s+auto/);
+  assert.match(button!, /width:\s*auto/);
+  const narrow = ruleBody(/\.arkmail-root:not\(\.arkmail-wide\)\s+\.arkmail-book-alias\s*/);
+  assert.ok(narrow, 'waski alias ma osobny wariant');
+  assert.match(narrow!, /flex-direction:\s*column/);
+  const importRow = ruleBody(/\.arkmail-alias-import\s*/);
+  assert.match(importRow!, /margin-top:\s*calc\(12px/);
+});
