@@ -253,14 +253,15 @@ Zmienić:
 - nadać wierszom osób responsywny układ;
 - nazwa ma `min-width: 0` i wielokropek w szerokim widoku;
 - `Odebrane` i `Wyslane` grupować razem, `Do ksiazki` pozostawić osobno;
-- wszystkie przyciski akcji mają naturalną szerokość.
+- wszystkie przyciski akcji mają naturalną szerokość;
+- odbudować kontakty z wczytanego Archiwum podczas startu i restartu pluginu, przed pierwszym renderem; dotychczas po przeładowaniu lista Osób była pusta mimo zapisanych listów i wracała dopiero po kolejnej operacji pocztowej.
 
 Bez zmian:
 
 - sortowanie, filtr, skok do listów, kierunek i dodawanie do książki;
 - własne przewijanie listy oraz zachowanie fokusu i karetki.
 
-Dowody: test CSS wrappera ghost, test struktury grup akcji, pełne testy Osób, Playwright z długą nazwą, dużymi licznikami i obiema szerokościami.
+Dowody: test CSS wrappera ghost, test struktury grup akcji, pełne testy Osób, test inicjalizacji z zapisanym Archiwum z lokalnym RED przed poprawką i GREEN po niej oraz Playwright z długą nazwą, dużymi licznikami i obiema szerokościami.
 
 ### U-10 — Usuwanie listów
 
@@ -366,10 +367,11 @@ Zrzuty są materiałem kontrolnym, nie zastępują asercji geometrycznych.
    - commit przez Git Data API, bez wymuszenia;
    - odczytać SHA, komunikat, ścieżki drzewa i zielony Build plugins przed partią zależną.
 10. Po partiach kodu ponownie uruchomić kompletny nowy test układu na nowym ZIP-ie, a potem pełną lokalną macierz ArkMaila. Dodać testy Playwright do repozytorium testów dopiero po przygotowaniu zielonego wydania, aby CI nie uruchomiło ich celowo przeciwko starej wersji.
-11. Gdy wszystkie punkty U-01–U-11 są wykonane, usunąć ten plan, podnieść wersję do 1.30.4 i zbudować dokładnie jeden `arkmail_1_30_4.zip`. Commit: `Przygotuj ArkMail 1.30.4`.
-12. Poczekać na zielone CI wydania, utworzyć tag i GitHub Release `ArkMail v1.30.4` z jednym assetem. Krótki opis zwykłym językiem, bez identyfikatorów technicznych.
-13. Opublikować testy Playwright w `Isithunzi000/arkadia-dargoth-testy`, odczekać zieloną macierz na opublikowanym ZIP-ie i porównać liczbę testów z poprzednią macierzą powiększoną o nowy zakres.
-14. Zweryfikować pobrany asset bajt po bajcie z lokalnym buildem, zamknąć raport z liczbami testów i stanem obu repozytoriów. Nie wykonywać żadnych kroków marketplace ani Vercel.
+11. Regresja wykryta przez test Archiwum: najpierw test startu z zapisanym Archiwum i lokalny RED, potem jednorazowa inicjalizacja kontaktów przed pierwszym renderem. Commit testu, implementacji i aktualizacji planu: `Odbuduj kontakty z archiwum przy starcie`.
+12. Gdy wszystkie punkty U-01–U-11 są wykonane, usunąć ten plan, podnieść wersję do 1.30.4 i zbudować dokładnie jeden `arkmail_1_30_4.zip`. Commit: `Przygotuj ArkMail 1.30.4`.
+13. Poczekać na zielone CI wydania, utworzyć tag i GitHub Release `ArkMail v1.30.4` z jednym assetem. Krótki opis zwykłym językiem, bez identyfikatorów technicznych.
+14. Opublikować testy Playwright w `Isithunzi000/arkadia-dargoth-testy`, odczekać zieloną macierz na opublikowanym ZIP-ie i porównać liczbę testów z poprzednią macierzą powiększoną o nowy zakres.
+15. Zweryfikować pobrany asset bajt po bajcie z lokalnym buildem, zamknąć raport z liczbami testów i stanem obu repozytoriów. Nie wykonywać żadnych kroków marketplace ani Vercel.
 
 ## 7. Idempotentność i bezpieczeństwo operacji
 

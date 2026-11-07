@@ -75,6 +75,27 @@ test('contactsFromArchive: rekord bez daty i bez flagged forwarded (stare storag
   assert.equal(el.lastContactKey, undefined);
 });
 
+test('init: kontakty odbudowuja sie z zapisanego archiwum przed pierwszym renderem', async () => {
+  const h: Harness = await startHarness({
+    archive: [archLetter({ id: 'zapisany-1', party: 'Foo' })],
+  });
+  const { content, waitFor } = h;
+  try {
+    click(h, '[data-tab="archiwum"]');
+    click(h, '[data-archive-tab="osoby"]');
+    await waitFor(
+      () => content.querySelectorAll('.arkmail-contact').length === 1,
+      'kontakt odbudowany z archiwum po starcie pluginu',
+    );
+    const name = content.querySelector('.arkmail-contact-name') as { textContent?: string | null } | null;
+    assert.equal(name?.textContent, 'Foo');
+    const received = content.querySelector('[data-dir="odebrane"]') as { disabled?: boolean } | null;
+    assert.equal(received?.disabled, false);
+  } finally {
+    await stopHarness();
+  }
+});
+
 test('kontakty z archiwum: pusta skrzynka (kompletna prawda) zdejmuje liczniki', async () => {
   const h: Harness = await startHarness();
   const { f, waitFor, content } = h;

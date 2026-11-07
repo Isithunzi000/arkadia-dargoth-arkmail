@@ -446,6 +446,11 @@ export async function init(api: PluginApi) {
     );
   };
 
+  // Start i restart: archiwum jest juz wczytane, a kontakty musza byc
+  // gotowe przed pierwszym createContent. Bez tej inicjalizacji znikaly
+  // do pierwszej pozniejszej operacji wywolujacej rebuildContacts.
+  rebuildContacts();
+
   /**
    * Import osob z gry (Fala UI-2): komenda "zapamietani"/
    * "przedstawieni". Import DOLACZA imiona do ksiazki adresowej
