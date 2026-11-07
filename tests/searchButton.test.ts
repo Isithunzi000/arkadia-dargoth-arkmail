@@ -92,8 +92,10 @@ test('listy: przycisk szukania to Szukaj / Odswiez z podpowiedzia', () => {
     assert.ok(go, 'przycisk istnieje');
     assert.equal((go!.textContent ?? '').trim(), 'Szukaj / Odswiez');
     const hint = go!.getAttribute('title') ?? '';
-    assert.ok(hint.includes('pustych filtrach') && hint.includes('odswieza skrzynke'),
-      `podpowiedz opisuje obie role: "${hint}"`);
+    assert.equal(
+      hint,
+      'Szuka listow po wpisanych filtrach. Przy pustych filtrach odswieza wybrana skrzynke.',
+    );
   } finally {
     off();
   }

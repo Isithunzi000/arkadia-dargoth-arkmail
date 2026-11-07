@@ -35,6 +35,15 @@ import {
 const BREAKER_MSG = 'Serwer poczty nie odpowiada';
 const ERROR_LINE = 'Data zostala podana w zlym formacie.';
 
+const assertWarningSummary = (h: Harness, text: string): void => {
+  const notice = [...h.f.shown].reverse().find((candidate) => {
+    const value = candidate as { text?: string };
+    return value.text === text;
+  }) as { level?: string } | undefined;
+  assert.ok(notice, `podsumowanie: ${text}`);
+  assert.equal(notice.level, 'warning', 'wynik czesciowy nie moze byc sukcesem');
+};
+
 /** Komendy re-kotwic petli pobierania (listy ... przed <data>). */
 const anchors = (h: Harness): string[] =>
   h.f.sent.filter((c) => / przed \d+ [IVX]+ \d{4}$/.test(c));
@@ -163,9 +172,10 @@ test('breaker: sukces resetuje licznik - petla konczy sie zwyklym podsumowaniem'
     await answerError(h, 5); // odebrane 21 XII
 
     await waitRt(
-      () => notifyText(f, 'Pobrano tresci 1 z 5; nieudane: 4'),
+      () => notifyText(f, 'Pobrano: 1 z 5. Nieudane: 4.'),
       'zwykle podsumowanie po resecie',
     );
+    assertWarningSummary(h, 'Pobrano: 1 z 5. Nieudane: 4.');
     assert.ok(!notifyText(f, BREAKER_MSG), 'breaker nie strzelil po resecie');
   } finally {
     await stopHarness();
@@ -195,9 +205,10 @@ test('breaker: znikniety list (missing) resetuje licznik bledow', async () => {
     await answerError(h, 8); // odebrane 22 VIII
 
     await waitRt(
-      () => notifyText(f, 'Pobrano tresci 0 z 5; nieudane: 4; nie ma juz w skrzynce: 1'),
+      () => notifyText(f, 'Pobrano: 0 z 5. Nieudane: 4. Nie ma juz w skrzynce: 1.'),
       'podsumowanie ze zniknietym i bez breakera',
     );
+    assertWarningSummary(h, 'Pobrano: 0 z 5. Nieudane: 4. Nie ma juz w skrzynce: 1.');
     assert.ok(!notifyText(f, BREAKER_MSG), 'missing nie jest bledem breakera');
   } finally {
     await stopHarness();

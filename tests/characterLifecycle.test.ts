@@ -37,7 +37,9 @@ async function within<T>(promise: Promise<T>): Promise<T> {
     return await Promise.race([
       promise,
       new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error('Przekroczono czas oczekiwania.')), 100);
+        // Limit wylapuje zawieszenie, nie mierzy wydajnosci startu.
+        // 100 ms przerywalo poprawna inicjalizacje przy obciazonym srodowisku.
+        timer = setTimeout(() => reject(new Error('Przekroczono czas oczekiwania.')), 5000);
       }),
     ]);
   } finally {

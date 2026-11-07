@@ -41,8 +41,8 @@ test('archiwum: pokazuje trzy kroki i niekompletny indeks', async () => {
     assert.match(labels[1], /2\. Pobranie tresci/);
     assert.match(labels[2], /3\. Zapis ZIP/);
     assert.match(labels[0], /Czesciowo: 1 z 4 skrzynek/);
-    assert.match(labels[1], /Gotowe: 1 list z trescia/);
-    assert.match(labels[2], /Gotowe: 1 list do zapisu/);
+    assert.match(labels[1], /Liczba listow z trescia: 1\. Do pobrania nie nadaja sie: 0 \(brak prawidlowej daty\)\./);
+    assert.match(labels[2], /Do zapisu: 1\. Pominiete bez tresci: 0\./);
   } finally {
     await stopHarness();
   }
@@ -91,12 +91,11 @@ test('archiwum: czesciowy indeks pozwala zapisac dostepne tresci z ostrzezeniem'
     click(h, '.arkmail-arch-export');
     await waitRt(() => captured.length === 1, 'zapis czesciowego ZIP');
     assert.deepEqual(h.f.sent, []);
-    assert.ok(notifyText(h.f, 'Zapisano listy do ZIP (1 plik)'));
-    assert.ok(notifyText(h.f, 'pominietych bez tresci: 1'));
+    assert.ok(notifyText(h.f, 'Zapisano pliki TXT do ZIP. Liczba plikow: 1. Pominiete bez tresci: 1.'));
     const steps = Array.from(h.content.querySelectorAll('.arkmail-archive-step')).map((step) =>
       String((step as { textContent?: string }).textContent ?? ''),
     );
-    assert.match(steps[2], /Gotowe: 1 list do zapisu \(1 bez tresci\)/);
+    assert.match(steps[2], /Do zapisu: 1\. Pominiete bez tresci: 1\./);
   } finally {
     setDownloadImpl(null);
     await stopHarness();

@@ -59,21 +59,25 @@ test('grupy: panel w trybie kolumnowym z przypietym naglowkiem', () => {
     (pane as { className?: string }).className?.includes('arkmail-listy'),
     'panel Grupy ma klase kolumnowa arkmail-listy',
   );
-  // Naglowek (tworzenie grupy + filtr) to bezposrednie dzieci panelu -
-  // stoja nad scrollowalnym kontenerem.
+  // Naglowek (tworzenie grupy + filtr) stoi bezposrednio w aktywnym
+  // semantycznym podpanelu kolumnowym, nad scrollowalnym kontenerem.
+  const subPanel = q(pane, '#arkmail-contact-panel-grupy[role="tabpanel"]');
+  assert.ok(subPanel, 'semantyczny podpanel Grupy istnieje');
+  assert.ok(
+    (subPanel as { className?: string }).className?.includes('arkmail-listy'),
+    'podpanel Grupy zachowuje klase kolumnowa',
+  );
   const addRow = q(pane, '.arkmail-group-add');
   assert.ok(addRow, 'wiersz tworzenia grupy istnieje');
   assert.ok(
-    (addRow as { parentElement?: { getAttribute(n: string): string | null } }).parentElement
-      ?.getAttribute('data-pane-key') === 'kontakty',
-    'wiersz tworzenia grupy jest bezposrednim dzieckiem panelu',
+    (addRow as { parentElement?: unknown }).parentElement === subPanel,
+    'wiersz tworzenia grupy jest bezposrednim dzieckiem podpanelu',
   );
   const filterRow = q(pane, '.arkmail-group-filter');
   assert.ok(filterRow, 'wiersz filtra grup istnieje');
   assert.ok(
-    (filterRow as { parentElement?: { getAttribute(n: string): string | null } }).parentElement
-      ?.getAttribute('data-pane-key') === 'kontakty',
-    'wiersz filtra grup jest bezposrednim dzieckiem panelu',
+    (filterRow as { parentElement?: unknown }).parentElement === subPanel,
+    'wiersz filtra grup jest bezposrednim dzieckiem podpanelu',
   );
 });
 
@@ -90,10 +94,16 @@ test('grupy: lista grup w scrollowalnym kontenerze z wlasnym pane-key', () => {
   assert.ok(scroll, 'kontener listy grup z pane-key kontakty:grupy istnieje');
   const toggles = qa(scroll, '[data-group-toggle]');
   assert.equal(toggles.length, 2, 'oba wiersze grup mieszkaja w kontenerze scrolla');
-  // Kontener jest podpiety do drzewa panelu.
+  // Kontener jest bezposrednio w aktywnym podpanelu, a ten w panelu Kontaktow.
+  const subPanel = q(container, '#arkmail-contact-panel-grupy[role="tabpanel"]');
+  assert.ok(subPanel, 'semantyczny podpanel Grupy istnieje');
   assert.ok(
-    (scroll as { parentElement?: { getAttribute(n: string): string | null } }).parentElement
+    (scroll as { parentElement?: unknown }).parentElement === subPanel,
+    'kontener scrolla jest dzieckiem podpanelu Grupy',
+  );
+  assert.ok(
+    (subPanel as { parentElement?: { getAttribute(n: string): string | null } }).parentElement
       ?.getAttribute('data-pane-key') === 'kontakty',
-    'kontener scrolla jest dzieckiem panelu kontakty',
+    'podpanel Grupy jest dzieckiem panelu Kontakty',
   );
 });

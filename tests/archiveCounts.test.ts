@@ -1,5 +1,5 @@
 /**
- * Fala 31d: pasek agregatu nad lista archiwum - "Listow w bazie: N"
+ * Fala 31d: pasek agregatu nad lista archiwum - "Liczba listow w bazie: N."
  * z rozbiem per skrzynka. Zasady:
  *  - deduplikacja blizniakow (ten sam list w "nieprzeczytane" i
  *    "odebrane" liczony raz - klucz: contentKeyOf);
@@ -66,7 +66,7 @@ test('archiwum: agregat liczy listy po deduplikacji (purge Fala 28 juz usunal sk
     const text = countsText(container);
     assert.equal(
       text,
-      'Listow w bazie: 2 listy (odebrane: 1 list, nieprzeczytane: 1 list, wyslane: 1 list).',
+      'Liczba listow w bazie: 2.',
       `agregat: ${text}`,
     );
   } finally {
@@ -85,7 +85,7 @@ test('archiwum: total liczy kazdy rekord skrzynki (blizniaki w skrzynce osobno)'
     const text = countsText(container);
     assert.equal(
       text,
-      'Listow w bazie: 2 listy (odebrane: 2 listy).',
+      'Liczba listow w bazie: 2.',
       `agregat: ${text}`,
     );
   } finally {
@@ -110,7 +110,7 @@ test('archiwum: agregat jest globalny, filtrowanie go nie zmienia', () => {
   ]);
   try {
     const before = countsText(container);
-    assert.equal(before, 'Listow w bazie: 2 listy (odebrane: 1 list, nieprzeczytane: 1 list, wyslane: 1 list).');
+    assert.equal(before, 'Liczba listow w bazie: 2.');
     store.setArchive([
       ...store.state.archive,
       archived('odebrane', 'Dopisany'),
@@ -120,7 +120,7 @@ test('archiwum: agregat jest globalny, filtrowanie go nie zmienia', () => {
     const after = countsText(container);
     assert.equal(
       after,
-      'Listow w bazie: 3 listy (odebrane: 2 listy, nieprzeczytane: 1 list, wyslane: 1 list).',
+      'Liczba listow w bazie: 3.',
       `po dopisaniu: ${after}`,
     );
   } finally {

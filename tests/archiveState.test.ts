@@ -98,12 +98,12 @@ test('pobieranie: pusta i bledna data nie sa zniknieciem listu z serwera', async
     startDownload(h);
     await waitRt(
       () =>
-        notifyText(h.f, 'Nie mozna pobrac tresci - listy bez prawidlowej daty: 2.') ||
+        notifyText(h.f, 'Nie mozna pobrac tresci. Liczba listow bez prawidlowej daty: 2.') ||
         notifyText(h.f, 'Pobrano tresci'),
       'koniec sprawdzania dat',
     );
-    assert.ok(notifyText(h.f, 'Nie mozna pobrac tresci - listy bez prawidlowej daty: 2.'));
-    assert.ok(!notifyText(h.f, 'nie ma juz w skrzynce'));
+    assert.ok(notifyText(h.f, 'Nie mozna pobrac tresci. Liczba listow bez prawidlowej daty: 2.'));
+    assert.ok(!notifyText(h.f, 'Nie ma juz w skrzynce'));
     assert.deepEqual(h.f.sent, [], 'bez daty nie ma komendy odnalezienia listu');
   } finally {
     await stopHarness();
@@ -121,11 +121,11 @@ test('pobieranie: legacy-zombie (missingOnServer) purgowany przy ladowaniu', asy
     startDownload(h);
     await waitRt(
       () =>
-        notifyText(h.f, 'Skrzynki sa puste - nie ma czego pobierac.') ||
+        notifyText(h.f, 'Archiwum jest puste - nie ma czego pobierac.') ||
         notifyText(h.f, 'Wszystkie listy w bazie maja tresci.'),
       'komunikat o pustym archiwum',
     );
-    assert.ok(notifyText(h.f, 'Skrzynki sa puste - nie ma czego pobierac.'));
+    assert.ok(notifyText(h.f, 'Archiwum jest puste - nie ma czego pobierac.'));
     assert.ok(!notifyText(h.f, 'Wszystkie listy w bazie maja tresci.'));
     assert.deepEqual(h.f.sent, []);
   } finally {
@@ -157,8 +157,8 @@ test('statusy: liczniki pobierania i ZIP uwzgledniaja rekordy oraz niedostepne d
     // rekord bez tresci liczy sie osobno (blizniak nie pozycza tresci).
     // Liczniki kroku 2 ida per rekord: blizniak bez tresci w drugiej
     // skrzynce to realny kandydat do pobrania, nie "grupa z trescia".
-    assert.match(steps[1], /Czesciowo: 1 list z trescia\. Do pobrania: 1 \(1 bez daty\)\./);
-    assert.match(steps[2], /Gotowe: 1 list do zapisu \(2 bez tresci\)\./);
+    assert.match(steps[1], /Czesciowo: liczba listow z trescia 1\. Do pobrania: 1\. Bez tresci i bez prawidlowej daty: 1\./);
+    assert.match(steps[2], /Do zapisu: 1\. Pominiete bez tresci: 2\./);
   } finally {
     await stopHarness();
   }
@@ -174,10 +174,10 @@ test('eksport: legacy-zombie z trescia purgowany przy ladowaniu, nie eksportowan
     await openArchive(h);
     click(h, '.arkmail-arch-export');
     await waitRt(
-      () => notifyText(h.f, 'Skrzynki sa puste - nie ma czego zapisywac.'),
+      () => notifyText(h.f, 'Archiwum jest puste - nie ma czego zapisywac.'),
       'komunikat o braku plikow',
     );
-    assert.ok(notifyText(h.f, 'Skrzynki sa puste - nie ma czego zapisywac.'));
+    assert.ok(notifyText(h.f, 'Archiwum jest puste - nie ma czego zapisywac.'));
     assert.equal(captured.length, 0);
     assert.deepEqual(h.f.sent, []);
   } finally {
@@ -225,7 +225,7 @@ test('eksport: powtorne klikniecia po bledzie zapisu nie daja falszywego sukcesu
     await waitRt(() => attempts === 2, 'dwie proby zapisu');
     assert.equal(attempts, 2);
     assert.ok(notifyText(h.f, 'Nie udalo sie zapisac pliku'));
-    assert.ok(!notifyText(h.f, 'Zapisano listy do ZIP'));
+    assert.ok(!notifyText(h.f, 'Zapisano pliki TXT do ZIP'));
     assert.deepEqual(h.f.sent, []);
   } finally {
     setDownloadImpl(null);

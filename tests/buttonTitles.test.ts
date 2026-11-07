@@ -157,9 +157,7 @@ test('podpowiedzi: bledy walidacji zmieniaja title razem z etykieta', async () =
 test('podpowiedzi: dynamiczne stany i ponownie utworzone przyciski zachowuja title', () => {
   const store = withBox(new MailUiStore());
   const listy = mount(store);
-  store.setAnimalFlying(true);
   store.setLoadAll({ box: 'odebrane', pages: 7 });
-  assert.ok(title(listy, '.arkmail-animal-send').includes('drodze'));
   assert.ok(title(listy, '.arkmail-older-all').includes('Przerwij'));
 
   // Fala UI-2 krok 4: filtr kontaktow mieszka w panelu Archiwum.

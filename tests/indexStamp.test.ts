@@ -65,7 +65,7 @@ test('blad 1 (D1): pelny refresh 4 skrzynek = kompletna indeksacja w kontaktach 
     click(h, '[data-tab="archiwum"]');
     assert.match(
       paneText(h),
-      /Gotowe od \d{4}-\d{2}-\d{2}: wszystkie skrzynki zapisane\./,
+      /Wszystkie skrzynki zapisane\. Najstarszy zapis: \d{4}-\d{2}-\d{2}\./,
       'archiwum widzi kompletny stan po refreshu',
     );
   } finally {
@@ -87,7 +87,7 @@ test('blad 1 (D1): same puste skrzynki w refreshu tez stempluja indeksacje', asy
     click(h, '[data-tab="archiwum"]');
     assert.match(
       paneText(h),
-      /Gotowe od \d{4}-\d{2}-\d{2}: wszystkie skrzynki zapisane\./,
+      /Wszystkie skrzynki zapisane\. Najstarszy zapis: \d{4}-\d{2}-\d{2}\./,
       'same puste skrzynki = kompletna wiedza o skrzynkach',
     );
   } finally {
@@ -128,7 +128,7 @@ test('blad 1 (D2): loadOlder do dna stempluje skrzynke i czysci luki', async () 
     click(h, '[data-tab="archiwum"]');
     assert.match(
       paneText(h),
-      /Gotowe od \d{4}-\d{2}-\d{2}: wszystkie skrzynki zapisane\./,
+      /Wszystkie skrzynki zapisane\. Najstarszy zapis: \d{4}-\d{2}-\d{2}\./,
       'dno skrzynki = pelna wiedza, luki wyczyszczone',
     );
   } finally {

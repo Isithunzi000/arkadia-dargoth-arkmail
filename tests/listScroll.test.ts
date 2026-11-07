@@ -101,7 +101,7 @@ test('scroll: Ksiazka adresowa - naglowek staly, lista w kontenerze scrolla', ()
   // Zgloszenie 2026-11-05 (D9): wzorzec z zakladki Listy - sub-pigulki
   // i klawisze zbiorcze stoja na stale, scrolluje sie tylko filtr
   // i lista imion. K7: import z gry i dodawanie przeniesione do
-  // pigulki Import-Eksport (jedno miejsce budowy ksiazki).
+  // pigulki Import i eksport (jedno miejsce budowy ksiazki).
   const container = document.createElement('div');
   const store = new MailUiStore({ tab: 'kontakty', people: ['Fred', 'Grault'] });
   mountMailUi(container as unknown as HTMLElement, store, {
@@ -126,23 +126,23 @@ test('scroll: Ksiazka adresowa - naglowek staly, lista w kontenerze scrolla', ()
     'scroll wewnatrz panelu Kontakty',
   );
   // Wydanie 1.30.1 (zgloszenie pkt 4): reczne dodawanie mieszka w
-  // Ksiazce (w naglowku, nad scrollem), importy zostaly w Import-Eksport.
+  // Ksiazce (w naglowku, nad scrollem), importy zostaly w Import i eksport.
   const addRow = cq('[data-book-new]');
   assert.ok(addRow && !isInside(scroll as unknown as El, addRow as unknown as El), 'dodawanie imion w naglowku, NIE w scrollu');
-  assert.ok(!cq('[data-import]'), 'importy NIE w Ksiazce (przeniesione do Import-Eksport)');
+  assert.ok(!cq('[data-import]'), 'importy NIE w Ksiazce (przeniesione do Import i eksport)');
   const bulk = cq('[data-book-delete-checked]');
   assert.ok(bulk && !isInside(scroll as unknown as El, bulk as unknown as El), 'klawisze zbiorcze NIE w scrollu');
   const row = cq('[data-book-row]');
   assert.ok(row && isInside(scroll as unknown as El, row as unknown as El), 'wiersze imion WEWNATRZ scrolla');
   const filter = cq('[data-book-filter]');
   assert.ok(filter && isInside(scroll as unknown as El, filter as unknown as El), 'filtr WEWNATRZ scrolla');
-  // Ostatnia kliknieta pigulka to Import-Eksport: czysty import/eksport
+  // Ostatnia kliknieta pigulka to Import i eksport: czysty import/eksport
   // bez pol recznego dodawania (zgloszenia 4/5).
   for (const pill of Array.from(
     container.querySelectorAll('.arkmail-subpill') as unknown as Array<{ click(): void }>,
   )) {
     pill.click();
   }
-  assert.equal(cq('[data-book-new]'), null, 'dodawanie imion NIE w pigulce Import-Eksport');
-  assert.ok(cq('[data-import]'), 'importy w pigulce Import-Eksport');
+  assert.equal(cq('[data-book-new]'), null, 'dodawanie imion NIE w pigulce Import i eksport');
+  assert.ok(cq('[data-import]'), 'importy w pigulce Import i eksport');
 });

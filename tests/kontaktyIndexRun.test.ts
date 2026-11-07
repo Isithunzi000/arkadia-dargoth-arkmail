@@ -8,7 +8,7 @@ import type { Harness } from './harness';
  * Fala 25 (blad 2), po kroku 4 UI-2: status indeksacji ma jedno
  * zrodlo prawdy - krok "1. Indeksacja" w zakladce Archiwum. Testy
  * pilnuja dwoch regresji z gloszenia: (1) podczas pedzela status
- * mowi "W toku: <skrzynka>, stron: M" i przycisk to "Przerwij
+ * mowi "W toku: skrzynka <skrzynka>. Liczba stron: M." i przycisk to "Przerwij
  * indeksowanie (N/4)", (2) przy ponownej indeksacji z kompletnym
  * indexMeta przycisk dalej pokazuje Przerwij (dawniej brama znikala,
  * bo wisiala na fladze kompletu). Sub-pigulka Osoby z Kontaktow
@@ -49,11 +49,11 @@ test('blad 2: archiwum pokazuje "W toku" podczas pedzla i Przerwij zamiast Indek
     await waitFor(() => f.sent.includes('listy odebrane'), 'start indeksacji');
     // Odswiezenie zakladki = render z biezacego stanu (indexRun aktywny).
     click(h, '[data-tab="archiwum"]');
-    assert.match(paneText(h), /W toku: odebrane, stron: \d+/, 'status widzi pedzel');
+    assert.match(paneText(h), /W toku: skrzynka odebrane\. Liczba stron: \d+\./, 'status widzi pedzel');
     assert.match(indexButton(h), /Przerwij indeksowanie \(1\/4\)/, 'przycisk to Przerwij');
     await finishIndexAll(h);
     click(h, '[data-tab="archiwum"]');
-    assert.match(paneText(h), /Gotowe od \d{4}-\d{2}-\d{2}: wszystkie skrzynki zapisane/, 'po pedzlu pelny status');
+    assert.match(paneText(h), /Wszystkie skrzynki zapisane\. Najstarszy zapis: \d{4}-\d{2}-\d{2}\./, 'po pedzlu pelny status');
   } finally {
     await stopHarness();
   }
@@ -71,11 +71,11 @@ test('blad 2: ponowna indeksacja przy kompletnym indexMeta - "Przerwij" widoczne
   try {
     const { f, waitFor } = h;
     click(h, '[data-tab="archiwum"]');
-    assert.match(paneText(h), /Gotowe od \d{4}-\d{2}-\d{2}: wszystkie skrzynki zapisane/, 'setup: kompletny stan');
+    assert.match(paneText(h), /Wszystkie skrzynki zapisane\. Najstarszy zapis: \d{4}-\d{2}-\d{2}\./, 'setup: kompletny stan');
     click(h, '.arkmail-index-all');
     await waitFor(() => f.sent.includes('listy odebrane'), 'start ponownej indeksacji');
     click(h, '[data-tab="archiwum"]');
-    assert.match(paneText(h), /W toku: odebrane, stron: \d+/, 'status widzi pedzel mimo kompletu');
+    assert.match(paneText(h), /W toku: skrzynka odebrane\. Liczba stron: \d+\./, 'status widzi pedzel mimo kompletu');
     assert.match(
       indexButton(h),
       /Przerwij indeksowanie \(1\/4\)/,

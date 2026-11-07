@@ -165,3 +165,30 @@ test('gmcp.mail.state: nieprawidlowy payload jest ignorowany', async () => {
     await stopHarness();
   }
 });
+
+
+test('gmcp.mail.state: reconnect traktuje identyczna ramke jako pierwsza nowej sesji, duplikat nadal odfiltrowany', async () => {
+  answered.clear();
+  const h = await startHarness();
+  try {
+    const state = { unread: true, unreceived: false, unsent: false };
+    h.f.fireEvent('gmcp.mail.state', state);
+    await answerEmpty(h, 'odebrane');
+    await answerEmpty(h, 'nieprzeczytane');
+    await waitIdle(h);
+
+    h.f.fireEvent('client.disconnect', undefined);
+    h.f.fireEvent('client.connect', undefined);
+    h.f.fireEvent('gmcp.mail.state', state);
+    await answerEmpty(h, 'odebrane');
+    await answerEmpty(h, 'nieprzeczytane');
+    await waitIdle(h);
+
+    const sentBeforeDuplicate = h.f.sent.length;
+    h.f.fireEvent('gmcp.mail.state', state);
+    await sleep(120);
+    assert.equal(h.f.sent.length, sentBeforeDuplicate, 'duplikat w nowej sesji nie strzela');
+  } finally {
+    await stopHarness();
+  }
+});

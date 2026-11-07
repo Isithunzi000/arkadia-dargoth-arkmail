@@ -19,7 +19,7 @@ import assert from 'node:assert/strict';
 
 import type { MailBox } from '../src/arkmail/core/protocol/types.js';
 import { ANIMAL_TIMING } from '../src/arkmail/index';
-import { startHarness, stopHarness, click, waitRt, type Harness } from './harness';
+import { startHarness, stopHarness, click, waitRt, queryUi, type Harness } from './harness';
 
 const GENITIVE: Record<MailBox, string> = {
   odebrane: 'odebranych',
@@ -44,11 +44,11 @@ const waitIdle = (h: Harness): Promise<void> =>
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 const animalDisabled = (h: Harness): boolean | null =>
-  (h.content.querySelector('.arkmail-animal-send') as { disabled: boolean } | null)?.disabled ?? null;
+  (queryUi(h, '.arkmail-animal-send') as { disabled: boolean } | null)?.disabled ?? null;
 
 const sluchamToast = (h: Harness): boolean =>
   h.f.shown.some((o) =>
-    String((o as { text?: string })?.text ?? '').includes('Zwierze nie odpowiada'),
+    String((o as { text?: string })?.text ?? '').includes('Arkadia nie rozpoznala komendy wyslania zwierzecia. Sprawdz, czy masz zwierze pocztowe.'),
   );
 
 test('"Slucham?" w oknie po wyslaniu konczy lot i daje tost o braku zwierzecia', async () => {
@@ -99,6 +99,24 @@ test('"Slucham?" po potwierdzeniu wyslania (Wysylasz) nie konczy lotu', async ()
     await answerEmpty(h, 'niewyslane');
     await answerEmpty(h, 'wyslane');
     await waitIdle(h);
+  } finally {
+    await stopHarness();
+  }
+});
+
+test('natychmiastowe "Slucham?" z wnetrza API nie gubi zdarzenia ani nie zostawia lotu', async () => {
+  answered.clear();
+  const h = await startHarness();
+  h.f.sendImpl = () => {
+    h.f.fire('Slucham?');
+    return Promise.resolve();
+  };
+  try {
+    click(h, '.arkmail-animal-send');
+    await h.waitFor(() => sluchamToast(h), 'natychmiastowy komunikat serwera');
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.equal(animalDisabled(h), false, 'pozne przyjecie Promise nie odpala lotu po bledzie serwera');
+    assert.equal(h.f.sent.filter((cmd) => cmd === 'wyslij zwierze').length, 1);
   } finally {
     await stopHarness();
   }

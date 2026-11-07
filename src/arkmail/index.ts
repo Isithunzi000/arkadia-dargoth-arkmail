@@ -18,7 +18,7 @@ import {
   PLUGIN_AUTHOR,
   PLUGIN_DESCRIPTION,
 } from "./meta";
-import type { MailBox } from "./core/protocol/types";
+import type { MailBox, MailError } from "./core/protocol/types";
 import { parseNotification, extractPagerPrompt, parseMailDate } from "./core/protocol/parser";
 import { isEchoLine } from "./core/session/lines";
 import { clearPagerOrphan, isPagerOrphanSuspected } from "./core/session/orphanPager";
@@ -27,6 +27,7 @@ import {
   nextDay,
   searchListingCommand,
   searchDescription,
+  isValidPersonName,
   validateListingSearch,
 } from "./core/protocol/commands";
 import type { LetterTemplate } from "./core/letterRender";
@@ -49,6 +50,8 @@ import {
   migratePeople,
   applyBookImport,
   buildAddressBookExport,
+  findGroupAliasConflicts,
+  groupAliasConflict,
   unionPeople,
   type AddressBookExport,
   type ImportMode,
@@ -71,6 +74,7 @@ import { humanizeMailError, isOperationCancelled } from "./core/errors";
 import { archiveExportEntries, letterTxt, txtFileName } from "./core/exportTxt";
 import { buildZip } from "./core/zipStore";
 import { downloadBlob } from "./ui/download";
+import { buildDownloadSummary, buildExportSummary } from "./ui/operationSummary";
 import { PagerSession } from "./core/session/pager";
 import { EditorSession } from "./core/session/editor";
 import { SessionLock } from "./core/sessionLock";
@@ -80,6 +84,7 @@ import { STORAGE_WRITE_ERROR } from "./adapters/writeThroughStorage";
 import { notify } from "./adapters/notify";
 import { INDEX_BOXES, MailUiStore, formatBadgeSuffix } from "./ui/store";
 import { mountMailUi, type MailUiHandlers } from "./ui/render";
+import { createAnimalHeader, type AnimalHeaderControl } from "./ui/animalHeader";
 import { applyConfirmedDeletions, matchSelectionOnFreshListing } from "./core/bulkDelete";
 import { formatListCount } from "./ui/deletion";
 
@@ -143,6 +148,19 @@ export const indexSweepMode = (
  * kopii zdania. Krotko i po ludzku.
  */
 const SESSION_BUSY_MSG = "Poczekaj, az skoncze biezaca operacje.";
+const OPERATION_TIMEOUT_MSG = "Serwer nie odpowiedzial na czas. Sprobuj ponownie.";
+const SEND_FAILURE_MSG = "Nie udalo sie wyslac listu. Sprobuj ponownie.";
+const FORWARD_FAILURE_MSG = "Nie udalo sie przekazac listu. Sprobuj ponownie.";
+
+/** Rozpoznany blad serwera zachowuje swoja przyczyne, bez zgadywania. */
+const mailErrorText = (error: MailError): string => {
+  if (error.kind === "brak-adresata") return `Nie ma takiego adresata: ${error.adresat}.`;
+  if (error.kind === "zly-numer") return `Zly numer listu: ${error.numer}.`;
+  return "Zadne listy nie zostaly wybrane.";
+};
+
+const isPagerTimeout = (error: unknown): boolean =>
+  error instanceof Error && /^timeout: pager session list \d+$/.test(error.message);
 
 /**
  * Fala 24g: komendy gracza wchodzace w tryb poczty (ich pager jest
@@ -203,6 +221,22 @@ const knownRecipientNames = (state: {
   return known;
 };
 
+/** Dokladna nazwa niekolidujacej grupy jest jedynym przeksztalceniem listy. */
+const expandLocalGroup = (
+  value: string,
+  state: {
+    importedAliases: { name: string; targets: string[] }[];
+    groups: { name: string; members: string[] }[];
+  },
+): string => {
+  const key = value.toLowerCase();
+  const group = state.groups.find((candidate) =>
+    candidate.name.toLowerCase() === key
+    && candidate.members.length > 0
+    && !groupAliasConflict(candidate.name, state.importedAliases));
+  return group ? group.members.join(", ") : value;
+};
+
 let apiRef: PluginApi | null = null;
 let storageRef: CharStorage | null = null;
 let popup: PersistentPopupHandle | null = null;
@@ -213,6 +247,8 @@ let transport: DargothTransport | null = null;
 let store: MailUiStore | null = null;
 let unmount: (() => void) | null = null;
 let unsubBadge: (() => void) | null = null;
+let unsubAnimalHeader: (() => void) | null = null;
+let animalHeader: AnimalHeaderControl | null = null;
 let wideObserver: ResizeObserver | null = null;
 /** Timer bezpiecznika lotu zwierzecia (Fala 13b) - czyszczony w destroy. */
 let animalTimer: ReturnType<typeof setTimeout> | null = null;
@@ -273,10 +309,12 @@ export async function init(api: PluginApi) {
   apiRef = api;
   lifecycleDestroyed = false;
   cleanupLegacyStorage();
+  animalHeader = createAnimalHeader(() => handlersRef?.onSendAnimal?.());
 
   popup = await api.ui.registerPersistentPopup({
     id: POPUP_ID,
     title: PLUGIN_NAME,
+    headerActions: animalHeader.element,
     // Start: szeroki dwupanelowy na normalnym ekranie, waski na komorce
     // (85vw). Rozmiar ustawiony przez gracza zawsze wygrywa z tymi
     // wartosciami - po zmianie domyslnego pomocny jest reset rozmiaru.
@@ -380,6 +418,11 @@ export async function init(api: PluginApi) {
     groups: loadGroups(storage),
   });
   const ui = store;
+  unsubAnimalHeader?.();
+  unsubAnimalHeader = ui.subscribe((state) => {
+    animalHeader?.update(state.wide, state.animalFlying);
+  });
+  animalHeader?.update(ui.state.wide, ui.state.animalFlying);
   const mailbox = new MailboxSession(transport, sessionOpts);
   const pager = new PagerSession(transport, sessionOpts);
   const editor = new EditorSession(transport, sessionOpts);
@@ -425,7 +468,7 @@ export async function init(api: PluginApi) {
       const people = unionPeople(ui.state.people, names);
       savePeople(storage, people);
       ui.setPeople(people);
-      notify(api, `Osob pobranych z gry: ${names.length}. Nowych w ksiazce: ${people.length - before}.`, { level: "success" });
+      notify(api, `Liczba pobranych osob: ${names.length}. Liczba nowych osob w ksiazce: ${people.length - before}.`, { level: "success" });
     })
       .catch((err: unknown) => {
         if (!isOperationCancelled(err)) {
@@ -453,6 +496,12 @@ export async function init(api: PluginApi) {
     void runExclusive(async () => {
       const aliases = await importer.fetchAliases();
       if (generation !== connectionGeneration) return;
+      const oldConflicts = new Set(
+        findGroupAliasConflicts(ui.state.groups, ui.state.importedAliases)
+          .map((group) => group.name.trim().toLowerCase()),
+      );
+      const newConflicts = findGroupAliasConflicts(ui.state.groups, aliases)
+        .filter((group) => !oldConflicts.has(group.name.trim().toLowerCase()));
       saveImportedAliases(storage, aliases);
       ui.setImportedAliases(aliases);
       const before = ui.state.people.length;
@@ -463,7 +512,10 @@ export async function init(api: PluginApi) {
       savePeople(storage, people);
       ui.setPeople(people);
       rebuildContacts();
-      notify(api, `Aliasow pocztowych: ${aliases.length}. Osob dolaczonych do ksiazki: ${people.length - before}.`, { level: "success" });
+      notify(api, `Zaimportowano aliasy. Liczba aliasow: ${aliases.length}. Liczba osob dopisanych do ksiazki: ${people.length - before}.`, { level: "success" });
+      if (newConflicts.length > 0) {
+        notify(api, `Nowe konflikty grup z aliasami: ${newConflicts.map((group) => group.name).join(", ")}.`, { level: "warning" });
+      }
     })
       .catch((err: unknown) => {
         if (!isOperationCancelled(err)) {
@@ -606,17 +658,27 @@ export async function init(api: PluginApi) {
     pruneGoneFromView(box, purged.removedIds);
   };
 
-  const refreshBoxes = (boxes: MailBox[], mode: "sync" | "replace" = "sync"): void => {
+  const refreshBoxes = (
+    boxes: MailBox[],
+    mode: "sync" | "replace" = "sync",
+    source: "auto" | "manual" = "auto",
+  ): void => {
     if (ui.state.tab === "usuwanie") ui.resetDeletion();
     ui.clearSearchBoxes(boxes);
     const generation = connectionGeneration;
     void runExclusive(() => fetchBoxes(boxes, mode))
-      .catch(() => {})
+      .catch((err: unknown) => {
+        if (source === "manual" && !isOperationCancelled(err)) {
+          notify(api, humanizeMailError(err instanceof Error ? err.message : String(err)), {
+            title: "Blad odswiezania",
+            level: "error",
+          });
+        }
+      })
       .finally(() => {
         if (generation !== connectionGeneration) return;
         ui.setBusy(null);
-        rebuildContacts();
-        persistArchive();
+        finalizeArchiveChange();
       });
   };
 
@@ -626,9 +688,11 @@ export async function init(api: PluginApi) {
   // leci na pusto ("Zadne listy nie zostaly wybrane.", log 2026-10-19
   // 17:13:14; zgloszenie pkt 3/13 "klikam i nie moge wyswietlic listu").
   // Po uniewaznieniu auto-refresh daje widokowi swieze stemple.
-  const cancelConnectionOperations = (): void => {
+  const cancelConnectionOperations = (resetMailState = true): void => {
     connectionGeneration++;
     listingCtx = null;
+    if (resetMailState) lastMailState = null;
+    clearPagerOrphan();
     transport!.setOnline(false);
     lock.cancelWaiting();
     for (const cancel of [...cancelListeners]) cancel();
@@ -672,7 +736,9 @@ export async function init(api: PluginApi) {
   let lastUpstreamClosed = false;
   const onClientConnect = (): void => {
     lastUpstreamClosed = false;
-    cancelConnectionOperations();
+    // Stan GMCP resetuje disconnect/zmiana postaci. Sam connect moze
+    // poprzedzac swieza ramke po replayu proxy i nie moze zatrzec jej roznicy.
+    cancelConnectionOperations(false);
   };
   const armGameTransport = (): void => {
     transport!.setOnline(true);
@@ -773,8 +839,7 @@ export async function init(api: PluginApi) {
       .finally(() => {
         if (generation !== connectionGeneration) return;
         ui.setBusy(null);
-        rebuildContacts();
-        persistArchive();
+        finalizeArchiveChange();
         drainScheduled = false;
         if (pendingRefresh.size > 0) scheduleRefresh([]);
       });
@@ -873,6 +938,12 @@ export async function init(api: PluginApi) {
     storage.setLetters(ui.state.archive);
   };
 
+  /** Wspolny koniec zmiany archiwum: zapis i natychmiastowa przebudowa osob. */
+  const finalizeArchiveChange = (): void => {
+    persistArchive();
+    rebuildContacts();
+  };
+
   /** Fala 18c: flagi kompletnej indeksacji skrzynek (brama Kontaktow). */
   const persistIndexMeta = (): void => {
     storage.setJSON(INDEX_KEY, ui.state.indexMeta);
@@ -969,7 +1040,7 @@ export async function init(api: PluginApi) {
       return entry;
     }
     if (!entry.date) {
-      notify(api, "Nie moge znalezc tego listu - odswiez skrzynke.", { level: "warning" });
+      notify(api, "Nie mozna odnalezc tego listu - odswiez skrzynke.", { level: "warning" });
       return null;
     }
     const generation = connectionGeneration;
@@ -1022,7 +1093,7 @@ export async function init(api: PluginApi) {
     } finally {
       offCancel();
     }
-    notify(api, "Nie ma tego listu na liscie - odswiez skrzynke.", { level: "warning" });
+    notify(api, "Nie mozna odnalezc tego listu - odswiez skrzynke.", { level: "warning" });
     return null;
   };
 
@@ -1380,6 +1451,10 @@ export async function init(api: PluginApi) {
    * serwerowy cooldown przy spamie nie jest znany - brak dowodu w logach).
    */
   let animalFlight = false;
+  /** Wysylka oczekuje na przyjecie przez API; to jeszcze nie jest lot. */
+  let animalSendPending = false;
+  /** Uniewaznia pozne resolve po natychmiastowym "Slucham?" lub reconnectcie. */
+  let animalSendSerial = 0;
   /**
    * Okno "Slucham?" (Fala 13d): uzbrojone tylko po NASZYM wyslaniu
    * "wyslij zwierze" i tylko do potwierdzenia linia 'wysylasz' albo
@@ -1606,9 +1681,9 @@ export async function init(api: PluginApi) {
       notify(
         api,
         ui.state.archive.length === 0
-          ? "Skrzynki sa puste - nie ma czego pobierac."
+          ? "Archiwum jest puste - nie ma czego pobierac."
           : noBody.length > 0
-            ? `Nie mozna pobrac tresci - listy bez prawidlowej daty: ${noBody.length}.`
+            ? `Nie mozna pobrac tresci. Liczba listow bez prawidlowej daty: ${noBody.length}.`
             : "Wszystkie listy w bazie maja tresci.",
         { level: "warning" },
       );
@@ -1749,17 +1824,15 @@ export async function init(api: PluginApi) {
               `Pobrano: ${done} z ${total}.`,
               { title: "Przerwano pobieranie", level: "warning" },
             );
-          } else if (failed === 0 && missing === 0) {
-            notify(api, `Pobrano tresci do archiwum (${formatListCount(done)}).`, { level: "success" });
           } else {
-            const parts: string[] = [];
-            if (failed > 0) parts.push(`nieudane: ${failed}`);
-            if (missing > 0) parts.push(`nie ma juz w skrzynce: ${missing}`);
+            const summary = buildDownloadSummary({ done, total, failed, missing });
             notify(
-            api,
-            `${done} z ${total}; ${parts.join("; ")}.`,
-            { title: "Pobrano tresci", level: "success" },
-          );
+              api,
+              summary.text,
+              summary.level === "warning"
+                ? { title: "Pobrano tresci", level: summary.level }
+                : { level: summary.level },
+            );
           }
         } finally {
           if (generation !== connectionGeneration) return;
@@ -1783,7 +1856,7 @@ export async function init(api: PluginApi) {
       notify(
         api,
         ui.state.archive.length === 0
-          ? "Skrzynki sa puste - nie ma czego zapisywac."
+          ? "Archiwum jest puste - nie ma czego zapisywac."
           : "Brak listow z trescia w archiwum - najpierw pobierz tresci.",
         { level: "warning" },
       );
@@ -1798,14 +1871,13 @@ export async function init(api: PluginApi) {
       `_${p2(now.getHours())}${p2(now.getMinutes())}.zip`;
     // buildZip alokuje bufor dokladnie na wynik - buffer jest ArrayBuffer.
     const ok = downloadBlob(name, new Blob([zip.buffer as ArrayBuffer], { type: "application/zip" }));
+    const summary = buildExportSummary(entries.length, skipped);
     notify(
       api,
       ok
-        ? `Zapisano listy do ZIP (${entries.length} ${entries.length === 1 ? 'plik' : 'plikow'})` +
-            (skipped > 0 ? `; pominietych bez tresci: ${skipped}` : "") +
-            "."
+        ? summary.text
         : "Nie udalo sie zapisac pliku - klient nie obsluguje pobierania.",
-      { title: "Zapis do ZIP", level: ok ? "success" : "error" },
+      { title: "Zapis do ZIP", level: ok ? summary.level : "error" },
     );
   };
 
@@ -1986,12 +2058,35 @@ export async function init(api: PluginApi) {
         notify(api, "Zwierze jest juz w drodze - poczekaj na jego powrot.", { level: "warning" });
         return;
       }
-      startAnimalFlight();
-      // Fala 28h: z echem - gracz widzi komende jak przy recznym
-      // wpisaniu. Linie lotu (wyslanie/powrot/dostawa) i tak nie sa
-      // gagowane - lot zwierzecia nie bierze blokady sesji.
-      transport!.send("wyslij zwierze", true);
+      if (animalSendPending) {
+        notify(api, "Trwa wysylanie zwierzecia - poczekaj na przyjecie komendy.", { level: "warning" });
+        return;
+      }
+      const serial = ++animalSendSerial;
+      const generation = connectionGeneration;
+      animalSendPending = true;
+      // Detektor stoi PRZED wywolaniem API: odpowiedz synchroniczna nie zginie.
       armSluchamWindow();
+      void Promise.resolve()
+        .then(() => transport!.send("wyslij zwierze", true))
+        .then(() => {
+          if (serial !== animalSendSerial) return;
+          animalSendPending = false;
+          if (generation !== connectionGeneration || lifecycleDestroyed) return;
+          // Fala 28h: z echem - gracz widzi komende jak przy recznym wpisaniu.
+          // Lot zaczyna sie dopiero po rzeczywistym przyjeciu komendy przez API.
+          if (!animalFlight) startAnimalFlight();
+        })
+        .catch((err: unknown) => {
+          if (serial !== animalSendSerial) return;
+          animalSendPending = false;
+          disarmSlucham();
+          if (generation !== connectionGeneration || lifecycleDestroyed || isOperationCancelled(err)) return;
+          notify(api, "Nie udalo sie wyslac komendy. Sprobuj ponownie.", {
+            title: "Blad wysylania zwierzecia",
+            level: "error",
+          });
+        });
     },
     onOpenLetter: (box, entry) => {
       // Fala 12a: sesje modalne NIE kolejkuja klikow - w trakcie wiszacej
@@ -2041,8 +2136,38 @@ export async function init(api: PluginApi) {
     // Fala UI-2 krok 3: CRUD grup recznych - kazda mutacja zapisu
     // trwa w tym samym przebiegu (storage + stan UI).
     onSaveGroups: (groups) => {
+      const oldConflicts = new Set(
+        findGroupAliasConflicts(ui.state.groups, ui.state.importedAliases)
+          .map((group) => group.name.trim().toLowerCase()),
+      );
+      const introduced = findGroupAliasConflicts(groups, ui.state.importedAliases)
+        .find((group) => !oldConflicts.has(group.name.trim().toLowerCase()));
+      if (introduced) {
+        notify(api, `Nazwa grupy "${introduced.name}" koliduje z aliasem pocztowym z gry. Wybierz inna nazwe.`, { level: "error" });
+        return;
+      }
       saveGroups(storage, groups);
       ui.setGroups(groups);
+    },
+    onAddGroupMember: (groupName, rawName) => {
+      const name = rawName.trim();
+      if (!isValidPersonName(name)) return "Imie: tylko litery.";
+      const group = ui.state.groups.find((candidate) => candidate.name === groupName);
+      if (!group) return "Grupa nie istnieje.";
+      if (group.members.some((member) => member.toLowerCase() === name.toLowerCase())) {
+        return `${name} juz jest w tej grupie.`;
+      }
+      const groups = ui.state.groups.map((candidate) =>
+        candidate.name === groupName
+          ? { ...candidate, members: [...candidate.members, name] }
+          : candidate,
+      );
+      const people = unionPeople(ui.state.people, [name]);
+      saveGroups(storage, groups);
+      savePeople(storage, people);
+      ui.setAddressBook(people, groups);
+      rebuildContacts();
+      return null;
     },
     // Fala UI-2 krok 3: zapis plaskiej ksiazki imion po mutacji CRUD
     // (dodanie, usuniecie pojedyncze, usuniecie zaznaczonych) - storage
@@ -2058,19 +2183,28 @@ export async function init(api: PluginApi) {
     // grupy zawartoscia pliku (niezmiennik kompletnosci czlonkow i tak
     // obowiazuje). Aliasy sa lustrem z gry - import pliku ich nie rusza.
     onImportAddressBook: (data: AddressBookExport, mode: ImportMode = "dolacz") => {
+      const oldConflicts = new Set(
+        findGroupAliasConflicts(ui.state.groups, ui.state.importedAliases)
+          .map((group) => group.name.trim().toLowerCase()),
+      );
       const { data: merged, stats } = applyBookImport(
         { people: ui.state.people, groups: ui.state.groups },
         data,
         mode,
       );
+      const newConflicts = findGroupAliasConflicts(merged.groups, ui.state.importedAliases)
+        .filter((group) => !oldConflicts.has(group.name.trim().toLowerCase()));
       saveGroups(storage, merged.groups);
       savePeople(storage, merged.people);
       ui.setGroups(merged.groups);
       ui.setPeople(merged.people);
       rebuildContacts();
       notify(api, mode === "zastap"
-        ? `Ksiazka adresowa zastapiona. Grup: ${merged.groups.length}, imion: ${merged.people.length}.`
-        : `Dolaczono. Grup: ${data.groups.length} (nowe: ${stats.addedGroups}, scalone: ${stats.mergedGroups}). Imion: ${merged.people.length} (nowe: ${stats.addedPeople}).`, { level: "success" });
+        ? `Ksiazka adresowa zastapiona. Liczba grup: ${merged.groups.length}. Liczba imion: ${merged.people.length}.`
+        : `Z pliku: liczba grup ${data.groups.length} (dodano: ${stats.addedGroups}, scalono: ${stats.mergedGroups}). W ksiazce: liczba imion ${merged.people.length} (dodano: ${stats.addedPeople}).`, { level: "success" });
+      if (newConflicts.length > 0) {
+        notify(api, `Nowe konflikty grup z aliasami: ${newConflicts.map((group) => group.name).join(", ")}.`, { level: "warning" });
+      }
     },
     // Zgloszenie 2026-11-05: wyczyszczenie lokalnego lustra aliasow
     // (przycisk w pigulce "Aliasy Pocztowe"). Kasuje wylacznie lokalny
@@ -2080,7 +2214,7 @@ export async function init(api: PluginApi) {
       saveImportedAliases(storage, []);
       ui.setImportedAliases([]);
       rebuildContacts();
-      notify(api, "Wyczyszczono lokalne aliasy. Pobierz aliasy z gry ponownie, gdy beda potrzebne.", { level: "success" });
+      notify(api, "Wyczyszczono lokalne lustro aliasow. Aliasy na serwerze zostaly bez zmian.", { level: "success" });
     },
     // Zgloszenie 2026-11-05: wyczyszczenie calej ksiazki adresowej
     // (imiona + grupy + aliasy) z guardem dwukliku w pigulce
@@ -2111,7 +2245,7 @@ export async function init(api: PluginApi) {
       notify(
         api,
         ok
-          ? `Ksiazka adresowa zapisana do pliku (imion: ${ui.state.people.length}, grup: ${ui.state.groups.length}).`
+          ? `Ksiazka adresowa zapisana do pliku. Liczba imion: ${ui.state.people.length}. Liczba grup: ${ui.state.groups.length}.`
           : "Nie udalo sie zapisac pliku - klient nie obsluguje pobierania.",
         { level: ok ? "success" : "error" },
       );
@@ -2125,7 +2259,14 @@ export async function init(api: PluginApi) {
       const people = unionPeople(ui.state.people, names);
       savePeople(storage, people);
       ui.setPeople(people);
-      notify(api, `Dopisano do ksiazki: ${people.length - before} nowych osob (razem: ${people.length}).`, { level: "success" });
+      const added = people.length - before;
+      notify(
+        api,
+        added === 0
+          ? "Brak nowych osob do dopisania."
+          : `Dopisano nowe osoby do ksiazki. Liczba dodanych: ${added}. Liczba osob w ksiazce: ${people.length}.`,
+        { level: added === 0 ? "info" : "success" },
+      );
     },
     // Fala 17g: eksporty TXT/ZIP - operacje czysto lokalne (dane
     // z cache), bez locka i bez komend do serwera.
@@ -2168,12 +2309,16 @@ export async function init(api: PluginApi) {
         notify(api, SESSION_BUSY_MSG, { level: "warning" });
         return;
       }
+      const recipients = {
+        adresat: expandLocalGroup(input.adresat, ui.state),
+        dw: expandLocalGroup(input.dw, ui.state),
+      };
       // Fala UI-2 krok 5: advisory guard - imiona spoza bazy osob
       // wypisane w ostrzezeniu, wysylka NIE jest blokowana (serwer
       // i tak ostatecznie zweryfikuje adresatow).
-      const unknown = unknownRecipients(input, knownRecipientNames(ui.state));
+      const unknown = unknownRecipients(recipients, knownRecipientNames(ui.state));
       if (unknown.length > 0) {
-        notify(api, `Poza baza osob: ${unknown.join(", ")}.`, { level: "warning" });
+        notify(api, `Odbiorcy spoza zapisanej bazy: ${unknown.join(", ")}. Wysylka bedzie kontynuowana, a serwer zweryfikuje ich nazwy.`, { level: "warning" });
       }
       ui.setBusy("Wysylam list...");
       const generation = connectionGeneration;
@@ -2185,9 +2330,9 @@ export async function init(api: PluginApi) {
           composeVisible = true;
           try {
             const out = await editor.send({
-              adresat: input.adresat.trim(),
+              adresat: recipients.adresat,
               temat: input.temat,
-              dw: input.dw.trim() === "" ? undefined : input.dw.trim(),
+              dw: recipients.dw.trim() === "" ? undefined : recipients.dw,
               linie: input.linie,
             });
             if (out.result === "wyslany") {
@@ -2210,14 +2355,16 @@ export async function init(api: PluginApi) {
               // Fala UI-2 krok 5: gracz przerwal compose w grze (~q).
               // Formularz ZOSTAJE - poprawka i ponowna wysylka mozliwa.
               notify(api, "Przerwano wysylke listu.", { level: "info" });
-            } else if (out.result === "blad" && out.error.kind === "brak-adresata") {
-              // Fala UI-2 krok 5: serwer wskazal sprawce - toast ma go
-              // wymieniac z imienia, nie ogolnikiem o "sprawdzeniu".
-              notify(api, `Nie ma takiego adresata: ${out.error.adresat}.`, {
-                level: "error",
-              });
-            } else {
-              notify(api, "Blad wysylki - sprawdz adresata.", { level: "error" });
+            } else if (out.result === "blad") {
+              // Rozpoznany blad zachowuje przyczyne. Timeout i nieznany
+              // fallback nie przypisuja porazki adresatowi.
+              notify(
+                api,
+                out.error.kind === "timeout"
+                  ? OPERATION_TIMEOUT_MSG
+                  : mailErrorText(out.error),
+                { level: "error" },
+              );
             }
           } finally {
             composeVisible = false;
@@ -2225,7 +2372,7 @@ export async function init(api: PluginApi) {
           }
         })
         .catch((err: unknown) => {
-          if (!isOperationCancelled(err)) notify(api, "Blad wysylki listu.", { level: "error" });
+          if (!isOperationCancelled(err)) notify(api, SEND_FAILURE_MSG, { level: "error" });
         })
         .finally(() => {
           if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
@@ -2241,7 +2388,7 @@ export async function init(api: PluginApi) {
         notify(api, SESSION_BUSY_MSG, { level: "warning" });
         return;
       }
-      refreshBoxes([box]);
+      refreshBoxes([box], "sync", "manual");
     },
     onLoadOlder: (box) => {
       if (lock.locked) {
@@ -2279,7 +2426,7 @@ export async function init(api: PluginApi) {
             const merged = mergeListingPage(ui.state.archive, box, searchRecords);
             ui.setArchive(merged.letters);
             stampEntries(box, res.entries, merged.resolvedIds);
-            persistArchive();
+            finalizeArchiveChange();
             notify(api, `Wyniki szukania (${formatListCount(res.entries.length)}).`, { level: "success" });
           } else {
             notify(api, "Brak pasujacych listow.");
@@ -2377,18 +2524,24 @@ export async function init(api: PluginApi) {
           try {
             const res = await pager.forwardLetter(fresh.number, adresat);
             if (res.queued) {
-              notify(api, "List przekazany - czeka w niewyslanych.", { level: "success" });
+              notify(api, "Przekazany list zapisany w niewyslanych.", { level: "success" });
               refreshBoxes(["niewyslane"]);
               flashUnsent();
             } else {
-              notify(api, "Blad przekazania - sprawdz adresata.", { level: "error" });
+              notify(
+                api,
+                res.error ? mailErrorText(res.error) : FORWARD_FAILURE_MSG,
+                { level: "error" },
+              );
             }
           } finally {
             transport!.endModal();
           }
         })
         .catch((err: unknown) => {
-          if (!isOperationCancelled(err)) notify(api, "Blad przekazania listu.", { level: "error" });
+          if (!isOperationCancelled(err)) {
+            notify(api, isPagerTimeout(err) ? OPERATION_TIMEOUT_MSG : FORWARD_FAILURE_MSG, { level: "error" });
+          }
         })
         .finally(() => {
           if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
@@ -2443,9 +2596,11 @@ export async function init(api: PluginApi) {
     const now = Date.now();
     if (now - lastWatchdogQ < 2000) return; // cooldown: jedno q na serie
     lastWatchdogQ = now;
-    transport!.send("q");
-    // "q" to komenda-wyjscie pagera - po jej wyslaniu sieroty nie ma.
-    clearPagerOrphan();
+    // Flaga znika dopiero po przyjeciu q. Odrzucenie zostawia podejrzenie
+    // do kolejnej proby i nie moze trafic do nieobslugonego rejection.
+    void Promise.resolve(transport!.send("q"))
+      .then(() => clearPagerOrphan())
+      .catch(() => {});
   });
 
   // Powiadomienia pocztowe: odswiezenie + opcjonalny tost.
@@ -2468,9 +2623,11 @@ export async function init(api: PluginApi) {
       // Fala 13d: "Slucham?" w oknie po naszym wyslaniu = serwer nie zna
       // komendy, czyli brak zwierzecia pocztowego (log 1999-08-22).
       if (sluchamArmed) {
+        animalSendSerial++;
+        animalSendPending = false;
         disarmSlucham();
         endAnimalFlight();
-        notify(api, "Zwierze nie odpowiada - sprawdz, czy masz zwierze pocztowe.", { level: "warning" });
+        notify(api, "Arkadia nie rozpoznala komendy wyslania zwierzecia. Sprawdz, czy masz zwierze pocztowe.", { level: "warning" });
       }
     } else if (n.kind === "powrot-zwierzecia") {
       // Fala 13b: powrot zwierzecia konczy lot; serwer przy ladowaniu
@@ -2529,6 +2686,10 @@ export async function init(api: PluginApi) {
       for (const timer of delayedInboxTimers) clearTimeout(timer);
       delayedInboxTimers = [];
       await Promise.allSettled([...tasks]);
+      if (unsubAnimalHeader) {
+        unsubAnimalHeader();
+        unsubAnimalHeader = null;
+      }
       if (unsubBadge) {
         unsubBadge();
         unsubBadge = null;
@@ -2608,6 +2769,10 @@ export async function destroy() {
     clearTimeout(playerMailModeTimer);
     playerMailModeTimer = null;
   }
+  if (unsubAnimalHeader) {
+    unsubAnimalHeader();
+    unsubAnimalHeader = null;
+  }
   if (unsubBadge) {
     unsubBadge();
     unsubBadge = null;
@@ -2642,6 +2807,7 @@ export async function destroy() {
     popup.close();
     popup = null;
   }
+  animalHeader = null;
   if (storageRef) {
     const storage = storageRef;
     storageRef = null;

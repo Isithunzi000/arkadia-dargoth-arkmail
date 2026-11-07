@@ -71,7 +71,7 @@ test('brama panelu Osoby: bez indeksu przycisk indeksacji zamiast licznikow', ()
       // graczowi.
       const gateText = container.textContent ?? '';
       assert.ok(
-        gateText.includes('Kontakty powstaja z listow zebranych ze wszystkich skrzynek.'),
+        gateText.includes('Osoby z listow powstaja z listow zebranych ze wszystkich skrzynek.'),
         'brama wyjasnia, skad bierze sie baza kontaktow',
       );
       // Fala 24a: bez dopisku "(jednorazowo)" - indeksowanie nie jest
@@ -135,7 +135,7 @@ test('brama panelu Osoby: lista kontaktow widoczna mimo braku indeksu, wskazowka
       assert.ok(panel, 'panel Osoby z listow');
       const panelText = (panel as unknown as { textContent?: string }).textContent ?? '';
       assert.ok(
-        panelText.includes('Kontakty powstaja z listow zebranych ze wszystkich skrzynek.'),
+        panelText.includes('Osoby z listow powstaja z listow zebranych ze wszystkich skrzynek.'),
         'wskazowka w panelu',
       );
       const gateBtn = (panel as unknown as { querySelector(s: string): unknown }).querySelector(
@@ -149,7 +149,7 @@ test('brama panelu Osoby: lista kontaktow widoczna mimo braku indeksu, wskazowka
       // Wskazowka jest przed kontrolkami w HTML panelu.
       const panelHtml = (panel as unknown as { innerHTML?: string }).innerHTML ?? '';
       assert.ok(
-        panelHtml.indexOf('Kontakty powstaja z listow') <
+        panelHtml.indexOf('Osoby z listow powstaja z listow') <
           panelHtml.indexOf('arkmail-contact-controls'),
         'wskazowka NAD lista kontaktow',
       );
@@ -255,14 +255,14 @@ test('Indeksuj wszystkie: paginacja kotwicowa, flagi, gone-marking, odblokowanie
     assert.ok(stepStatus, 'status kroku 1 istnieje');
     assert.match(
       String(stepStatus!.textContent ?? ''),
-      /Gotowe od 20\d\d-\d\d-\d\d: wszystkie skrzynki zapisane/,
+      /Wszystkie skrzynki zapisane\. Najstarszy zapis: 20\d\d-\d\d-\d\d\./,
       'data kompletu w kroku 1',
     );
     const strip = h.content.querySelector('.arkmail-arch-counts') as unknown as {
       textContent?: string;
     } | null;
     assert.ok(strip, 'pasek licznikow istnieje');
-    assert.ok(String(strip!.textContent ?? '').includes('Listow w bazie: 3'), 'rozmiar bazy');
+    assert.ok(String(strip!.textContent ?? '').includes('Liczba listow w bazie: 3.'), 'rozmiar bazy');
   } finally {
     await stopHarness();
   }
@@ -276,7 +276,7 @@ test('pobieranie tresci przy pustej bazie: jasny toast bez indeksacji', async ()
     await waitRt(() => !!h.content.querySelector('.arkmail-arch-download'), 'przycisk pobierania');
     click(h, '.arkmail-arch-download'); // uzbrojenie (dwuklik)
     click(h, '.arkmail-arch-download'); // odpalenie
-    await waitRt(() => notifyText(f, 'Skrzynki sa puste'), 'toast pustych skrzynek');
+    await waitRt(() => notifyText(f, 'Archiwum jest puste'), 'toast pustych skrzynek');
     assert.equal(f.sent.length, 0, 'pobieranie pustej bazy bez komend');
   } finally {
     await stopHarness();
@@ -290,7 +290,7 @@ test('eksport ZIP: pusta baza daje jasny toast bez indeksacji', async () => {
     click(h, '[data-tab="archiwum"]');
     await waitRt(() => !!h.content.querySelector('.arkmail-arch-export'), 'przycisk eksportu');
     click(h, '.arkmail-arch-export');
-    await waitRt(() => notifyText(f, 'Skrzynki sa puste'), 'toast pustych skrzynek');
+    await waitRt(() => notifyText(f, 'Archiwum jest puste'), 'toast pustych skrzynek');
     assert.ok(!notifyText(f, 'kliknij ponownie'), 'brak prosby o ponowny klik');
     assert.equal(f.sent.length, 0, 'eksport pustej bazy bez komend');
   } finally {

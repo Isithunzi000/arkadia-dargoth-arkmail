@@ -1,6 +1,7 @@
 /**
  * Style ArkMail - jeden <style> wstrzykiwany do kontenera popupu.
- * Wszystko scopingowane pod .arkmail-root, zero globalnych regul.
+ * Wnetrze jest scopingowane pod .arkmail-root. Jedyny wyjatek to
+ * wlasny przycisk w natywnym naglowku, ktory znajduje sie poza rootem.
  *
  * Fala 7c: nowoczesny, ciemny wyglad programu pocztowego + naprawa
  * buga "bialy przycisk, niewidoczna czcionka" (klient Dargoth ma
@@ -31,6 +32,11 @@ const BG_UNREAD = 'var(--popup-accent-subtle-bg)'; // tlo wiersza nieprzeczytane
 const HOVER_BASE = 'var(--popup-control-hover-bg)';
 
 export const STYLES = `
+/* Naglowek jest poza .arkmail-root; selektor ogranicza sie do jednej klasy. */
+.arkmail-animal-send.popup-header-btn {
+  color: ${ACCENT};
+  background: ${BG_UNREAD};
+}
 .arkmail-root {
   display: flex;
   flex-direction: column;
@@ -164,6 +170,16 @@ export const STYLES = `
   flex-direction: column;
   overflow: hidden;
 }
+/* Etap 8: semantyczne podpanele nie zmieniaja ukladu Archiwum;
+   Kontakty zachowuja kolumnowy uklad listy w dodatkowym kontenerze. */
+.arkmail-subpanel { display: contents; }
+.arkmail-contact-subpanel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.arkmail-contact-subpanel-scroll { overflow: auto; }
 .arkmail-list-scroll {
   flex: 1 1 auto;
   min-height: 0;
@@ -211,6 +227,12 @@ export const STYLES = `
 /* Wydanie 1.30.1 (zgloszenie 1): klawisze operacji naturalnej
    szerokosci (bez rozciagania), odstep jak miedzy pigulkami skrzynek. */
 .arkmail-box-ops { display: flex; flex-wrap: wrap; gap: calc(8px * var(--window-font-scale, 1)); margin-bottom: calc(8px * var(--window-font-scale, 1)); }
+.arkmail-destructive-zone {
+  flex: none;
+  margin-top: auto;
+  margin-bottom: 0;
+  padding-top: calc(8px * var(--window-font-scale, 1));
+}
 .arkmail-box-ops button { flex: 0 1 auto; }
 .arkmail-root button:not(.popup-btn):not(.dialog-tab):disabled { opacity: 0.45; cursor: default; }
 .arkmail-root button:not(.popup-btn):not(.dialog-tab):disabled:hover { background: ${BG_RAISED}; }
@@ -445,13 +467,19 @@ export const STYLES = `
   cursor: pointer;
 }
 .arkmail-root button.arkmail-contact-dir:hover, .arkmail-root button.arkmail-contact-addbook:hover { background: ${HOVER_BASE}; border-color: ${ACCENT}; color: ${ACCENT}; }
-/* Fala UI-2 krok 4: naglowek zwijanego panelu "Osoby z listow". */
-/* Zgloszenie 2026-11-05 (A1): rozwineta lista osob scrolluje sie
- * wlasnym kontenerem - dluga ksiazka osob nie pcha calej zakladki
- * w dol (skala zgodnie z sekcja "rozmiar czcionki okna"). */
+/* Etap 9 (A1): panel osob uzywa calej dostepnej wysokosci.
+ * Jedynym przewijanym obszarem jest sama lista. */
+.arkmail-root .arkmail-arch-people-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
 .arkmail-root .arkmail-arch-people-list {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  max-height: calc(240px * var(--window-font-scale, 1));
 }
 /* Waski popup: wiersz ksiazki trzyma checkbox, imie i oba przyciski
  * w jednej linii; imie sie skraca (wielokropek), nie wypycha przyciskow.
@@ -481,6 +509,7 @@ export const STYLES = `
   gap: calc(6px * var(--window-font-scale, 1));
   margin-bottom: calc(8px * var(--window-font-scale, 1));
 }
+.arkmail-root .arkmail-arch-people-panel .arkmail-contact-controls { flex: none; }
 .arkmail-archive-steps {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(calc(220px * var(--window-font-scale, 1)), 1fr));

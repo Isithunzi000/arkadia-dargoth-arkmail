@@ -250,7 +250,7 @@ test('blizniaki: missing czysci TYLKO rekord, ktorego wiersza nie ma na listingu
     // moze istniec gdzie indziej) - odpowiadamy pustymi listingami.
     await drainOtherBoxes(h);
     await waitRt(
-      () => notifyText(h.f, 'nie ma juz w skrzynce'),
+      () => notifyText(h.f, 'Nie ma juz w skrzynce'),
       'podsumowanie z missing: 1',
     );
     assert.ok(

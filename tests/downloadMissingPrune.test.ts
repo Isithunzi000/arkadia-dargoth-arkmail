@@ -125,7 +125,7 @@ test('missing przy pobieraniu: grupa wypada z archiwum I wiersz znika z widoku',
 
     await waitRt(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec pobierania');
     assert.ok(
-      notifyText(f, 'nie ma juz w skrzynce: 1'),
+      notifyText(f, 'Nie ma juz w skrzynce: 1'),
       'komunikat o missing jednej grupy',
     );
 
@@ -133,7 +133,7 @@ test('missing przy pobieraniu: grupa wypada z archiwum I wiersz znika z widoku',
     const strip = (): string =>
       (content.querySelector('.arkmail-arch-counts') as { textContent: string } | null)
         ?.textContent ?? '';
-    await waitRt(() => strip().includes('Listow w bazie: 2'), 'archiwum bez najnowszego');
+    await waitRt(() => strip().includes('Liczba listow w bazie: 2.'), 'archiwum bez najnowszego');
     assert.ok(!strip().includes('3'), 'trzy rekordy juz nie');
 
     // Widok skrzynki: martwy wiersz ma zniknac (RED - dzis zostaje).

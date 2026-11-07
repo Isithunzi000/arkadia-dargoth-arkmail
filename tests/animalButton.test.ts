@@ -23,7 +23,7 @@ import assert from 'node:assert/strict';
 
 import type { MailBox } from '../src/arkmail/core/protocol/types.js';
 import { ANIMAL_TIMING } from '../src/arkmail/index';
-import { startHarness, stopHarness, click, textOf, waitRt, type Harness } from './harness';
+import { startHarness, stopHarness, click, textOf, waitRt, queryUi, type Harness } from './harness';
 
 const GENITIVE: Record<MailBox, string> = {
   odebrane: 'odebranych',
@@ -47,11 +47,11 @@ const waitIdle = (h: Harness): Promise<void> =>
   h.waitFor(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji');
 
 const animalBtn = (h: Harness): { disabled: boolean } | null =>
-  h.content.querySelector('.arkmail-animal-send') as { disabled: boolean } | null;
+  queryUi(h, '.arkmail-animal-send') as { disabled: boolean } | null;
 
 test('przycisk Wyslij Zwierze istnieje i wysyla komende "wyslij zwierze"', async () => {
   answered.clear();
-  const h = await startHarness();
+  const h = await startHarness({ wide: true });
   try {
     assert.ok(animalBtn(h), 'przycisk w pasku operacji');
     assert.equal(textOf(h, '.arkmail-animal-send'), 'Wyslij zwierze');
@@ -64,7 +64,7 @@ test('przycisk Wyslij Zwierze istnieje i wysyla komende "wyslij zwierze"', async
 
 test('po wyslaniu przycisk jest nieaktywny do konca lotu', async () => {
   answered.clear();
-  const h = await startHarness();
+  const h = await startHarness({ wide: true });
   try {
     click(h, '.arkmail-animal-send');
     await h.waitFor(() => h.f.sent.includes('wyslij zwierze'), 'komenda wyslij zwierze');
@@ -183,6 +183,75 @@ test('klik w trakcie lotu nie wysyla duplikatu', async () => {
     await answerEmpty(h, 'odebrane');
     await answerEmpty(h, 'nieprzeczytane');
     // Fala 24f1: powrot odswieza tez niewyslane i wyslane.
+    await answerEmpty(h, 'niewyslane');
+    await answerEmpty(h, 'wyslane');
+    await waitIdle(h);
+  } finally {
+    await stopHarness();
+  }
+});
+
+test('klik offline nie uruchamia lotu i pokazuje blad wysylki', async () => {
+  answered.clear();
+  const h = await startHarness({ skipArm: true });
+  try {
+    click(h, '.arkmail-animal-send');
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    assert.equal(animalBtn(h)?.disabled, false, 'brak 60-sekundowej blokady po odrzuceniu offline');
+    assert.ok(h.f.shown.some((entry) => String((entry as { title?: string }).title ?? '').includes('Blad wysylania zwierzecia')), 'wlasny toast bledu');
+    assert.deepEqual(h.f.sent, [], 'offline zero komend do gry');
+  } finally {
+    await stopHarness();
+  }
+});
+
+test('lot startuje dopiero po przyjeciu komendy, a podwojny klik nie duplikuje jej', async () => {
+  answered.clear();
+  const h = await startHarness();
+  let accept: () => void = () => {};
+  h.f.sendImpl = (command) => command === 'wyslij zwierze'
+    ? new Promise<void>((resolve) => { accept = resolve; })
+    : Promise.resolve();
+  try {
+    click(h, '.arkmail-animal-send');
+    await h.waitFor(() => h.f.sent.includes('wyslij zwierze'), 'pierwsza komenda');
+    click(h, '.arkmail-animal-send');
+    assert.equal(h.f.sent.filter((cmd) => cmd === 'wyslij zwierze').length, 1, 'jedna komenda przed rozstrzygnieciem');
+    assert.equal(animalBtn(h)?.disabled, false, 'oczekiwanie na API nie jest jeszcze lotem');
+    accept();
+    await h.waitFor(() => animalBtn(h)?.disabled === true, 'lot po przyjeciu komendy');
+    h.f.fire('Wsrod trzepotu skrzydel Sroka laduje na twoim prawym ramieniu.', 'mail');
+    await answerEmpty(h, 'odebrane');
+    await answerEmpty(h, 'nieprzeczytane');
+    await answerEmpty(h, 'niewyslane');
+    await answerEmpty(h, 'wyslane');
+    await waitIdle(h);
+  } finally {
+    accept();
+    await stopHarness();
+  }
+});
+
+test('odrzucenie komendy konczy oczekiwanie, zdejmuje detektor i pozwala ponowic', async () => {
+  answered.clear();
+  const h = await startHarness();
+  let attempts = 0;
+  h.f.sendImpl = () => {
+    attempts++;
+    return attempts === 1 ? Promise.reject(new Error('odrzucona')) : Promise.resolve();
+  };
+  try {
+    click(h, '.arkmail-animal-send');
+    await waitRt(() => h.f.shown.some((entry) => String((entry as { title?: string }).title ?? '').includes('Blad wysylania zwierzecia')), 'toast odrzucenia');
+    assert.equal(animalBtn(h)?.disabled, false, 'brak lotu po bledzie API');
+    h.f.fire('Slucham?');
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    assert.ok(!h.f.shown.some((entry) => String((entry as { text?: string }).text ?? '').includes('Arkadia nie rozpoznala')), 'stary detektor jest wyczyszczony');
+    click(h, '.arkmail-animal-send');
+    await h.waitFor(() => animalBtn(h)?.disabled === true, 'ponowienie dziala po bledzie');
+    h.f.fire('Wsrod trzepotu skrzydel Sroka laduje na twojej rece.', 'mail');
+    await answerEmpty(h, 'odebrane');
+    await answerEmpty(h, 'nieprzeczytane');
     await answerEmpty(h, 'niewyslane');
     await answerEmpty(h, 'wyslane');
     await waitIdle(h);

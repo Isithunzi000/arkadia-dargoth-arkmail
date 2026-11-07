@@ -248,7 +248,7 @@ test('archiwum: wpis bez tresci i bez daty = toast, zadna komenda nie wylatuje',
     clickArchiveRow(h, 'bezdatny');
     await waitFor(
       // Fala 17f: komunikat po ludzku ("zlokalizowac" zastapione).
-      () => notifyText(f, 'Nie moge znalezc tego listu'),
+      () => notifyText(f, 'Nie mozna odnalezc tego listu'),
       'toast o braku lokalizacji',
     );
     assert.equal(f.sent.length, base, 'zadna komenda nie wyleciala');

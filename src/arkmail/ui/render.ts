@@ -11,6 +11,7 @@ import type { MailBox } from '../core/protocol/types.js';
 import type { MailboxEntry } from '../core/session/mailbox.js';
 import {
   fromISODate,
+  isValidPersonName,
   validateSearchDraft,
   type ListingSearch,
 } from '../core/protocol/commands.js';
@@ -21,7 +22,6 @@ import {
 } from '../core/archive.js';
 import {
   liveArchiveGroups,
-  perBoxCounts,
   totalLive,
 } from '../core/archiveStats.js';
 import { parseMailDate } from '../core/protocol/parser.js';
@@ -29,6 +29,7 @@ import { archiveExportEntries } from '../core/exportTxt.js';
 import { viewContacts, type ContactSort } from '../core/contacts.js';
 import {
   parseAddressBookExport,
+  groupAliasConflict,
   type AddressBookExport,
   type ContactGroup,
   type ImportMode,
@@ -111,8 +112,8 @@ export interface MailUiHandlers {
   onIndexAll?(): void;
   /**
    * Import osob z gry (Fala UI-2): zapamietani lub przedstawieni.
-   * Zapisuje PULE (podmianka), nie tworzy grup - z bazy gracz sklada
-   * grupy recznie. Opcjonalny: starsze montaze testowe go nie podaja.
+   * Dopisuje nowe osoby do istniejacej puli, nie tworzy grup - z bazy
+   * gracz sklada grupy recznie. Opcjonalny: starsze montaze go nie podaja.
    */
   onImportPeople?(kind: 'zapamietani' | 'przedstawieni'): void;
   /**
@@ -127,6 +128,8 @@ export interface MailUiHandlers {
    * Opcjonalny: starsze montaze testowe go nie podaja.
    */
   onSaveGroups?(groups: ContactGroup[]): void;
+  /** Jedna operacja dopisania czlonka do grupy i Ksiazki. Zwraca blad walidacji. */
+  onAddGroupMember?(groupName: string, name: string): string | null;
   /**
    * Zapis plaskiej ksiazki imion (Fala UI-2 krok 3): wywolywany po
    * kazdej mutacji CRUD (dodanie, usuniecie pojedyncze, usuniecie
@@ -252,9 +255,43 @@ const nativeFieldClass = (el: HTMLElement): void => {
   // 'listy' (domyslnie) albo 'osoby'. Stan lokalny, repaint przez
   // store.refresh(), jak sub-pigulki Kontaktow.
   const archView = { sub: 'listy' as 'listy' | 'osoby' };
+  const ARCHIVE_CLEAR_TITLE =
+    'Czysci filtry Archiwum i Osob z listow oraz przywraca sortowanie osob: Nazwa A-Z.';
+  const archiveFiltersDirty = (): boolean =>
+    Object.values(archFilter).some((value) => value !== undefined && value !== '') ||
+    contactView.filter !== '' ||
+    contactView.sort !== 'nazwa';
+  const clearArchiveFilters = (): boolean => {
+    if (!archiveFiltersDirty()) return false;
+    for (const key of ['osoba', 'temat', 'tresc', 'odDaty', 'doDaty', 'skrzynka'] as const) {
+      archFilter[key] = undefined;
+    }
+    contactView.filter = '';
+    contactView.sort = 'nazwa';
+    return true;
+  };
+  const wireArchiveClearButton = (button: HTMLButtonElement): (() => void) => {
+    button.textContent = 'Wyczysc filtry';
+    button.setAttribute('title', ARCHIVE_CLEAR_TITLE);
+    const sync = (): void => {
+      if (archiveFiltersDirty()) button.removeAttribute('disabled');
+      else button.setAttribute('disabled', '1');
+    };
+    button.addEventListener('click', () => {
+      if (clearArchiveFilters()) store.refresh();
+    });
+    sync();
+    return sync;
+  };
   /** Tryb importu pliku ksiazki (Fala UI-2 krok 3): lokalny jak
    *  contactView - domyslnie dolacz; "zastap" podmienia imiona i grupy. */
   let bookImportMode: ImportMode = 'dolacz';
+  let bookImportSelection = 0;
+  let pendingBookReplace: {
+    selection: number;
+    fileName: string;
+    data: AddressBookExport;
+  } | null = null;
   /** Zaznaczenie w widoku ksiazki adresowej (Fala UI-2 krok 3): lokalne
    *  (jak filtry). Zerowane przy kazdej zmianie listy imion - porownanie
    *  referencji tablicy w store, wiec importy/dodanie/usuniecie kasuja
@@ -291,7 +328,8 @@ const nativeFieldClass = (el: HTMLElement): void => {
   // szukaja. Zakladka Listy juz tak dzialala; usuwanie dojrzewalo do
   // tej samej semantyki (osobny "Odswiez" byl redundantny).
   const SEARCH_GO_LABEL = 'Szukaj / Odswiez';
-  const SEARCH_GO_TITLE = 'Szuka po wpisanych filtrach; przy pustych filtrach odswieza skrzynke';
+  const SEARCH_GO_TITLE =
+    'Szuka listow po wpisanych filtrach. Przy pustych filtrach odswieza wybrana skrzynke.';
 
   // --- Guard dwukliku klawiszy usuwajacych (zgloszenie 2026-11-05):
   // jeden wzorzec dla calego UI. Pierwszy klik uzbraja na 3 s
@@ -307,6 +345,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     timer: ReturnType<typeof setTimeout> | null;
     baseText: string;
     baseTitle: string;
+    baseAriaLabel: string | null;
   }
   const armedButtons = new Set<ArmedButton>();
   const disarmButton = (g: ArmedButton): void => {
@@ -315,6 +354,8 @@ const nativeFieldClass = (el: HTMLElement): void => {
     g.el.removeAttribute('data-armed');
     g.el.textContent = g.baseText;
     g.el.setAttribute('title', g.baseTitle);
+    if (g.baseAriaLabel === null) g.el.removeAttribute('aria-label');
+    else g.el.setAttribute('aria-label', g.baseAriaLabel);
     armedButtons.delete(g);
   };
   const disarmAllButtons = (): void => {
@@ -325,18 +366,25 @@ const nativeFieldClass = (el: HTMLElement): void => {
     onConfirm: () => void,
     opts: { armedLabel?: string; armedTitle?: string } = {},
   ): void => {
+    // Ikony bez widocznego tekstu dostaja nazwe dostepnosci z title.
+    if (!btn.getAttribute('aria-label')) {
+      btn.setAttribute('aria-label', btn.getAttribute('title') ?? btn.textContent ?? 'Usun');
+    }
     const g: ArmedButton = {
       el: btn,
       timer: null,
       baseText: btn.textContent ?? '',
       baseTitle: btn.getAttribute('title') ?? '',
+      baseAriaLabel: btn.getAttribute('aria-label'),
     };
     btn.addEventListener('click', () => {
       if (g.timer === null) {
         g.timer = setTimeout(() => disarmButton(g), GUARD_ARM_MS);
         btn.setAttribute('data-armed', '1');
         if (opts.armedLabel !== undefined) btn.textContent = opts.armedLabel;
-        btn.setAttribute('title', opts.armedTitle ?? 'Kliknij ponownie, aby usunac.');
+        const armedTitle = opts.armedTitle ?? 'Kliknij ponownie, aby usunac.';
+        btn.setAttribute('title', armedTitle);
+        btn.setAttribute('aria-label', opts.armedLabel ?? armedTitle);
         armedButtons.add(g);
         return;
       }
@@ -357,7 +405,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
   // zmiana store (strona loadAll co ~400 ms, merge notyfikacji) niszczyla
   // DOM i gubila focus/karet/scroll - litera po literze wywalalo z pola.
   interface ViewSnap {
-    focusKey: string | null;
+    focusKey: { attribute: string; value: string } | null;
     /** Wartosc aktywnego pola: draft aktualizuje sie na 'input', ale
      *  wpis bez zdarzenia (i tak trafia tu zawsze najswiezszy tekst z DOM). */
     focusValue: string | null;
@@ -377,7 +425,32 @@ const nativeFieldClass = (el: HTMLElement): void => {
       }
     });
   };
-  const focusKeyOf = (el: Element | null): string | null => {
+  const submitOnEnter = (input: HTMLInputElement, activate: () => void): void => {
+    input.addEventListener('keydown', (ev: KeyboardEvent) => {
+      if (ev.key !== 'Enter' || ev.repeat || ev.isComposing) return;
+      ev.preventDefault();
+      activate();
+    });
+  };
+  const wireTabKeyboard = (
+    bar: HTMLElement,
+    buttons: readonly HTMLButtonElement[],
+    activate: (index: number) => void,
+  ): void => {
+    bar.addEventListener('keydown', (ev: KeyboardEvent) => {
+      const current = buttons.indexOf(ev.target as HTMLButtonElement);
+      if (current < 0) return;
+      let next: number;
+      if (ev.key === 'ArrowRight') next = (current + 1) % buttons.length;
+      else if (ev.key === 'ArrowLeft') next = (current - 1 + buttons.length) % buttons.length;
+      else if (ev.key === 'Home') next = 0;
+      else if (ev.key === 'End') next = buttons.length - 1;
+      else return;
+      ev.preventDefault();
+      activate(next);
+    });
+  };
+  const focusKeyOf = (el: Element | null): { attribute: string; value: string } | null => {
     if (!el || typeof (el as HTMLElement).getAttribute !== 'function') return null;
     if (!root.contains(el)) return null;
     for (const attr of [
@@ -387,9 +460,15 @@ const nativeFieldClass = (el: HTMLElement): void => {
       'data-deletion-filter',
       'data-deletion-number',
       'data-book-check',
+      'data-book-filter',
+      'data-book-new',
+      'data-group-filter',
+      'data-group-add',
+      'data-group-rename',
+      'data-member-add',
     ]) {
-      const v = (el as HTMLElement).getAttribute(attr);
-      if (v !== null) return `[${attr}="${v}"]`;
+      const value = (el as HTMLElement).getAttribute(attr);
+      if (value !== null) return { attribute: attr, value };
     }
     return null;
   };
@@ -429,7 +508,11 @@ const nativeFieldClass = (el: HTMLElement): void => {
       }
     }
     if (snap.focusKey) {
-      const el = root.querySelector(snap.focusKey) as HTMLInputElement | null;
+      // Wartosc atrybutu nigdy nie trafia do selektora: znaki specjalne
+      // w nazwach nie moga zepsuc przywracania fokusu.
+      const el = Array.from(root.querySelectorAll(`[${snap.focusKey.attribute}]`)).find(
+        (candidate) => candidate.getAttribute(snap.focusKey!.attribute) === snap.focusKey!.value,
+      ) as HTMLInputElement | undefined;
       if (el) {
         if (el.getAttribute('type') === 'checkbox') {
           el.checked = snap.focusValue === '1';
@@ -480,7 +563,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
   const adresatSource: GhostSource = () => [
     ...personSource(),
     ...store.state.groups
-      .filter((g) => g.members.length > 0)
+      .filter((g) => g.members.length > 0 && !groupAliasConflict(g.name, store.state.importedAliases))
       .map((g) => ({ text: g.name, expand: g.members.join(', ') })),
   ];
   // Filtr grup: nazwy grup z ksiazki (zgloszenie 2026-11-05, K8).
@@ -512,6 +595,9 @@ const nativeFieldClass = (el: HTMLElement): void => {
     footer.className = 'arkmail-status';
     const busyEl = doc.createElement('div');
     busyEl.className = 'arkmail-busy' + (state.busy !== null ? '' : ' arkmail-busy-empty');
+    busyEl.setAttribute('role', 'status');
+    busyEl.setAttribute('aria-live', 'polite');
+    busyEl.setAttribute('aria-atomic', 'true');
     const label = doc.createElement('span');
     // Fala 18d: ETA przy petli pobierania tresci (od 3 ukonczonych).
     const dl = state.archiveDownload;
@@ -520,11 +606,16 @@ const nativeFieldClass = (el: HTMLElement): void => {
       (dl !== null && dl.etaMs !== null ? ` (${formatEta(dl.etaMs)})` : '');
     busyEl.appendChild(label);
     if (dl !== null && dl.total > 0) {
+      const pct = Math.min(100, Math.round((dl.done / dl.total) * 100));
       const track = doc.createElement('div');
       track.className = 'arkmail-busy-track';
+      track.setAttribute('role', 'progressbar');
+      track.setAttribute('aria-valuemin', '0');
+      track.setAttribute('aria-valuemax', '100');
+      track.setAttribute('aria-valuenow', String(pct));
+      track.setAttribute('aria-valuetext', `${dl.done} z ${dl.total}`);
       const bar = doc.createElement('div');
       bar.className = 'arkmail-busy-bar';
-      const pct = Math.min(100, Math.round((dl.done / dl.total) * 100));
       bar.style.width = `${pct}%`;
       track.appendChild(bar);
       busyEl.appendChild(track);
@@ -544,10 +635,12 @@ const nativeFieldClass = (el: HTMLElement): void => {
     // Fala 12d: pelny podglad zyje tylko na zakladce napisz - zmiana
     // zakladki zamyka overlay (powrot do napisz = formularz).
     if (state.tab !== 'napisz') previewFull = false;
+    const selectedTab: UiTab | null = state.tab === 'list' ? null : state.tab;
     const nodes: Node[] = [renderTabs(state)];
+    let panel: HTMLElement;
     if (state.tab === 'napisz' && previewFull) {
       // Fala 12d: podglad na cale okno popupu (oba tryby szerokosci).
-      nodes.push(renderPreviewFull());
+      panel = renderPreviewFull();
     } else if (state.wide && state.tab === 'listy') {
       // Fala 10: na szerokim zakladka 'listy' to ZAWSZE split (klasyczny
       // klient poczty) - bez otwartego listu prawy panel ma placeholder.
@@ -555,7 +648,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
       split.className = 'arkmail-split';
       split.appendChild(renderListy(state));
       split.appendChild(renderList(state));
-      nodes.push(split);
+      panel = split;
     } else if (state.wide && state.tab === 'napisz') {
       // Fala 11d: compose dwupanelowy - formularz z lewej, zywy podglad
       // wysylanego listu z prawej (konwencja podgladu /list w kliencie).
@@ -563,10 +656,15 @@ const nativeFieldClass = (el: HTMLElement): void => {
       split.className = 'arkmail-split arkmail-split-compose';
       split.appendChild(renderNapisz(state));
       split.appendChild(renderComposePreview());
-      nodes.push(split);
+      panel = split;
     } else {
-      nodes.push(renderPane(state));
+      panel = renderPane(state);
     }
+    panel.id = `arkmail-panel-${state.tab}`;
+    panel.setAttribute('role', 'tabpanel');
+    if (selectedTab === null) panel.setAttribute('aria-label', 'List');
+    else panel.setAttribute('aria-labelledby', `arkmail-tab-${selectedTab}`);
+    nodes.push(panel);
     nodes.push(renderStatusFooter(state));
     root.replaceChildren(...nodes);
     fillButtonTitles(root);
@@ -574,23 +672,38 @@ const nativeFieldClass = (el: HTMLElement): void => {
   };
 
   const renderTabs = (state: MailUiState): HTMLElement => {
+    const selectedTab: UiTab | null = state.tab === 'list' ? null : state.tab;
     const bar = doc.createElement('div');
     bar.className = 'arkmail-tabs dialog-tabs';
+    bar.setAttribute('role', 'tablist');
+    bar.setAttribute('aria-label', 'ArkMail');
+    const buttons: HTMLButtonElement[] = [];
     for (const [id, label] of TABS) {
       const btn = doc.createElement('button');
       btn.className =
         'arkmail-tab dialog-tab' +
-        (state.tab === id ? ' is-active' : '') +
+        (selectedTab === id ? ' is-active' : '') +
         // Fala 14b: flash po odlozeniu listu w niewyslanych (compose
         // poza poczta zawsze kolejkuje) - gracz widzi, gdzie kliknac.
         (state.unsentFlash && id === 'listy' ? ' arkmail-flash' : '');
       btn.setAttribute('data-tab', id);
+      btn.id = `arkmail-tab-${id}`;
+      btn.setAttribute('role', 'tab');
+      btn.setAttribute('aria-selected', selectedTab === id ? 'true' : 'false');
+      btn.setAttribute('aria-controls', `arkmail-panel-${id}`);
+      btn.tabIndex = selectedTab === id || (selectedTab === null && id === 'listy') ? 0 : -1;
       // Fala 14d: '(u)' albo '(u/n)' - nieprzeczytane/niewyslane.
       btn.textContent =
         id === 'listy' ? label + formatBadgeSuffix(state.badge, state.badgeUnsent) : label;
       btn.addEventListener('click', () => store.setTab(id));
       bar.appendChild(btn);
+      buttons.push(btn);
     }
+    wireTabKeyboard(bar, buttons, (index) => {
+      const id = TABS[index]![0];
+      store.setTab(id);
+      (root.querySelector(`[data-tab="${id}"]`) as HTMLButtonElement | null)?.focus();
+    });
     return bar;
   };
 
@@ -633,7 +746,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     controls.className = 'arkmail-deletion-controls';
     const box = doc.createElement('select');
     nativeFieldClass(box);
-    box.className = 'arkmail-deletion-box';
+    box.classList.add('arkmail-deletion-box');
     box.setAttribute('title', 'Wybierz skrzynke');
     for (const [id, label] of BOXES) {
       const option = doc.createElement('option');
@@ -742,6 +855,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
       field.addEventListener('input', () => {
         deletionDraft[key] = field.value;
       });
+      submitOnEnter(field, () => search.click());
       wrap.appendChild(field);
       filterRow.appendChild(wrap);
     }
@@ -886,15 +1000,6 @@ const nativeFieldClass = (el: HTMLElement): void => {
     // Operacje na aktywnej skrzynce.
     const ops = doc.createElement('div');
     ops.className = 'arkmail-box-ops';
-    // Fala 13b: wyslanie zwierzecia pocztowego (send/receive w jednym) -
-    // komenda "wyslij zwierze". Nieaktywny w trakcie lotu (roundtrip
-    // 20-50 s wg logow); koniec lotu: linia ladowania albo timeout.
-    const animalBtn = doc.createElement('button');
-    animalBtn.className = 'arkmail-animal-send popup-btn popup-btn--control';
-    animalBtn.textContent = state.animalFlying ? 'Zwierze w drodze...' : 'Wyslij zwierze';
-    if (state.animalFlying) animalBtn.setAttribute('disabled', '');
-    animalBtn.addEventListener('click', () => handlers.onSendAnimal?.());
-    ops.appendChild(animalBtn);
     const view0 = state.boxes[state.activeBox];
     const searchMode0 = state.search && state.search.box === state.activeBox ? state.search : null;
     const loopHere = state.loadAll !== null && state.loadAll.box === state.activeBox;
@@ -968,7 +1073,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
       return input;
     };
     const sOsoba = mkSearch('osoba', 'Osoba (kogo? czego?)');
-    sOsoba.setAttribute('title', 'Wpisz imie w dopelniaczu.');
+    sOsoba.setAttribute('title', 'Wpisz szukana fraze w dopelniaczu (kogo? czego?).');
     const sTemat = mkSearch('temat', 'Temat');
     // Fala 28a: szukanie po tresci - serwer wspiera "o tresci"
     // (?listy, help w grze), builder komendy obslugiwal od zawsze,
@@ -979,7 +1084,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     // (lewo-prawo) z WIDOCZNYMI etykietami - placeholder na
     // input[type=date] jest ignorowany przez przegladarke i pole bylo
     // anonimowe (zgloszenie 2026-10-23 pkt 1).
-    sTresc.className = 'arkmail-search-wide';
+    sTresc.classList.add('arkmail-search-wide');
     const sOd = mkSearch('odDaty', 'Od dnia', 'date');
     const sDo = mkSearch('doDaty', 'Do dnia', 'date');
     const sOdF = mkDateField(doc, sOd, 'Od dnia (wlacznie)', 'Szukanie zwroci listy wyslane od tego dnia WLACZNIE.');
@@ -1065,7 +1170,11 @@ const nativeFieldClass = (el: HTMLElement): void => {
       banner.appendChild(doc.createTextNode(`Wyniki szukania: ${searchMode.label}`));
       const clear = doc.createElement('button');
       clear.className = 'arkmail-search-clear popup-btn popup-btn--control popup-btn--danger popup-btn--ghost';
-      clear.textContent = 'Wyczysc';
+      clear.textContent = 'Wyczysc wyniki i filtry';
+      clear.setAttribute(
+        'title',
+        'Usuwa wyniki szukania, czysci wszystkie pola i przywraca pelny widok skrzynki.',
+      );
       clear.addEventListener('click', () => {
         // Fala 16g: Wyczysc kasuje tez pola szukajki (zgloszenie pkt 11)
         // - wyniki znikaly, ale frazy zostawaly w polach i mylily.
@@ -1079,11 +1188,11 @@ const nativeFieldClass = (el: HTMLElement): void => {
 
     const view = state.boxes[state.activeBox];
     if (!view) {
-      scroll.appendChild(dim('Skrzynka nie zaladowana - kliknij jej nazwe, aby pobrac.'));
+      scroll.appendChild(dim('Skrzynka nie zaladowana - kliknij jej nazwe, aby ja pobrac.'));
       return pane;
     }
     if (view.empty !== null) {
-      scroll.appendChild(dim(view.empty === 'puste' ? 'Skrzynka pusta.' : 'Brak pasujacych listow.'));
+      scroll.appendChild(dim(view.empty === 'puste' ? 'Skrzynka jest pusta.' : 'Brak pasujacych listow.'));
       return pane;
     }
     // Serwer podaje najstarszy->najnowszy; wyswietlamy najnowszy->najstarszy.
@@ -1271,6 +1380,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
         const adresat = fwdInput.value.trim();
         if (adresat) handlers.onForwardLetter(l.box, source, adresat);
       });
+      submitOnEnter(fwdInput, () => fwd.click());
     } else {
       fwd.setAttribute('disabled', '');
       fwd.setAttribute('title', 'Otworz list z zakladki Listy, aby go przekazac.');
@@ -1281,7 +1391,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     // paska: pin kolejnosci rezerwuje poczatek dla Odpowiedz/Usun.
     const exp = doc.createElement('button');
     exp.className = 'arkmail-export-letter popup-btn popup-btn--control';
-    exp.textContent = 'Zapisz list TXT';
+    exp.textContent = 'Zapisz list jako TXT';
     exp.addEventListener('click', () => handlers.onExportLetter?.());
     ops.appendChild(exp);
     pane.appendChild(ops);
@@ -1310,8 +1420,8 @@ const nativeFieldClass = (el: HTMLElement): void => {
     composeDraft.tresc = '';
     store.setTab('napisz');
   };
-  // Format listy adresatow na linie do gry: "A, B, C" (przecinki -
-  // zgodnie z PROTOCOL.md; serwer rozbija odbiorcow po przecinkach).
+  // Rozwiniecie lokalnej grupy ma staly format "A, B, C". Zgodnie z
+  // PROTOCOL.md serwer akceptuje przecinki i spacje jako separatory.
   // Spojnik " i " zostaje wylacznie dla parsowania listingow
   // (splitParty). Jedna osoba = samo imie. Pusta lista nie wystepuje -
   // przyciski sa wylaczone.
@@ -1423,9 +1533,11 @@ const nativeFieldClass = (el: HTMLElement): void => {
     for (const [field, label] of fields) {
       const lab = doc.createElement('label');
       lab.textContent = label;
+      lab.htmlFor = `arkmail-compose-${field}`;
       pane.appendChild(lab);
       const input = doc.createElement('input');
       nativeFieldClass(input);
+      input.id = `arkmail-compose-${field}`;
       input.setAttribute('data-field', field);
       input.value = composeDraft[field as 'adresat' | 'temat' | 'dw'];
       input.addEventListener('input', () => {
@@ -1441,9 +1553,11 @@ const nativeFieldClass = (el: HTMLElement): void => {
     // Szablon ramki + szerokosc linii (trzymane w store, trwale).
     const labSz = doc.createElement('label');
     labSz.textContent = 'Szablon';
+    labSz.htmlFor = 'arkmail-compose-szablon';
     pane.appendChild(labSz);
     const sel = doc.createElement('select');
     nativeFieldClass(sel);
+    sel.id = 'arkmail-compose-szablon';
     sel.setAttribute('data-field', 'szablon');
     for (const [value, label] of TEMPLATES) {
       const opt = doc.createElement('option');
@@ -1459,24 +1573,46 @@ const nativeFieldClass = (el: HTMLElement): void => {
 
     const labW = doc.createElement('label');
     labW.textContent = 'Szerokosc linii (20-120)';
+    labW.htmlFor = 'arkmail-compose-szerokosc';
     pane.appendChild(labW);
     const width = doc.createElement('input');
     nativeFieldClass(width);
+    width.id = 'arkmail-compose-szerokosc';
     width.setAttribute('data-field', 'szerokosc');
+    width.setAttribute('inputmode', 'numeric');
+    width.setAttribute('aria-describedby', 'arkmail-compose-szerokosc-error');
     width.value = String(state.composeWidth);
+    const widthError = doc.createElement('div');
+    widthError.id = 'arkmail-compose-szerokosc-error';
+    widthError.className = 'arkmail-dim arkmail-compose-width-error';
+    widthError.setAttribute('data-compose-width-error', '');
+    widthError.setAttribute('role', 'alert');
     width.addEventListener('change', () => {
-      const parsed = Number.parseInt(width.value, 10);
-      store.setCompose({
-        width: Number.isFinite(parsed) ? clampLineWidth(parsed) : 60,
-      });
+      if (!/^\d+$/.test(width.value)) {
+        width.setAttribute('aria-invalid', 'true');
+        widthError.textContent = 'Podaj liczbe calkowita od 20 do 120.';
+        return;
+      }
+      const parsed = Number(width.value);
+      if (parsed < 20 || parsed > 120) {
+        width.setAttribute('aria-invalid', 'true');
+        widthError.textContent = 'Podaj liczbe calkowita od 20 do 120.';
+        return;
+      }
+      width.removeAttribute('aria-invalid');
+      widthError.textContent = '';
+      store.setCompose({ width: clampLineWidth(parsed) });
     });
     pane.appendChild(width);
+    pane.appendChild(widthError);
 
     const lab = doc.createElement('label');
     lab.textContent = 'Tresc';
+    lab.htmlFor = 'arkmail-compose-tresc';
     pane.appendChild(lab);
     const tresc = doc.createElement('textarea');
     nativeFieldClass(tresc);
+    tresc.id = 'arkmail-compose-tresc';
     tresc.setAttribute('data-field', 'tresc');
     tresc.value = composeDraft.tresc;
     pane.appendChild(tresc);
@@ -1555,7 +1691,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     // wraca do stanu poczatkowego.
     const clearCompose = doc.createElement('button');
     clearCompose.className = 'arkmail-compose-clear popup-btn popup-btn--control popup-btn--danger popup-btn--ghost';
-    clearCompose.textContent = 'Wyczysc';
+    clearCompose.textContent = 'Wyczysc pola listu';
     // 1.30.2 (Etap 5): wspolny guard (jak "Wyczysc zapisane dane").
     clearCompose.setAttribute('title', 'Czysci pola listu: adresat, temat, DW i tresc.');
     guardDeleteButton(clearCompose, () => {
@@ -1631,9 +1767,14 @@ const nativeFieldClass = (el: HTMLElement): void => {
         showError(`Grupa "${name}" juz istnieje.`);
         return;
       }
+      if (groupAliasConflict(name, state.importedAliases)) {
+        showError(`Nazwa grupy "${name}" koliduje z aliasem pocztowym z gry. Wybierz inna nazwe.`);
+        return;
+      }
       groupAddInput.value = '';
       handlers.onSaveGroups?.([...state.groups, { name, members: [] }]);
     });
+    submitOnEnter(groupAddInput, () => groupAddBtn.click());
     groupAddRow.appendChild(groupAddInput);
     groupAddRow.appendChild(groupAddBtn);
     pane.appendChild(groupAddRow);
@@ -1650,10 +1791,10 @@ const nativeFieldClass = (el: HTMLElement): void => {
     filterInput.setAttribute('title', 'Pokazuje tylko grupy z nazwa zawierajaca wpisany fragment.');
     filterInput.value = groupFilter;
     const filterClear = doc.createElement('button');
-    filterClear.className = 'popup-btn popup-btn--control';
+    filterClear.className = 'popup-btn popup-btn--control popup-btn--danger popup-btn--ghost';
     filterClear.textContent = 'Wyczysc filtr';
     filterClear.setAttribute('data-group-filter-clear', '');
-    filterClear.setAttribute('title', 'Czysci filtr grup - znowu wszystkie grupy.');
+    filterClear.setAttribute('title', 'Czysci filtr grup i pokazuje wszystkie grupy.');
     if (!groupFilter) filterClear.setAttribute('disabled', '1');
     filterClear.addEventListener('click', () => {
       groupFilter = '';
@@ -1714,12 +1855,19 @@ const nativeFieldClass = (el: HTMLElement): void => {
       });
       row.appendChild(toggle);
 
+      if (groupAliasConflict(group.name, state.importedAliases)) {
+        const warning = doc.createElement('div');
+        warning.className = 'arkmail-dim arkmail-group-alias-conflict';
+        warning.textContent = 'Nazwa koliduje z aliasem pocztowym. Grupa nie jest rozwijana w podpowiedziach. Zmien nazwe albo usun grupe.';
+        row.appendChild(warning);
+      }
+
       if (expanded) {
       const head = doc.createElement('div');
       head.className = 'arkmail-group-head';
       const rename = doc.createElement('input');
       nativeFieldClass(rename);
-      rename.setAttribute('data-group-rename', '');
+      rename.setAttribute('data-group-rename', group.name);
       rename.value = group.name;
       rename.setAttribute('title', 'Nazwa grupy - zapisz obok.');
       const renameOk = doc.createElement('button');
@@ -1737,8 +1885,17 @@ const nativeFieldClass = (el: HTMLElement): void => {
           showError(`Grupa "${name}" juz istnieje.`);
           return;
         }
+        if (groupAliasConflict(name, state.importedAliases)) {
+          showError(`Nazwa grupy "${name}" koliduje z aliasem pocztowym z gry. Wybierz inna nazwe.`);
+          return;
+        }
+        if (expandedGroups.has(group.name)) {
+          expandedGroups.delete(group.name);
+          expandedGroups.add(name);
+        }
         save(state.groups.map((g) => (g.name === group.name ? { ...g, name } : g)));
       });
+      submitOnEnter(rename, () => renameOk.click());
       // Zgloszenie 2026-11-05: poziom danger + wspolny guard dwukliku.
       const del = doc.createElement('button');
       del.className = 'popup-btn popup-btn--control popup-btn--danger popup-btn--ghost';
@@ -1763,7 +1920,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
         write.setAttribute('disabled', '1');
         write.setAttribute('title', 'Pusta grupa - najpierw dodaj czlonkow.');
       } else {
-        write.setAttribute('title', 'Otwiera zakladke Napisz z czlonkami grupy jako adresatami.');
+        write.setAttribute('title', 'Otwiera zakladke Napisz list z czlonkami grupy jako adresatami.');
         write.addEventListener('click', () => writeTo(partyLabel(group.members)));
       }
       head.appendChild(write);
@@ -1801,7 +1958,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
       // wpisuje kanoniczna forme z kontaktow i importow).
       const addMember = doc.createElement('input');
       nativeFieldClass(addMember);
-      addMember.setAttribute('data-member-add', '');
+      addMember.setAttribute('data-member-add', group.name);
       addMember.setAttribute('placeholder', 'Dodaj osobe');
       const addMemberOk = doc.createElement('button');
       addMemberOk.className = 'popup-btn popup-btn--control';
@@ -1811,16 +1968,18 @@ const nativeFieldClass = (el: HTMLElement): void => {
       addMemberOk.addEventListener('click', () => {
         const name = addMember.value.trim();
         if (!name) return;
+        if (!isValidPersonName(name)) {
+          showError('Imie: tylko litery.');
+          return;
+        }
         if (group.members.some((m) => m.toLowerCase() === name.toLowerCase())) {
           showError(`${name} juz jest w tej grupie.`);
           return;
         }
-        save(
-          state.groups.map((g) =>
-            g.name === group.name ? { ...g, members: [...g.members, name] } : g,
-          ),
-        );
+        const error = handlers.onAddGroupMember?.(group.name, name);
+        if (error) showError(error);
       });
+      submitOnEnter(addMember, () => addMemberOk.click());
       // 1.30.2 (Etap 2): attachGhost dopiero po podpieciu inputu do
       // rodzica - wrap liczy na parentNode (jak w Ksiazce, bookAddRow).
       members.appendChild(addMember);
@@ -1847,7 +2006,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
 
     // --- operacje zbiorcze + eksport/import ksiazki adresowej
     const ops = doc.createElement('div');
-    ops.className = 'arkmail-box-ops';
+    ops.className = 'arkmail-box-ops arkmail-destructive-zone';
     const delAll = doc.createElement('button');
     delAll.className = 'popup-btn popup-btn--control popup-btn--danger popup-btn--ghost';
     delAll.textContent = 'Usun wszystkie grupy';
@@ -1857,7 +2016,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     guardDeleteButton(delAll, () => save([]), {
       armedLabel: 'Na pewno usunac wszystkie?',
     });
-    // Eksport/import ksiazki przeniesiony do pigulki Import-Eksport
+    // Eksport/import ksiazki przeniesiony do pigulki Import i eksport
     // (zgloszenie 2026-11-05): operacja dotyka calej ksiazki, nie grup.
     ops.appendChild(delAll);
     pane.appendChild(ops);
@@ -1877,7 +2036,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
 
     // Zgloszenie 2026-11-05 pkt 4: reczne dodawanie imion mieszka w
     // Ksiazce (ponizej klawiszy zbiorczych); import z gry i eksport
-    // zostaly w pigulce Import-Eksport. Ta pigulka to lista imion
+    // zostaly w pigulce Import i eksport. Ta pigulka to lista imion
     // z operacjami zbiorczymi i filtrem.
 
     // --- usuwanie zaznaczonych (uzbrojony dwuklik, jak w Grupy)
@@ -1923,7 +2082,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     writeBulk.setAttribute('data-book-write-checked', '');
     writeBulk.setAttribute(
       'title',
-      'Otwiera zakladke Napisz z zaznaczonymi osobami jako adresatami.',
+      'Otwiera zakladke Napisz list z zaznaczonymi osobami jako adresatami.',
     );
     if (bookSelection.size === 0) writeBulk.setAttribute('disabled', '1');
     writeBulk.addEventListener('click', () => {
@@ -1961,7 +2120,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     pane.appendChild(deselectAllBtn);
 
     // --- reczne dodawanie imienia (zgloszenie 2026-11-05 pkt 4:
-    // mieszka w Ksiazce, nie w Import-Eksport). Pole z ghost-
+    // mieszka w Ksiazce, nie w Import i eksport). Pole z ghost-
     // podpowiedziami (jak pole adresata): kontakty + aliasy,
     // strzalka w prawo wpisuje kanoniczna forme kandydata.
     // --- dodawanie imienia do ksiazki
@@ -1992,7 +2151,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
         showAddError('Podaj imie.');
         return;
       }
-      if (!/^[A-Za-z]+$/.test(name)) {
+      if (!isValidPersonName(name)) {
         showAddError('Imie: tylko litery.');
         return;
       }
@@ -2031,10 +2190,10 @@ const nativeFieldClass = (el: HTMLElement): void => {
     filterInput.setAttribute('title', 'Pokazuje tylko imiona zawierajace wpisany fragment.');
     filterInput.value = bookFilter;
     const filterClear = doc.createElement('button');
-    filterClear.className = 'popup-btn popup-btn--control';
+    filterClear.className = 'popup-btn popup-btn--control popup-btn--danger popup-btn--ghost';
     filterClear.textContent = 'Wyczysc filtr';
     filterClear.setAttribute('data-book-filter-clear', '');
-    filterClear.setAttribute('title', 'Czysci filtr imion - znowu cala ksiazka adresowa.');
+    filterClear.setAttribute('title', 'Czysci filtr imion i pokazuje cala ksiazke adresowa.');
     if (!bookFilter) filterClear.setAttribute('disabled', '1');
     filterClear.addEventListener('click', () => {
       bookFilter = '';
@@ -2132,7 +2291,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
       write.className = 'arkmail-book-write popup-btn popup-btn--control';
       write.setAttribute('data-book-write', '');
       write.textContent = 'Napisz';
-      write.setAttribute('title', `Otwiera zakladke Napisz z adresem: ${name}.`);
+      write.setAttribute('title', `Otwiera zakladke Napisz list z adresem: ${name}.`);
       write.addEventListener('click', () => writeTo(name));
       row.appendChild(write);
       listWrap.appendChild(row);
@@ -2143,67 +2302,80 @@ const nativeFieldClass = (el: HTMLElement): void => {
     pane.appendChild(scroll);
 
     // --- aliasy pocztowe: lustro z gry przeniesione do pigulki
-    // "Aliasy Pocztowe" (zgloszenie 2026-11-05).
+    // "Aliasy pocztowe" (zgloszenie 2026-11-05).
     fillButtonTitles(pane);
   };
 
   const renderKontakty = (state: MailUiState): HTMLElement => {
     const pane = doc.createElement('div');
-    // Zgloszenie 2026-11-05 (D9): w Ksiazce naglowek stoi na stale
-    // (jak w zakladce Listy) - panel w trybie kolumnowym, scrolluje
-    // sie wylacznie kontener listy.
-    pane.className =
-      'arkmail-pane' + (contactView.sub === 'ksiazka' || contactView.sub === 'grupy' ? ' arkmail-listy' : '');
+    pane.className = 'arkmail-pane arkmail-listy';
     pane.setAttribute('data-pane-key', 'kontakty');
-    // Fala UI-2 krok 3: sub-pigulki; krok 4: zostaly dwie (pigulka
-    // "Osoby" - indeks osob zebranych z listow - przeniesiona do
-    // panelu zakladki Archiwum). Zgloszenie 2026-11-05: cztery
-    // sekcje - Ksiazka adresowa / Aliasy Pocztowe / Grupy /
-    // Import-Eksport (eksport/import wyprowadzony z sekcji Grupy,
-    // aliasy z dedykowanym czyszczeniem lustra). Klasy .arkmail-boxes
-    // (zero nowych kolorow); stan lokalny jak filtr/sort - repaint
-    // renderuje tylko wybrany podpanel.
     const subRow = doc.createElement('div');
     subRow.className = 'arkmail-boxes';
+    subRow.setAttribute('role', 'tablist');
+    subRow.setAttribute('aria-label', 'Kontakty');
     const SUBPILLS: Array<[typeof contactView.sub, string]> = [
       ['ksiazka', 'Ksiazka adresowa'],
-      ['aliasy', 'Aliasy Pocztowe'],
+      ['aliasy', 'Aliasy pocztowe'],
       ['grupy', 'Grupy'],
-      ['importeksport', 'Import-Eksport'],
+      ['importeksport', 'Import i eksport'],
     ];
+    const subPanel = doc.createElement('div');
+    subPanel.className =
+      contactView.sub === 'ksiazka' || contactView.sub === 'grupy'
+        ? 'arkmail-contact-subpanel arkmail-listy'
+        : 'arkmail-contact-subpanel arkmail-contact-subpanel-scroll';
+    subPanel.id = `arkmail-contact-panel-${contactView.sub}`;
+    subPanel.setAttribute('role', 'tabpanel');
+    subPanel.setAttribute('aria-labelledby', `arkmail-contact-tab-${contactView.sub}`);
+    const buttons: HTMLButtonElement[] = [];
     for (const [sub, label] of SUBPILLS) {
       const pill = doc.createElement('button');
       pill.className =
         'arkmail-subpill dialog-tab' + (contactView.sub === sub ? ' is-active' : '');
+      pill.id = `arkmail-contact-tab-${sub}`;
+      pill.setAttribute('data-contact-tab', sub);
+      pill.setAttribute('role', 'tab');
+      pill.setAttribute('aria-selected', contactView.sub === sub ? 'true' : 'false');
+      pill.setAttribute('aria-controls', `arkmail-contact-panel-${sub}`);
+      pill.tabIndex = contactView.sub === sub ? 0 : -1;
       pill.textContent = label;
       pill.addEventListener('click', () => {
         contactView.sub = sub;
         store.refresh();
       });
       subRow.appendChild(pill);
+      buttons.push(pill);
     }
+    wireTabKeyboard(subRow, buttons, (index) => {
+      const sub = SUBPILLS[index]![0];
+      contactView.sub = sub;
+      store.refresh();
+      (root.querySelector(`[data-contact-tab="${sub}"]`) as HTMLButtonElement | null)?.focus();
+    });
     pane.appendChild(subRow);
+    pane.appendChild(subPanel);
     if (contactView.sub === 'grupy') {
-      renderGrupy(state, pane);
+      renderGrupy(state, subPanel);
       return pane;
     }
     if (contactView.sub === 'aliasy') {
-      renderAliasy(state, pane);
+      renderAliasy(state, subPanel);
       return pane;
     }
     if (contactView.sub === 'importeksport') {
-      renderImportEksport(state, pane);
+      renderImportEksport(state, subPanel);
       return pane;
     }
     if (contactView.sub === 'ksiazka') {
-      renderKsiazka(state, pane);
+      renderKsiazka(state, subPanel);
       return pane;
     }
     return pane;
   };
 
   /**
-   * Sekcja "Aliasy Pocztowe" (zgloszenie 2026-11-05): lustro aliasow
+   * Sekcja "Aliasy pocztowe" (zgloszenie 2026-11-05): lustro aliasow
    * z gry wydzielone z ksiazki adresowej do wlasnej pigulki. Aliasy
    * nie sa edytowalne (rozstrzyga je serwer przy wysylce), ale lustro
    * lokalne da sie wyczyscic - po czyszczeniu aliasy pobiera sie z
@@ -2216,10 +2388,10 @@ const nativeFieldClass = (el: HTMLElement): void => {
     const aliasNote = doc.createElement('div');
     aliasNote.className = 'arkmail-dim';
     aliasNote.textContent =
-      'Aliasy pocztowe z gry - tylko odczyt, nie sa zapisywane do pliku. Aliasy edytujesz i usuniesz w grze.';
+      'Aliasy pocztowe z gry sa w ArkMailu tylko do odczytu. Sa zapisane lokalnie jako lustro, ale nie trafiaja do eksportu JSON. Aliasy edytujesz i usuwasz w grze.';
     aliasSec.appendChild(aliasNote);
     if (state.importedAliases.length === 0) {
-      aliasSec.appendChild(dim('Brak aliasow - aliasy pobiera sie z gry.'));
+      aliasSec.appendChild(dim('Brak zapisanych aliasow. Pobierz je z gry przyciskiem Importuj aliasy pocztowe.'));
     } else {
       for (const alias of state.importedAliases) {
         const row = doc.createElement('div');
@@ -2232,31 +2404,44 @@ const nativeFieldClass = (el: HTMLElement): void => {
         write.className = 'arkmail-book-write popup-btn popup-btn--control';
         write.setAttribute('data-alias-write', '');
         write.textContent = 'Napisz';
-        write.setAttribute('title', `Otwiera zakladke Napisz z adresem: ${alias.name}.`);
+        write.setAttribute('title', `Otwiera zakladke Napisz list z adresem: ${alias.name}.`);
         write.addEventListener('click', () => writeTo(alias.name));
         row.appendChild(write);
         aliasSec.appendChild(row);
       }
     }
+    const importAliases = doc.createElement('button');
+    importAliases.className = 'arkmail-import-btn popup-btn popup-btn--control';
+    importAliases.setAttribute('data-import', 'aliasy');
+    importAliases.textContent = 'Importuj aliasy pocztowe';
+    importAliases.setAttribute(
+      'title',
+      'Pobiera z gry aliasy pocztowe i dopisuje ich odbiorcow do ksiazki. W ArkMailu aliasy sa tylko do odczytu; edytujesz i usuwasz je w grze. Rozwija je serwer.',
+    );
+    importAliases.addEventListener('click', () => handlers.onImportAliases?.());
+    aliasSec.appendChild(importAliases);
+    pane.appendChild(aliasSec);
+    const zone = doc.createElement('div');
+    zone.className = 'arkmail-box-ops arkmail-destructive-zone';
     const clearBtn = doc.createElement('button');
     clearBtn.className = 'popup-btn popup-btn--control popup-btn--danger popup-btn--ghost';
-    clearBtn.textContent = 'Wyczysc aliasy';
+    clearBtn.textContent = 'Wyczysc zapisane aliasy';
     clearBtn.setAttribute('data-aliases-clear', '');
     clearBtn.setAttribute(
       'title',
-      'Kasuje lokalnie zaimportowane aliasy. Na serwerze Arkadii nic nie znika - aliasy pobierzesz z gry ponownie.',
+      'Usuwa lokalne lustro aliasow. Na serwerze Arkadii nic nie znika. Aliasy pobierzesz z gry ponownie.',
     );
     if (state.importedAliases.length === 0) clearBtn.setAttribute('disabled', '1');
     guardDeleteButton(clearBtn, () => handlers.onClearAliases?.(), {
       armedLabel: 'Na pewno usunac aliasy?',
     });
-    aliasSec.appendChild(clearBtn);
-    pane.appendChild(aliasSec);
+    zone.appendChild(clearBtn);
+    pane.appendChild(zone);
     fillButtonTitles(pane);
   };
 
   /**
-   * Sekcja "Import-Eksport" (zgloszenie 2026-11-05): eksport/import
+   * Sekcja "Import i eksport" (zgloszenie 2026-11-05): eksport/import
    * ksiazki JSON przeniesione z sekcji Grupy (operacja dotyka calej
    * ksiazki, nie grup), czyszczenie calej ksiazki (imiona + grupy +
    * aliasy, guard dwukliku) i dopisanie wszystkich osob zebranych z
@@ -2287,25 +2472,20 @@ const nativeFieldClass = (el: HTMLElement): void => {
     // --- import bazy osob z gry (Fala UI-2 krok 4: przeniesione z
     // sub-pigulki Osoby w Kontaktach - indeks osob przeniesiony do
     // panelu Archiwum, a import jest czynnoscia ksiazki adresowej).
-    // Import ZAMIENIA pule (refresh), nie tworzy grup - z bazy gracz
-    // sklada grupy recznie (widok Grupy).
+    // Import DOPISUJE nowe osoby do istniejacej puli, nie tworzy grup -
+    // z bazy gracz sklada grupy recznie (widok Grupy).
     const importRow = doc.createElement('div');
     importRow.className = 'arkmail-import-row';
     const IMPORT_BTNS: Array<[string, string, string]> = [
       [
         'zapamietani',
         'Importuj zapamietanych',
-        'Pobiera z gry osoby zapamietane na stale i zapisuje je jako baze osob. Grup nie tworzy.',
+        'Pobiera z gry osoby zapamietane i dopisuje nowe do ksiazki adresowej. Istniejacych osob nie usuwa. Grup nie tworzy.',
       ],
       [
         'przedstawieni',
         'Importuj przedstawionych',
-        'Pobiera z gry osoby, ktore zostaly ci ostatnio przedstawione, i zapisuje je jako baze osob. Grup nie tworzy.',
-      ],
-      [
-        'aliasy',
-        'Importuj aliasy pocztowe',
-        'Pobiera z gry aliasy pocztowe. Nie da sie ich edytowac - rozwija je serwer przy wysylce. Osoby z aliasow dolaczaja do bazy osob.',
+        'Pobiera z gry osoby, ktore zostaly ci ostatnio przedstawione, i dopisuje nowe do ksiazki adresowej. Istniejacych osob nie usuwa. Grup nie tworzy.',
       ],
     ];
     for (const [kind, label, title] of IMPORT_BTNS) {
@@ -2315,8 +2495,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
       btn.textContent = label;
       btn.setAttribute('title', title);
       btn.addEventListener('click', () => {
-        if (kind === 'aliasy') handlers.onImportAliases?.();
-        else handlers.onImportPeople?.(kind as 'zapamietani' | 'przedstawieni');
+        handlers.onImportPeople?.(kind as 'zapamietani' | 'przedstawieni');
       });
       importRow.appendChild(btn);
     }
@@ -2348,7 +2527,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
       [
         'dolacz',
         'Dolacz do ksiazki',
-        'Nowe grupy z pliku dolacza. Gdy grupa o tej samej nazwie juz jest, scala jej czlonkow. Imiona z pliku dolacza do ksiazki adresowej.',
+        'Dolacza imiona i nowe grupy z pliku. Grupe o tej samej nazwie scala z istniejaca. Nie usuwa obecnych danych.',
       ],
       [
         'zastap',
@@ -2379,20 +2558,71 @@ const nativeFieldClass = (el: HTMLElement): void => {
       'title',
       'Wczytuje imiona i grupy z pliku JSON. Sposob zalezy od trybu: dolacz albo zastap. Aliasy pobierasz z gry.',
     );
+    const paintReplaceConfirmation = (): void => {
+      pane.querySelector('[data-book-replace-confirm]')?.remove();
+      const pending = pendingBookReplace;
+      if (!pending || pending.selection !== bookImportSelection) return;
+      const panel = doc.createElement('div');
+      panel.className = 'arkmail-box-ops arkmail-book-replace-confirm';
+      panel.setAttribute('data-book-replace-confirm', '');
+      const description = doc.createElement('div');
+      description.className = 'arkmail-dim';
+      description.textContent = `Zastapic cala ksiazke plikiem ${pending.fileName}? Plik: ${pending.data.people.length} imion, ${pending.data.groups.length} grup. Aliasy pocztowe zostana bez zmian.`;
+      const confirm = doc.createElement('button');
+      confirm.className = 'popup-btn popup-btn--control popup-btn--danger';
+      confirm.setAttribute('data-book-replace-ok', '');
+      confirm.textContent = 'Zastap cala ksiazke';
+      confirm.addEventListener('click', () => {
+        const current = pendingBookReplace;
+        if (!current || current.selection !== bookImportSelection) return;
+        pendingBookReplace = null;
+        handlers.onImportAddressBook?.(current.data, 'zastap');
+      });
+      const cancel = doc.createElement('button');
+      cancel.className = 'popup-btn popup-btn--control';
+      cancel.setAttribute('data-book-replace-cancel', '');
+      cancel.textContent = 'Anuluj';
+      cancel.addEventListener('click', () => {
+        pendingBookReplace = null;
+        paintReplaceConfirmation();
+      });
+      panel.appendChild(description);
+      panel.appendChild(confirm);
+      panel.appendChild(cancel);
+      error.before(panel);
+    };
     impInput.addEventListener('change', () => {
+      const selection = ++bookImportSelection;
+      const selectedMode = bookImportMode;
       const file = impInput.files?.[0];
-      if (!file) return;
-      void file
-        .text()
-        .then((content: string) => {
+      pendingBookReplace = null;
+      paintReplaceConfirmation();
+      showError('');
+      if (!file) {
+        impInput.value = '';
+        return;
+      }
+      void (async () => {
+        try {
+          const content = await file.text();
+          if (selection !== bookImportSelection) return;
           const parsed = parseAddressBookExport(content);
           if (!parsed) {
             showError('Niepoprawny plik ksiazki adresowej.');
             return;
           }
-          handlers.onImportAddressBook?.(parsed, bookImportMode);
-        })
-        .catch(() => showError('Nie udalo sie odczytac pliku.'));
+          if (selectedMode === 'zastap') {
+            pendingBookReplace = { selection, fileName: file.name, data: parsed };
+            paintReplaceConfirmation();
+          } else {
+            handlers.onImportAddressBook?.(parsed, selectedMode);
+          }
+        } catch {
+          if (selection === bookImportSelection) showError('Nie udalo sie odczytac pliku.');
+        } finally {
+          impInput.value = '';
+        }
+      })();
     });
     const impBtn = doc.createElement('button');
     impBtn.className = 'popup-btn popup-btn--control';
@@ -2412,7 +2642,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     // Czyszczenie calej ksiazki: imiona + grupy + aliasy lokalnie.
     const clearAll = doc.createElement('button');
     clearAll.className = 'popup-btn popup-btn--control popup-btn--danger popup-btn--ghost';
-    clearAll.textContent = 'Wyczysc cala ksiazke';
+    clearAll.textContent = 'Wyczysc cala ksiazke i aliasy';
     clearAll.setAttribute('data-book-clear-all', '');
     clearAll.setAttribute(
       'title',
@@ -2421,7 +2651,10 @@ const nativeFieldClass = (el: HTMLElement): void => {
     guardDeleteButton(clearAll, () => handlers.onClearAddressBook?.(), {
       armedLabel: 'Na pewno wyczyscic cala ksiazke?',
     });
-    pane.appendChild(clearAll);
+    const clearZone = doc.createElement('div');
+    clearZone.className = 'arkmail-box-ops arkmail-destructive-zone';
+    clearZone.appendChild(clearAll);
+    pane.appendChild(clearZone);
     fillButtonTitles(pane);
   };
 
@@ -2439,6 +2672,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
   const renderArchPeople = (state: MailUiState): HTMLElement => {
     const panel = doc.createElement('div');
     panel.setAttribute('data-arch-people', '');
+    panel.className = 'arkmail-arch-people-panel';
     // Wydanie 1.30.1 (zgloszenie 6): panel mieszka pod chipem
     // "Osoby z listow" - zwijanie ustapilo chipsom.
     // Zgloszenie 2026-11-05: klawisz indeksowania znika z panelu osob -
@@ -2446,7 +2680,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     // bazy zostaje (kontekst listy), bez klawisza.
     if (!allBoxesIndexed(state.indexMeta) || state.indexRun) {
       panel.appendChild(
-        dim('Kontakty powstaja z listow zebranych ze wszystkich skrzynek.'),
+        dim('Osoby z listow powstaja z listow zebranych ze wszystkich skrzynek.'),
       );
     }
     const gaps = INDEX_BOXES.flatMap((box) =>
@@ -2472,7 +2706,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     const SORT_OPTS: Array<[ContactSort, string]> = [
       ['nazwa', 'Nazwa A-Z'],
       ['liczba', 'Liczba listow'],
-      ['ostatni', 'Ostatni kontakt'],
+      ['ostatni', 'Ostatni list'],
     ];
     for (const [value, label] of SORT_OPTS) {
       const o = doc.createElement('option');
@@ -2483,6 +2717,12 @@ const nativeFieldClass = (el: HTMLElement): void => {
     sel.value = contactView.sort;
     controls.appendChild(input);
     controls.appendChild(sel);
+    const clearFilters = doc.createElement('button');
+    clearFilters.className =
+      'arkmail-arch-clear popup-btn popup-btn--control popup-btn--danger popup-btn--ghost';
+    clearFilters.setAttribute('data-arch-people-clear', '');
+    const syncClear = wireArchiveClearButton(clearFilters);
+    controls.appendChild(clearFilters);
     panel.appendChild(controls);
     // Fala 40: filtr z ghostem jak pole Osoba w Archiwum - kandydaci
     // z kontaktow + aliasow, strzalka w prawo wpisuje kanoniczna forme.
@@ -2531,7 +2771,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
             (target as { scrollIntoView?: () => void } | null)?.scrollIntoView?.();
           };
           // Klik w imie = kierunek domyslny: odebrane, gdy sa.
-          name.setAttribute('title', 'Pokaz listy tej osoby w archiwum (domyslnie: odebrane)');
+          name.setAttribute('title', 'Pokaz listy tej osoby w archiwum.');
           makeClickable(name, () => {
             if (c.lettersReceived > 0) jumpTo('odebrane');
             else if (c.lettersSent > 0) jumpTo('wyslane');
@@ -2541,7 +2781,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
           stats.className = 'arkmail-contact-stats';
           stats.textContent =
             `(odebrane: ${c.lettersReceived}, wyslane: ${c.lettersSent})` +
-            (c.mailAlias ? ` alias: ${c.mailAlias}` : '');
+            (c.mailAlias ? ` | alias: ${c.mailAlias}` : '');
           row.appendChild(stats);
           if (c.lastContactRaw) {
             const last = doc.createElement('span');
@@ -2558,7 +2798,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
           ];
           for (const [box, label, count] of DIR_OPTS) {
             const btn = doc.createElement('button');
-            btn.className = 'arkmail-contact-dir';
+            btn.className = 'arkmail-contact-dir popup-btn popup-btn--control';
             btn.setAttribute('data-dir', box);
             btn.textContent = label;
             if (count === 0) {
@@ -2575,7 +2815,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
           // jest w ksiazce (bez wzgledu na wielkosc liter) - brak
           // listenera, wiec klikniecie nie zapisuje.
           const addBook = doc.createElement('button');
-          addBook.className = 'arkmail-contact-addbook';
+          addBook.className = 'arkmail-contact-addbook popup-btn popup-btn--control';
           addBook.setAttribute('data-arch-add-book', '');
           addBook.textContent = 'Do ksiazki';
           if (state.people.some((p) => p.toLowerCase() === c.name.toLowerCase())) {
@@ -2595,8 +2835,8 @@ const nativeFieldClass = (el: HTMLElement): void => {
         list.replaceChildren(
           dim(
             state.contacts.length === 0
-              ? 'Brak kontaktow - pojawia sie po pobraniu skrzynek.'
-              : 'Zaden kontakt nie pasuje do filtra.',
+              ? 'Brak osob z listow - pojawia sie po pobraniu skrzynek.'
+              : 'Zadna osoba nie pasuje do filtra.',
           ),
         );
       }
@@ -2605,10 +2845,12 @@ const nativeFieldClass = (el: HTMLElement): void => {
     input.addEventListener('input', () => {
       contactView.filter = input.value;
       repaint();
+      syncClear();
     });
     sel.addEventListener('change', () => {
       contactView.sort = sel.value as ContactSort;
       repaint();
+      syncClear();
     });
     repaint();
     return panel;
@@ -2616,36 +2858,59 @@ const nativeFieldClass = (el: HTMLElement): void => {
 
   const renderArchiwum = (state: MailUiState): HTMLElement => {
     const pane = doc.createElement('div');
-    pane.className = 'arkmail-pane';
+    pane.className = archView.sub === 'osoby' ? 'arkmail-pane arkmail-listy' : 'arkmail-pane';
     pane.setAttribute('data-pane-key', 'archiwum');
     // Wydanie 1.30.1 (zgloszenie 6): chipsy jak w Kontaktach - lista
     // listow i osoby jako osobne widoki, nie jedno nad drugim.
     const subRow = doc.createElement('div');
     subRow.className = 'arkmail-boxes';
+    subRow.setAttribute('role', 'tablist');
+    subRow.setAttribute('aria-label', 'Archiwum');
     const ARCH_SUBS: Array<[typeof archView.sub, string]> = [
       ['listy', 'Archiwum listow'],
       ['osoby', 'Osoby z listow'],
     ];
+    const subPanel = doc.createElement('div');
+    subPanel.className = 'arkmail-subpanel';
+    subPanel.id = `arkmail-archive-panel-${archView.sub}`;
+    subPanel.setAttribute('role', 'tabpanel');
+    subPanel.setAttribute('aria-labelledby', `arkmail-archive-tab-${archView.sub}`);
+    const buttons: HTMLButtonElement[] = [];
     for (const [sub, label] of ARCH_SUBS) {
       const pill = doc.createElement('button');
       pill.className =
         'arkmail-subpill dialog-tab' + (archView.sub === sub ? ' is-active' : '');
+      pill.id = `arkmail-archive-tab-${sub}`;
+      pill.setAttribute('data-archive-tab', sub);
+      pill.setAttribute('role', 'tab');
+      pill.setAttribute('aria-selected', archView.sub === sub ? 'true' : 'false');
+      pill.setAttribute('aria-controls', `arkmail-archive-panel-${sub}`);
+      pill.tabIndex = archView.sub === sub ? 0 : -1;
       pill.textContent = label;
       pill.addEventListener('click', () => {
         archView.sub = sub;
         store.refresh();
       });
       subRow.appendChild(pill);
+      buttons.push(pill);
     }
+    wireTabKeyboard(subRow, buttons, (index) => {
+      const sub = ARCH_SUBS[index]![0];
+      archView.sub = sub;
+      store.refresh();
+      (root.querySelector(`[data-archive-tab="${sub}"]`) as HTMLButtonElement | null)?.focus();
+    });
     pane.appendChild(subRow);
+    pane.appendChild(subPanel);
     if (archView.sub === 'osoby') {
-      pane.appendChild(renderArchPeople(state));
+      subPanel.appendChild(renderArchPeople(state));
       return pane;
     }
     // Wszystkie filtry lokalne (poza store): repaint tylko listy,
     // input nie traci fokusu przy pisaniu.
     const controls = doc.createElement('div');
     controls.className = 'arkmail-arch-controls';
+    let syncClear: () => void = () => {};
     const mkText = (key: 'osoba' | 'temat' | 'tresc' | 'odDaty' | 'doDaty', placeholder: string, type = 'text') => {
       const input = doc.createElement('input');
       nativeFieldClass(input);
@@ -2656,6 +2921,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
       input.addEventListener('input', () => {
         archFilter[key] = input.value === '' ? undefined : input.value;
         repaint();
+        syncClear();
       });
       return input;
     };
@@ -2682,6 +2948,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
     skr.addEventListener('change', () => {
       archFilter.skrzynka = skr.value === '' ? undefined : (skr.value as MailBox);
       repaint();
+      syncClear();
     });
     controls.appendChild(skr);
     const aTemat = mkText('temat', 'Temat');
@@ -2701,23 +2968,9 @@ const nativeFieldClass = (el: HTMLElement): void => {
     // Fala 16g: czyszczenie wszystkich filtrow archiwum jednym klikiem
     // (zgloszenie pkt 11). Niedestrukcyjne (dane zostaja) - bez dwukliku.
     const clearFilters = doc.createElement('button');
-    clearFilters.className = 'arkmail-arch-clear popup-btn popup-btn--control popup-btn--danger popup-btn--ghost';
-    clearFilters.textContent = 'Wyczysc filtry';
-    clearFilters.addEventListener('click', () => {
-      for (const key of ['osoba', 'temat', 'tresc', 'odDaty', 'doDaty'] as const) {
-        archFilter[key] = undefined;
-      }
-      archFilter.skrzynka = undefined;
-      // Zgloszenie 2026-11-05 (D8): czyszczenie obejmuje tez panel
-      // "Osoby z listow" - filtr i sortowanie wracaja do wartosci
-      // domyslnych (pelny widok osob).
-      contactView.filter = '';
-      contactView.sort = 'nazwa';
-      controls.querySelectorAll('[data-filter]').forEach((el) => {
-        (el as HTMLInputElement | HTMLSelectElement).value = '';
-      });
-      store.refresh();
-    });
+    clearFilters.className =
+      'arkmail-arch-clear popup-btn popup-btn--control popup-btn--danger popup-btn--ghost';
+    syncClear = wireArchiveClearButton(clearFilters);
     controls.appendChild(clearFilters);
 
     const steps = doc.createElement('div');
@@ -2753,11 +3006,11 @@ const nativeFieldClass = (el: HTMLElement): void => {
     const gapPhrase = (days: number): string =>
       days === 1 ? 'brakuje danych z 1 dnia' : `brakuje danych z ${days} dni`;
     const indexStatus = state.indexRun
-      ? `W toku: ${state.indexRun.box}, stron: ${state.indexRun.pages}.`
+      ? `W toku: skrzynka ${state.indexRun.box}. Liczba stron: ${state.indexRun.pages}.`
       : allBoxesIndexed(state.indexMeta)
         ? gapCount > 0
           ? `Gotowe, ale ${gapPhrase(gapCount)}.`
-          : `Gotowe od ${earliestIndexDate}: wszystkie skrzynki zapisane.`
+          : `Wszystkie skrzynki zapisane. Najstarszy zapis: ${earliestIndexDate}.`
         : indexedCount > 0 || gapCount > 0
           ? `Czesciowo: ${indexedCount} z ${INDEX_BOXES.length} skrzynek${gapCount > 0 ? ` (${gapPhrase(gapCount)})` : ''}.`
           : 'Jeszcze nie zaczeto.';
@@ -2783,48 +3036,32 @@ const nativeFieldClass = (el: HTMLElement): void => {
       if (dateRaw !== null && parseMailDate(dateRaw) !== null) pendingBody += 1;
       else undatedBody += 1;
     }
-    // Fala 31e: szczegoly w nawiasie, liczebnik przedom
-    // ("1 bez daty").
-    const bodyWarnings = [
-      undatedBody > 0 ? `${undatedBody} bez daty` : '',
-    ].filter((text) => text !== '');
-    const warningSuffix = bodyWarnings.length > 0 ? ` (${bodyWarnings.join(', ')})` : '';
     const downloadStatus = state.archiveDownload
       ? `Pobieram tresci: ${state.archiveDownload.done} z ${state.archiveDownload.total}.`
       : state.archive.length === 0
         ? 'Jeszcze nie pobrano.'
         : pendingBody > 0
-          ? `Czesciowo: ${formatListCount(withBody)} z trescia. Do pobrania: ${pendingBody}${warningSuffix}.`
-          : bodyWarnings.length > 0
-            ? `Gotowe: ${formatListCount(withBody)} z trescia${warningSuffix}.`
-            : `Gotowe: ${formatListCount(withBody)} z trescia.`;
+          ? `Czesciowo: liczba listow z trescia ${withBody}. Do pobrania: ${pendingBody}. Bez tresci i bez prawidlowej daty: ${undatedBody}.`
+          : `Liczba listow z trescia: ${withBody}. Do pobrania nie nadaja sie: ${undatedBody} (brak prawidlowej daty).`;
     const exportable = archiveExportEntries(state.archive);
     const exportStatus =
       exportable.entries.length === 0
         ? 'Brak listow z trescia - nie ma czego zapisywac.'
-        : exportable.skipped > 0
-          ? `Gotowe: ${formatListCount(exportable.entries.length)} do zapisu (${exportable.skipped} bez tresci).`
-          : `Gotowe: ${formatListCount(exportable.entries.length)} do zapisu.`;
+        : `Do zapisu: ${exportable.entries.length}. Pominiete bez tresci: ${exportable.skipped}.`;
     // Fala 31d/28: agregat nad lista - globalny (nie zalezy od filtra),
     // Agregat = totalLive (suma MAX na klucz tresci w kazdej skrzynce),
     // a nie liczba grup kluczy: dwa rekordy tej samej skrzynki o
     // identycznym kluczu to dwa listy i agregat ma je liczyc osobno.
     // Skrzynki z zerem pomijane. Kazdy rekord jest zywy (fizyczny purge
     // Fala 28), wiec zywosc nie jest sprawdzana.
-    const boxCounts = perBoxCounts(state.archive);
     let countsStrip: HTMLElement | null = null;
     if (archiveGroups.length > 0) {
-      const parts: string[] = [];
-      for (const box of INDEX_BOXES) {
-        const count = boxCounts.get(box);
-        if (count !== undefined) parts.push(`${box}: ${formatListCount(count)}`);
-      }
       countsStrip = doc.createElement('p');
       countsStrip.className = 'arkmail-dim arkmail-arch-counts';
-      countsStrip.textContent = `Listow w bazie: ${formatListCount(totalLive(state.archive))}${parts.length > 0 ? ` (${parts.join(', ')})` : ''}.`;
+      countsStrip.textContent = `Liczba listow w bazie: ${totalLive(state.archive)}.`;
     }
     const indexStep = makeStep('1. Indeksacja', indexStatus, state.indexRun ? 'active' : allBoxesIndexed(state.indexMeta) ? (gapCount > 0 ? 'warning' : 'done') : indexedCount > 0 || gapCount > 0 ? 'incomplete' : 'idle');
-    const downloadStep = makeStep('2. Pobranie tresci', downloadStatus, state.archiveDownload ? 'active' : pendingBody > 0 ? 'incomplete' : bodyWarnings.length > 0 ? 'warning' : withBody > 0 ? 'done' : 'idle');
+    const downloadStep = makeStep('2. Pobranie tresci', downloadStatus, state.archiveDownload ? 'active' : pendingBody > 0 ? 'incomplete' : undatedBody > 0 ? 'warning' : withBody > 0 ? 'done' : 'idle');
     const exportStep = makeStep('3. Zapis ZIP', exportStatus, exportable.entries.length > 0 ? (exportable.skipped > 0 ? 'warning' : 'done') : 'idle');
 
     // Fala 18c (zgloszenie 2026-10-20 pkt 1): indeksacja wszystkich
@@ -2868,14 +3105,14 @@ const nativeFieldClass = (el: HTMLElement): void => {
     expBtn.textContent = 'Zapisz wszystkie (ZIP)';
     expBtn.addEventListener('click', () => handlers.onExportArchive?.());
     exportStep.appendChild(expBtn);
-    pane.appendChild(steps);
-    pane.appendChild(controls);
-    if (countsStrip) pane.appendChild(countsStrip);
+    subPanel.appendChild(steps);
+    subPanel.appendChild(controls);
+    if (countsStrip) subPanel.appendChild(countsStrip);
     const list = doc.createElement('div');
     // Zgloszenie 2026-11-05 (A2): klasa = punkt przewijania po skoku
     // z osoby (jumpTo w renderArchPeople).
     list.className = 'arkmail-arch-list';
-    pane.appendChild(list);
+    subPanel.appendChild(list);
     const repaint = () => {
       // Fala 30a: sprzeczny zakres dat (Od pozniej niz Do) = komunikat
       // i POMINIECIE filtrow dat, zamiast milczaco pustej listy
@@ -2891,22 +3128,22 @@ const nativeFieldClass = (el: HTMLElement): void => {
       const effFilter = datesInvalid || datesClash
         ? { ...archFilter, odDaty: undefined, doDaty: undefined }
         : archFilter;
-      const oldErr = pane.querySelector('.arkmail-dates-error');
+      const oldErr = subPanel.querySelector('.arkmail-dates-error');
       if (oldErr) oldErr.remove();
       if (datesInvalid || datesClash) {
         const err = doc.createElement('div');
         err.className = 'arkmail-dates-error';
         err.textContent = datesInvalid
-          ? 'Nieprawidlowa data - filtry dat pomijane.'
-          : 'Od dnia pozniej niz Do dnia - daty pomijane.';
-        pane.insertBefore(err, list);
+          ? 'Nieprawidlowa data - oba filtry dat zostaly pominiete.'
+          : "Data 'Od dnia' jest pozniejsza niz 'Do dnia' - oba filtry dat zostaly pominiete.";
+        subPanel.insertBefore(err, list);
       }
       // Fala 41: jeden wiersz na rekord, nieobecne ukryte (core).
       const rows = filterVisibleArchive(state.archive, effFilter);
       // Podpis filtra tresci: tresc zna tylko pobrane listy - bez
       // podpowiedzi filtr "milczaco" nic nie znajdowal (zgloszenie
       // 2026-10-20 pkt 3).
-      const oldNote = pane.querySelector('.arkmail-tresc-note');
+      const oldNote = subPanel.querySelector('.arkmail-tresc-note');
       if (oldNote) oldNote.remove();
       if (archFilter.tresc !== undefined) {
         const base = filterVisibleArchive(state.archive, { ...effFilter, tresc: undefined });
@@ -2914,7 +3151,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
         const note = doc.createElement('div');
         note.className = 'arkmail-dim arkmail-tresc-note';
         note.textContent = `Filtr tresci obejmuje tylko listy z pobrana trescia (${withBody} z ${base.length}).`;
-        pane.insertBefore(note, list);
+        subPanel.insertBefore(note, list);
       }
       list.replaceChildren(
         ...rows.flatMap((l, idx) => {
@@ -2939,7 +3176,7 @@ const nativeFieldClass = (el: HTMLElement): void => {
         }),
       );
       if (rows.length === 0) {
-        list.replaceChildren(dim('Archiwum puste albo zaden list nie pasuje do filtra.'));
+        list.replaceChildren(dim('Archiwum jest puste albo zaden list nie pasuje do filtra.'));
       }
     };
     repaint();
@@ -2986,6 +3223,13 @@ const nativeFieldClass = (el: HTMLElement): void => {
   // a function).
   const onEscape = (event: Event): void => {
     if ((event as KeyboardEvent).key !== 'Escape') return;
+    const wasArmed = armedButtons.size > 0 || store.state.deletion.armedAt !== 0;
+    if (!wasArmed) return;
+    // Pierwszy ESC nalezy do aktywnego guarda. Bez zatrzymania propagacji
+    // klient rowniez go obsluzy i zamknie caly popup zamiast tylko rozbroic
+    // operacje. Kolejny ESC, juz bez uzbrojenia, przechodzi do klienta.
+    event.preventDefault();
+    event.stopPropagation();
     // Zgloszenie 2026-11-05: ESC rozbraja kazde uzbrojenie w oknie -
     // guard klawiszy usuwajacych (X, Na pewno usunac?) i guard sesji
     // usuwania w zakladce Usuwanie.

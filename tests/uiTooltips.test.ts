@@ -5,7 +5,7 @@
  * Slownictwo zatwierdzone w tej fali: "baza osob" (import zapamietani/
  * przedstawieni NIE tworzy grup), "grupa" (ksiazka adresowa pluginu),
  * "alias pocztowy" (alias z gry, rozwija go serwer przy wysylce).
- * "Wpisz imie w dopelniaczu." zostaje bez zmian (decyzja uzytkownika).
+ * "Wpisz szukana fraze w dopelniaczu (kogo? czego?)." (etap 9, S38).
  *
  * Guard pilnuje regresji:
  *  - KAZDY przycisk w KAZDYM widoku ma niepusty tooltip;
@@ -102,11 +102,11 @@ test('tooltipy: czyszczenie danych mowi, ze grupy i ksiazka zostaja', () => {
   );
 });
 
-test('tooltipy: "Wpisz imie w dopelniaczu." zostaje bez zmian', () => {
+test('tooltipy: pole osoby wyjasnia fraze i dopelniacz', () => {
   const { titles } = collectTitles();
   assert.ok(
-    titles.includes('Wpisz imie w dopelniaczu.'),
-    'tooltip pola osoby w szukajce serwerowej bez zmian',
+    titles.includes('Wpisz szukana fraze w dopelniaczu (kogo? czego?).'),
+    'tooltip pola osoby w szukajce serwerowej zgodny z S38',
   );
 });
 
@@ -123,7 +123,7 @@ test('tooltipy: uzbrojone kasowanie - jednolity schemat dwukliku', () => {
   }
 });
 
-test('tooltipy: import bazy osob - slownictwo zatwierdzone', () => {
+test('tooltipy: import osob - slownictwo zatwierdzone', () => {
   const { titles } = collectTitles();
   const byKind = (kind: string): string => {
     const container = document.createElement('div');
@@ -143,7 +143,7 @@ test('tooltipy: import bazy osob - slownictwo zatwierdzone', () => {
     } as never);
     s.setTab('kontakty' as never);
     // Zgloszenie 2026-11-05 (K7): przyciski importu stoja w pigulce
-    // Import-Eksport, nie w Ksiazce.
+    // Import i eksport, nie w Ksiazce.
     for (const sub of Array.from(
       container.querySelectorAll('.arkmail-subpill') as unknown as Array<{ click(): void }>,
     )) {
@@ -159,7 +159,8 @@ test('tooltipy: import bazy osob - slownictwo zatwierdzone', () => {
   };
   for (const kind of ['zapamietani', 'przedstawieni']) {
     const t = byKind(kind);
-    assert.ok(/baz\w* osob/i.test(t), `import ${kind} mowi o bazie osob: ${t}`);
+    assert.ok(t.includes('dopisuje nowe do ksiazki adresowej'), `import ${kind} mowi o dopisywaniu do ksiazki: ${t}`);
+    assert.ok(t.includes('Istniejacych osob nie usuwa'), `import ${kind} wyklucza usuwanie: ${t}`);
     assert.ok(t.includes('Grup nie tworzy'), `import ${kind} wyjasnia, ze grup nie tworzy: ${t}`);
   }
   assert.ok(byKind('aliasy').includes('aliasy pocztowe'), 'import aliasow uzywa slownictwa');

@@ -27,6 +27,7 @@ import {
   stopHarness,
   loadTruncatedBox,
   click,
+  clickText,
   textOf,
   type Harness,
 } from './harness';
@@ -249,6 +250,64 @@ test('szukaj integracja: pole Tresc buduje komende "o tresci" (Fala 28a)', async
       () => f.sent.includes('listy odebrane od corge o tresci morze o temacie perly'),
       'komenda laczona: osoba -> tresc -> temat (temat ostatni)',
     );
+  } finally {
+    await stopHarness();
+  }
+});
+
+
+test('szukaj integracja: nowa osoba trafia do kontaktow, Dodaj wszystkie ja widzi, powtorka nie duplikuje', async () => {
+  const h = await startHarness();
+  const { f, waitFor, content } = h;
+  const reply = (): void => {
+    f.fire('Wybrane listy odebrane:', 'mail');
+    f.fire(' 1. *R* Temat: nowy kontakt', 'mail');
+    f.fire('Nadawca: Grault                      Wt, 24 VIII 1999, 00:11:12', 'mail');
+    f.fire('> ', 'prompt');
+  };
+  const search = async (): Promise<void> => {
+    click(h, '[data-tab="listy"]');
+    setInput(h, '[data-search="temat"]', 'nowy kontakt');
+    click(h, '.arkmail-search-go');
+    await waitFor(
+      () => f.sent.filter((c) => c === 'listy odebrane o temacie nowy kontakt').length >= 1,
+      'komenda wyszukania nowej osoby',
+    );
+    reply();
+    await waitFor(() => content.querySelectorAll('.arkmail-entry').length === 1, 'wynik wyszukania');
+    await waitFor(() => textOf(h, '.arkmail-busy') === '', 'koniec wyszukania');
+  };
+  const addAll = (): void => {
+    click(h, '[data-tab="kontakty"]');
+    clickText(h, '.arkmail-subpill', 'Import i eksport');
+    const button = content.querySelector('[data-book-add-all-contacts]') as {
+      hasAttribute(name: string): boolean;
+    };
+    assert.equal(button.hasAttribute('disabled'), false, 'wyszukana osoba odblokowuje Dodaj wszystkie');
+    click(h, '[data-book-add-all-contacts]');
+    clickText(h, '.arkmail-subpill', 'Ksiazka adresowa');
+  };
+  try {
+    await search();
+    addAll();
+    const names = () => Array.from(content.querySelectorAll('[data-book-name]')).map(
+      (element) => (element as { textContent?: string }).textContent,
+    );
+    assert.deepEqual(names(), ['Grault'], 'ostatnie wyszukiwanie zasila Dodaj wszystkie');
+
+    click(h, '[data-tab="listy"]');
+    click(h, '.arkmail-search-go');
+    await waitFor(
+      () => f.sent.filter((c) => c === 'listy odebrane o temacie nowy kontakt').length === 2,
+      'powtorzone wyszukanie',
+    );
+    reply();
+    await waitFor(() => textOf(h, '.arkmail-busy') === '', 'koniec powtornego wyszukania');
+    addAll();
+    assert.deepEqual(names(), ['Grault'], 'osoba nie jest duplikowana');
+
+    click(h, '[data-tab="archiwum"]');
+    assert.equal(content.querySelectorAll('.arkmail-arch-entry').length, 1, 'rekord archiwum nie jest duplikowany');
   } finally {
     await stopHarness();
   }

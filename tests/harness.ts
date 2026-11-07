@@ -8,7 +8,7 @@ import { Window } from 'happy-dom';
 import { IDBFactory } from 'fake-indexeddb';
 
 import type PluginApi from 'plugin-api';
-import { init, destroy } from '../src/arkmail/index';
+import { init, destroy, WIDE_MIN_WIDTH } from '../src/arkmail/index';
 import { IndexedDbStorageDriver } from '../src/arkmail/adapters/storageDriver';
 import type { ArchiveLetter } from '../src/arkmail/core/archive';
 import type { MailBox } from '../src/arkmail/core/protocol/types';
@@ -20,7 +20,10 @@ export class FakeApi {
   triggerCb: TriggerCb | null = null;
   emitted: { event: string; args: unknown[] }[] = [];
   shown: unknown[] = [];
-  popupConfig: { createContent: () => Promise<unknown> } | null = null;
+  popupConfig: {
+    createContent: () => Promise<unknown>;
+    headerActions?: { querySelector(s: string): unknown; querySelectorAll(s: string): unknown[] } | null;
+  } | null = null;
   popupCloseCallback: (() => void) | null = null;
 
   closePopup(): void {
@@ -39,6 +42,9 @@ export class FakeApi {
   sentEcho: boolean[] = [];
   characterName: string | null = 'Foo';
   characterListeners = new Set<(name: string | null) => void>();
+  sendImpl: ((command: string) => Promise<void>) | null = null;
+  headerActions: { querySelector(s: string): unknown; querySelectorAll(s: string): unknown[] } | null = null;
+  headerUpdates = 0;
 
   setCharacter(name: string | null): void {
     this.characterName = name;
@@ -47,9 +53,10 @@ export class FakeApi {
 
   readonly api = {
     command: {
-      send: async (command: string, echo?: boolean) => {
+      send: (command: string, echo?: boolean): Promise<void> => {
         this.sent.push(command);
         this.sentEcho.push(echo ?? false);
+        return this.sendImpl?.(command) ?? Promise.resolve();
       },
       addSuggestions: () => {},
       removeSuggestions: () => {},
@@ -102,8 +109,12 @@ export class FakeApi {
       getAll: () => [],
     },
     ui: {
-      registerPersistentPopup: async (cfg: { createContent: () => Promise<unknown> }) => {
+      registerPersistentPopup: async (cfg: {
+        createContent: () => Promise<unknown>;
+        headerActions?: { querySelector(s: string): unknown; querySelectorAll(s: string): unknown[] } | null;
+      }) => {
         this.popupConfig = cfg;
+        this.headerActions = cfg.headerActions ?? null;
         return {
           id: 'arkmail',
           isOpen: false,
@@ -118,7 +129,10 @@ export class FakeApi {
           setTitle: () => {},
           setBody: () => {},
           setPinned: () => {},
-          setHeaderActions: () => {},
+          setHeaderActions: (actions: { querySelector(s: string): unknown; querySelectorAll(s: string): unknown[] } | null) => {
+            this.headerActions = actions;
+            this.headerUpdates++;
+          },
         };
       },
       addPopupMenuEntry: () => ({ remove: () => {} }),
@@ -156,6 +170,7 @@ export interface Harness {
 }
 
 let previousIndexedDB: IDBFactory | undefined;
+let previousResizeObserver: unknown;
 
 export async function startHarness(
   options: {
@@ -166,12 +181,25 @@ export async function startHarness(
     // (symulacja install/enable pluginu W GRZE - sygnaly obecnosci
     // przeminely, zanim plugin zdazyl sie zaladowac).
     skipArm?: boolean;
+    /** Symuluje ResizeObserver i od razu ustawia szeroki albo waski popup. */
+    wide?: boolean;
   } = {},
 ): Promise<Harness> {
   const window = new Window();
   (globalThis as { document?: unknown }).document = window.document;
   previousIndexedDB = globalThis.indexedDB;
   globalThis.indexedDB = new IDBFactory();
+  const resizeGlobal = globalThis as { ResizeObserver?: unknown };
+  previousResizeObserver = resizeGlobal.ResizeObserver;
+  if (options.wide !== undefined) {
+    resizeGlobal.ResizeObserver = class {
+      constructor(private readonly callback: (entries: Array<{ contentRect: { width: number } }>) => void) {}
+      observe(): void {
+        this.callback([{ contentRect: { width: options.wide ? WIDE_MIN_WIDTH + 100 : WIDE_MIN_WIDTH - 100 } }]);
+      }
+      disconnect(): void {}
+    };
+  }
   if (options.archive || options.notifyEnabled !== undefined || options.indexMeta) {
     const seed = new IndexedDbStorageDriver(globalThis.indexedDB);
     if (options.archive) {
@@ -213,6 +241,9 @@ export async function stopHarness(): Promise<void> {
   delete (globalThis as { document?: unknown }).document;
   if (previousIndexedDB === undefined) delete (globalThis as { indexedDB?: IDBFactory }).indexedDB;
   else globalThis.indexedDB = previousIndexedDB;
+  const resizeGlobal = globalThis as { ResizeObserver?: unknown };
+  if (previousResizeObserver === undefined) delete resizeGlobal.ResizeObserver;
+  else resizeGlobal.ResizeObserver = previousResizeObserver;
 }
 
 /** Wspolny prolog: powiadomienie -> listing 3 listow (obciety) -> puste nieprzeczytane. */
@@ -238,8 +269,19 @@ export async function loadTruncatedBox(h: Harness): Promise<void> {
   await waitFor(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji prologu');
 }
 
+export const queryUi = (h: Harness, selector: string): unknown => {
+  const inContent = h.content.querySelector(selector);
+  if (inContent) return inContent;
+  const root = h.f.headerActions as unknown as {
+    matches(selector: string): boolean;
+    querySelector(selector: string): unknown;
+  } | null;
+  if (root?.matches(selector)) return root;
+  return root?.querySelector(selector) ?? null;
+};
+
 export const click = (h: Harness, selector: string): void =>
-  (h.content.querySelector(selector) as { dispatchEvent(e: unknown): void }).dispatchEvent(
+  (queryUi(h, selector) as { dispatchEvent(e: unknown): void }).dispatchEvent(
     new h.window.Event('click'),
   );
 
@@ -305,4 +347,4 @@ export const notifyText = (f: FakeApi, fragment: string): boolean =>
 
 /** Tekst elementu (happy-dom) albo ''. */
 export const textOf = (h: Harness, selector: string): string =>
-  String((h.content.querySelector(selector) as { textContent?: string } | null)?.textContent ?? '');
+  String((queryUi(h, selector) as { textContent?: string } | null)?.textContent ?? '');

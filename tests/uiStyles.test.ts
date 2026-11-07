@@ -154,10 +154,17 @@ test('style: przyciski spojne wysokoscia; box-ops wolny od margin-top paginacji'
 // Audyt etykiet (Fala 16k): kazda statyczna etykieta w render.ts musi
 // byc krotka (<=45 znakow), a stary dlugi format "Przerwij (strona N)"
 // jest zakazany - teraz "Przerwij · N" (dynamiczny, poza regexem).
+// Opisowe ostrzezenie przy grupie nie jest etykieta kontrolki. Jego pelna
+// tresc i trwalosc sprawdza groupAliasConflicts.test.ts.
 test('style: audyt etykiet - krotkie, bez starego formatu Przerwij', () => {
   // Test leci skompilowany z out-test/tests/ - repo root dwa poziomy wyzej.
   const src = readFileSync(join(__dirname, '..', '..', 'src/arkmail/ui/render.ts'), 'utf8');
-  const labels = [...src.matchAll(/textContent = '([^']+)'/g)].map((m) => m[1]);
+  const descriptions = new Set([
+    'Nazwa koliduje z aliasem pocztowym. Grupa nie jest rozwijana w podpowiedziach. Zmien nazwe albo usun grupe.',
+  ]);
+  const labels = [...src.matchAll(/textContent = '([^']+)'/g)]
+    .map((m) => m[1])
+    .filter((label) => !descriptions.has(label));
   assert.ok(labels.length >= 20, `audyt obejmuje etykiety (znaleziono: ${labels.length})`);
   for (const label of labels) {
     assert.ok(label.length <= 45, `etykieta <= 45 znakow (${label.length}): "${label}"`);

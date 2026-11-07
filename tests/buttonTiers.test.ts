@@ -98,7 +98,6 @@ function mount(store: MailUiStore) {
 /** Oczekiwane klasy poziomow per przycisk (istniejaca klasa -> poziom). */
 const TIERS: Array<{ tab: string; selector: string; tier: string }> = [
   { tab: 'listy', selector: '.arkmail-search-go', tier: 'popup-btn--solid' },
-  { tab: 'listy', selector: '.arkmail-animal-send', tier: 'popup-btn--control' },
   { tab: 'listy', selector: '.arkmail-older-all', tier: 'popup-btn--control' },
   { tab: 'listy-full', selector: '.arkmail-older', tier: 'popup-btn--control' },
   { tab: 'listy', selector: '.arkmail-cache-clear', tier: 'popup-btn--danger' },

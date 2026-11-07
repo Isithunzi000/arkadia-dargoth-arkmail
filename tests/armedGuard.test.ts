@@ -1,7 +1,7 @@
 /**
  * Wydanie 1.30.2 (Etap 5): jednolity sygnal uzbrojenia dwukliku.
  * Regresja C1: cztery klawisze ("Usun" listu, "Wyczysc zapisane dane",
- * "Wyczysc" compose, "Pobierz tresci do archiwum") uzbrajaly tylko
+ * "Wyczysc pola listu" compose, "Pobierz tresci do archiwum") uzbrajaly tylko
  * etykieta, bez data-armed i bez reakcji na ESC - inny sygnal niz
  * guardDeleteButton (czerwone tlo + obwodka). Kontrakt: kazde
  * uzbrojenie w oknie ustawia data-armed="1" i daje sie rozbroic ESC.
@@ -78,10 +78,10 @@ test('guard: "Wyczysc zapisane dane" uzbraja data-armed i daje rozbroic ESC', ()
   assert.equal(calls.clearCache, 1, 'drugi klik w uzbrojenie wykonuje akcje');
 });
 
-test('guard: "Wyczysc" w compose uzbraja data-armed i daje rozbroic ESC', () => {
+test('guard: "Wyczysc pola listu" w compose uzbraja data-armed i daje rozbroic ESC', () => {
   const store = new MailUiStore({ tab: 'napisz' });
   const { container } = mount(store);
-  const btn = buttonByText(container, 'Wyczysc');
+  const btn = buttonByText(container, 'Wyczysc pola listu');
   click(btn);
   assert.ok(armed(btn), 'pierwszy klik uzbraja');
   pressEsc();
@@ -140,4 +140,40 @@ test('guard: "Usun" otwartego listu uzbraja data-armed i daje rozbroic ESC', () 
   click(btn);
   click(btn);
   assert.equal(calls.deleteLetter, 1, 'drugi klik w uzbrojenie kasuje list');
+});
+
+test('guard: ESC rozbraja bez przekazywania zdarzenia do okna', () => {
+  const store = new MailUiStore({ tab: 'listy' });
+  const { container } = mount(store);
+  document.body.appendChild(container);
+  const btn = buttonByText(container, 'Wyczysc zapisane dane') as {
+    dispatchEvent(event: unknown): void;
+  };
+  click(btn);
+  assert.ok(armed(btn), 'pierwszy klik uzbraja');
+  let windowEscape = 0;
+  const onWindowEscape = (event: Event): void => {
+    if ((event as KeyboardEvent).key === 'Escape') windowEscape += 1;
+  };
+  window.addEventListener('keydown', onWindowEscape as never);
+  try {
+    const event = new window.KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true,
+    });
+    btn.dispatchEvent(event);
+    assert.ok(!armed(btn), 'ESC rozbraja');
+    assert.equal(windowEscape, 0, 'ESC uzbrojenia nie dociera do klienta i nie zamyka popupu');
+    assert.equal(event.defaultPrevented, true, 'zdarzenie uzbrojenia jest obsluzone');
+    btn.dispatchEvent(new window.KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true,
+    }));
+    assert.equal(windowEscape, 1, 'kolejny ESC bez uzbrojenia moze zamknac popup');
+  } finally {
+    window.removeEventListener('keydown', onWindowEscape as never);
+    container.remove();
+  }
 });

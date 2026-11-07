@@ -28,20 +28,29 @@ export function downloadBlob(name: string, data: Blob): boolean {
       URL?: { createObjectURL(b: Blob): string; revokeObjectURL(u: string): void };
     };
     const doc = g.document;
-    if (!doc?.body || !g.URL) return false;
+    const urlApi = g.URL;
+    if (!doc?.body || !urlApi) return false;
     const a = doc.createElement('a') as {
       href: string;
       download: string;
       click(): void;
       remove(): void;
     };
-    const url = g.URL.createObjectURL(data);
+    const url = urlApi.createObjectURL(data);
     a.href = url;
     a.download = name;
     doc.body.appendChild(a);
     a.click();
     a.remove();
-    g.URL.revokeObjectURL(url);
+    // true = rozpoczeto obsluge pobrania, nie ma dowodu zapisu na dysku.
+    // Adres zostaje zywy przez klik i dopiero timer go sprzata.
+    setTimeout(() => {
+      try {
+        urlApi.revokeObjectURL(url);
+      } catch {
+        // Pozne sprzatanie nie moze wywolac nieobslugonego bledu.
+      }
+    }, 1000);
     return true;
   } catch {
     return false;
