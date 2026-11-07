@@ -66,17 +66,17 @@ const switchSubByLabel = (container: unknown, label: string): void => {
   throw new Error(`brak pigulki: ${label}`);
 };
 
-test('import: pigulka Import-Eksport ma trzy przyciski importu z podpowiedziami', () => {
+test('import: Import i eksport ma dwa importy osob, a Aliasy maja import aliasow', () => {
   const s = new MailUiStore({ tab: 'kontakty' });
   const { container } = mount(s);
-  // Zgloszenie 2026-11-05 (K7): wszystkie importy w pigulce Import-Eksport.
+  // Etap 9: Import i eksport zachowuje importy osob; aliasy sa w swojej sekcji.
   assert.equal(q(container, '[data-import]'), null, 'Ksiazka bez przyciskow importu');
-  switchSubByLabel(container, 'Import-Eksport');
+  switchSubByLabel(container, 'Import i eksport');
   const btns = qa(container, '[data-import]');
   assert.deepEqual(
     btns.map((b) => (b as { getAttribute(n: string): string }).getAttribute('data-import')),
-    ['zapamietani', 'przedstawieni', 'aliasy'],
-    'trzy przyciski w ustalonej kolejnosci',
+    ['zapamietani', 'przedstawieni'],
+    'dwa importy osob w ustalonej kolejnosci',
   );
   for (const b of btns) {
     const el = b as { textContent?: string; getAttribute(n: string): string | null };
@@ -84,15 +84,24 @@ test('import: pigulka Import-Eksport ma trzy przyciski importu z podpowiedziami'
     const title = el.getAttribute('title');
     assert.ok(title && title.length > 10, 'podpowiedz niepusta');
   }
+  switchSubByLabel(container, 'Aliasy pocztowe');
+  const aliasImport = q(container, '[data-import="aliasy"]') as {
+    textContent?: string;
+    getAttribute(n: string): string | null;
+  };
+  assert.equal(aliasImport.textContent, 'Importuj aliasy pocztowe');
+  assert.ok((aliasImport.getAttribute('title') ?? '').includes('Pobiera z gry aliasy pocztowe'));
 });
 
 test('import: klik wywoluje handler z rodzajem importu', () => {
   const s = new MailUiStore({ tab: 'kontakty' });
   const { container, calls } = mount(s);
-  switchSubByLabel(container, 'Import-Eksport');
-  for (const kind of ['zapamietani', 'przedstawieni', 'aliasy']) {
+  switchSubByLabel(container, 'Import i eksport');
+  for (const kind of ['zapamietani', 'przedstawieni']) {
     (q(container, `[data-import="${kind}"]`) as { click(): void }).click();
   }
+  switchSubByLabel(container, 'Aliasy pocztowe');
+  (q(container, '[data-import="aliasy"]') as { click(): void }).click();
   assert.deepEqual(calls, ['people:zapamietani', 'people:przedstawieni', 'aliases']);
 });
 

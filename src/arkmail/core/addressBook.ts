@@ -47,6 +47,23 @@ export interface ImportedAlias {
   targets: string[];
 }
 
+/** Konflikt jest cecha wyliczana ze stanu, nigdy polem zapisywanym w grupie. */
+export function groupAliasConflict(
+  name: string,
+  aliases: readonly ImportedAlias[],
+): boolean {
+  const key = name.trim().toLowerCase();
+  return key !== '' && aliases.some((alias) => alias.name.trim().toLowerCase() === key);
+}
+
+/** Zwraca grupy w ich stabilnej kolejnosci, takze puste i starsze konflikty. */
+export function findGroupAliasConflicts(
+  groups: readonly ContactGroup[],
+  aliases: readonly ImportedAlias[],
+): ContactGroup[] {
+  return groups.filter((group) => groupAliasConflict(group.name, aliases));
+}
+
 function cleanNames(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   const out: string[] = [];
@@ -87,11 +104,13 @@ function cleanGroups(value: unknown): ContactGroup[] {
     // Uszkodzony wpis (czlonkowie nie sa lista) odpada caly; pusta
     // lista to legalna grupa/alias oczekujacy na czlonkow.
     if (!Array.isArray(candidate.members)) continue;
-    const members = cleanNames(candidate.members);
-    const existing = out.find((g) => g.name === name);
+    const members = cleanBookNames(candidate.members);
+    const existing = out.find((g) => g.name.toLowerCase() === name.toLowerCase());
     if (existing) {
       for (const member of members) {
-        if (!existing.members.includes(member)) existing.members.push(member);
+        if (!existing.members.some((m) => m.toLowerCase() === member.toLowerCase())) {
+          existing.members.push(member);
+        }
       }
     } else {
       out.push({ name, members });
@@ -282,6 +301,18 @@ export interface AddressBookExport {
   groups: ContactGroup[];
 }
 
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string");
+}
+
+function hasGroupsShape(value: unknown): boolean {
+  return Array.isArray(value) && value.every((item) => {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) return false;
+    const group = item as Record<string, unknown>;
+    return typeof group.name === "string" && isStringArray(group.members);
+  });
+}
+
 /**
  * Waliduje i czysci plik importu. Wersja 2: pola people + groups.
  * Wersja 1 (stare wydania): imiona = suma pul zapamietani/przedstawieni,
@@ -314,6 +345,8 @@ export function parseAddressBookExport(json: string): AddressBookExport | null {
       groups: cleanGroups(candidate.groups),
     };
   }
+  if (candidate.version !== 2) return null;
+  if (!isStringArray(candidate.people) || !hasGroupsShape(candidate.groups)) return null;
   return {
     people: cleanBookNames(candidate.people),
     groups: cleanGroups(candidate.groups),

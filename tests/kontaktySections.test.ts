@@ -1,10 +1,10 @@
 /**
  * Struktura zakladki Kontakty (zgloszenie live 2026-11-05):
- * 4 sub-pigulki - Ksiazka adresowa / Aliasy Pocztowe / Grupy /
- * Import-Eksport. Eksport/import przeniesione z sekcji Grupy do
- * Import-Eksport. Aliasy pocztowe jako osobna sekcja z klawiszem
+ * 4 sub-pigulki - Ksiazka adresowa / Aliasy pocztowe / Grupy /
+ * Import i eksport. Eksport/import przeniesione z sekcji Grupy do
+ * Import i eksport. Aliasy pocztowe jako osobna sekcja z klawiszem
  * czyszczenia lustra (guard dwukliku, poziom danger). Sekcja
- * Import-Eksport: czyszczenie calej ksiazki (imiona + grupy + aliasy,
+ * Import i eksport: czyszczenie calej ksiazki (imiona + grupy + aliasy,
  * guard) i dopisanie wszystkich osob zebranych z listow (klawisz
  * aktywny tylko gdy baza istnieje).
  * Imiona syntetyczne (Fred/Grault/Corge/Waldo - dozwolone przez guardy).
@@ -79,7 +79,7 @@ const switchSub = (root: Root, label: string): void => {
   assert.fail(`brak sub-pigulki: ${label}`);
 };
 
-const PILL_LABELS = ['Ksiazka adresowa', 'Aliasy Pocztowe', 'Grupy', 'Import-Eksport'];
+const PILL_LABELS = ['Ksiazka adresowa', 'Aliasy pocztowe', 'Grupy', 'Import i eksport'];
 
 test('kontakty: 4 sub-pigulki w zatwierdzonym porzadku', () => {
   const { container } = mount(new MailUiStore({ tab: 'kontakty' }));
@@ -102,14 +102,14 @@ test('kontakty: eksport/import nie mieszka juz w sekcji Grupy', () => {
   assert.equal(q(container, '[data-book-import-mode]'), null, 'tryby importu przeniesione');
 });
 
-test('kontakty: sekcja Import-Eksport ma eksport, import i tryby', () => {
+test('kontakty: sekcja Import i eksport ma eksport, import i tryby', () => {
   const s = new MailUiStore({
     tab: 'kontakty',
     people: ['Fred'],
     groups: [{ name: 'Gildia', members: ['Fred'] }],
   });
   const { container } = mount(s);
-  switchSub(container, 'Import-Eksport');
+  switchSub(container, 'Import i eksport');
   assert.ok(q(container, '[data-book-export]'), 'eksport obecny');
   assert.ok(q(container, '[data-book-import]'), 'import obecny');
   assert.equal(
@@ -117,14 +117,15 @@ test('kontakty: sekcja Import-Eksport ma eksport, import i tryby', () => {
     2,
     'dwa tryby importu',
   );
-  assert.equal(qa(container, '[data-import]').length, 3, 'trzy importy z gry');
+  assert.equal(qa(container, '[data-import]').length, 2, 'dwa importy osob z gry');
+  assert.equal(q(container, '[data-import="aliasy"]'), null, 'import aliasow jest w Aliasach');
   // Wydanie 1.30.1 (zgloszenia 4/5): reczne dodawanie mieszka w Ksiazce
-  // i Grupach; Import-Eksport to czysty import/eksport.
+  // i Grupach; Import i eksport to czysty import/eksport.
   assert.equal(q(container, '[data-book-new]'), null, 'dodawanie imienia w Ksiazce, nie tu');
   assert.equal(q(container, '[data-group-add]'), null, 'tworzenie grupy w Grupach, nie tu');
 });
 
-test('kontakty: Aliasy Pocztowe jako osobna sekcja z czyszczeniem', () => {
+test('kontakty: Aliasy pocztowe jako osobna sekcja z czyszczeniem', () => {
   const s = new MailUiStore({
     tab: 'kontakty',
     importedAliases: [{ name: 'zgromadzenie', targets: ['Fred'] }],
@@ -132,8 +133,9 @@ test('kontakty: Aliasy Pocztowe jako osobna sekcja z czyszczeniem', () => {
   const { container, calls } = mount(s);
   // W Ksiazce aliasow juz nie ma - sekcja ma wlasna pigulke.
   assert.equal(q(container, '[data-book-aliases]'), null, 'Ksiazka bez sekcji aliasow');
-  switchSub(container, 'Aliasy Pocztowe');
+  switchSub(container, 'Aliasy pocztowe');
   assert.ok(q(container, '[data-book-aliases]'), 'aliasy w swojej sekcji');
+  assert.ok(q(container, '[data-import="aliasy"]'), 'import aliasow w swojej sekcji');
   assert.match(
     (q(container, '[data-book-aliases]') as { textContent?: string }).textContent ?? '',
     /zgromadzenie/,
@@ -150,7 +152,7 @@ test('kontakty: Aliasy Pocztowe jako osobna sekcja z czyszczeniem', () => {
 
 test('kontakty: Wyczysc cala ksiazke - guard i zakres', () => {
   const { container, calls } = mount(new MailUiStore({ tab: 'kontakty' }));
-  switchSub(container, 'Import-Eksport');
+  switchSub(container, 'Import i eksport');
   const clearAll = q(container, '[data-book-clear-all]');
   assert.ok(clearAll, 'klawisz czyszczenia calej ksiazki');
   assert.ok(classesOf(clearAll).includes('popup-btn--danger'), 'danger');
@@ -167,7 +169,7 @@ test('kontakty: Wyczysc cala ksiazke - guard i zakres', () => {
 
 test('kontakty: Dopisz wszystkie osoby z listow - tylko gdy baza istnieje', () => {
   const empty = mount(new MailUiStore({ tab: 'kontakty' }));
-  switchSub(empty.container, 'Import-Eksport');
+  switchSub(empty.container, 'Import i eksport');
   const disabledBtn = q(empty.container, '[data-book-add-all-contacts]');
   assert.ok(disabledBtn, 'klawisz istnieje');
   assert.equal(
@@ -178,7 +180,7 @@ test('kontakty: Dopisz wszystkie osoby z listow - tylko gdy baza istnieje', () =
 
   const s = new MailUiStore({ tab: 'kontakty', contacts: [contact('Fred'), contact('Grault')] });
   const { container, calls } = mount(s);
-  switchSub(container, 'Import-Eksport');
+  switchSub(container, 'Import i eksport');
   const btn = q(container, '[data-book-add-all-contacts]');
   assert.notEqual((btn as { getAttribute(n: string): string | null }).getAttribute('disabled'), '1',
     'z baza aktywny');

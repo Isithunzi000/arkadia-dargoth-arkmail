@@ -2,7 +2,7 @@
  * Reczne dodawanie mieszka we wlasciwych sekcjach (wydanie 1.30.1,
  * Etap 4) - piny regresji na zgloszenia 4 i 5: pole nowej osoby
  * (data-book-new) w Ksiazce adresowej, pole nowej grupy (data-group-add)
- * w Grupach. Pigulka Import-Eksport zostaje z czystym importem/eksportem.
+ * w Grupach. Pigulka Import i eksport zostaje z czystym importem/eksportem.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -68,12 +68,12 @@ test('umiejscowienie: Grupy maja pole tworzenia nowej grupy', () => {
   assert.ok(q(container, '[data-group-create]'), 'klawisz Utworz grupe obok pola');
 });
 
-test('umiejscowienie: Import-Eksport bez pol recznego dodawania', () => {
+test('umiejscowienie: Import i eksport bez pol recznego dodawania', () => {
   const s = new MailUiStore({ tab: 'kontakty' });
   const container = mount(s);
-  switchSubByLabel(container, 'Import-Eksport');
-  assert.equal(q(container, '[data-book-new]'), null, 'Import-Eksport bez data-book-new');
-  assert.equal(q(container, '[data-group-add]'), null, 'Import-Eksport bez data-group-add');
+  switchSubByLabel(container, 'Import i eksport');
+  assert.equal(q(container, '[data-book-new]'), null, 'Import i eksport bez data-book-new');
+  assert.equal(q(container, '[data-group-add]'), null, 'Import i eksport bez data-group-add');
   // Import/eksport zostaje na miejscu.
   assert.ok(q(container, '[data-import]'), 'przyciski importu zostaja');
 });

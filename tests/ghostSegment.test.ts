@@ -145,3 +145,122 @@ test('segment: grupa pusta (bez czlonkow) nie jest kandydatem', () => {
   type(el, 'pus');
   assert.equal(ghostRest(c, '[data-field="adresat"]'), '');
 });
+
+
+// Etap 7: granice segmentow zaleza od kandydatow, nie tylko od przecinka.
+type RecipientField = 'adresat' | 'dw';
+const recipientFields: readonly RecipientField[] = ['adresat', 'dw'];
+const recipientSelector = (field: RecipientField): string => `[data-field="${field}"]`;
+
+for (const field of recipientFields) {
+  test(`segment: druga osoba po spacji jest podpowiedziana w polu ${field}`, () => {
+    const s = new MailUiStore({ tab: 'napisz' });
+    s.setContacts([contact('Fred'), contact('Grault')]);
+    const c = mount(s);
+    const el = input(c, recipientSelector(field));
+    type(el, 'Fred gr');
+    assert.equal(ghostRest(c, recipientSelector(field)), 'ault');
+    key(el, 'ArrowRight');
+    assert.equal(el.value, 'Fred Grault', 'pierwsza osoba i spacja zostaja bez zmian');
+  });
+
+  test(`segment: dokladna grupa wygrywa z wczesniejszym prefiksem w polu ${field}`, () => {
+    const s = new MailUiStore({ tab: 'napisz' });
+    s.setGroups([
+      { name: 'gildia-rada', members: ['Corge'] },
+      { name: 'gildia', members: ['Fred', 'Grault'] },
+    ]);
+    const c = mount(s);
+    const el = input(c, recipientSelector(field));
+    type(el, 'gildia');
+    assert.equal(ghostRest(c, recipientSelector(field)), '', 'dokladna nazwa nie dostaje sufiksu');
+    key(el, 'ArrowRight');
+    assert.equal(el.value, 'Fred, Grault', 'rozwinieta jest dokladna grupa, nie gildia-rada');
+  });
+
+  for (const separator of [', ', ' '] as const) {
+    const separatorName = separator === ', ' ? 'przecinku' : 'spacji';
+
+    test(`segment: grupa po ${separatorName} zachowuje glowe pola ${field}`, () => {
+      const s = new MailUiStore({ tab: 'napisz' });
+      s.setGroups([{ name: 'Patrol', members: ['Fred', 'Grault'] }]);
+      const c = mount(s);
+      const el = input(c, recipientSelector(field));
+      const head = `Corge${separator}`;
+      type(el, `${head}pat`);
+      assert.equal(ghostRest(c, recipientSelector(field)), 'rol');
+      key(el, 'ArrowRight');
+      assert.equal(el.value, `${head}Fred, Grault`, 'glowa zostaje bajtowo niezmieniona');
+    });
+
+    test(`segment: alias po ${separatorName} pozostaje jednym tokenem w polu ${field}`, () => {
+      const s = new MailUiStore({ tab: 'napisz' });
+      s.setImportedAliases([{ name: 'zgromadzenie', targets: ['Fred'] }]);
+      const c = mount(s);
+      const el = input(c, recipientSelector(field));
+      const head = `Corge${separator}`;
+      type(el, `${head}zgr`);
+      assert.equal(ghostRest(c, recipientSelector(field)), 'omadzenie');
+      key(el, 'ArrowRight');
+      assert.equal(el.value, `${head}zgromadzenie`, 'alias nie jest rozwijany');
+    });
+
+    test(`segment: najdluzszy sufiks i dokladna nazwa wygrywaja po ${separatorName} w polu ${field}`, () => {
+      const s = new MailUiStore({ tab: 'napisz' });
+      s.setGroups([
+        { name: 'C', members: ['Corge'] },
+        { name: 'B C D', members: ['Thud'] },
+        { name: 'B C', members: ['Fred', 'Grault'] },
+      ]);
+      const c = mount(s);
+      const el = input(c, recipientSelector(field));
+      const head = `A${separator}`;
+      type(el, `${head}B C`);
+      assert.equal(ghostRest(c, recipientSelector(field)), '', 'dokladne B C wygrywa z B C D');
+      key(el, 'ArrowRight');
+      assert.equal(el.value, `${head}Fred, Grault`, 'B C wygrywa z krotszym C i dluzszym prefiksem');
+    });
+
+    test(`segment: pusty suffix po ${separatorName} jest cichy w polu ${field}`, () => {
+      const s = new MailUiStore({ tab: 'napisz' });
+      s.setContacts([contact('Fred')]);
+      const c = mount(s);
+      const el = input(c, recipientSelector(field));
+      type(el, `Fred${separator}`);
+      assert.equal(ghostRest(c, recipientSelector(field)), '');
+    });
+  }
+}
+
+test('segment: akceptacja po spacji nie zmienia drugiego pola adresatow', () => {
+  const s = new MailUiStore({ tab: 'napisz' });
+  s.setContacts([contact('Fred'), contact('Grault')]);
+  const c = mount(s);
+  const adresat = input(c, '[data-field="adresat"]');
+  const dw = input(c, '[data-field="dw"]');
+  type(dw, 'Zachowaj ten szkic');
+  type(adresat, 'Fred gr');
+  key(adresat, 'ArrowRight');
+  assert.equal(adresat.value, 'Fred Grault');
+  assert.equal(dw.value, 'Zachowaj ten szkic');
+});
+
+test('segment: ghost synchronizuje scrollLeft przy input, scroll i focus', () => {
+  const s = new MailUiStore({ tab: 'napisz' });
+  s.setContacts([contact('Bar')]);
+  const c = mount(s);
+  const el = input(c, '[data-field="adresat"]');
+  type(el, 'b');
+  const wrap = el.closest('.arkmail-ghost-wrap');
+  const ghost = wrap?.querySelector('.arkmail-ghost') as HTMLElement | null;
+  assert.ok(ghost);
+  el.scrollLeft = 7;
+  el.dispatchEvent(new window.Event('input') as unknown as Event);
+  assert.equal(ghost.scrollLeft, 7, 'input synchronizuje przewiniecie');
+  el.scrollLeft = 11;
+  el.dispatchEvent(new window.Event('scroll') as unknown as Event);
+  assert.equal(ghost.scrollLeft, 11, 'scroll synchronizuje przewiniecie');
+  el.scrollLeft = 13;
+  el.dispatchEvent(new window.Event('focus') as unknown as Event);
+  assert.equal(ghost.scrollLeft, 13, 'focus synchronizuje przewiniecie');
+});

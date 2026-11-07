@@ -39,12 +39,12 @@ const click = (el: unknown): void => (el as { click(): void }).click();
 
 const switchToImportEksport = (container: unknown): void => {
   for (const pill of qa(container, '.arkmail-subpill')) {
-    if ((pill as { textContent?: string }).textContent === 'Import-Eksport') {
+    if ((pill as { textContent?: string }).textContent === 'Import i eksport') {
       click(pill);
       return;
     }
   }
-  assert.fail('brak sub-pigulki Import-Eksport');
+  assert.fail('brak sub-pigulki Import i eksport');
 };
 
 test('import: klawisz importu to button, nie etykieta', () => {

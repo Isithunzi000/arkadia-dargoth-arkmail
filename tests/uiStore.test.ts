@@ -53,6 +53,16 @@ test('ui: setTab emituje do subskrybenta, unsubscribe odcina', () => {
   assert.deepEqual(seen, ['napisz', 'kontakty']);
 });
 
+test('ui: setAddressBook publikuje grupe i Ksiazke w jednej emisji', () => {
+  const s = new MailUiStore();
+  const seen: Array<{ people: string[]; groups: Array<{ name: string; members: string[] }> }> = [];
+  s.subscribe((state) => seen.push({ people: state.people, groups: state.groups }));
+  s.setAddressBook(['Grault'], [{ name: 'Gildia', members: ['Grault'] }]);
+  assert.deepEqual(seen, [
+    { people: ['Grault'], groups: [{ name: 'Gildia', members: ['Grault'] }] },
+  ]);
+});
+
 test('ui: badge z listingu nieprzeczytanych ma pierwszenstwo', () => {
   const s = new MailUiStore();
   s.applyMailbox('odebrane', lista('odebrane', [{ isRead: false }, { isRead: false }, {}]));

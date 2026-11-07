@@ -273,7 +273,7 @@ test('archiwum: Zapisz wszystkie (ZIP) pobiera pliki TXT, puste archiwum = toast
     assert.ok(expBtn, 'przycisk eksportu archiwum');
     assert.equal(expBtn.textContent, 'Zapisz wszystkie (ZIP)', 'etykieta mowi ZIP, nie TXT');
     click(h, '.arkmail-arch-export');
-    await waitRt(() => notifyText(f, 'Skrzynki sa puste'), 'toast pustego archiwum');
+    await waitRt(() => notifyText(f, 'Archiwum jest puste'), 'toast pustego archiwum');
     assert.ok(!notifyText(f, 'kliknij ponownie'), 'bez prosby o ponowny klik');
     assert.equal(captured.length, 0, 'bez pobierania dla pustego archiwum');
     assert.equal(f.sent.length, 0, 'eksport bez komend do serwera');
@@ -319,7 +319,7 @@ test('archiwum: Zapisz wszystkie (ZIP) pobiera pliki TXT, puste archiwum = toast
       names.every((n) => n.startsWith('odebrane/') && n.endsWith('.txt')),
       'foldery per skrzynka',
     );
-    assert.ok(notifyText(f, 'Zapisano listy do ZIP (3 plikow)'), 'toast podsumowania');
+    assert.ok(notifyText(f, 'Zapisano pliki TXT do ZIP. Liczba plikow: 3. Pominiete bez tresci: 0.'), 'toast podsumowania');
   } finally {
     setDownloadImpl(null);
     captured.length = 0;

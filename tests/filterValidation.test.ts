@@ -19,7 +19,7 @@ import { mountMailUi, type MailUiHandlers } from '../src/arkmail/ui/render';
 import { MailUiStore } from '../src/arkmail/ui/store';
 import { notifyText, startHarness, stopHarness, waitRt } from './harness';
 
-const PERSON_ERROR = 'Osoba: tylko litery a-zA-Z.';
+const PERSON_ERROR = 'Osoba: tylko litery a-z i A-Z.';
 const SUBJECT_ERROR = 'Temat nie moze zawierac znakow ; ani #.';
 const BODY_ERROR = 'Tresc nie moze zawierac znakow ; ani #.';
 const DATE_ERROR = 'Podaj prawidlowa date w formacie RRRR-MM-DD.';

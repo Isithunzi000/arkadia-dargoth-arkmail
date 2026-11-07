@@ -5,8 +5,8 @@
  * niewidzialny span powtarza wpisany tekst (ulozenie 1:1 z polem),
  * za nim przytlumiony suffix kandydata.
  *
- * Warunki pokazania: kursor na koncu pola, kandydat ma prefiks rowny
- * wpisanemu tekstowi (bez wzgledu na wielkosc liter) i jest dluzszy.
+ * Warunki pokazania: kursor na koncu pola, a wybrany suffix jest
+ * prefiksem kandydata lub jego dokladna nazwa (bez wielkosci liter).
  * Akceptacja (ArrowRight) wstawia KANONICZNA forme kandydata.
  * Blur chowa, Escape chowa do nastepnej zmiany tekstu.
  */
@@ -29,9 +29,9 @@ export type GhostSource = () => readonly (string | GhostCandidate)[];
 
 export interface GhostOptions {
   /**
-   * Tryb segmentu dla pol wieloodbiorczych (adresat/DW): dopasowanie
-   * i akceptacja dzialaja po ostatnim przecinku - "Fred, Gr"
-   * dopelnia tylko "Gr", reszta pola zostaje nietknieta.
+   * Tryb segmentu dla pol wieloodbiorczych (adresat/DW): granice po
+   * przecinkach i spacjach, najdluzszy suffix pasujacy do kandydata.
+   * Akceptacja podmienia tylko ten suffix, reszta pola zostaje 1:1.
    */
   segment?: boolean;
 }
@@ -60,65 +60,98 @@ export function attachGhost(
   wrap.appendChild(ghost);
 
   let candidate: GhostCandidate | null = null;
+  let candidateHead = '';
+  let candidateSegment = '';
+  let candidateValue = '';
   let escapeHidden = false;
+
+  const syncScroll = (): void => {
+    ghost.scrollLeft = input.scrollLeft;
+  };
 
   const hide = (): void => {
     candidate = null;
     ghost.style.display = 'none';
   };
 
-  /** W trybie segmentu: czesc pola do ostatniego przecinka (z przecinkiem). */
-  const splitHead = (value: string): string => {
-    if (!opts?.segment) return '';
-    const idx = value.lastIndexOf(',');
-    if (idx === -1) return '';
-    // Segment zaczyna sie PO odstepach za przecinkiem - inaczej dopasowanie
-    // dostaje spacje na poczatku i "fred, Gr" nigdy sie nie uklada.
-    let end = idx + 1;
-    while (value[end] === ' ') end += 1;
-    return value.slice(0, end);
+  /**
+   * Mozliwe poczatki suffixu, od najdluzszego do najkrotszego. Separator
+   * i wszystkie spacje po nim naleza do glowy, wiec akceptacja nie zmieni
+   * ich pisowni. Pusty suffix nigdy nie jest kandydatem.
+   */
+  const segmentStarts = (value: string): number[] => {
+    if (value.length === 0) return [];
+    if (!opts?.segment) return [0];
+    const starts = [0];
+    for (let idx = 0; idx < value.length; idx += 1) {
+      if (value[idx] !== ',' && value[idx] !== ' ') continue;
+      let start = idx + 1;
+      while (value[start] === ' ') start += 1;
+      if (start < value.length && !starts.includes(start)) starts.push(start);
+    }
+    return starts.sort((a, b) => a - b);
   };
 
   const update = (): void => {
     escapeHidden = false;
+    syncScroll();
+    candidate = null;
+    candidateHead = '';
+    candidateSegment = '';
+    candidateValue = '';
     const value = input.value;
     const atEnd =
       input.selectionStart === value.length && input.selectionEnd === value.length;
-    const head = atEnd ? splitHead(value) : '';
-    const segment = value.slice(head.length);
-    candidate =
-      segment.length > 0 && atEnd
-        ? (source()
-            .map((c) => (typeof c === 'string' ? ({ text: c } as GhostCandidate) : c))
-            .find(
-              (c) =>
-                c.text.length > segment.length &&
-                c.text.toLowerCase().startsWith(segment.toLowerCase()),
-            ) ?? null)
-        : null;
+    const candidates = atEnd
+      ? source()
+          .map((c) => (typeof c === 'string' ? ({ text: c } as GhostCandidate) : c))
+          .map((c) => ({ ...c, text: c.text.trim() }))
+          .filter((c) => c.text.length > 0)
+      : [];
+    for (const start of segmentStarts(value)) {
+      const segment = value.slice(start);
+      const key = segment.toLowerCase();
+      // Przy tym samym suffixie dokladna nazwa wygrywa z dluzszym
+      // prefiksem. find() zachowuje stabilna kolejnosc zrodla.
+      const match = candidates.find((c) => c.text.toLowerCase() === key)
+        ?? candidates.find(
+          (c) => c.text.length > segment.length && c.text.toLowerCase().startsWith(key),
+        );
+      if (!match) continue;
+      candidate = match;
+      candidateHead = value.slice(0, start);
+      candidateSegment = segment;
+      candidateValue = value;
+      break;
+    }
     if (!candidate) {
       ghost.style.display = 'none';
       return;
     }
     typed.textContent = value;
-    rest.textContent = candidate.text.slice(segment.length);
+    rest.textContent = candidate.text.slice(candidateSegment.length);
     ghost.style.display = '';
+    syncScroll();
   };
 
   input.addEventListener('input', update);
   input.addEventListener('focus', update);
+  input.addEventListener('scroll', syncScroll);
   input.addEventListener('blur', hide);
   input.addEventListener('keydown', (ev) => {
     if (ev.key === 'ArrowRight' && candidate && !escapeHidden) {
       const value = input.value;
-      if (input.selectionStart === value.length && input.selectionEnd === value.length) {
+      if (
+        input.selectionStart === value.length &&
+        input.selectionEnd === value.length &&
+        candidateValue === value
+      ) {
         ev.preventDefault();
         // Grupa: wstawiamy czlonkow rozwinietych po przecinku; osoba
-        // i alias: kanoniczna forma segmentu. Glowa pola (przed
-        // ostatnim przecinkiem) zostaje nietknieta.
-        const head = splitHead(value);
+        // i alias: kanoniczna forma segmentu. Akceptacja podmienia tylko
+        // suffix wybrany przy ostatnim przeliczeniu, glowa zostaje 1:1.
         const insert = candidate.expand ?? candidate.text;
-        input.value = head + insert;
+        input.value = candidateHead + insert;
         input.selectionStart = input.value.length;
         input.selectionEnd = input.value.length;
         // Fala 26a (zgloszenie 2026-10-22): akceptacja musi odpalic

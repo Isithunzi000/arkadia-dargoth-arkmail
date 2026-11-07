@@ -165,7 +165,7 @@ test('total: stopka indeksacji liczy zywe grupy (blizniak raz), nie surowe rekor
     } | null;
     assert.ok(strip, 'pasek licznikow istnieje');
     assert.ok(
-      String(strip!.textContent).includes('Listow w bazie: 1'),
+      String(strip!.textContent).includes('Liczba listow w bazie: 1.'),
       `pasek: ${strip!.textContent}`,
     );
   } finally {
@@ -240,7 +240,7 @@ test('total: wysylka szkicu odswieza wyslane INIEWYSLANE - szkic znika z bazy', 
     click(h, '[data-tab="archiwum"]');
     await waitRt(() => !!content.querySelector('.arkmail-arch-counts'), 'pasek agregatu');
     const strip = textOf(h, '.arkmail-arch-counts');
-    assert.equal(strip, 'Listow w bazie: 1 list (wyslane: 1 list).', `agregat: ${strip}`);
+    assert.equal(strip, 'Liczba listow w bazie: 1.', `agregat: ${strip}`);
   } finally {
     await stopHarness();
   }

@@ -44,18 +44,18 @@ const arch = (subject: string, sortKey: string): ArchiveLetter => ({
 const click = (el: unknown): void => (el as { click(): void }).click();
 
 // Zgloszenie 2026-11-05 (K7): dodawanie osob i importy stoja w pigulce
-// Import-Eksport; repaint renderuje tylko wybrany podpanel, wiec trzeba
+// Import i eksport; repaint renderuje tylko wybrany podpanel, wiec trzeba
 // go najpierw wlaczyc kliknieciem.
 const switchToImportEksport = (container: unknown): void => {
   for (const pill of (container as { querySelectorAll(s: string): Iterable<unknown> }).querySelectorAll(
     '.arkmail-subpill',
   )) {
-    if ((pill as { textContent?: string }).textContent === 'Import-Eksport') {
+    if ((pill as { textContent?: string }).textContent === 'Import i eksport') {
       click(pill);
       return;
     }
   }
-  assert.fail('brak sub-pigulki Import-Eksport');
+  assert.fail('brak sub-pigulki Import i eksport');
 };
 
 function mount(store: MailUiStore, overrides?: { onSearch?: (box: unknown, q: unknown) => void }) {
@@ -210,7 +210,7 @@ test('szukajka: pole osoby wymaga dopelniacza, nie ma ghosta i zachowuje draft',
   const c = mount(s);
   const el = input(c, '[data-search="osoba"]');
   assert.equal(el.placeholder, 'Osoba (kogo? czego?)');
-  assert.equal(el.getAttribute('title'), 'Wpisz imie w dopelniaczu.');
+  assert.equal(el.getAttribute('title'), 'Wpisz szukana fraze w dopelniaczu (kogo? czego?).');
   type(el, 'cor');
   assert.equal(ghostRest(c, '[data-search="osoba"]'), '');
   key(el, 'ArrowRight');

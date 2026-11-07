@@ -725,6 +725,11 @@ export class MailUiStore {
     this.update({ groups });
   }
 
+  /** Jedna aktualizacja Ksiazki i grup, bez posredniego repaintu. */
+  setAddressBook(people: string[], groups: ContactGroup[]): void {
+    this.update({ people, groups });
+  }
+
   setArchive(archive: ArchiveLetter[]): void {
     this.update({ archive });
   }

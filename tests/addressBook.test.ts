@@ -281,17 +281,53 @@ test('format: brak zgodnosci odrzuca (zly format, brak wersji, nie-JSON)', () =>
   assert.equal(parseAddressBookExport('nie-json'), null);
   assert.equal(parseAddressBookExport('{"format":"arkmail-addressbook"}'), null, 'brak wersji');
   assert.equal(parseAddressBookExport('{"format":"arkmail-addressbook","version":"dwa"}'), null);
+  for (const version of [0, 2.5, 3, 99]) {
+    assert.equal(
+      parseAddressBookExport(JSON.stringify({ format: 'arkmail-addressbook', version, people: [], groups: [] })),
+      null,
+      `nieobslugiwana wersja ${version} musi zostac odrzucona`,
+    );
+  }
 });
 
-test('format: plik bez danych daje pusta ksiazke', () => {
-  assert.deepEqual(parseAddressBookExport('{"format":"arkmail-addressbook","version":2}'), {
-    people: [],
-    groups: [],
-  });
+test('format: v1 bez danych daje pusta ksiazke', () => {
   assert.deepEqual(parseAddressBookExport('{"format":"arkmail-addressbook","version":1}'), {
     people: [],
     groups: [],
   });
+});
+
+test('format: v2 wymaga obu list people i groups', () => {
+  for (const payload of [
+    { format: 'arkmail-addressbook', version: 2 },
+    { format: 'arkmail-addressbook', version: 2, people: [] },
+    { format: 'arkmail-addressbook', version: 2, groups: [] },
+    { format: 'arkmail-addressbook', version: 2, people: {}, groups: [] },
+    { format: 'arkmail-addressbook', version: 2, people: [], groups: {} },
+  ]) {
+    assert.equal(parseAddressBookExport(JSON.stringify(payload)), null, JSON.stringify(payload));
+  }
+  assert.deepEqual(
+    parseAddressBookExport('{"format":"arkmail-addressbook","version":2,"people":[],"groups":[]}'),
+    { people: [], groups: [] },
+    'jawnie pusta, kompletna v2 pozostaje poprawna',
+  );
+});
+
+test('format: v2 odrzuca nieprawidlowe typy wpisow zamiast cicho je pomijac', () => {
+  const invalid = [
+    { people: ['Fred', 17], groups: [] },
+    { people: [], groups: ['Rada'] },
+    { people: [], groups: [null] },
+    { people: [], groups: [{ name: 17, members: [] }] },
+    { people: [], groups: [{ name: 'Rada' }] },
+    { people: [], groups: [{ name: 'Rada', members: 'Fred' }] },
+    { people: [], groups: [{ name: 'Rada', members: ['Fred', 17] }] },
+  ];
+  for (const data of invalid) {
+    const payload = JSON.stringify({ format: 'arkmail-addressbook', version: 2, ...data });
+    assert.equal(parseAddressBookExport(payload), null, payload);
+  }
 });
 
 test('format: bez suffixow import - kolizja nazw zostaje do scalenia', () => {
@@ -307,6 +343,26 @@ test('format: bez suffixow import - kolizja nazw zostaje do scalenia', () => {
 });
 
 // --- applyBookImport: tryby dolacz / zastap ----------------------------------
+
+test('applyBookImport: oba tryby scalaja duplikaty bez wielkosci liter i sa idempotentne', () => {
+  const incoming = {
+    people: [],
+    groups: [
+      { name: ' Rada ', members: [' Fred ', 'Grault'] },
+      { name: 'rada', members: ['fred', 'Corge', 'corge'] },
+    ],
+  };
+  const empty = { people: [], groups: [] };
+  for (const mode of ['dolacz', 'zastap'] as const) {
+    const first = applyBookImport(empty, incoming, mode);
+    assert.deepEqual(first.data.groups, [
+      { name: 'Rada', members: ['Fred', 'Grault', 'Corge'] },
+    ], mode);
+    assert.deepEqual(first.data.people, ['Fred', 'Grault', 'Corge'], mode);
+    const repeated = applyBookImport(first.data, incoming, mode);
+    assert.deepEqual(repeated.data, first.data, `powtorzenie ${mode} jest no-op`);
+  }
+});
 
 test('applyBookImport: dolacz = mergeAddressBook (grupy scalone, imiona dopisane)', () => {
   const existing = {

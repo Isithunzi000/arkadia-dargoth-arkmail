@@ -77,9 +77,9 @@ const switchSubByLabel = (container: unknown, label: string): void => {
   assert.fail(`brak sub-pigulki: ${label}`);
 };
 const switchToKsiazka = (container: unknown): void => switchSubByLabel(container, 'Ksiazka adresowa');
-const switchToAliasy = (container: unknown): void => switchSubByLabel(container, 'Aliasy Pocztowe');
+const switchToAliasy = (container: unknown): void => switchSubByLabel(container, 'Aliasy pocztowe');
 const switchToImportEksport = (container: unknown): void =>
-  switchSubByLabel(container, 'Import-Eksport');
+  switchSubByLabel(container, 'Import i eksport');
 
 const qs = (el: unknown, selector: string): unknown =>
   (el as { querySelector(s: string): unknown }).querySelector(selector);
@@ -92,9 +92,9 @@ test('ksiazka: cztery sub-pigulki (Osoby przeniesione do Archiwum)', () => {
   const pills = qa(container, '.arkmail-subpill');
   assert.deepEqual(pills.map(text), [
     'Ksiazka adresowa',
-    'Aliasy Pocztowe',
+    'Aliasy pocztowe',
     'Grupy',
-    'Import-Eksport',
+    'Import i eksport',
   ]);
 });
 
@@ -261,10 +261,10 @@ test('aliasy: sekcja read-only z nota', () => {
   const { container } = mount(s);
   switchToAliasy(container);
   const section = q(container, '[data-book-aliases]');
-  assert.ok(section, 'sekcja aliasow istnieje w pigulce Aliasy Pocztowe');
+  assert.ok(section, 'sekcja aliasow istnieje w pigulce Aliasy pocztowe');
   assert.ok(
     text(section).includes(
-      'Aliasy pocztowe z gry - tylko odczyt, nie sa zapisywane do pliku. Aliasy edytujesz i usuniesz w grze.',
+      'Aliasy pocztowe z gry sa w ArkMailu tylko do odczytu. Sa zapisane lokalnie jako lustro, ale nie trafiaja do eksportu JSON. Aliasy edytujesz i usuwasz w grze.',
     ),
   );
   assert.ok(text(section).includes('zgromadzenie'), 'nazwa aliasu widoczna');
@@ -279,7 +279,7 @@ test('aliasy: sekcja read-only z nota', () => {
   assert.ok(write, 'klawisz Napisz przy aliasie');
   assert.equal(
     write.getAttribute('title'),
-    'Otwiera zakladke Napisz z adresem: zgromadzenie.',
+    'Otwiera zakladke Napisz list z adresem: zgromadzenie.',
   );
   click(write);
   assert.equal(s.state.tab, 'napisz', 'przejscie na Napisz');
@@ -295,7 +295,7 @@ test('aliasy: bez aliasow sekcja pokazuje nota o pustym stanie', () => {
   switchToAliasy(container);
   const section = q(container, '[data-book-aliases]');
   assert.ok(section, 'sekcja istnieje takze bez aliasow');
-  assert.ok(text(section).includes('Brak aliasow - aliasy pobiera sie z gry.'), 'nota o pustym stanie');
+  assert.ok(text(section).includes('Brak zapisanych aliasow. Pobierz je z gry przyciskiem Importuj aliasy pocztowe.'), 'nota o pustym stanie');
 });
 
 // --- pusty stan --------------------------------------------------------------

@@ -73,11 +73,15 @@ export class WriteThroughStorage {
     const current = this.letters.get(character) ?? new Map<string, string>();
     this.letters.set(character, current);
     let changed = false;
+    let retryPending = false;
     for (const letter of letters) {
       const value = JSON.stringify(letter);
-      if (current.get(letter.id) === value) continue;
-      current.set(letter.id, value);
       const key = JSON.stringify([character, letter.id]);
+      if (current.get(letter.id) === value) {
+        if (this.pendingLetters.has(key)) retryPending = true;
+        continue;
+      }
+      current.set(letter.id, value);
       this.pendingLetters.set(key, { character, id: letter.id, value });
       changed = true;
     }
@@ -92,7 +96,7 @@ export class WriteThroughStorage {
       this.pendingLetters.delete(JSON.stringify([character, id]));
     }
     for (const id of removed) current.delete(id);
-    if (changed) this.enqueue(() => this.flushPendingLetters());
+    if (changed || retryPending) this.enqueue(() => this.flushPendingLetters());
     if (removed.length > 0) {
       const batch = removed;
       this.enqueue(() => this.driver.deleteLetters(character, batch));
@@ -131,6 +135,9 @@ export class WriteThroughStorage {
 
   async flush(): Promise<void> {
     await this.queue;
+    if (this.pendingLetters.size === 0) return;
+    this.enqueue(() => this.flushPendingLetters());
+    await this.queue;
   }
 
   async close(): Promise<void> {
@@ -140,10 +147,9 @@ export class WriteThroughStorage {
 
   private async flushPendingLetters(): Promise<void> {
     if (this.pendingLetters.size === 0) return;
-    const pending = [...this.pendingLetters.values()];
-    this.pendingLetters.clear();
+    const pending = [...this.pendingLetters.entries()];
     const byCharacter = new Map<string, Record<string, string>>();
-    for (const letter of pending) {
+    for (const [, letter] of pending) {
       let values = byCharacter.get(letter.character);
       if (!values) {
         values = {};
@@ -153,6 +159,11 @@ export class WriteThroughStorage {
     }
     for (const [character, values] of byCharacter) {
       await this.driver.putLetters(character, values);
+      for (const [key, letter] of pending) {
+        if (letter.character === character && this.pendingLetters.get(key) === letter) {
+          this.pendingLetters.delete(key);
+        }
+      }
     }
   }
 

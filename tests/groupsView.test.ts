@@ -23,11 +23,12 @@ interface Calls {
   groups: string[][];
   imports: unknown[];
   bookExports: number;
+  memberAdds: Array<{ groupName: string; name: string }>;
 }
 
 function mount(store: MailUiStore) {
   const container = document.createElement('div');
-  const calls: Calls = { groups: [], imports: [], bookExports: 0 };
+  const calls: Calls = { groups: [], imports: [], bookExports: 0, memberAdds: [] };
   mountMailUi(container as unknown as HTMLElement, store, {
     onOpenLetter: () => {},
     onSendCompose: () => {},
@@ -44,6 +45,17 @@ function mount(store: MailUiStore) {
     onSaveGroups: (groups: { name: string; members: string[] }[]) => {
       calls.groups.push(groups.map((g) => `${g.name}=${g.members.join('+')}`));
       store.setGroups(groups);
+    },
+    onAddGroupMember: (groupName: string, name: string) => {
+      calls.memberAdds.push({ groupName, name });
+      const groups = store.state.groups.map((group) =>
+        group.name === groupName ? { ...group, members: [...group.members, name] } : group,
+      );
+      store.setGroups(groups);
+      if (!store.state.people.some((person) => person.toLowerCase() === name.toLowerCase())) {
+        store.setPeople([...store.state.people, name]);
+      }
+      return null;
     },
     onImportAddressBook: (data: unknown, mode: unknown) => calls.imports.push({ data, mode }),
     // Zgloszenie 2026-11-05 (K7): eksport ksiazki idzie przez handler
@@ -86,7 +98,7 @@ const switchSubByLabel = (container: unknown, label: string): void => {
 const switchToGrupy = (container: unknown): void => switchSubByLabel(container, 'Grupy');
 const switchToKsiazka = (container: unknown): void => switchSubByLabel(container, 'Ksiazka adresowa');
 const switchToImportEksport = (container: unknown): void =>
-  switchSubByLabel(container, 'Import-Eksport');
+  switchSubByLabel(container, 'Import i eksport');
 
 // Zgloszenie 2026-11-05 (D3): grupy domyslnie zwiniete - testy dotykajace
 // ciala grupy najpierw rozwijaja ja naglowkiem.
@@ -155,19 +167,19 @@ test('grupy: cztery sub-pigulki (Osoby w Archiwum)', () => {
   const pills = qa(container, '.arkmail-subpill');
   assert.deepEqual(pills.map(text), [
     'Ksiazka adresowa',
-    'Aliasy Pocztowe',
+    'Aliasy pocztowe',
     'Grupy',
-    'Import-Eksport',
+    'Import i eksport',
   ]);
   // Wydanie 1.30.1 (zgloszenia 4/5): reczne dodawanie mieszka w
-  // Ksiazce i Grupach; importy z gry zostaja w Import-Eksport.
+  // Ksiazce i Grupach; importy z gry zostaja w Import i eksport.
   assert.ok(q(container, '[data-book-new]'), 'domyslnie Ksiazka: formularz dodawania widoczny');
   assert.ok(!q(container, '[data-import]'), 'domyslnie Ksiazka: bez przyciskow importu');
   assert.ok(!q(container, '[data-group-add]'), 'domyslnie Grupy: formularz grupy ukryty');
   switchToImportEksport(container);
-  assert.ok(!q(container, '[data-book-new]'), 'Import-Eksport: bez formularza dodawania');
-  assert.ok(q(container, '[data-import]'), 'Import-Eksport: przyciski importu z gry widoczne');
-  assert.ok(!q(container, '[data-group-add]'), 'Import-Eksport: bez tworzenia grupy');
+  assert.ok(!q(container, '[data-book-new]'), 'Import i eksport: bez formularza dodawania');
+  assert.ok(q(container, '[data-import]'), 'Import i eksport: przyciski importu z gry widoczne');
+  assert.ok(!q(container, '[data-group-add]'), 'Import i eksport: bez tworzenia grupy');
   switchToGrupy(container);
   assert.ok(q(container, '[data-group-add]'), 'Grupy: tworzenie grupy widoczne');
 });
@@ -217,6 +229,8 @@ test('grupy: zmiana nazwy z walidacja kolizji', () => {
   type(rename, 'Rada');
   click(q(container, '[data-group-rename-ok]'));
   assert.deepEqual(calls.groups, [['Rada=Fred', 'Patrol=Corge']]);
+  assert.equal(text(q(container, '[data-group-toggle]')), 'v Rada (1)', 'grupa zostaje rozwinieta');
+  assert.equal((q(container, '[data-group-rename]') as HTMLInputElement).value, 'Rada');
 });
 
 test('grupy: usuniecie czlonka i dodanie z ghosta', () => {
@@ -237,12 +251,57 @@ test('grupy: usuniecie czlonka i dodanie z ghosta', () => {
   type(add, 'cor');
   add.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'ArrowRight', cancelable: true }) as unknown as Event);
   click(q(container, '[data-member-add-ok]'));
-  assert.deepEqual(calls.groups.at(-1), ['Gildia=Fred+Corge'], 'Corge z ghosta dolacza');
+  assert.deepEqual(calls.memberAdds.at(-1), { groupName: 'Gildia', name: 'Corge' });
+  assert.deepEqual(s.state.groups, [{ name: 'Gildia', members: ['Fred', 'Corge'] }]);
+});
+
+test('grupy: nowy poprawny czlonek jest dopisywany do grupy i Ksiazki jedna operacja', () => {
+  const s = new MailUiStore({
+    tab: 'kontakty',
+    groups: [{ name: 'Gildia', members: ['Fred'] }],
+    people: ['Fred'],
+  });
+  const { container, calls } = mount(s);
+  switchToGrupy(container);
+  expandFirstGroup(container);
+  type(q(container, '[data-member-add]'), ' Grault ');
+  click(q(container, '[data-member-add-ok]'));
+
+  assert.deepEqual(calls.memberAdds, [{ groupName: 'Gildia', name: 'Grault' }]);
+  assert.equal(calls.groups.length, 0, 'operacja nie przechodzi przez czesciowy zapis samych grup');
+  assert.deepEqual(s.state.groups, [{ name: 'Gildia', members: ['Fred', 'Grault'] }]);
+  assert.deepEqual(s.state.people, ['Fred', 'Grault']);
+});
+
+test('grupy: niepoprawne imie nowego czlonka nie zmienia grupy ani Ksiazki', () => {
+  const s = new MailUiStore({
+    tab: 'kontakty',
+    groups: [{ name: 'Gildia', members: ['Fred'] }],
+    people: ['Fred'],
+  });
+  const { container, calls } = mount(s);
+  switchToGrupy(container);
+  expandFirstGroup(container);
+  type(q(container, '[data-member-add]'), 'Grault2');
+  click(q(container, '[data-member-add-ok]'));
+
+  assert.equal(calls.groups.length, 0, 'bez zapisu grup');
+  assert.equal(text(q(container, '[data-group-error]')), 'Imie: tylko litery.');
+  assert.deepEqual(s.state.groups, [{ name: 'Gildia', members: ['Fred'] }]);
+  assert.deepEqual(s.state.people, ['Fred']);
+
+  type(q(container, '[data-member-add]'), ' fred ');
+  click(q(container, '[data-member-add-ok]'));
+  assert.equal(calls.memberAdds.length, 0, 'duplikat bez wielkosci liter jest no-op');
+  assert.equal(text(q(container, '[data-group-error]')), 'fred juz jest w tej grupie.');
+  assert.deepEqual(s.state.groups, [{ name: 'Gildia', members: ['Fred'] }]);
+  assert.deepEqual(s.state.people, ['Fred']);
 });
 
 test('grupy: usuniecie grupy i wszystkich grup - uzbrojone potwierdzenie', () => {
   const s = new MailUiStore({
     tab: 'kontakty',
+    people: ['Fred', 'Corge'],
     groups: [
       { name: 'Gildia', members: ['Fred'] },
       { name: 'Patrol', members: ['Corge'] },
@@ -257,6 +316,7 @@ test('grupy: usuniecie grupy i wszystkich grup - uzbrojone potwierdzenie', () =>
   assert.equal(calls.groups.length, 0, 'pierwszy klik tylko uzbraja');
   click(del);
   assert.deepEqual(calls.groups, [['Patrol=Corge']], 'Gildia skasowana');
+  assert.deepEqual(s.state.people, ['Fred', 'Corge'], 'usuniecie grupy nie usuwa osob z Ksiazki');
   // Wszystkie grupy: tez uzbrojone.
   const delAll = q(container, '[data-groups-delete-all]');
   click(delAll);
@@ -371,10 +431,34 @@ test('import-eksport: import w trybie zastap przekazuje mode zastap', async () =
       groups: [{ name: 'Gildia', members: ['Corge', 'Waldo'] }],
     }),
   );
-  assert.equal(calls.imports.length, 1);
+  assert.equal(calls.imports.length, 0, 'wybor pliku nie wykonuje destrukcyjnego zapisu');
+  assert.ok(q(container, '[data-book-replace-confirm]'), 'potwierdzenie dotyczy wybranego pliku');
+  click(q(container, '[data-book-replace-ok]'));
+  assert.equal(calls.imports.length, 1, 'dopiero potwierdzenie wywoluje handler');
   const call = calls.imports[0] as { mode: string; data: { people: string[] } };
   assert.equal(call.mode, 'zastap', 'tryb zastap przekazany do handlera');
   assert.deepEqual(call.data.people, ['Corge']);
+});
+
+test('import-eksport: bledny plik w trybie zastap pozostawia poprzedni stan bez mutacji', async () => {
+  const s = new MailUiStore({
+    tab: 'kontakty',
+    people: ['Fred'],
+    groups: [{ name: 'Stara', members: ['Fred'] }],
+    importedAliases: [{ name: 'rada', targets: ['Fred'] }],
+  });
+  const { container, calls } = mount(s);
+  switchToImportEksport(container);
+  (qa(container, '[data-book-import-mode] input[type=radio]')[1] as HTMLInputElement).click();
+  await importFile(
+    container,
+    JSON.stringify({ format: 'arkmail-addressbook', version: 99, people: [], groups: [] }),
+  );
+
+  assert.equal(calls.imports.length, 0, 'odrzucony plik nie wywoluje mutacji');
+  assert.deepEqual(s.state.people, ['Fred']);
+  assert.deepEqual(s.state.groups, [{ name: 'Stara', members: ['Fred'] }]);
+  assert.deepEqual(s.state.importedAliases, [{ name: 'rada', targets: ['Fred'] }]);
 });
 
 test('import-eksport: tooltip importu mowi o trybie, nie wspomina suffixow', () => {
