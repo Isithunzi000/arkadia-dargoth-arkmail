@@ -281,7 +281,7 @@ test('powiadomienie o nowej poczcie: nowy list ląduje na GORZE widoku, strony z
  * Fala 30b (zgloszenie 2026-10-23): list skasowany na serwerze zostawal
  * w widoku po Odswiez, gdy skrzynka byla pelna (listing uciety) - galaz
  * usuwajaca syncMailboxPage odpalala TYLKO przy kompletnym listingu,
- * wiec martwy wpis klikalny konczyl sie "Nie ma tego listu na liscie".
+ * wiec martwy wpis klikalny konczyl sie "Nie mozna odnalezc tego listu".
  *
  * Nowy kontrakt: przy UCIETYM listingu sync dostaje granice dnia
  * (najstarszy dzien swiezej strony) i usuwa z widoku wylacznie wpisy

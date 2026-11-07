@@ -24,11 +24,13 @@ class FakeApi {
   hookPriority: number | null = null;
   emitted: { event: string; args: unknown[] }[] = [];
   shown: unknown[] = [];
+  sendImpl: ((command: string) => Promise<void>) | null = null;
 
   readonly api = {
     command: {
-      send: async (command: string, echo?: boolean, options?: { preserveCase?: boolean }) => {
+      send: (command: string, echo?: boolean, options?: { preserveCase?: boolean }): Promise<void> => {
         this.sent.push(options === undefined ? { command, echo } : { command, echo, options });
+        return this.sendImpl?.(command) ?? Promise.resolve();
       },
       addSuggestions: () => {},
       removeSuggestions: () => {},
@@ -89,12 +91,11 @@ function armedTransport(f: FakeApi): DargothTransport {
   return t;
 }
 
-test('adapter: transport startuje rozbrojony - send przed uzbrojeniem nic nie wysyla', async () => {
+test('adapter: wysylka offline jest odrzucona i nie trafia do gry', async () => {
   const f = new FakeApi();
   const t = new DargothTransport(f.api);
-  t.send('listy odebrane');
-  await new Promise((r) => setImmediate(r));
-  assert.deepEqual(f.sent, [], 'rozbrojony transport milczy (brama gry, blad 3)');
+  await assert.rejects(t.send('listy odebrane'), /offline/);
+  assert.deepEqual(f.sent, [], 'rozbrojony transport milczy, ale nie zglasza pomyslnego wyslania');
 });
 
 test('adapter: send idzie przez command.send z wyciszonym echem', async () => {
@@ -202,6 +203,77 @@ test('adapter: echo wlasnej wysylki (echo=true) oznaczane own; echo gracza nie',
   assert.equal(seen[1]!.own, undefined, 'echo gracza bez own');
 });
 
+test('adapter: odrzucona wysylka usuwa tylko wlasny wpis echa', async (context) => {
+  const f = new FakeApi();
+  const t = armedTransport(f);
+  const seen: ProtoLine[] = [];
+  t.subscribe((line) => seen.push(line));
+  f.sendImpl = () => Promise.reject(new Error('brak polaczenia'));
+  await assert.rejects(t.send('napisz list', true), /brak polaczenia/);
+  f.sendImpl = null;
+  f.fireLine('→ napisz list', 'info');
+  assert.equal(seen[0]?.own, undefined, 'pozniejsze reczne echo nie jest echo pluginu');
+
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  await t.send('napisz list', true);
+  context.mock.timers.tick(9_999);
+  f.fireLine('→ napisz list', 'info');
+  assert.equal(seen[1]?.own, true, 'echo przed uplywem terminu nadal jest rozpoznawane');
+  await t.send('napisz list', true);
+  context.mock.timers.tick(10_000);
+  f.fireLine('→ napisz list', 'info');
+  assert.equal(seen[2]?.own, undefined, 'wpis echa wygasa po 10 sekundach');
+  context.mock.timers.reset();
+  t.dispose();
+});
+
+test('adapter: dwa identyczne echo maja odrebna tozsamosc przy bledzie', async () => {
+  const f = new FakeApi();
+  const t = armedTransport(f);
+  const seen: ProtoLine[] = [];
+  t.subscribe((line) => seen.push(line));
+  let rejectFirst: ((err: Error) => void) | null = null;
+  let call = 0;
+  f.sendImpl = () => {
+    call++;
+    if (call === 1) return new Promise<void>((_resolve, reject) => { rejectFirst = reject; });
+    return Promise.resolve();
+  };
+  const first = t.send('napisz list', true);
+  await new Promise((resolve) => setImmediate(resolve));
+  const second = t.send('napisz list', true);
+  rejectFirst!(new Error('pierwsza odrzucona'));
+  await assert.rejects(first, /pierwsza odrzucona/);
+  await second;
+  f.fireLine('→ napisz list', 'info');
+  f.fireLine('→ napisz list', 'info');
+  assert.equal(seen[0]?.own, true, 'pozostalo echo drugiej, przyjetej wysylki');
+  assert.equal(seen[1]?.own, undefined, 'wpis odrzuconej wysylki nie zostal w kolejce');
+  t.dispose();
+});
+
+test('adapter: wygaszenie echa i cap sprzataja wpisy bez wplywu na reczne komendy', async (context) => {
+  const f = new FakeApi();
+  const t = armedTransport(f);
+  const seen: ProtoLine[] = [];
+  t.subscribe((line) => seen.push(line));
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  for (let i = 0; i < 11; i++) await t.send(`komenda ${i}`, true);
+  f.fireLine('→ komenda 0', 'info');
+  assert.equal(seen[0]?.own, undefined, 'najstarszy wpis ponad cap zostal usuniety');
+  t.setOnline(false);
+  context.mock.timers.tick(20_000);
+  t.setOnline(true);
+  f.fireLine('→ komenda 10', 'info');
+  assert.equal(seen[1]?.own, undefined, 'reconnect czysci wpisy i ich termin wygasniecia');
+  await t.send('po reconnect', true);
+  t.dispose();
+  context.mock.timers.tick(20_000);
+  f.fireLine('→ po reconnect', 'info');
+  assert.equal(seen[2]?.own, undefined, 'dispose czysci wpis i timer');
+  context.mock.timers.reset();
+});
+
 test('adapter: modal-guard odtwarza komendy gracza z echem', async () => {
   const f = new FakeApi();
   const t = armedTransport(f);
@@ -234,7 +306,7 @@ test('adapter: rozlaczenie porzuca kolejke modalna i blokuje stare wysylki', asy
   t.beginModal();
   f.hookCb!('pomoc');
   t.setOnline(false);
-  t.send('q');
+  await assert.rejects(t.send('q'), /offline/);
   t.endModal();
   t.setOnline(true);
   t.endModal();

@@ -191,7 +191,7 @@ test('archiwum: wyjatek z re-kotwicy nie zabija petli pobierania tresci', async 
     await waitRt(() => f.sent.includes('przeczytaj list 3'), 'odczyt trzeciego listu');
     replayLetter(h, 3, 'najstarszy', 'Tresc trzeciego.');
 
-    await waitRt(() => notifyText(f, 'nieudane: 1'), 'podsumowanie z jedna porazka');
+    await waitRt(() => notifyText(f, 'Nieudane: 1'), 'podsumowanie z jedna porazka');
     assert.ok(
       !notifyText(f, 'Blad pobierania tresci do archiwum.'),
       'petla nie umarla na wyjatku z re-kotwicy',

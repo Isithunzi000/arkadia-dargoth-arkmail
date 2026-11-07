@@ -107,3 +107,83 @@ test('sesja: prompt bez danych - pusta lista, nie blad', async () => {
   ]);
   assert.deepEqual(await op, [], 'brak osob = pula pusta');
 });
+
+
+interface CancelRegistry {
+  listeners: Set<() => void>;
+  registrations: number;
+  unregistrations: number;
+  onCancel: (cb: () => void) => () => void;
+}
+
+function cancelRegistry(): CancelRegistry {
+  const listeners = new Set<() => void>();
+  const registry: CancelRegistry = {
+    listeners,
+    registrations: 0,
+    unregistrations: 0,
+    onCancel: (cb) => {
+      listeners.add(cb);
+      registry.registrations++;
+      let active = true;
+      return () => {
+        if (!active) return;
+        active = false;
+        registry.unregistrations++;
+        listeners.delete(cb);
+      };
+    },
+  };
+  return registry;
+}
+
+function assertSingleCleanup(registry: CancelRegistry): void {
+  assert.equal(registry.registrations, 1, 'jedna rejestracja anulowania');
+  assert.equal(registry.unregistrations, 1, 'dokladnie jedno wyrejestrowanie');
+  assert.equal(registry.listeners.size, 0, 'zakonczony import nie zostaje w rejestrze reconnectu');
+}
+
+test('sesja: sukces zdejmuje dokladnie jedna rejestracje anulowania', async () => {
+  const t = new MockTransport();
+  const registry = cancelRegistry();
+  const s = new ImportSession(t, { ...OPTS, onCancel: registry.onCancel });
+  const op = s.fetchPeople('zapamietani');
+  await t.replay([
+    { cls: 'mail', text: '[12] Zapamietane przez ciebie imiona to Fred.' },
+    { cls: 'mail', text: '> ' },
+  ]);
+  assert.deepEqual(await op, ['Fred']);
+  assertSingleCleanup(registry);
+});
+
+test('sesja: blad zdejmuje dokladnie jedna rejestracje anulowania', async () => {
+  const t = new MockTransport();
+  const registry = cancelRegistry();
+  const s = new ImportSession(t, { timeoutMs: 20, onCancel: registry.onCancel });
+  await assert.rejects(s.fetchPeople('zapamietani'), /timeout/i);
+  assertSingleCleanup(registry);
+});
+
+test('sesja: anulowanie i jego powtorzenie sa bezpieczne i sprzataja raz', async () => {
+  const t = new MockTransport();
+  const registry = cancelRegistry();
+  const s = new ImportSession(t, { ...OPTS, onCancel: registry.onCancel });
+  const op = s.fetchPeople('zapamietani');
+  const cancel = [...registry.listeners][0];
+  assert.ok(cancel, 'operacja zarejestrowala anulowanie');
+  cancel();
+  await assert.rejects(op, /przerwano/i);
+  cancel();
+  assertSingleCleanup(registry);
+});
+
+test('sesja: blad transport.send sprzata raz i nie zostawia callbacku', async () => {
+  const t = new MockTransport();
+  const failing: typeof t = Object.assign(Object.create(Object.getPrototypeOf(t)), t, {
+    send: () => Promise.reject(new Error('brak polaczenia')),
+  });
+  const registry = cancelRegistry();
+  const s = new ImportSession(failing, { ...OPTS, onCancel: registry.onCancel });
+  await assert.rejects(s.fetchPeople('zapamietani'), /brak polaczenia/);
+  assertSingleCleanup(registry);
+});

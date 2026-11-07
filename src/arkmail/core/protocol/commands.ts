@@ -19,6 +19,11 @@ const ROMAN_MONTHS = [
 export const SEARCH_DATE_ERROR = 'Podaj prawidlowa date w formacie RRRR-MM-DD.';
 const SEARCH_RANGE_ERROR = 'Od dnia pozniej niz Do dnia.';
 
+/** Wspolna regula recznego imienia w Ksiazce i w grupie. */
+export function isValidPersonName(name: string): boolean {
+  return /^[A-Za-z]+$/.test(name);
+}
+
 function isValidDateYMD(date: DateYMD): boolean {
   if (!Number.isInteger(date.day) || !Number.isInteger(date.month) || !Number.isInteger(date.year)) {
     return false;
@@ -115,7 +120,7 @@ type SearchTextFields = Pick<ListingSearch, 'osoba' | 'temat' | 'tresc'>;
 
 function validateSearchText(query: SearchTextFields): string | null {
   if (query.osoba && !/^[a-zA-Z]+$/.test(query.osoba)) {
-    return 'Osoba: tylko litery a-zA-Z.';
+    return 'Osoba: tylko litery a-z i A-Z.';
   }
   if (query.temat && /[;#]/.test(query.temat)) {
     return 'Temat nie moze zawierac znakow ; ani #.';

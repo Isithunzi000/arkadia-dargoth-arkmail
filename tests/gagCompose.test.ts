@@ -15,7 +15,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { startHarness, stopHarness, click, textOf, waitRt } from './harness';
+import { startHarness, stopHarness, click, waitRt, queryUi } from './harness';
 
 test('gag: compose widoczny w oknie gry (prompty i wynik nie gagowane)', async () => {
   const h = await startHarness();
@@ -107,7 +107,7 @@ test('echo: wysylki composera i "wyslij zwierze" ida z echem, listingi bez', asy
 
     // Zwierze z przycisku (zakladka Listy): echo + linie lotu widoczne.
     click(h, '[data-tab="listy"]');
-    await waitRt(() => content.querySelector('.arkmail-animal-send') !== null, 'przycisk zwierzecia');
+    await waitRt(() => queryUi(h, '.arkmail-animal-send') !== null, 'przycisk zwierzecia');
     const idx = f.sent.length;
     click(h, '.arkmail-animal-send');
     await waitRt(() => f.sent.length > idx, 'komenda zwierzecia zostala wyslana');

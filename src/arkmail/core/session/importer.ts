@@ -39,20 +39,26 @@ export class ImportSession {
     return new Promise<string[]>((resolve, reject) => {
       const lines: string[] = [];
       let done = false;
-      const finish = (): void => {
-        if (done) return;
-        done = true;
+      let cleaned = false;
+      let cancelUnsub: (() => void) | undefined;
+      const cleanup = (): void => {
+        if (cleaned) return;
+        cleaned = true;
         clearTimeout(timeout);
         if (idle !== undefined) clearTimeout(idle);
         unsubscribe();
+        cancelUnsub?.();
+      };
+      const finish = (): void => {
+        if (done) return;
+        done = true;
+        cleanup();
         resolve(lines);
       };
       const fail = (err: Error): void => {
         if (done) return;
         done = true;
-        clearTimeout(timeout);
-        if (idle !== undefined) clearTimeout(idle);
-        unsubscribe();
+        cleanup();
         reject(err);
       };
 
@@ -74,12 +80,11 @@ export class ImportSession {
       const timeout = setTimeout(() => {
         fail(new Error(`import ${command}: timeout`));
       }, this.opts.timeoutMs);
-      const cancelUnsub = this.opts.onCancel?.(() => {
+      cancelUnsub = this.opts.onCancel?.(() => {
         fail(new Error(`import ${command}: przerwano`));
       });
 
       void Promise.resolve(this.transport.send(command)).catch((err: unknown) => {
-        cancelUnsub?.();
         fail(err instanceof Error ? err : new Error(String(err)));
       });
     });

@@ -124,6 +124,21 @@ export class MailboxSession {
         cancelUnsub();
         unsub();
       };
+      const fail = (error: unknown): void => {
+        if (done) return;
+        cleanup();
+        reject(error instanceof Error ? error : new Error(String(error)));
+      };
+      /** Kazda wysylka konczy sesje przez ten sam cleanup; zadne odrzucenie
+       *  nie zostaje bez obslugi, takze w retry i awaryjnym q. */
+      const send = (line: string): void => {
+        if (done) return;
+        try {
+          void Promise.resolve(this.transport.send(line)).catch(fail);
+        } catch (error: unknown) {
+          fail(error);
+        }
+      };
       const finish = (r: MailboxResult) => {
         cleanup();
         // Fala 24g: listing doszedl = komendy docieraja do serwera,
@@ -174,7 +189,7 @@ export class MailboxSession {
           }
           loadRetried = true;
           loadRetryTimer = setTimeout(() => {
-            if (!done) this.transport.send(cmd);
+            if (!done) send(cmd);
           }, LISTS_LOADING_RETRY_MS);
           return;
         }
@@ -187,7 +202,7 @@ export class MailboxSession {
           if (awaitingPromptAfterQ) {
             if (line.cls === 'prompt' || isPromptLine(line.text)) {
               awaitingPromptAfterQ = false;
-              this.transport.send(cmd);
+              send(cmd);
             }
             return;
           }
@@ -207,7 +222,7 @@ export class MailboxSession {
             }
             pagerRetried = true;
             awaitingPromptAfterQ = true;
-            this.transport.send('q');
+            send('q');
             return;
           }
           const empty = parseEmptyListing(line.text);
@@ -280,7 +295,7 @@ export class MailboxSession {
         cleanup();
         reject(new Error('operacja anulowana'));
       }) ?? (() => {});
-      if (!done) this.transport.send(cmd);
+      if (!done) send(cmd);
     });
   }
 }

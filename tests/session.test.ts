@@ -22,6 +22,92 @@ function fixture(name: string): ProtoLine[] {
 
 const OPTS = { timeoutMs: 500 };
 
+/** Transport z kontrolowanym odrzuceniem i licznikiem aktywnych subskrypcji. */
+class RejectingTransport extends MockTransport {
+  activeSubscriptions = 0;
+
+  constructor(private readonly shouldReject: (line: string) => boolean) {
+    super();
+  }
+
+  override send(line: string, echo = false): Promise<void> {
+    this.sent.push(line);
+    this.sentEcho.push(echo);
+    return this.shouldReject(line)
+      ? Promise.reject(new Error('transport offline'))
+      : Promise.resolve();
+  }
+
+  override subscribe(cb: (line: ProtoLine) => void): () => void {
+    this.activeSubscriptions++;
+    const unsubscribe = super.subscribe(cb);
+    let active = true;
+    return () => {
+      if (active) {
+        active = false;
+        this.activeSubscriptions--;
+      }
+      unsubscribe();
+    };
+  }
+}
+
+test('mailbox: odrzucenie pierwszej komendy konczy fetch i sprzata zasoby', async () => {
+  const t = new RejectingTransport(() => true);
+  let cancellations = 0;
+  const mailbox = new MailboxSession(t, {
+    timeoutMs: 30,
+    onCancel: () => {
+      cancellations++;
+      return () => { cancellations--; };
+    },
+  });
+  await assert.rejects(mailbox.fetch('odebrane'), /transport offline/);
+  assert.equal(t.activeSubscriptions, 0, 'subskrypcja zdjeta');
+  assert.equal(cancellations, 0, 'rejestracja anulowania zdjeta');
+});
+
+test('mailbox: odrzucenie awaryjnego q konczy fetch i sprzata subskrypcje', async () => {
+  const t = new RejectingTransport((line) => line === 'q');
+  const mailbox = new MailboxSession(t, { timeoutMs: 100, idleMs: 20 });
+  const operation = mailbox.fetch('odebrane');
+  const rejected = assert.rejects(operation, /transport offline/);
+  t.emit({ cls: 'mail', text: '[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ' });
+  await rejected;
+  assert.equal(t.activeSubscriptions, 0, 'subskrypcja zdjeta po bledzie q');
+});
+
+test('pager: odrzucenie pierwszej komendy konczy odczyt i sprzata zasoby', async () => {
+  const t = new RejectingTransport(() => true);
+  let cancellations = 0;
+  const pager = new PagerSession(t, {
+    timeoutMs: 30,
+    onCancel: () => {
+      cancellations++;
+      return () => { cancellations--; };
+    },
+  });
+  await assert.rejects(pager.readLetter(1), /transport offline/);
+  assert.equal(t.activeSubscriptions, 0, 'subskrypcja zdjeta');
+  assert.equal(cancellations, 0, 'rejestracja anulowania zdjeta');
+});
+
+test('pager: odrzucenie q przy zamykaniu konczy odczyt i sprzata subskrypcje', async () => {
+  const t = new RejectingTransport((line) => line === 'q');
+  const pager = new PagerSession(t, { timeoutMs: 100, idleMs: 1000 });
+  const operation = pager.readLetter(1);
+  const rejected = assert.rejects(operation, /transport offline/);
+  await t.replay([
+    { cls: 'mail', text: 'List : 1' },
+    { cls: 'mail', text: 'Od   : Gracz' },
+    { cls: 'mail', text: 'Temat: Test' },
+    { cls: 'mail', text: 'Data : Pn, 19 X 2026, 18:47:36' },
+    { cls: 'mail', text: '[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ' },
+  ]);
+  await rejected;
+  assert.equal(t.activeSubscriptions, 0, 'subskrypcja zdjeta po bledzie q');
+});
+
 /** Linie fixture od echa danej komendy (odcina stare linie sprzed komendy). */
 function fromCommand(lines: ProtoLine[], cmd: string): ProtoLine[] {
   const idx = lines.findIndex((l) => l.cls === 'command' && l.text === `→ ${cmd}`);
@@ -200,6 +286,7 @@ test('editor: compose pipelined - wyslany w urzedzie', async () => {
     '  \\_/_ _______________________________________________________________/ ',
   ];
   const op = s.send({ adresat: 'Garply', temat: 'Perly', linie });
+  await new Promise((resolve) => setImmediate(resolve));
   assert.deepEqual(t.sent.slice(0, 2), ['napisz list', 'Garply'], 'etap 1: napisz + adresat');
   await t.replay(fixture('compose-pelny'));
   const res = await op;

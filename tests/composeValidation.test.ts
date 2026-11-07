@@ -211,7 +211,7 @@ test('ui: adresat odrzuca znaki spoza a-zA-Z i puste elementy listy', () => {
     setField(container, 'adresat', adresat);
     clickEl(sendBtn(container));
     assert.equal(sends(calls).length, 0, `adresat odrzucony: ${JSON.stringify(adresat)}`);
-    assert.equal(sendBtn(container).textContent, 'Adresat: tylko litery a-zA-Z, przecinki i spacje.');
+    assert.equal(sendBtn(container).textContent, "Adresatow oddziel przecinkami lub spacjami, bez spojnika 'i'. Dozwolone: litery a-z i A-Z.");
     assert.equal(
       fieldValue(container, 'adresat'),
       adresat,
@@ -231,7 +231,7 @@ test('ui: DW odrzuca znaki spoza a-zA-Z i puste elementy listy', () => {
     setField(container, 'dw', dw);
     clickEl(sendBtn(container));
     assert.equal(sends(calls).length, 0, `DW odrzucone: ${JSON.stringify(dw)}`);
-    assert.equal(sendBtn(container).textContent, 'DW: tylko litery a-zA-Z, przecinki i spacje.');
+    assert.equal(sendBtn(container).textContent, "Adresatow DW oddziel przecinkami lub spacjami, bez spojnika 'i'. Dozwolone: litery a-z i A-Z.");
     assert.equal(
       fieldValue(container, 'dw'),
       dw,
@@ -316,11 +316,11 @@ test('handler: pomijanie formularza nie omija zadnej walidacji compose', async (
       },
       {
         input: { adresat: 'Foo1', temat: 'Perly', dw: '', tresc: 'czesc', linie: ['czesc'] },
-        message: 'Adresat: tylko litery a-zA-Z, przecinki i spacje.',
+        message: "Adresatow oddziel przecinkami lub spacjami, bez spojnika 'i'. Dozwolone: litery a-z i A-Z.",
       },
       {
         input: { adresat: 'Foo\n', temat: 'Perly', dw: '', tresc: 'czesc', linie: ['czesc'] },
-        message: 'Adresat: tylko litery a-zA-Z, przecinki i spacje.',
+        message: "Adresatow oddziel przecinkami lub spacjami, bez spojnika 'i'. Dozwolone: litery a-z i A-Z.",
       },
       {
         input: { adresat: 'Foo', temat: '', dw: '', tresc: 'czesc', linie: ['czesc'] },
@@ -332,11 +332,11 @@ test('handler: pomijanie formularza nie omija zadnej walidacji compose', async (
       },
       {
         input: { adresat: 'Foo', temat: 'Perly', dw: 'Bar,', tresc: 'czesc', linie: ['czesc'] },
-        message: 'DW: tylko litery a-zA-Z, przecinki i spacje.',
+        message: "Adresatow DW oddziel przecinkami lub spacjami, bez spojnika 'i'. Dozwolone: litery a-z i A-Z.",
       },
       {
         input: { adresat: 'Foo', temat: 'Perly', dw: 'Bar\n', tresc: 'czesc', linie: ['czesc'] },
-        message: 'DW: tylko litery a-zA-Z, przecinki i spacje.',
+        message: "Adresatow DW oddziel przecinkami lub spacjami, bez spojnika 'i'. Dozwolone: litery a-z i A-Z.",
       },
       {
         input: { adresat: 'Foo', temat: 'Perly', dw: '', tresc: 'czesc;raport', linie: ['czesc;raport'] },

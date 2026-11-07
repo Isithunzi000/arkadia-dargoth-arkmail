@@ -22,6 +22,7 @@ class ComposeClient {
   trigger: Trigger | null = null;
   onWire: ((command: string) => void) | null = null;
   resultAfter = '**';
+  reject: string | null = null;
   delay: (command: string) => number = () => 0;
   private finished = false;
   private readonly pending = new Set<Promise<void>>();
@@ -29,6 +30,9 @@ class ComposeClient {
   readonly api = {
     command: {
       send: (command: string, _echo?: boolean, _options?: unknown): Promise<void> => {
+        if (command === this.reject) {
+          return Promise.reject(new Error(`syntetyczne odrzucenie: ${command}`));
+        }
         const task = this.process(command);
         this.pending.add(task);
         void task.then(() => this.pending.delete(task));
@@ -167,6 +171,18 @@ test('compose: timeout nie zwalnia pozostalych linii', async () => {
   assert.deepEqual(outcome, { result: 'blad', error: { kind: 'timeout' } });
   assert.deepEqual(client.wire, [...PREFIX, TOP]);
   assert.ok(!client.wire.includes('**'));
+});
+
+test('compose: odrzucenie pierwszej komendy nie zwalnia adresata', async () => {
+  const client = new ComposeClient();
+  client.reject = 'napisz list';
+  const { transport, operation } = start(client);
+
+  await assert.rejects(operation, /syntetyczne odrzucenie: napisz list/);
+  transport.endModal();
+  await client.drain();
+
+  assert.deepEqual(client.wire, []);
 });
 
 test('transport: identyczne komendy pluginu i gracza nie mieszaja kolejek', async () => {

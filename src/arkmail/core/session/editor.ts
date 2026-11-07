@@ -157,11 +157,13 @@ export class EditorSession {
         reject(new Error('operacja anulowana'));
       }) ?? (() => {});
       if (!done) {
-        // Adapter zachowuje kolejnosc tych dwoch komend. Testowy transport
-        // nadal moze zapisac je synchronicznie, jak dotychczas.
-        const first = this.transport.send('napisz list', true);
-        const second = this.transport.send(input.adresat, true);
-        transition = Promise.all([first, second]).then(() => {});
+        // Adresat wchodzi do kolejki dopiero po przyjeciu "napisz list".
+        // Odrzucenie pierwszej komendy nie moze zwolnic go jako zwyklego
+        // polecenia do gry.
+        transition = (async () => {
+          await this.transport.send('napisz list', true);
+          if (!done) await this.transport.send(input.adresat, true);
+        })();
         transition.catch(fail);
       }
     });

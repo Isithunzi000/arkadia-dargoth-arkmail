@@ -109,3 +109,57 @@ test('straznik: podejrzenie + prompt pagera -> jedno q i flaga zdjeta', async ()
     await stopHarness();
   }
 });
+
+
+test('straznik: odrzucone q jest obsluzone i nie zdejmuje podejrzenia', async () => {
+  const h = await startHarness();
+  const { f, waitFor } = h;
+  try {
+    await loadTruncatedBox(h);
+    suspectPagerOrphan();
+    f.sendImpl = (command) => command === 'q'
+      ? Promise.reject(new Error('transport offline'))
+      : Promise.resolve();
+    const qBefore = f.sent.filter((c) => c === 'q').length;
+    f.fire('[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ', 'mail');
+    await waitFor(
+      () => f.sent.filter((c) => c === 'q').length === qBefore + 1,
+      'straznik probowal wyslac q',
+    );
+    await new Promise((r) => setImmediate(r));
+    assert.equal(isPagerOrphanSuspected(), true, 'bez przyjecia q podejrzenie zostaje');
+  } finally {
+    clearPagerOrphan();
+    await stopHarness();
+  }
+});
+
+test('straznik: reconnect czysci podejrzenie, a prompt nowej sesji gracza zostaje nietkniety', async () => {
+  const h = await startHarness();
+  try {
+    suspectPagerOrphan();
+    h.f.fireEvent('client.disconnect', undefined);
+    assert.equal(isPagerOrphanSuspected(), false, 'podejrzenie nie przechodzi do nowej generacji');
+    h.f.fire('[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ', 'mail');
+    await new Promise((r) => setTimeout(r, 50));
+    assert.ok(!h.f.sent.includes('q'), 'brak q w recznej sesji po reconnectcie');
+  } finally {
+    clearPagerOrphan();
+    await stopHarness();
+  }
+});
+
+test('straznik: zmiana postaci czysci podejrzenie starej generacji', async () => {
+  const h = await startHarness();
+  try {
+    suspectPagerOrphan();
+    h.f.setCharacter('Bar');
+    await h.waitFor(() => !isPagerOrphanSuspected(), 'czyszczenie przy zmianie postaci');
+    h.f.fire('[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ', 'mail');
+    await new Promise((r) => setTimeout(r, 50));
+    assert.ok(!h.f.sent.includes('q'), 'stare podejrzenie nie zabija sesji nowej postaci');
+  } finally {
+    clearPagerOrphan();
+    await stopHarness();
+  }
+});

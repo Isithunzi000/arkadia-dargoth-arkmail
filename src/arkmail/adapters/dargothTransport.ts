@@ -21,6 +21,13 @@ const MODAL_HOOK_PRIORITY = 100;
 
 /** Fala 42: pamiec ostatnich wysylek z echem oczekujacych na linie-echo. */
 const PENDING_ECHO_CAP = 10;
+const PENDING_ECHO_TTL_MS = 10_000;
+
+interface PendingEcho {
+  id: number;
+  line: string;
+  timer: ReturnType<typeof setTimeout>;
+}
 
 export class DargothTransport implements Transport {
   private readonly subscribers = new Set<(line: ProtoLine) => void>();
@@ -35,7 +42,8 @@ export class DargothTransport implements Transport {
    *  linie-echo w strumieniu. FIFO z limitem. Wysylka bez echa NIE
    *  rejestruje sie - identyczny tekst wpisany recznie przez gracza
    *  nigdy nie dostanie znacznika own. */
-  private pendingEchoSends: string[] = [];
+  private pendingEchoSends: PendingEcho[] = [];
+  private nextEchoId = 1;
   // Fala 25 (blad 3): transport startuje ROZBROJONY. Brama otwiera
   // wylacznie sygnal obecnosci w grze (gmcp.char.info / char.name /
   // mail.state / room.long albo proxy.session z faktycznym wznowieniem
@@ -64,29 +72,58 @@ export class DargothTransport implements Transport {
 
   /** Jedna komenda czeka na zakonczenie przetwarzania poprzedniej. */
   private enqueue(line: string, echo: boolean | undefined): Promise<void> {
-    if (!this.online) return Promise.resolve();
+    if (!this.online) return Promise.reject(new Error('transport offline'));
     const generation = this.connectionGeneration;
     const task = this.commandQueue.then(async () => {
-      if (!this.online || generation !== this.connectionGeneration) return;
-      let pending: Promise<void>;
+      if (!this.online || generation !== this.connectionGeneration) {
+        throw new Error('transport offline: wysylka anulowana');
+      }
+      let echoEntry: PendingEcho | undefined;
       if (echo) {
-        // Fala 42: wysylka z echem zadeklaruje oczekiwanie; dopasowanie
-        // FIFO oznaczy jej linie-echo jako own (hook wejscia w poczte).
-        this.pendingEchoSends.push(line);
-        if (this.pendingEchoSends.length > PENDING_ECHO_CAP) this.pendingEchoSends.shift();
+        // Kazda operacja ma wlasna tozsamosc, takze przy identycznym tekscie.
+        // Termin ogranicza pomylke z pozniejsza, reczna komenda gracza.
+        const entry: PendingEcho = {
+          id: this.nextEchoId++,
+          line,
+          timer: setTimeout(() => this.removePendingEcho(entry), PENDING_ECHO_TTL_MS),
+        };
+        (entry.timer as unknown as { unref?: () => void }).unref?.();
+        echoEntry = entry;
+        this.pendingEchoSends.push(entry);
+        if (this.pendingEchoSends.length > PENDING_ECHO_CAP) {
+          this.removePendingEcho(this.pendingEchoSends[0]!);
+        }
       }
-      // Hook jest wywolywany synchronicznie przez api.command.send. Flaga
-      // rozroznia wysylke pluginu od komendy gracza takze przy tym samym tekscie.
-      this.sendingOwn = true;
       try {
-        pending = this.api.command.send(line, echo, { preserveCase: true });
-      } finally {
-        this.sendingOwn = false;
+        // Hook jest wywolywany synchronicznie przez api.command.send. Flaga
+        // rozroznia wysylke pluginu od komendy gracza takze przy tym samym tekscie.
+        this.sendingOwn = true;
+        let pending: Promise<void>;
+        try {
+          pending = this.api.command.send(line, echo, { preserveCase: true });
+        } finally {
+          this.sendingOwn = false;
+        }
+        await pending;
+      } catch (err: unknown) {
+        if (echoEntry) this.removePendingEcho(echoEntry);
+        throw err;
       }
-      await pending;
     });
     this.commandQueue = task.catch(() => {});
     return task;
+  }
+
+  private removePendingEcho(entry: PendingEcho): void {
+    const index = this.pendingEchoSends.findIndex((candidate) => candidate.id === entry.id);
+    if (index < 0) return;
+    this.pendingEchoSends.splice(index, 1);
+    clearTimeout(entry.timer);
+  }
+
+  private clearPendingEchoes(): void {
+    for (const entry of this.pendingEchoSends) clearTimeout(entry.timer);
+    this.pendingEchoSends = [];
   }
 
   subscribe(cb: (line: ProtoLine) => void): () => void {
@@ -134,7 +171,7 @@ export class DargothTransport implements Transport {
     if (online) return;
     this.connectionGeneration++;
     this.commandQueue = Promise.resolve();
-    this.pendingEchoSends = [];
+    this.clearPendingEchoes();
     if (this.hookId !== null) {
       this.api.commandHooks.unregister(this.hookId);
       this.hookId = null;
@@ -152,7 +189,7 @@ export class DargothTransport implements Transport {
     }
     this.subscribers.clear();
     this.queue = [];
-    this.pendingEchoSends = [];
+    this.clearPendingEchoes();
     this.connectionGeneration++;
     this.commandQueue = Promise.resolve();
   }
@@ -180,9 +217,9 @@ export class DargothTransport implements Transport {
               ? proto.text
               : null;
           if (echoed !== null) {
-            const i = this.pendingEchoSends.indexOf(echoed);
+            const i = this.pendingEchoSends.findIndex((entry) => entry.line === echoed);
             if (i >= 0) {
-              this.pendingEchoSends.splice(i, 1);
+              this.removePendingEcho(this.pendingEchoSends[i]!);
               proto.own = true;
             }
           }

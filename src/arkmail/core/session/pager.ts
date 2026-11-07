@@ -284,8 +284,6 @@ export class PagerSession {
       let quietTimer: ReturnType<typeof setTimeout> | null = null;
       let graceTimer: ReturnType<typeof setTimeout> | null = null;
       let cancelUnsub: () => void = () => {};
-      const actions = makeActions({ send: (l) => this.transport.send(l) });
-
       const cleanup = () => {
         done = true;
         clearTimeout(timer);
@@ -296,6 +294,23 @@ export class PagerSession {
         cancelUnsub();
         unsub();
       };
+      const fail = (error: unknown): void => {
+        if (done) return;
+        cleanup();
+        reject(error instanceof Error ? error : new Error(String(error)));
+      };
+      /** Wszystkie komendy transakcji, takze akcje i q, maja obsluge
+       *  odrzucenia i wspolne, jednokrotne sprzatanie. */
+      const send = (line: string): void => {
+        if (done) return;
+        try {
+          void Promise.resolve(this.transport.send(line)).catch(fail);
+        } catch (error: unknown) {
+          fail(error);
+        }
+      };
+      const actions = makeActions({ send });
+
       /** Fala 17a: Przerwij w trakcie sesji (shouldAbort z zewnnatrz). */
       let aborted = false;
       const finish = () => {
@@ -359,12 +374,8 @@ export class PagerSession {
             // wracamy do dawnego zachowania (Fala 12a): cisza = body
             // kompletne.
             advances++;
-            try {
-              this.transport.send('');
-            } catch {
-              /* transport martwy - cisza i tak domknie sesje */
-            }
-            armQuiet();
+            send('');
+            if (!done) armQuiet();
             return;
           }
           state = 'pager';
@@ -372,7 +383,7 @@ export class PagerSession {
           idleOpened = true;
           if (actions && actions.onPager) {
             actions.onPager();
-            armQuiet(); // potwierdzenie akcji albo domkniecie po ciszy
+            if (!done) armQuiet(); // potwierdzenie akcji albo domkniecie po ciszy
           } else {
             enterClosing();
           }
@@ -406,16 +417,14 @@ export class PagerSession {
         state = 'closing';
         wantClose = false;
         idleOpened = false;
-        try {
-          this.transport.send('q');
-        } catch {
-          /* transport martwy - i tak porzucamy sesje */
+        send('q');
+        if (!done) {
+          graceTimer = setTimeout(() => {
+            suspectPagerOrphan();
+            cleanup();
+            reject(new Error(`timeout: pager session list ${numer}`));
+          }, Math.max(idleMs, CLOSE_GRACE_MS));
         }
-        graceTimer = setTimeout(() => {
-          suspectPagerOrphan();
-          cleanup();
-          reject(new Error(`timeout: pager session list ${numer}`));
-        }, Math.max(idleMs, CLOSE_GRACE_MS));
       }, this.opts.timeoutMs);
 
       const enterClosing = () => {
@@ -423,8 +432,8 @@ export class PagerSession {
         idleOpened = false;
         state = 'closing';
         if (quietTimer) clearTimeout(quietTimer);
-        this.transport.send('q');
-        armIdle();
+        send('q');
+        if (!done) armIdle();
       };
 
       const unsub = this.transport.subscribe((line: ProtoLine) => {
@@ -449,13 +458,14 @@ export class PagerSession {
         if (state === 'recovering') {
           if (line.cls === 'prompt' || isPromptLine(line.text)) {
             state = 'letter';
-            this.transport.send(`przeczytaj list ${numer}`);
+            send(`przeczytaj list ${numer}`);
           }
           return;
         }
         if (state === 'letter' && !headersDone && PAGER_REJECTION_RE.test(line.text)) {
           // Kazde odrzucenie zamykamy "q" - sierota nie zostaje po nas.
-          this.transport.send('q');
+          send('q');
+          if (done) return;
           if (retried) {
             // Fala 24g: drugie odrzucenie = pager przetrwal pierwsze
             // "q"; drugie wlasnie poszlo bez potwierdzenia - sierota
@@ -490,7 +500,7 @@ export class PagerSession {
             loadRetried = true;
             loadRetryTimer = setTimeout(() => {
               if (!done && state === 'letter') {
-                this.transport.send(`przeczytaj list ${numer}`);
+                send(`przeczytaj list ${numer}`);
               }
             }, LISTS_LOADING_RETRY_MS);
             return;
@@ -568,7 +578,7 @@ export class PagerSession {
         cleanup();
         reject(new Error('operacja anulowana'));
       }) ?? (() => {});
-      if (!done) this.transport.send(`przeczytaj list ${numer}`);
+      if (!done) send(`przeczytaj list ${numer}`);
     });
   }
 }

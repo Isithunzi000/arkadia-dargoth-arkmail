@@ -122,7 +122,7 @@ test('handler: advisory guard wypisuje obce imiona, ale NIE blokuje wysylki', as
     handlers.onSendCompose(SEND_INPUT);
     await h.waitFor(() => h.f.sent.includes('napisz list'), 'wysylka rusza mimo advisory');
     assert.ok(
-      notifyText(h.f, 'Poza baza osob: Thud'),
+      notifyText(h.f, 'Odbiorcy spoza zapisanej bazy: Thud. Wysylka bedzie kontynuowana, a serwer zweryfikuje ich nazwy.'),
       'ostrzezenie wypisuje imie spoza bazy',
     );
   } finally {
@@ -137,7 +137,7 @@ test('handler: brak ostrzezenia, gdy adresat jest w bazie (archiwum)', async () 
     h.f.sent.length = 0;
     handlers.onSendCompose({ ...SEND_INPUT, adresat: 'Fred' });
     await h.waitFor(() => h.f.sent.includes('napisz list'), 'wysylka rusza');
-    assert.ok(!notifyText(h.f, 'Poza baza osob'), 'znane imie nie dostaje ostrzezenia');
+    assert.ok(!notifyText(h.f, 'Odbiorcy spoza zapisanej bazy'), 'znane imie nie dostaje ostrzezenia');
   } finally {
     await restore();
   }

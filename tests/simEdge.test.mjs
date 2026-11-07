@@ -155,13 +155,17 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const t = new MockTransport();
   const mb = new MailboxSession(t, OPTS);
   const p = mb.fetch('odebrane');
-  await t.replay([
+  // E8 nie testuje idle-flushu (robi to E6). Synchroniczne ramki domykaja
+  // listing promptem przed obsluga zegarow, wiec opoznienie srodowiska nie
+  // moze zwrocic pustego, czesciowego wyniku przed odtworzeniem wpisow.
+  for (const line of [
     { cls: 'command', text: '→ wesprzyj Arkadie' }, // echo recznej komendy gracza
     ...load('listing-odebrane-male.json').slice(3, -1),
     { cls: 'prompt', text: '> ' },
-  ]);
+  ]) t.emit(line);
   const res = await p;
-  ok('E8 echo gracza nie psuje listingu', res.kind === 'lista' && res.entries.length === 3);
+  ok('E8 echo gracza nie psuje listingu', res.kind === 'lista' && res.entries.length === 3,
+    res.kind === 'lista' ? `entries=${res.entries.length}` : res.kind);
 }
 
 // --- E9: pager: abort z zewnatrz (Przerwij) ----------------------------------

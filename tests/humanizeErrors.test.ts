@@ -155,8 +155,7 @@ test('stringi klasa B: poprawione, naturalne polskie (ASCII)', () => {
   assert.ok(!index.includes('Trwa inna operacja pocztowa'), '13 kopii toastu - jest SESSION_BUSY_MSG');
   assert.ok(!index.includes('Kasuje list'), '"Kasuje" - jest "Usuwam"');
   // Nowe wersje obecne:
-  assert.ok(index.includes('Nie ma tego listu na liscie - odswiez skrzynke.'), 'nowy komunikat re-kotwicy');
-  assert.ok(index.includes('Nie moge znalezc tego listu - odswiez skrzynke.'), 'brak daty bez technikaliow');
+  assert.equal(index.split('Nie mozna odnalezc tego listu - odswiez skrzynke.').length - 1, 2, 'wspolny komunikat re-kotwicy i braku daty');
   assert.ok(index.includes('Poczekaj, az skoncze biezaca operacje.'), 'SESSION_BUSY_MSG');
   assert.ok(index.includes('Zapisane dane wyczyszczone.'), 'toast czyszczenia bez zargonu');
   // Fala 21b: anglicyzmy, zargon i niezgrabnosci zakazane:
@@ -173,15 +172,15 @@ test('stringi klasa B: poprawione, naturalne polskie (ASCII)', () => {
   assert.ok(render.includes('Kasuje lokalnie listy, archiwum, kontakty i indeksy.'), 'dim czyszczenia');
   assert.ok(render.includes('Podglad wysylanego listu'), 'nowy podglad (21b)');
   assert.ok(render.includes('Zapisz w niewyslanych'), 'spojne ze skrzynka niewyslane');
-  assert.ok(render.includes('Kontakty powstaja z listow zebranych ze wszystkich skrzynek'), 'brama 21b');
+  assert.ok(render.includes('Osoby z listow powstaja z listow zebranych ze wszystkich skrzynek'), 'brama 21b');
   assert.ok(render.includes('Wybierz list, aby go przeczytac.'), 'bez "list z listy"');
   // Fala UI-2 krok 4: data kompletu indeksacji mieszka w kroku 1
   // Archiwum (stopka sub-pigulki Osoby zniknela).
-  assert.ok(render.includes('Gotowe od '), 'jasny opis kompletnej indeksacji z data');
-  assert.ok(render.includes('wszystkie skrzynki zapisane'), 'komplet po ludzku');
+  assert.ok(render.includes('Najstarszy zapis: '), 'jasny opis kompletnej indeksacji z data');
+  assert.ok(render.includes('Wszystkie skrzynki zapisane'), 'komplet po ludzku');
   assert.ok(render.includes('Jeszcze nie zaczeto.'), 'jasny opis niezaczetej indeksacji');
   assert.ok(render.includes('Indeksuj wszystkie skrzynki'), 'jedna wersja przycisku indeksacji');
   assert.ok(render.includes('Pobieranie potrwa dlugo - kliknij ponownie'), 'nowy tekst uzbrojenia');
-  assert.ok(render.includes('Archiwum puste albo zaden list nie pasuje do filtra.'), 'nowe puste archiwum');
-  assert.ok(render.includes('Zaden kontakt nie pasuje do filtra.'), 'nowy pusty filtr kontaktow');
+  assert.ok(render.includes('Archiwum jest puste albo zaden list nie pasuje do filtra.'), 'nowe puste archiwum');
+  assert.ok(render.includes('Zadna osoba nie pasuje do filtra.'), 'nowy pusty filtr kontaktow');
 });

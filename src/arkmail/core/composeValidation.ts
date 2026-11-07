@@ -22,7 +22,7 @@ function validRecipients(value: string, required: boolean): boolean {
     const names = part.trim();
     // Wolne slowo "i" nie jest imieniem - skladnia listingow ("A, B i C")
     // na linie do gry trafia jako jeden bezsensowny odbiorca i serwer
-    // odrzuca cala wysylke. Na linie ida wylacznie przecinki.
+    // odrzuca cala wysylke. Plugin zostawia surowy wpis bez zmian.
     if (/(?:^|\s)i(?:\s|$)/i.test(names)) return false;
     return /^[a-zA-Z]+(?: +[a-zA-Z]+)*$/.test(names);
   });
@@ -34,22 +34,54 @@ export function validateCompose(input: ComposeValidationInput): string | null {
   if (/[;#]/.test(input.tresc)) return 'Tresc nie moze zawierac znakow ; ani #.';
   if (!input.adresat.trim()) return 'Podaj adresata.';
   if (!validRecipients(input.adresat, true)) {
-    return 'Adresat: tylko litery a-zA-Z, przecinki i spacje.';
+    return "Adresatow oddziel przecinkami lub spacjami, bez spojnika 'i'. Dozwolone: litery a-z i A-Z.";
   }
   if (!input.temat.trim()) return 'Podaj temat.';
   if (/[;#]/.test(input.temat)) return 'Temat nie moze zawierac znakow ; ani #.';
   if (!validRecipients(input.dw, false)) {
-    return 'DW: tylko litery a-zA-Z, przecinki i spacje.';
+    return "Adresatow DW oddziel przecinkami lub spacjami, bez spojnika 'i'. Dozwolone: litery a-z i A-Z.";
   }
   return null;
 }
 
-/** Rozbija pole odbiorcow na imiona (przecinki, odstepy obojetne). */
-export function splitRecipients(value: string): string[] {
-  return value
-    .split(',')
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0);
+/**
+ * Parser WYLACZNIE dla lokalnego advisory. Rozpoznaje przecinki i spacje.
+ * Najpierw dzieli przecinki, potem szuka najdluzszych znanych nazw od
+ * lewej do prawej. Surowa wartosc pol nigdy nie jest tu zmieniana ani
+ * uzywana ponownie do wysylki.
+ */
+export function splitRecipients(
+  value: string,
+  known: ReadonlySet<string> = new Set<string>(),
+): string[] {
+  const knownKeys = new Set([...known].map((name) => name.trim().toLowerCase()));
+  const maxWords = Math.max(1, ...[...knownKeys].map((name) => name.split(/\s+/).length));
+  const out: string[] = [];
+  for (const rawSegment of value.split(',')) {
+    const words = rawSegment.trim().split(/\s+/).filter(Boolean);
+    let index = 0;
+    while (index < words.length) {
+      let matched: string | null = null;
+      let matchedLength = 0;
+      const limit = Math.min(maxWords, words.length - index);
+      for (let length = limit; length >= 1; length--) {
+        const candidate = words.slice(index, index + length).join(' ');
+        if (knownKeys.has(candidate.toLowerCase())) {
+          matched = candidate;
+          matchedLength = length;
+          break;
+        }
+      }
+      if (matched !== null) {
+        out.push(matched);
+        index += matchedLength;
+      } else {
+        out.push(words[index]!);
+        index++;
+      }
+    }
+  }
+  return out;
 }
 
 /**
@@ -64,7 +96,7 @@ export function unknownRecipients(
 ): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const name of [...splitRecipients(input.adresat), ...splitRecipients(input.dw)]) {
+  for (const name of [...splitRecipients(input.adresat, known), ...splitRecipients(input.dw, known)]) {
     const key = name.toLowerCase();
     if (known.has(key) || seen.has(key)) continue;
     seen.add(key);
