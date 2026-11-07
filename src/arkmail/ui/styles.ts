@@ -333,16 +333,40 @@ export const STYLES = `
  * przycisk odjezdzal od sasiadow (zgloszenie pkt 1). */
 .arkmail-box-ops button.arkmail-older-all { margin-top: 0; width: auto; flex: 0 1 auto; }
 
+/* --- wspolny wiersz akcji --- */
+.arkmail-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(6px * var(--window-font-scale, 1));
+  max-width: 100%;
+}
+.arkmail-action-group {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: calc(6px * var(--window-font-scale, 1));
+  min-width: 0;
+  max-width: 100%;
+}
+.arkmail-action-row > button,
+.arkmail-action-group > button { flex: 0 1 auto; width: auto; max-width: 100%; }
+
 /* --- widok listu --- */
 .arkmail-letter-head {
   position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: calc(8px * var(--window-font-scale, 1));
   background: ${BG};
   border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
   border-radius: calc(8px * var(--window-font-scale, 1));
   padding: calc(8px * var(--window-font-scale, 1)) calc(12px * var(--window-font-scale, 1));
   margin-bottom: calc(8px * var(--window-font-scale, 1));
 }
-.arkmail-letter-subject { font-size: calc(15px * var(--window-font-scale, 1)); font-weight: 700; color: ${FG}; }
+.arkmail-letter-heading { flex: 1; min-width: 0; }
+.arkmail-letter-subject { font-size: calc(15px * var(--window-font-scale, 1)); font-weight: 700; color: ${FG}; overflow-wrap: anywhere; }
 .arkmail-letter-meta { color: ${FG_DIM}; font-size: calc(12px * var(--window-font-scale, 1)); margin-top: calc(2px * var(--window-font-scale, 1)); }
 .arkmail-letter-body {
   white-space: pre-wrap;
@@ -361,6 +385,10 @@ export const STYLES = `
 .arkmail-fwd { flex: none; }
 
 /* --- formularz compose --- */
+.arkmail-compose-settings { display: grid; grid-template-columns: minmax(0, 1fr); gap: calc(6px * var(--window-font-scale, 1)); }
+.arkmail-compose-setting { min-width: 0; }
+.arkmail-wide .arkmail-compose-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.arkmail-compose-actions { margin-top: calc(10px * var(--window-font-scale, 1)); }
 .arkmail-form label { display: block; margin: calc(6px * var(--window-font-scale, 1)) 0 calc(3px * var(--window-font-scale, 1)); color: ${FG_DIM}; font-size: calc(12px * var(--window-font-scale, 1)); }
 .arkmail-form input, .arkmail-form textarea, .arkmail-form select {
   width: 100%;
@@ -404,7 +432,7 @@ export const STYLES = `
 .arkmail-preview-full-pane { display: flex; flex-direction: column; }
 .arkmail-preview-full-pane .arkmail-preview { flex: 1; max-height: none; }
 .arkmail-root .arkmail-send {
-  margin-top: calc(10px * var(--window-font-scale, 1));
+  margin-top: 0;
   padding: calc(6px * var(--window-font-scale, 1)) calc(18px * var(--window-font-scale, 1));
   font-weight: 600;
 }
@@ -591,9 +619,7 @@ export const STYLES = `
   grid-template-columns: minmax(0, 3fr) minmax(calc(280px * var(--window-font-scale, 1)), 2fr);
 }
 .arkmail-root .arkmail-letter-close {
-  position: absolute;
-  top: calc(6px * var(--window-font-scale, 1));
-  right: calc(10px * var(--window-font-scale, 1));
+  flex: 0 0 auto;
   padding: calc(2px * var(--window-font-scale, 1)) calc(10px * var(--window-font-scale, 1));
 }
 

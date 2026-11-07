@@ -94,32 +94,18 @@ const field = (container: unknown, name: string): string =>
     `[data-field="${name}"]`,
   ) as { value: string } | null)?.value ?? '(brak pola)';
 
-test('ui: przyciski odpowiedzi pierwsze w pasku operacji listu', () => {
+test('ui: odpowiedzi tworza pierwsza grupe, a usuwanie jest na koncu', () => {
   const s = new MailUiStore();
   const { container, off } = mount(s);
   openLetter(s, 'odebrane', { from: 'Foo', to: 'Gracz', cc: null });
   const ops = container.querySelector('.arkmail-letter-ops')!;
-  const kids = Array.from(ops.children);
-  assert.equal(
-    (kids[0] as { textContent: string }).textContent,
-    'Odpowiedz',
-    'pierwszy przycisk to Odpowiedz',
-  );
-  assert.equal(
-    (kids[1] as { textContent: string }).textContent,
-    'Odpowiedz wszystkim',
-    'drugi przycisk to Odpowiedz wszystkim',
-  );
-  // Fala 28c: trzeci przycisk to Odpowiedz z cytowaniem.
-  assert.equal(
-    (kids[2] as { textContent: string }).textContent,
-    'Odpowiedz z cytowaniem',
-    'trzeci przycisk to Odpowiedz z cytowaniem',
-  );
-  assert.ok(
-    (kids[3] as { classList: { contains(c: string): boolean } }).classList.contains('arkmail-del'),
-    'Usun dopiero po przyciskach odpowiedzi',
-  );
+  const replies = ops.querySelector('.arkmail-letter-replies')!;
+  assert.equal(ops.firstElementChild, replies, 'pierwsza grupa to odpowiedzi');
+  const labels = Array.from(replies.querySelectorAll('button')).map((button) => button.textContent);
+  assert.deepEqual(labels, ['Odpowiedz', 'Odpowiedz wszystkim', 'Odpowiedz z cytowaniem']);
+  const danger = ops.querySelector('.arkmail-letter-danger')!;
+  assert.equal(ops.lastElementChild, danger, 'usuwanie jest ostatnia grupa');
+  assert.ok(danger.querySelector('.arkmail-del'), 'Usun pozostaje w grupie niebezpiecznej');
   off();
 });
 

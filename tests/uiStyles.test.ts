@@ -308,3 +308,47 @@ test('style F5: swiadome wyjatki bez zmian', () => {
   const attention = ruleBody(/\.arkmail-box-attention/);
   assert.match(attention!, /border-color:\s*var\(--popup-accent\)/, 'obramowanie box-attention akcent zostaje');
 });
+
+
+test('uklad CSS: wspolny wiersz akcji zawija sie bez rozciagania przyciskow', () => {
+  const row = ruleBody(/\.arkmail-action-row\s*/);
+  assert.ok(row, 'regula wspolnego wiersza akcji istnieje');
+  assert.match(row!, /display:\s*flex/);
+  assert.match(row!, /flex-wrap:\s*wrap/);
+  assert.match(row!, /align-items:\s*center/);
+  const buttons = ruleBody(/\.arkmail-action-row\s*>\s*button\s*/);
+  assert.ok(buttons, 'bezposrednie przyciski maja naturalna szerokosc');
+  assert.match(buttons!, /flex:\s*0\s+1\s+auto/);
+  assert.match(buttons!, /width:\s*auto/);
+  assert.match(buttons!, /max-width:\s*100%/);
+  const group = ruleBody(/\.arkmail-action-group\s*/);
+  assert.ok(group, 'grupa akcji istnieje');
+  assert.match(group!, /display:\s*flex/);
+  assert.match(group!, /flex-wrap:\s*wrap/);
+  assert.match(group!, /max-width:\s*100%/);
+});
+
+test('uklad CSS: naglowek listu nie pozycjonuje Zamknij absolutnie', () => {
+  const head = ruleBody(/\.arkmail-letter-head\s*/);
+  assert.match(head!, /display:\s*flex/);
+  const heading = ruleBody(/\.arkmail-letter-heading\s*/);
+  assert.ok(heading, 'blok tematu i metadanych istnieje');
+  assert.match(heading!, /flex:\s*1/);
+  assert.match(heading!, /min-width:\s*0/);
+  const subject = ruleBody(/\.arkmail-letter-subject\s*/);
+  assert.match(subject!, /overflow-wrap:\s*anywhere/);
+  const close = ruleBody(/\.arkmail-root\s+\.arkmail-letter-close\s*/);
+  assert.ok(close, 'regula Zamknij istnieje');
+  assert.doesNotMatch(close!, /position:\s*absolute/);
+  assert.match(close!, /flex:\s*0\s+0\s+auto/);
+});
+
+test('uklad CSS: ustawienia compose maja jedna lub dwie kolumny', () => {
+  const settings = ruleBody(/\.arkmail-compose-settings\s*/);
+  assert.ok(settings, 'siatka ustawien istnieje');
+  assert.match(settings!, /display:\s*grid/);
+  assert.match(settings!, /grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+  const wide = ruleBody(/\.arkmail-wide\s+\.arkmail-compose-settings\s*/);
+  assert.ok(wide, 'szeroki wariant siatki istnieje');
+  assert.match(wide!, /grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/);
+});

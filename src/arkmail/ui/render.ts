@@ -1271,6 +1271,9 @@ const filterClearClass = (viewClass?: string): string =>
     }
     const head = doc.createElement('div');
     head.className = 'arkmail-letter-head';
+    const heading = doc.createElement('div');
+    heading.className = 'arkmail-letter-heading';
+    head.appendChild(heading);
     if (state.wide) {
       // W podziale lista jest zawsze widoczna po lewej - zamiast przycisku
       // powrotu ("Zamknij list") jest Zamknij czyszczace podglad.
@@ -1283,7 +1286,7 @@ const filterClearClass = (viewClass?: string): string =>
     const subj = doc.createElement('div');
     subj.className = 'arkmail-letter-subject';
     subj.textContent = l.subject;
-    head.appendChild(subj);
+    heading.appendChild(subj);
     const meta = doc.createElement('div');
     meta.className = 'arkmail-letter-meta';
     // Fala 9e: czytelne pary pole-wartosc; serwerowy numer listu nic
@@ -1293,7 +1296,7 @@ const filterClearClass = (viewClass?: string): string =>
     if (l.cc) parts.push(`DW: ${l.cc}`);
     if (l.date) parts.push(l.date);
     meta.textContent = parts.join(' | ');
-    head.appendChild(meta);
+    heading.appendChild(meta);
     pane.appendChild(head);
     const body = doc.createElement('div');
     body.className = 'arkmail-letter-body';
@@ -1303,7 +1306,16 @@ const filterClearClass = (viewClass?: string): string =>
     // Operacje pagerowe: kasowanie i przekazanie (sesje w index.ts).
     // Wymagaja wpisu-zrodla (re-kotwiczenie numeru); bez zrodla wylaczone.
     const ops = doc.createElement('div');
-    ops.className = 'arkmail-letter-ops';
+    ops.className = 'arkmail-letter-ops arkmail-action-row';
+    const replies = doc.createElement('div');
+    replies.className = 'arkmail-action-group arkmail-letter-replies';
+    ops.appendChild(replies);
+    const forward = doc.createElement('div');
+    forward.className = 'arkmail-action-group arkmail-letter-forward';
+    ops.appendChild(forward);
+    const danger = doc.createElement('div');
+    danger.className = 'arkmail-action-group arkmail-letter-danger';
+    ops.appendChild(danger);
     const source = l.source;
     // Fala 15a: Odpowiedz / Odpowiedz wszystkim - pierwsze w pasku.
     // Czysta operacja UI: prefill composeDraft + przelaczenie na Napisz,
@@ -1323,12 +1335,12 @@ const filterClearClass = (viewClass?: string): string =>
     reply.className = 'arkmail-reply popup-btn popup-btn--control';
     reply.textContent = 'Odpowiedz';
     reply.addEventListener('click', () => replyTo(false));
-    ops.appendChild(reply);
+    replies.appendChild(reply);
     const replyAll = doc.createElement('button');
     replyAll.className = 'arkmail-reply-all popup-btn popup-btn--control';
     replyAll.textContent = 'Odpowiedz wszystkim';
     replyAll.addEventListener('click', () => replyTo(true));
-    ops.appendChild(replyAll);
+    replies.appendChild(replyAll);
     // Fala 28c (decyzja 2026-10-22): Odpowiedz z cytowaniem. Adresat jak
     // przy zwyklym Odpowiedz (bez DW), temat = "Odp: <oryginalny temat>"
     // DOSLOWNIE - temat "--" to swiadomie wpisane "--", nie marker
@@ -1352,7 +1364,7 @@ const filterClearClass = (viewClass?: string): string =>
       replyQuote.setAttribute('disabled', '');
       replyQuote.setAttribute('title', 'List bez tresci - nie ma czego cytowac.');
     }
-    ops.appendChild(replyQuote);
+    replies.appendChild(replyQuote);
     const del = doc.createElement('button');
     del.className = 'arkmail-del popup-btn popup-btn--control popup-btn--danger popup-btn--ghost';
     del.textContent = 'Usun';
@@ -1368,13 +1380,13 @@ const filterClearClass = (viewClass?: string): string =>
       del.setAttribute('disabled', '');
       del.setAttribute('title', 'Otworz list z zakladki Listy, aby go usunac.');
     }
-    ops.appendChild(del);
+    danger.appendChild(del);
     const fwdInput = doc.createElement('input');
     nativeFieldClass(fwdInput);
     fwdInput.setAttribute('data-field', 'forward');
     fwdInput.setAttribute('placeholder', 'Przekaz do (gracz lub alias)');
     if (!source) fwdInput.setAttribute('disabled', '');
-    ops.appendChild(fwdInput);
+    forward.appendChild(fwdInput);
     attachGhost(doc, fwdInput, personSource);
     const fwd = doc.createElement('button');
     fwd.className = 'arkmail-fwd popup-btn popup-btn--control';
@@ -1389,7 +1401,7 @@ const filterClearClass = (viewClass?: string): string =>
       fwd.setAttribute('disabled', '');
       fwd.setAttribute('title', 'Otworz list z zakladki Listy, aby go przekazac.');
     }
-    ops.appendChild(fwd);
+    forward.appendChild(fwd);
     // Fala 17g: eksport listu do TXT (zgloszenie 2026-10-19/20 pkt 7).
     // Operacja lokalna (dane z cache widoku) - bez dwukliku. Na koncu
     // paska: pin kolejnosci rezerwuje poczatek dla Odpowiedz/Usun.
@@ -1397,7 +1409,7 @@ const filterClearClass = (viewClass?: string): string =>
     exp.className = 'arkmail-export-letter popup-btn popup-btn--control';
     exp.textContent = 'Zapisz list jako TXT';
     exp.addEventListener('click', () => handlers.onExportLetter?.());
-    ops.appendChild(exp);
+    forward.appendChild(exp);
     pane.appendChild(ops);
 
     if (!state.wide) {
@@ -1555,10 +1567,19 @@ const filterClearClass = (viewClass?: string): string =>
     }
 
     // Szablon ramki + szerokosc linii (trzymane w store, trwale).
+    const settings = doc.createElement('div');
+    settings.className = 'arkmail-compose-settings';
+    const templateSetting = doc.createElement('div');
+    templateSetting.className = 'arkmail-compose-setting';
+    const widthSetting = doc.createElement('div');
+    widthSetting.className = 'arkmail-compose-setting';
+    settings.appendChild(templateSetting);
+    settings.appendChild(widthSetting);
+    pane.appendChild(settings);
     const labSz = doc.createElement('label');
     labSz.textContent = 'Szablon';
     labSz.htmlFor = 'arkmail-compose-szablon';
-    pane.appendChild(labSz);
+    templateSetting.appendChild(labSz);
     const sel = doc.createElement('select');
     nativeFieldClass(sel);
     sel.id = 'arkmail-compose-szablon';
@@ -1573,12 +1594,12 @@ const filterClearClass = (viewClass?: string): string =>
     sel.addEventListener('change', () => {
       store.setCompose({ template: sel.value as LetterTemplate });
     });
-    pane.appendChild(sel);
+    templateSetting.appendChild(sel);
 
     const labW = doc.createElement('label');
     labW.textContent = 'Szerokosc linii (20-120)';
     labW.htmlFor = 'arkmail-compose-szerokosc';
-    pane.appendChild(labW);
+    widthSetting.appendChild(labW);
     const width = doc.createElement('input');
     nativeFieldClass(width);
     width.id = 'arkmail-compose-szerokosc';
@@ -1607,8 +1628,8 @@ const filterClearClass = (viewClass?: string): string =>
       widthError.textContent = '';
       store.setCompose({ width: clampLineWidth(parsed) });
     });
-    pane.appendChild(width);
-    pane.appendChild(widthError);
+    widthSetting.appendChild(width);
+    widthSetting.appendChild(widthError);
 
     const lab = doc.createElement('label');
     lab.textContent = 'Tresc';
@@ -1643,6 +1664,8 @@ const filterClearClass = (viewClass?: string): string =>
       repaintCompose();
     });
 
+    const actions = doc.createElement('div');
+    actions.className = 'arkmail-compose-actions arkmail-action-row';
     const send = doc.createElement('button');
     send.className = 'arkmail-send popup-btn popup-btn--control popup-btn--solid';
     // Fala 14b: poza poczta compose ZAWSZE laduje w kolejce niewyslanych
@@ -1686,7 +1709,7 @@ const filterClearClass = (viewClass?: string): string =>
         linie: rendered.lines,
       });
     });
-    pane.appendChild(send);
+    actions.appendChild(send);
 
     // Fala 14b: czyszczenie pol compose z dwuklikowym potwierdzeniem
     // (uzbrojenie wygasa po 3 s; wzorzec "Wyczysc zapisane dane").
@@ -1715,7 +1738,8 @@ const filterClearClass = (viewClass?: string): string =>
       armedLabel: 'Na pewno? Kliknij ponownie',
       armedTitle: 'Kliknij ponownie, aby wyczyscic pola listu.',
     });
-    pane.appendChild(clearCompose);
+    actions.appendChild(clearCompose);
+    pane.appendChild(actions);
     return pane;
   };
 
