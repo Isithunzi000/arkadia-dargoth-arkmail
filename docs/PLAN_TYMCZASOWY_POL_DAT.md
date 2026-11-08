@@ -41,23 +41,24 @@ W ArkMailu i globalnych stylach Dargotha nie znaleziono ukrywania `::-webkit-cal
 
 ## Dowody red-green
 
-Najpierw nowe testy musza przejsc lokalnie na obecnym kodzie i wykazac RED. Celowego RED nie wolno wykonywac przez CI. Dopiero potem implementacja i pelny zestaw GREEN.
+Lokalny RED na starym kodzie jest wymagany dla nowego kontraktu stylu. Testy juz poprawnej struktury i zachowania sa zielona baza regresyjna; nie wolno sztucznie psuc ich dla uzyskania RED. Celowego RED nie wolno wykonywac przez CI. Dopiero po udokumentowanym RED nowego kontraktu powstaje implementacja i pelny zestaw GREEN.
 
-1. Test stylu na starym kodzie: wykrywa `light dark` i brak wspolnej reguły `color-scheme: inherit` dla wszystkich szesciu pol. Po poprawce ma przechodzic.
-2. Test struktury DOM: potwierdza `type="date"` dla dwoch pol w Listach, dwoch w Archiwum i dwoch w Usuwaniu.
+1. Test stylu na starym kodzie: wykrywa `light dark` i brak wspolnej reguly `color-scheme: inherit` dla wszystkich szesciu pol. Po poprawce ma przechodzic.
+2. Test struktury DOM: potwierdza `type="date"` dla dwoch pol w Listach, dwoch w Archiwum i dwoch w Usuwaniu. Jest kontrola regresyjna, poniewaz struktura jest juz poprawna.
 3. Test w prawdziwym Chromium dla wszystkich szesciu pol sprawdza efektywny `getComputedStyle(input).colorScheme` w czterech kombinacjach:
    - ciemny motyw klienta i jasny schemat systemu;
    - ciemny motyw klienta i ciemny schemat systemu;
    - jasny motyw klienta i jasny schemat systemu;
    - jasny motyw klienta i ciemny schemat systemu.
-4. Dowod wizualny na prawdziwym kliencie: zrzuty pol przed i po zmianie w obu krytycznych kombinacjach. Ikona musi byc wyrazna bez recznego kolorowania.
+   Przed implementacja RED dotyczy sciezek, ktorych stare wymuszenie lamie kontrakt. Usuwanie jest kontrola regresyjna i nie musi byc RED.
+4. Dowod wizualny na prawdziwym kliencie: zrzuty pol przed i po zmianie w obu krytycznych kombinacjach. Ikona musi byc wyrazna bez recznego kolorowania. To dowod porownawczy, nie automatyczny test RED.
 5. Test zachowania: klikniecie ikony i wybor dnia nadal ustawia wartosc ISO. Sam test otwarcia pickera nie wykrywa pierwotnego bledu, dlatego nie zastepuje punktow 3 i 4.
 6. Testy filtrowania maja pozostac bez zmian i potwierdzic brak regresji logiki.
-7. Po czesci red-green: pelny zestaw jednostkowy, `typecheck`, build i macierz E2E.
+7. Po czesci red-green: pelny zestaw jednostkowy, `typecheck`, build i macierz E2E zgodnie z zasadami bramek projektu.
 
 ## Warunek zamkniecia
 
 - Wszystkie szesc pol ma czytelna ikone w jasnym i ciemnym motywie, niezaleznie od schematu systemu.
 - Natywny picker i reczne wpisywanie dzialaja bez zmian.
 - Pelne testy sa zielone.
-- Ten dokument zostaje usuniety w commicie zamykajacym caly zakres.
+- Ten dokument zostaje usuniety w commicie zamykajacym caly zakres, wraz z aktualizacja odwolania w glownym planie.

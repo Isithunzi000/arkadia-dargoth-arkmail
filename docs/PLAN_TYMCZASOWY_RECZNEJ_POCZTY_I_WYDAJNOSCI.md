@@ -448,13 +448,36 @@ Ponizsze ustalenia uzupelniaja plan i rozstrzygaja kwestie omowione po pierwszym
 
 ### 13.1. Pola dat
 
-Zakres poprawki pol dat pozostaje zapisany osobno w `docs/PLAN_TYMCZASOWY_POL_DAT.md`:
+Szczegolowy zakres poprawki pozostaje zapisany w `docs/PLAN_TYMCZASOWY_POL_DAT.md`. Analiza zrodlowa objela ArkMaila 1.30.5 (`57b0bee3b7394098e46a91bc7b458eef499991b6`) i Dargotha (`13a6dce7ed9e55df3e53e9c3515b3ab7b9e8cedc`). Aktualne `src/arkmail/ui/styles.ts` i `src/arkmail/ui/render.ts` sa bajtowo identyczne z wersjami objetymi tamta analiza.
 
-1. Usunac dwie lokalne deklaracje `color-scheme: light dark`.
-2. Dodac wspolne `color-scheme: inherit`.
-3. Pozostawic obecny natywny picker i sposob wpisywania dat.
-4. Nie dodawac wlasnego kalendarza, przyciskow ani `showPicker()`.
-5. Sprawdzic wszystkie pola dat w jasnym i ciemnym motywie.
+Problem dotyczy wylacznie czytelnosci natywnej ikony kalendarza, a nie braku pickera, filtrowania, parsowania ani zakresow dat. Zakres obejmuje dokladnie szesc pol `input type="date"`:
+
+1. Listy: `data-search="odDaty"` i `data-search="doDaty"`.
+2. Archiwum: `data-filter="odDaty"` i `data-filter="doDaty"`.
+3. Usuwanie: `data-deletion-filter="odDaty"` i `data-deletion-filter="doDaty"`.
+
+Aktualny kod potwierdza lokalne `color-scheme: light dark` dla pol List i Archiwum. Tlo pochodzi z motywu klienta, ale natywna ikona moze wybrac wariant wedlug schematu systemu lub przegladarki. W Usuwaniu nie ma lokalnego nadpisania i pole dziedziczy schemat klienta. Dokument zrodlowy raportuje kontrolowana probe w Chromium 151 dla obu przeciwstawnych kombinacji; w tej kontroli porownawczej nie powtarzano pomiaru wizualnego.
+
+Decyzja projektowa:
+
+1. Usunac oba lokalne wymuszenia `color-scheme: light dark`.
+2. Dodac jedna wspolna regule dla wszystkich pol dat ArkMaila: `color-scheme: inherit`.
+3. Nie zmieniac `input type="date"`, recznego wpisywania, formatu `RRRR-MM-DD`, walidacji, komend serwera ani filtrowania Archiwum.
+4. Nie dodawac wlasnego kalendarza, nowych przyciskow ani wywolan `showPicker()`.
+5. Nie stosowac stalego `filter: invert(...)` ani innego recznego kolorowania ikony.
+6. Nie zmieniac etykiet ani innych elementow interfejsu w tej poprawce.
+
+Dowody i bramki:
+
+1. Lokalny RED na starym kodzie dotyczy nowego kontraktu stylu: wykrycia dwoch deklaracji `light dark` i braku wspolnej reguly `color-scheme: inherit` dla wszystkich szesciu pol. Celowego RED nie wolno wykonywac przez CI.
+2. Test struktury DOM potwierdza `type="date"` dla dwoch pol w kazdej z trzech zakladek. To zielona baza regresyjna, poniewaz struktura jest juz poprawna; nie wolno sztucznie psuc jej dla uzyskania RED.
+3. Test w prawdziwym Chromium sprawdza efektywny `getComputedStyle(input).colorScheme` dla wszystkich szesciu pol w czterech kombinacjach: ciemny motyw/jasny system, ciemny motyw/ciemny system, jasny motyw/jasny system i jasny motyw/ciemny system. Przed implementacja RED dotyczy sciezek, ktorych stare wymuszenie lamie kontrakt. Usuwanie jest kontrola regresyjna i nie musi byc RED.
+4. Dowod wizualny na prawdziwym kliencie obejmuje zrzuty przed i po zmianie w obu krytycznych kombinacjach. Ikona ma byc wyrazna bez recznego kolorowania. To dowod porownawczy, nie automatyczny test RED.
+5. Klikniecie ikony i wybor dnia nadal ustawiaja wartosc ISO. Samo otwarcie pickera nie wykrywa pierwotnego bledu i nie zastepuje kontroli obliczonego stylu ani dowodu wizualnego.
+6. Istniejace testy filtrowania pozostaja niezmienione i potwierdzaja brak regresji logiki.
+7. Po lokalnym RED nowego kontraktu i GREEN po implementacji wykonac pelny wymagany zestaw jednostkowy, `typecheck`, build i macierz E2E zgodnie z zasadami bramek projektu.
+
+Poprawke mozna zamknac dopiero, gdy wszystkie szesc pol ma czytelna ikone w jasnym i ciemnym motywie niezaleznie od schematu systemu, natywny picker i reczne wpisywanie dzialaja bez zmian, a pelne testy sa zielone. Po wdrozeniu calego zakresu pol dat usunac `docs/PLAN_TYMCZASOWY_POL_DAT.md` i zaktualizowac to odwolanie w tym samym commicie zamykajacym. Glowny tymczasowy dokument pozostaje do czasu wdrozenia calego wlasnego zakresu.
 
 ### 13.2. Rozpoznawanie zrodla komendy
 
