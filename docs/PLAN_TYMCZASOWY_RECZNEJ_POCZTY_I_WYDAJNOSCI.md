@@ -984,3 +984,315 @@ Przed zmiana kodu nalezy odtworzyc na danych syntetycznych co najmniej:
 6. **Obecna diagnostyka jest niewystarczajaca do pewnego postmortem.** `fetchArchiveBody()` redukuje rozne wyjatki do jednego `error`. Przed implementacja trzeba zachowac kategorie i etap bledu oraz odtworzyc wymienione scenariusze na danych syntetycznych.
 
 Nie wykonano implementacji, zmiany wersji, wydania ani publikacji. Decyzja o zakresie poprawek wymaga osobnego zatwierdzenia po przedstawieniu planu opartego na powyzszych dowodach.
+
+## 17. Plan naprawy pobierania tresci, reconnectow i poznych odpowiedzi
+
+### 17.1. Status i zakres
+
+Ten plan zapisuje uzgodniony kierunek naprawy zgloszenia z sekcji 16. Nie jest potwierdzeniem wykonania implementacji. Kod, wersja, wydanie i publikacja wymagaja osobnych polecen zgodnie z zasadami projektu.
+
+Naprawa obejmuje piec wzajemnie powiazanych obszarow:
+
+1. jednoznaczny wynik kazdego rekordu i prawdziwe liczniki;
+2. przynaleznosc odpowiedzi do sesji oraz bezpieczne zakonczenie gagowania;
+3. reconnect i potwierdzenie trwalego zapisu;
+4. re-kotwiczenie rekordu w dniu z ponad 50 listami;
+5. pomiar opoznien timerow i wiarygodne ETA.
+
+Nie wolno zastapic tej naprawy samym wydluzeniem timeoutow, dodaniem kolejnych pauz albo przedluzeniem gagowania.
+
+### 17.2. Nienaruszalne zasady
+
+- Nie ma rownoleglych automatycznych petli pobierania pod ta sama blokada.
+- Nie ma automatycznego odtwarzania przerwanej petli po reconnectcie.
+- Nie ma `q` do pagera uzytkownika ani pagera nieznanego pochodzenia.
+- Komendy uzytkownika maja pierwszenstwo i nie sa odtwarzane w innym kontekscie.
+- Odpowiedz niezgodna albo niejednoznaczna nie moze zaktualizowac archiwum jako sukces.
+- Pusta tablica tresci nie jest pobrana trescia.
+- Niepelny skan nie moze usunac rekordu jako `missing`.
+- Blad zapisu nie moze byc pokazany jako trwale zakonczony sukces.
+- Gagowanie nie konczy sie tylko dlatego, ze zakonczyla sie funkcja TypeScript albo zwolniono blokade.
+- Reczne wpisywanie odbiorcow i reczne operacje pocztowe pozostaja poza zakresem automatycznych przeksztalcen.
+
+Protokol nie dostarcza identyfikatorow odpowiedzi serwera. Nie ma podstaw do obiecywania pelnego exactly-once kazdej komendy. Celem jest brak nakladania wlasnych sesji, odrzucanie wykrytych niezgodnosci i bezpieczne ponowienie odczytu bez przypisania odpowiedzi do niewlasciwego rekordu.
+
+### 17.3. Najpierw lokalne testy RED
+
+Kazda zmiana wymaga lokalnego dowodu red->green. Najpierw test pada na starym kodzie lokalnie, nigdy celowo przez CI. Dopiero potem powstaje implementacja. Przed commitem caly zestaw ma przechodzic na zielono.
+
+Minimalny zestaw nowych scenariuszy:
+
+1. jeden `failed` przy pozostalych sukcesach, pelnym zakresie postepu i `Do pobrania: 1`;
+2. technicznie zakonczony odczyt z `body = []`;
+3. dzien z 51 listami i docelowym rekordem poza pierwsza strona;
+4. reconnect podczas re-kotwiczenia, odczytu, zamykania pagera, zapisu i pauzy;
+5. pozna odpowiedz przed i po zwolnieniu blokady;
+6. pozna odpowiedz po reconnectcie;
+7. pozna odpowiedz podczas nowej sesji mailbox i pagera;
+8. naglowek listu z numerem innym niz oczekiwany;
+9. linia o klasie innej niz `mail`;
+10. opoznione timery i powrot do aktywnego okna;
+11. blad trwalego zapisu i odtworzenie stanu po restarcie.
+
+Wszystkie dane testowe maja byc syntetyczne. Nie wolno zapisywac prawdziwych tresci listow, nazw postaci ani surowych logow.
+
+### 17.4. Jednoznaczny wynik rekordu i liczniki
+
+`fetchArchiveBody()` nie moze redukowac wszystkich niepowodzen do jednego `error`. Wynik ma zachowac etap i kategorie bez danych wrazliwych.
+
+Dozwolone koncowe stany proby:
+
+- `pobrano`: odpowiedz przypisana do wlasciwego rekordu, niepusta tresc i przyjety zapis;
+- `nie_ma_w_skrzynce`: dopiero po pelnym sprawdzeniu wszystkich skrzynek;
+- `blad_kotwiczenia`;
+- `blad_odczytu`;
+- `niejednoznaczna_odpowiedz`;
+- `pusta_tresc`;
+- `blad_zapisu`;
+- `anulowano`.
+
+Zasady rozliczenia:
+
+- `body = []` nie zwieksza liczby sukcesow;
+- `failed` moze zwiekszac liczbe przetworzonych, ale nigdy liczbe pobranych;
+- anulowanie nie jest pokazywane jako normalnie zakonczona operacja;
+- rekord po bledzie pozostaje kandydatem do kolejnego swiadomego uruchomienia;
+- podsumowanie pokazuje osobno pobrane, nieudane, usuniete jako znikniete i pozostale do pobrania;
+- `Do pobrania` nadal pochodzi z rzeczywistego stanu archiwum, a nie z licznika petli.
+
+### 17.5. Przynaleznosc odpowiedzi i koniec gagowania
+
+Kazda sesja mailbox/pager otrzymuje wlasny identyfikator i generacje polaczenia. Rejestracja subskrybenta ma byc zwiazana z konkretna sesja. Samo nadanie generacji operacji nie wystarcza, jesli pozna linia nadal moze trafic do subskrybenta nowej sesji.
+
+Wymagane zabezpieczenia:
+
+1. Pager porownuje numer z naglowka `List : N` z numerem zadanym.
+2. Niezgodnosc numeru albo innych dostepnych danych identyfikujacych jest wynikiem niejednoznacznym i nie trafia do archiwum.
+3. Normalne zakonczenie wymaga ustalonego konca odpowiedzi, a nie samej ciszy, po ktorej stare linie nadal moga przyjsc.
+4. Po timeoutcie lub reconnectcie powstaje stan odzyskiwania: stara sesja jest zamknieta logicznie, automatyczna petla nie rozpoczyna kolejnej sesji, a linie pocztowe pozostaja gagowane.
+5. Nowa operacja automatyczna czeka na potwierdzony zwykly prompt albo konczy sie jako przerwana. Nie wolno czekac bez konca ani zgadywac stanu pagera.
+6. Gagowanie wygasa dopiero po zakonczeniu obslugi odpowiedzi albo bezpiecznym zakonczeniu odzyskiwania.
+
+Nie wolno gagowac wszystkich klas linii na slepo. Dla klas innych niz `mail` najpierw test i rejestr techniczny, potem decyzja o zakresie. Nie wolno ukryc zwyklego dialogu uzytkownika z gra.
+
+### 17.6. Reconnect i trwaly zapis
+
+Po reconnectcie uzytkownik moze swiadomie uruchomic ponownie pobieranie brakujacych tresci. Stara petla nie jest odtwarzana automatycznie.
+
+Dla kazdego rekordu:
+
+- sukces w RAM i sukces trwalego zapisu sa rozrozniane;
+- zapis ma wlasne potwierdzenie zakonczenia zamiast pelnego `flush()` calego archiwum po kazdym liscie;
+- blad IndexedDB pozostawia jednoznaczny stan niepowodzenia i komunikat;
+- reconnect nie kasuje juz potwierdzonych danych;
+- po restarcie archiwum zawiera dokladnie tresci, ktorych zapis zostal potwierdzony;
+- ponowne uruchomienie wybiera wylacznie rekordy nadal pozbawione potwierdzonej tresci.
+
+Nie wolno przedstawiac samej kolejki write-through jako gwarancji trwalosci przed zamknieciem strony.
+
+### 17.7. Dzien z ponad 50 listami
+
+Naprawa obejmuje skan, nie tylko komunikat.
+
+1. Test syntetyczny odtwarza co najmniej 51 listow jednego dnia i rekord poza pierwsza strona.
+2. Rejestrowana jest sekwencja stron, kotwic i sond wykluczajacych.
+3. Skan ma deterministycznie przeszukac pelny dostepny zakres dnia zamiast konczyc sie po pierwszej nierozstrzygnietej powtorce.
+4. Pelny skan bez rekordu daje `nie_ma_w_skrzynce`.
+5. Niepelny skan daje `blad_kotwiczenia` i pozostawia rekord.
+6. Blizniacze wpisy sa rozrozniane po `archiveId`; poprawka nie moze pobrac tresci innego listu o tych samych metadanych.
+7. Znacznik kompletnej indeksacji wraca dopiero po nowym pelnym potwierdzeniu, nie po samym zapisie pojedynczej tresci.
+
+Jesli ograniczenie serwera uniemozliwia pelne wyliczenie dnia, rekord pozostaje i uzytkownik dostaje konkretny powod. Nie wolno zamieniac tego ograniczenia na falszywy `missing`.
+
+### 17.8. Timery i ETA
+
+- Osiem timerow 50 ms pauzy zostaje zastapionych jednym anulowalnym timerem 400 ms.
+- Diagnostyka testowa rejestruje planowany i rzeczywisty czas wykonania etapu.
+- Opoznienie nie powoduje serii przyspieszonych komend w celu nadrobienia czasu.
+- Zmiana widocznosci rozpoczyna nowa probke ETA, aby stare opoznienie nie zawyzalo prognozy po powrocie.
+- Nie ma sztucznego odpytywania ani dodatkowych komend podtrzymujacych aktywnosc.
+- Nie obiecuje sie jednakowej szybkosci w tle, jesli srodowisko ogranicza timery.
+
+### 17.9. Kolejnosc i kryteria zakonczenia
+
+Kolejnosc commitow:
+
+1. wyniki per rekord, pusta tresc i podsumowanie;
+2. identyfikacja sesji, walidacja odpowiedzi i odzyskiwanie;
+3. pozne linie oraz koniec gagowania;
+4. reconnect i potwierdzanie trwalego zapisu;
+5. skan dnia z ponad 50 listami;
+6. timery, pomiar opoznien i ETA.
+
+Przed kazdym commitem: lokalny RED na starym kodzie, implementacja, lokalny GREEN nowego testu, pelny zestaw testow, kontrola typow i brak zmian pobocznych. Po pushu: zielony CI, weryfikacja SHA, komunikatu, rodzica i dokladnych sciezek.
+
+Zakonczenie wymaga jednoczesnie:
+
+- braku widocznych starych odpowiedzi;
+- braku zapisu odpowiedzi do zlego rekordu;
+- poprawnego wyniku dla dnia 50+;
+- zgodnosci paska, podsumowania i licznika;
+- bezpiecznego wznowienia po rozlaczeniu;
+- potwierdzonej trwalosci zapisu;
+- calego zestawu testow i CI na zielono.
+
+## 18. Analiza: Odpowiedz wszystkim pomija odbiorcow z pola Do
+
+### 18.1. Zgloszenie i podstawa analizy
+
+Zanonimizowane zgloszenie opisuje list z jednym nadawca i wieloma odbiorcami w polu `Do`, wsrod ktorych byla aktualna postac. Po wybraniu `Odpowiedz wszystkim` formularz zawieral tylko nadawce. Rozmowa wskazuje rowniez na koniecznosc uwzglednienia `DW`, ale nie dostarczono surowych naglowkow, wiec dokladny uklad osob w `Do` i `DW` pozostaje nieznany.
+
+Analize wykonano na HEAD `96fe5f334e33c3aa0f1f75dc5f90f66962305198`. Sprawdzono sciezke przyciskow odpowiedzi, typ `LetterContent`, parser pagera, formularz i walidacje compose, zapis Archiwum, ponowne otwarcie z cache oraz testy odpowiedzi i Archiwum. Nie wykonano implementacji ani nowych testow.
+
+Do raportu nie zapisano nickow, tresci rozmowy, nazw postaci ani naglowkow prawdziwego listu.
+
+### 18.2. Bezposrednia przyczyna w Listach
+
+Przycisk jest czysta operacja UI. Nie wysyla komendy odpowiedzi do serwera. Wypelnia lokalny `composeDraft` i przelacza uzytkownika do zakladki `Napisz`.
+
+Obecna logika dla `Odpowiedz wszystkim` jest rownowazna:
+
+```ts
+adresat = odebrany ? list.from : (list.to || list.cc || '')
+dw = list.cc || ''
+```
+
+Dla listu odebranego oznacza to:
+
+- `Adresat` = wylacznie `Od`;
+- `DW` = wylacznie oryginalne `DW`;
+- oryginalne `Do` nie jest w ogole uzyte.
+
+Pominiecie pozostalych odbiorcow nastepuje wiec przed walidacja i przed wysylka. Nie jest to efekt odrzucenia odbiorcow przez serwer. Handler wysylki korzysta dopiero z pol formularza, ktore zostaly juz przygotowane bez osob z `Do`.
+
+Istniejacy test `Odpowiedz wszystkim doklada oryginalne DW` potwierdza to zachowanie: oczekuje nadawcy jako jedynego adresata i samego oryginalnego DW. Test nie zawiera wielu osob w `Do`. Kolejny test twierdzi, ze brak DW oznacza zachowanie jak zwykle `Odpowiedz`, co jest niepoprawnym kontraktem dla listu z wieloma odbiorcami bez DW. Te testy trzeba bedzie zmienic razem z kontraktem, a nie traktowac jako dowodu poprawnosci zgloszonego zachowania.
+
+### 18.3. Drugi problem: utrata naglowkow w Archiwum
+
+`LetterContent` z pagera zawiera pelne `from`, `to`, `cc`, date i tresc. Parser pagera przepisuje naglowki `Do` i `DW` do tych pol. Zatem przy swiezym odczycie dane potrzebne do poprawnego `Odpowiedz wszystkim` istnieja.
+
+`ArchiveLetter` nie przechowuje jednak pelnych naglowkow. Zawiera miedzy innymi `party`, temat, date i tresc, ale nie zachowuje osobno `from`, `to` i `cc`. `fromOpenedLetter()` zapisuje tresc, lecz nie zapisuje pelnych naglowkow do rekordu Archiwum.
+
+Przy ponownym otwarciu rekordu z cache kod konstruuje widok zastepczy:
+
+- dla odebranych: `from = party`, `to = ''`, `cc = null`;
+- dla wyslanych: `from = ''`, `to = party`, `cc = null`.
+
+W konsekwencji nawet po wczesniejszym poprawnym odczycie z serwera:
+
+1. pierwsze otwarcie moze miec pelne naglowki w RAM;
+2. Archiwum zapisuje tylko czesc danych;
+3. kolejne otwarcie z cache traci pozostalych odbiorcow i DW;
+4. `Odpowiedz wszystkim` nie ma juz danych potrzebnych do zbudowania pelnej listy.
+
+Nie wiadomo, czy zgloszenie dotyczylo List czy Archiwum. Nie trzeba tego zgadywac: obie potwierdzone sciezki wymagaja naprawy, aby funkcja dzialala konsekwentnie.
+
+### 18.4. Format listy odbiorcow i walidacja
+
+Naglowki `Do` i `DW` sa surowymi lancuchami. Protokol pokazuje liste z przecinkami i koncowym spojnikiem ` i `. Formularz wysylki akceptuje przecinki i spacje, ale walidacja odrzuca wolne slowo `i`.
+
+Dlatego nie wolno tylko skleic `from`, `to` i `cc` oraz przeniesc ich bez zmian do formularza. Taka poprawka moglaby:
+
+- zostawic niedozwolony spojnik `i`;
+- zduplikowac nadawce lub odbiorce wystepujacego w kilku polach;
+- wpisac aktualna postac do wlasnej odpowiedzi;
+- blednie podzielic znana nazwe wielowyrazowa lub alias;
+- przy liscie wyslanym tylko na DW wpisac te same osoby jednoczesnie do `Adresat` i `DW`.
+
+Istniejace funkcje nie rozwiazuja tego kompletnie:
+
+- `splitParty()` sluzy kontaktom i zaklada jednowyrazowe imiona; nie jest bezpiecznym parserem compose dla nazw wielowyrazowych i aliasow;
+- `splitRecipients()` obsluguje znane nazwy wielowyrazowe, ale jest parserem advisory i nie obsluguje koncowego spojnika naglowkow jako osobnej reguly;
+- zwykla deduplikacja kontaktow jest inna operacja niz zbudowanie nowej listy odbiorcow odpowiedzi.
+
+Potrzebna jest jedna czysta funkcja core, ktora parsuje naglowkowa liste odbiorcow, korzysta ze znanych nazw i aliasow do rozwiazania nazw wielowyrazowych oraz zwraca kanoniczne pola formularza. Nie wolno uzywac mechanicznego dzielenia kazdej spacji.
+
+### 18.5. Rekomendowany kontrakt odpowiedzi
+
+Zwykle `Odpowiedz` oraz `Odpowiedz z cytowaniem` pozostaja bez zmian. Temat i tresc zwyklego `Odpowiedz wszystkim` pozostaja puste. Klikniecie nadal tylko wypelnia formularz; nie wysyla listu automatycznie.
+
+Dla `Odpowiedz wszystkim` na liscie odebranym albo nieprzeczytanym:
+
+- `Adresat`: oryginalny nadawca, a nastepnie pozostali bezposredni odbiorcy z `Do`;
+- `DW`: oryginalni odbiorcy `DW`;
+- aktualna postac jest usuwana z obu list;
+- duplikaty miedzy `Od`, `Do` i `DW` sa usuwane bez wielkosci liter, z zachowaniem pierwszego wystapienia i kolejnosci;
+- jesli nazwa aktualnej postaci jest nieznana, nie wolno zgadywac. Bezpieczniej jest zachowac wszystkich odbiorcow niz pominac niewlasciwa osobe.
+
+Dla listu z `wyslane` albo `niewyslane`:
+
+- `Adresat`: oryginalni odbiorcy `Do`;
+- `DW`: oryginalni odbiorcy `DW`;
+- aktualny nadawca nie jest dodawany ponownie;
+- obowiazuje ta sama deduplikacja i kontrola aktualnej postaci;
+- gdy `Do` jest puste, odbiorcy `DW` trafiaja do wymaganego pola `Adresat`, a `DW` pozostaje puste. Nie wolno powielac ich w obu polach;
+- jesli po odjeciu aktualnej postaci `Adresat` jest pusty, a `DW` nie jest, odbiorcy `DW` przechodza do `Adresat`;
+- jesli po tych regulach nie ma zadnego odbiorcy, formularz nie moze udawac poprawnego prefillu. Pokazuje konkretny komunikat i nie wysyla nic.
+
+Deduplikacja dotyczy wylacznie nowo generowanego prefillu. Po przelaczeniu do `Napisz` uzytkownik moze edytowac pola, a handler wysylki nie dokonuje nowej normalizacji recznego wpisu. Nie zmienia to zasady, ze Arkadia ostatecznie weryfikuje odbiorcow.
+
+### 18.6. Zachowanie pelnych naglowkow w Archiwum
+
+Rekord Archiwum powinien dodatkowo przechowywac komplet naglowkow potrzebnych do odpowiedzi, na przyklad jako opcjonalny obiekt `headers` z `from`, `to` i `cc`.
+
+Zasady:
+
+- obecnosc `headers` oznacza znany komplet, takze gdy `to` jest puste albo `cc` jest `null`;
+- brak `headers` oznacza rekord starszej wersji i nie wolno przedstawiac go jako pelnego;
+- `fromOpenedLetter()` zapisuje naglowki przy kazdym swiezym odczycie;
+- listing bez tresci i naglowkow nie kasuje wczesniej zachowanego kompletu;
+- `party`, `archiveId`, sortowanie, kontakty, filtry, format eksportu i dotychczasowa tresc pozostaja zgodne z obecnymi zasadami;
+- to rozszerzenie istniejacego rekordu JSON, nie zmiana identyfikatorow ani migracja schematu IndexedDB;
+- nie ma masowego ponownego pobierania listow tylko w celu uzupelnienia naglowkow.
+
+Przy otwarciu z cache rekord z kompletem naglowkow uzywa ich bez komend do serwera.
+
+Dla starego rekordu bez kompletu nie wolno po cichu wykonac niepelnego `Odpowiedz wszystkim`. Klikniecie powinno uruchomic kontrolowany odczyt z serwera przez istniejaca re-kotwice, zapisac komplet i dopiero wtedy wypelnic formularz. Przy bledzie, braku daty, reconnectcie albo niejednoznacznej odpowiedzi:
+
+- nie ma automatycznego fallbacku do samego nadawcy;
+- zwykle `Odpowiedz` pozostaje dostepne;
+- uzytkownik dostaje konkretny komunikat;
+- nie ma wysylki ani zgadywania odbiorcow.
+
+### 18.7. Testy wymagane przed implementacja
+
+Najpierw lokalne RED na obecnym kodzie, potem implementacja i pelny GREEN przed commitem.
+
+Minimum:
+
+1. Odebrany: jeden nadawca, `Do` z aktualna postacia i jedna inna osoba, puste `DW`; prefill zawiera nadawce i te inna osobe.
+2. Odebrany: wielu odbiorcow `Do` i wielu `DW`, lacznie z koncowym ` i `; wynik przechodzi `validateCompose()`.
+3. Aktualna postac w `Do` i `DW` zostaje usunieta bez wielkosci liter.
+4. Nadawca powtarza sie w `Do` albo `DW`; wystepuje tylko raz.
+5. Ta sama osoba w `Do` i `DW` z roznica wielkosci liter; zostaje pierwsze wystapienie.
+6. Znana nazwa wielowyrazowa lub alias nie zostaje podzielony.
+7. Nieznana nazwa aktualnej postaci nie powoduje zgadywania ani usuwania innych osob.
+8. List tylko z `DW` daje wymaganego adresata i puste `DW` bez duplikatow.
+9. Wyslany: `Odpowiedz wszystkim` zachowuje odbiorcow `Do` i `DW`, nie dodaje aktualnego nadawcy.
+10. Wyslany tylko na `DW`: brak powielenia odbiorcow w obu polach.
+11. Zwykle `Odpowiedz` i `Odpowiedz z cytowaniem` pozostaja bez zmian.
+12. Klikniecie nie wysyla komend i nie zmienia tematu ani tresci poza dotychczasowym kontraktem.
+13. Swiezy odczyt zapisuje pelne naglowki w Archiwum.
+14. Zamkniecie i ponowne otwarcie z cache zachowuje `Do` i `DW`, bez komend.
+15. Zapis, restart i odczyt rekordu zachowuja komplet naglowkow.
+16. Stary rekord bez kompletu uruchamia kontrolowany odczyt zamiast niepelnego prefillu.
+17. Blad odzyskania starych naglowkow nie powoduje fallbacku do samego nadawcy.
+18. Listing bez naglowkow nie kasuje wczesniej zapisanego kompletu.
+
+Istniejace testy utrwalajace stary kontrakt nalezy zaktualizowac w tym samym commicie co poprawka, z zachowaniem dowodu, ze nowy test najpierw padl na starym kodzie.
+
+### 18.8. Zakres implementacji po osobnym poleceniu
+
+1. Czysta funkcja core budujaca odbiorcow odpowiedzi, z parserem naglowkow, deduplikacja i obsluga aktualnej postaci.
+2. Podpiecie funkcji pod `Odpowiedz wszystkim` bez zmiany zwyklego `Odpowiedz` i cytowania.
+3. Dodatkowe zachowanie kompletu naglowkow w Archiwum i odtwarzanie ich z cache.
+4. Kontrolowane odzyskanie naglowkow dla starego rekordu, bez niepelnego fallbacku.
+5. Testy jednostkowe, UI, Archiwum, storage i pelny zestaw projektu.
+
+Nie sa potrzebne zmiany protokolu wysylki, automatyczne wysylanie odpowiedzi, nowe listingi przy nowych rekordach ani migracja identyfikatorow Archiwum. Nie wolno ograniczyc poprawki do doklejenia `l.to` w jednej linii renderu, poniewaz zostawilaby format ` i `, duplikaty, aktualna postac i utrate naglowkow w Archiwum.
+
+### 18.9. Koncowy wniosek
+
+Zgloszenie jest potwierdzonym bledem ArkMaila. Dla odebranych `Odpowiedz wszystkim` pomija cale oryginalne `Do`, a testy obecnie utrwalaja ten bledny kontrakt. Dodatkowo Archiwum traci `Do` i `DW` przy zapisie oraz ponownym otwarciu z cache.
+
+Poprawka ma zapewnic pelny, edytowalny prefill dla wszystkich odbiorcow, z usunieciem aktualnej postaci i duplikatow, bez automatycznej wysylki oraz bez zgadywania przy starych lub niekompletnych danych.
