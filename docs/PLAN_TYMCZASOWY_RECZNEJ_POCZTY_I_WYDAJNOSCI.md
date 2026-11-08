@@ -759,3 +759,228 @@ Rekord `ArchiveLetter` zawiera juz:
 8. Zrzuty i testy nie moga zawierac prawdziwych identyfikatorow, tresci listow ani danych z dostarczonych zrzutow.
 
 Kryterium odbioru: kazdy wiersz Archiwum pokazuje dotychczasowe informacje oraz date i czas z `dateRaw`, a rekord bez daty ma czytelne `brak daty`. Nie powstaja zadne nowe operacje pocztowe ani zmiany danych.
+
+
+## 16. Analiza pobierania tresci w tle, reconnectow i pozniejszych odpowiedzi
+
+### 16.1. Zakres i podstawa wnioskow
+
+Analiza objela zgloszenie dotyczace:
+
+- szybszego pobierania tresci przy aktywnym oknie i wolniejszego po przelaczeniu na inne okno;
+- kilku rozlaczen i ponownych uruchomien pobierania;
+- jednego rekordu pozostajacego bez tresci;
+- kolejnego pobierania, po ktorym w glownym oknie klienta pojawilo sie kilka odpowiedzi mimo gagowania, a licznik nadal wskazywal jeden rekord do pobrania.
+
+Podstawa jest kod i testy z HEAD `73d6a729aa870ea18ffa8fddd4bfbed6451c3a9e`. Sprawdzono caly kod `src/arkmail` pod katem obslugi widocznosci i fokusu oraz szczegolowo pobieranie tresci, re-kotwiczenie, sesje mailbox/pager, transport, blokade, storage, liczniki i testy tych obszarow.
+
+Nie dostarczono zanonimizowanego logu czasow, dokladnego komunikatu koncowego ani surowych klas widocznych linii. Nie wykonano profilowania przegladarki ani nowych testow. Nie zmieniono kodu produkcyjnego ani testow. Dlatego ponizszy raport rozroznia fakty w kodzie, mozliwe przebiegi zgodne z objawami i kwestie nierozstrzygalne bez pomiaru.
+
+### 16.2. Rzeczywisty przebieg pobierania jednego rekordu
+
+Przycisk `Pobierz tresci do archiwum` uruchamia `runArchiveDownload()`:
+
+1. Kandydatami sa rekordy z `body.length === 0` i poprawna `dateRaw`.
+2. Cala petla dziala pod jedna blokada `SessionLock`.
+3. Dla kazdego rekordu `resolveEntry()` ponownie ustala aktualny numer listu przez listing po dacie. Numer zapisany w archiwum nie jest wysylany na slepo.
+4. `PagerSession.readLetter()` pobiera naglowki i tresc, po czym zamyka pager przez `q`.
+5. Po rozwiazaniu odczytu `upsertLetters()` zapisuje tresc pod `archiveId` wskazanego rekordu, a `persistArchive()` przekazuje aktualne archiwum do storage.
+6. Po kazdym przetworzonym kandydacie nastepuje pauza `LOAD_ALL_PACE_MS = PAGE_PACE_MS = 400 ms`.
+7. Wynik `ok` zwieksza `done`, `missing` usuwa rekord po sprawdzeniu wszystkich skrzynek, a `error` zwieksza `failed` i zostawia rekord z pusta trescia.
+8. Trzy bledy z rzedu zatrzymuja petle. Sukces i `missing` resetuja te serie.
+
+Kolejne uruchomienie tworzy kandydatow ponownie z aktualnego archiwum. Nie korzysta z poprzedniej listy kandydatow ani z licznika postepu poprzedniego uruchomienia.
+
+### 16.3. Tempo przy nieaktywnym oknie
+
+#### Fakty w kodzie
+
+W calym `src/arkmail` nie ma obslugi `visibilitychange`, `document.hidden`, `document.visibilityState`, `window.focus` ani `window.blur`, ktora zmienialaby tempo pobierania. ArkMail nie ma wlasnego trybu szybkiego pobierania na pierwszym planie ani trybu oszczedzania w tle.
+
+Operacja jest natomiast zalezna od wielu timerow:
+
+| Miejsce | Nominalny czas | Rola |
+|---|---:|---|
+| `sleepOrCancel()` po kandydacie | 400 ms | pauza miedzy rekordami; wykonana jako osiem timerow po 50 ms |
+| `MailboxSession` idle | 400 ms w konfiguracji wykonawczej | zakonczenie listingu, gdy prompt nie dociera |
+| `PagerSession` quiet | 400 ms | wykrycie ciszy po naglowkach i tresci |
+| proby advance pagera | maksymalnie 3 proby po ciszy | pusty Enter przed uznaniem tresci za kompletna |
+| `PagerSession` idle po `q` | 400 ms | zakonczenie bez docierajacego promptu |
+| retry `Listy sa w tej chwili ladowane` | 2000 ms | jedno ponowienie komendy |
+| timeout sesji | 8000 ms | zakonczenie awaryjne; przy pagerze dodatkowy grace co najmniej 400 ms |
+| retry powtarzanej kotwicy | 2500, 4000, 4000 ms | ponowienia przy powtarzajacej sie stronie |
+| pauza miedzy stronami skanu | 400 ms | kolejne strony re-kotwiczenia |
+
+W szczegolnym przypadku bez widocznego promptu pagera kod moze wykonac trzy proby advance, kolejna cisze przed `q` i dalsza cisze przed zakonczeniem. Nominalne 400 ms nie jest wiec pelnym kosztem kazdego rekordu.
+
+`setTimeout` okresla najwczesniejsze planowane wykonanie, nie gwarancje wykonania dokladnie po tym czasie. Opoznienie timera w srodowisku wykonawczym opoznia rowniez przejscie sesji, pauze, retry i sam watchdog timeoutu. Z tego powodu `timeoutMs = 8000` nie jest twardym pomiarem maksymalnego czasu sciennego w obecnosci opozniania timerow.
+
+Niezalezny koszt stanowia praca synchroniczna i zapis:
+
+- kazda zmiana archiwum uruchamia aktualizacje stanu i renderowanie;
+- `setLetters()` serializuje rekordy przy porownywaniu i zapisie;
+- re-kotwiczenie moze wykonac wiele listingow i zapisow przed jednym odczytem;
+- trwaly zapis jest kolejkowany asynchronicznie.
+
+#### Wniosek i granica dowodu
+
+Zaleznosc od timerow jest potwierdzonym mechanizmem, ktory moze tlumaczyc roznice tempa, jesli przegladarka lub klient opoznia timery po przelaczeniu okna. Nie jest to dowod, ze wlasnie to spowodowalo konkretne zgloszenie. Bez pomiaru nie mozna podzielic czasu miedzy timery, siec, serwer, WebSocket, IndexedDB, renderowanie i obciazenie sprzetu.
+
+Sam fakt przelaczenia na inne okno nie wystarcza tez do ustalenia stanu widocznosci strony. Trzeba zmierzyc rzeczywiste zdarzenia i opoznienia w uzywanym kliencie, zamiast przypisywac przegladarce konkretny prog opozniania timerow.
+
+ETA jest liczone z rzeczywistego czasu miedzy przetworzeniami, wiec obejmuje rowniez pauze i pozniejszy rekord. Moze sie dostosowac do wolniejszego tempa, ale nie rozroznia jego przyczyny i nie jest resetowane przy zmianie widocznosci. Po powrocie do aktywnego okna wczesniejsza duza probka moze jeszcze przez kilka rekordow zawyzac ETA.
+
+### 16.4. Reconnect i rzeczywisty zakres idempotentnosci
+
+`cancelConnectionOperations()` po rozlaczeniu lub zdarzeniu konca sesji:
+
+- zwieksza `connectionGeneration`;
+- uniewaznia kontekst listingu i podejrzenie osieroconego pagera;
+- ustawia transport offline i odrzuca operacje oczekujace na blokade;
+- wywoluje anulowanie aktywnych sesji;
+- ustawia `cancelled` dla pobierania i innych petli;
+- czysci wskazniki biezacych operacji, odswiezenia oczekujace i odpowiedni stan UI.
+
+Aktywna sesja konczy sie przez wlasne odrzucenie, po czym `runExclusive()` zwalnia blokade. Nowe pobieranie nie wchodzi w rownolegla petle pod ta sama blokada. Sprawdzenie generacji w koncowym `finally` chroni stan nowej operacji przed wyczyszczeniem przez stara.
+
+Kazdy pomyslnie odczytany rekord jest przekazywany do archiwum od razu, a nie dopiero na koncu petli. RAM jest aktualizowany natychmiast. Trwaly zapis wykonuje kolejka storage; `flush()` nastepuje przy zamykaniu storage, nie przy kazdym reconnectcie. Blad zapisu jest zglaszany osobno, a oczekujacy rekord moze byc ponowiony przy kolejnej zmianie. Zamkniecie strony przed zakonczeniem kolejki albo trwaly blad IndexedDB moze wiec zmienic stan odtworzony po restarcie, mimo ze wczesniejszy widok w RAM byl kompletny.
+
+**Idempotentnosc jest ograniczona do ponownego wyboru rekordow z pusta trescia:**
+
+- rekord z niepusta trescia nie jest ponownie pobierany;
+- rekord po bledzie, anulowaniu albo niedokonczonym odczycie pozostaje kandydatem;
+- rekord uznany za `missing` jest usuwany;
+- ta sama tresc moze zostac pobrana ponownie, jesli poprzednia operacja zostala anulowana przed zapisem albo zapis trwaly nie doszedl do skutku.
+
+Nie jest to gwarancja wykonania kazdej komendy dokladnie raz ani trwaly dziennik postepu per rekord. Sam serwer moze juz oznaczyc list jako przeczytany, podczas gdy lokalna tresc po anulowaniu nadal bedzie pusta. Ponowny odczyt jest wtedy zamierzony.
+
+Odpowiedzi nie maja powiazanego identyfikatora operacji ani generacji. `connectionGeneration` zatrzymuje stara logike, ale nie oznacza pozniej docierajacych linii. Istniejacy test reconnectu sprawdza brak `q` i brak otwarcia starego listu po anulowaniu, lecz nie sprawdza spoznionej odpowiedzi docierajacej juz w trakcie nowej operacji ani jej widocznosci w glownym oknie.
+
+### 16.5. Dlaczego jeden rekord moze pozostac bez tresci
+
+Licznik w Archiwum rozroznia:
+
+- `pendingBody`: pusta tresc i poprawna data; dokladnie te rekordy trafiaja do pobierania;
+- `undatedBody`: pusta tresc i brak poprawnej daty; te rekordy nie trafiaja do pobierania.
+
+Komunikat `Do pobrania: 1` oznacza `pendingBody = 1`. Komunikat o rekordach nienadajacych sie do pobrania jest innym stanem i nie wolno mieszac tych przypadkow.
+
+Postep operacji nie jest liczba sukcesow. `reportProgress()` oblicza:
+
+```ts
+processed = done + failed + missing
+```
+
+Pasek moze wiec osiagnac koniec zakresu mimo bledow. Koncowe podsumowanie ma wtedy pokazac `Nieudane: N`. Kod potwierdza nastepujace mozliwe przyczyny pozostawienia jednego rekordu:
+
+1. **Pojedynczy blad.** Timeout, blad listingu, blad pagera lub niekompletna re-kotwica zwracaja `error`. Rekord zostaje z pusta trescia, `failed` rosnie, a petla moze kontynuowac i zakonczyc caly pasek. Dokladny wyjatek jest nastepnie odrzucany przez `fetchArchiveBody()`, ktore zwraca tylko `{ kind: "error" }`. Uzytkownik nie dostaje przyczyny per rekord.
+2. **Dzien z ponad 50 listami.** Re-kotwiczenie korzysta z `scanMailboxPages()`. Gdy serwer pokazuje tylko czesc gestego dnia i docelowego wiersza nie mozna znalezc, skan zapisuje luke i konczy sie jako `incomplete`. `resolveEntry()` zglasza blad, a nie `missing`. Rekord prawidlowo nie jest usuwany jako znikniety, lecz pozostaje bez tresci. Istniejacy test potwierdza wlasnie taki wynik: `Nieudane: 1`, brak `Nie ma juz w skrzynce` i rekord nadal widoczny. Zgloszony dzien z ponad 50 listami czyni te sciezke szczegolnie istotna, ale bez identyfikacji pozostalego rekordu nie przesadza o niej.
+3. **Przerwanie przed ukonczeniem.** Reconnect, reczne `Przerwij`, wejscie gracza w poczte albo circuit breaker zatrzymuja petle. Rekordy nieprzetworzone i rekord z biezacej nieudanej proby pozostaja kandydatami. Przy reconnectcie koncowe czyszczenie starej generacji nie nadpisuje stanu nowej operacji.
+4. **Technicznie udany odczyt z pusta tablica tresci.** `done` zwieksza sie po `ok`, ale `upsertLetters()` nie traktuje pustej tablicy jako tresci zastepujacej poprzednia. Rekord z `body = []` pozostanie kandydatem mimo zaliczenia proby. Kod nie ma osobnego stanu rozrozniajacego `nigdy nie pobrano`, `blad pobierania` i `serwer zwrocil pusta tresc`. Nie wiadomo, czy zgloszony list mial taka odpowiedz; wymaga to osobnego testu i dowodu z odpowiedzi.
+5. **Brak poprawnej daty.** Rekord zostaje poza kandydatami. Wtedy UI powinno wskazywac grupe `undatedBody`, a nie zwykle `Do pobrania: 1`.
+6. **Problem trwalego zapisu.** Moze wyjasnic powrot pustej tresci dopiero po restarcie lub zamknieciu strony. Nie jest podstawowym wyjasnieniem licznika, ktory pozostal niezmieniony natychmiast po pomyslnym zapisie w RAM, bo wtedy trzeba najpierw sprawdzic punkty 1-5.
+
+Sam `missing` nie wyjasnia pozostalego rekordu: taki rekord jest fizycznie usuwany z archiwum. Moze wrocic tylko przez pozniejszy listing, ktory ponownie go wykryje.
+
+**Najwazniejsza luka diagnostyczna:** podsumowanie zawiera liczbe nieudanych, ale tracony jest powod kazdego bledu. Bez zachowania etapu i kategorii bledu nie da sie po fakcie rozroznic timeoutu, luki gestego dnia, odrzucenia przez pager, reconnectu i pustej tresci.
+
+### 16.6. Dlaczego pozne odpowiedzi moga pojawic sie w glownym oknie
+
+Transport dostarcza linie do subskrybentow zawsze, a dopiero potem decyduje o ich wyswietleniu. Gagowanie zachodzi wylacznie, gdy:
+
+```ts
+type === 'mail' && lock.locked && !composeVisible
+```
+
+Nie jest sterowane przez `modalActive`, aktywna subskrypcje konkretnej sesji ani potwierdzenie, ze serwer zakonczyl odpowiedz.
+
+`cleanup()` mailbox/pagera odhacza subskrybenta i zatrzymuje timery. Nie zatrzymuje natomiast linii, ktore serwer lub klient dostarczy pozniej. Po odrzuceniu sesji `fetchArchiveBody()` moze kontynuowac petle, a po ostatnim rekordzie `runExclusive()` zwalnia blokade. Od tej chwili kazda pozna linia `mail` przechodzi do glownego okna, nawet jesli nalezy do operacji ArkMaila.
+
+Zgodny z objawem przebieg jest wiec technicznie mozliwy:
+
+1. Jedna lub kilka sesji konczy sie bledem albo anulowaniem.
+2. Odpowiedzi tych sesji docieraja opoznione.
+3. Linie przychodzace przed zwolnieniem blokady sa gagowane, ale juz nie sa parsowane przez zamknieta sesje.
+4. Linie przychodzace po zwolnieniu blokady nie sa gagowane i staja sie widoczne.
+5. Kilka opoznionych odpowiedzi moze pojawic sie jako seria po zakonczeniu pobierania.
+
+Reconnect tworzy analogiczna granice: anulowanie zamyka subskrypcje, a pozniejsze zwolnienie blokady konczy gagowanie. Nie dowodzi to jednak, ze konkretne widoczne odpowiedzi powstaly wlasnie tak.
+
+Sa jeszcze dwie istotne granice:
+
+- linia bez dokladnej klasy `mail` nie jest gagowana nawet pod blokada; bez rejestru klas nie mozna wykluczyc tej sciezki;
+- straznik osieroconego pagera moze wyslac `q` po zwolnieniu blokady, ale samo wyslanie nie jest ani potwierdzeniem zamkniecia pagera przez serwer, ani zabezpieczeniem przed pozniejszymi liniami.
+
+Istniejace testy gagowania potwierdzaja linie w trakcie operacji oraz celowo przywracaja widocznosc linii po operacji. Nie rozrozniaja recznej odpowiedzi od poznej odpowiedzi pluginu. Test reconnectu nie sprawdza tablicy `gagged`. Test timeoutu pagera uzywa prostego mocka transportu bez predykatu gagowania Dargotha. Brakuje zatem bezposredniego dowodu testowego dla scenariusza zgloszenia.
+
+### 16.7. Pozne linie podczas nowej operacji
+
+Samo przedluzenie gagowania nie rozwiazaloby calego problemu. Subskrybenci otrzymuja kazda linie przed decyzja o gagowaniu, a linie nie maja identyfikatora sesji.
+
+Po timeoutcie starej sesji i rozpoczeciu nowej pozna odpowiedz moze zostac odebrana przez subskrybenta nowej sesji. Mailbox czesciowo ogranicza ryzyko przez sprawdzenie skrzynki w naglowku, ale nie zna tozsamosci zadanej komendy. Pager przyjmuje naglowek `List : N` bez porownania `N` z numerem oczekiwanym. W konsekwencji kod nie ma pelnego mechanizmu odrzucenia starej odpowiedzi, ktora dotarla dopiero podczas nowej sesji tego samego typu.
+
+Nie jest to dowod blednego zapisu w zgloszeniu. Jest to potwierdzona granica projektu, ktora wymaga osobnych testow przed zmiana gagowania lub reconnectow. Poprawka powinna najpierw ustalic zasade przynaleznosci odpowiedzi do operacji; w przeciwnym razie mozna jedynie ukryc objaw w glownym oknie, pozostawiajac ryzyko blednego parsowania.
+
+### 16.8. Co potwierdzaja istniejace testy, a czego nie obejmuja
+
+Istniejace testy potwierdzaja:
+
+- zapis tresci i pozniejszy podglad z cache bez komend;
+- ponowne uruchomienie bez kandydatow po kompletnym pobraniu;
+- osobne rekordy blizniakow i zapis pod wlasne `archiveId`;
+- usuniecie rekordu dopiero po `missing` ze wszystkich skrzynek;
+- pozostawienie rekordu przy luce re-kotwiczenia i zaliczenie go do `Nieudane`;
+- zatrzymanie po trzech bledach z rzedu i reset serii po sukcesie albo `missing`;
+- przerwanie przez uzytkownika i wejscie gracza w poczte;
+- reconnect bez `q` do nowej sesji i bez otwarcia starego listu;
+- gagowanie zwyklych listingow i odczytow w trakcie blokady;
+- timeout pagera z proba zamkniecia przez `q` i obsluge podejrzenia osieroconego pagera.
+
+Nie znaleziono testow bezposrednio obejmujacych:
+
+1. opoznianie timerow po zmianie widocznosci albo fokusu;
+2. reconnect podczas kazdego etapu masowego pobierania: re-kotwica, odczyt, `q`, zapis i pauza;
+3. jeden `failed` przy koncowym `processed === total` i jednoczesnym `Do pobrania: 1`;
+4. pomyslny odczyt z `body = []` i zachowanie licznika oraz kolejnego uruchomienia;
+5. syntetyczny dzien przekraczajacy limit 50 z pozostawieniem wlasciwego rekordu i komunikatu przyczyny;
+6. pozne linie po timeoutcie i po zwolnieniu blokady, z kontrola `gagged`;
+7. pozne linie po reconnectcie, z kontrola widocznosci w glownym oknie;
+8. pozna odpowiedz starej sesji docierajaca podczas nowej sesji mailbox albo pagera;
+9. linie o klasie innej niz `mail` podczas operacji;
+10. blad trwalego zapisu i odtworzenie stanu po restarcie;
+11. zachowanie ETA po duzym opoznieniu i powrocie do aktywnego okna.
+
+### 16.9. Wymagana diagnostyka przed implementacja
+
+Do rozstrzygniecia konkretnego zdarzenia wystarczy zanonimizowany zapis techniczny bez tresci listow, nazw postaci, nadawcow, odbiorcow i tematow. Powinien zawierac:
+
+- czas zdarzenia i czas wykonania timera wzgledem planowanego czasu;
+- kolejny identyfikator operacji, generacje polaczenia i etap;
+- jednorazowy pseudonim rekordu, bez danych listu;
+- rodzaj komendy bez argumentow i bez tresci odpowiedzi;
+- klase linii, stan blokady, modalu, sesji i decyzje o gagowaniu;
+- wynik `ok/error/missing`, kategorie bledu i licznik bledow z rzedu;
+- informacje o luce dnia i zakonczeniu skanu;
+- rozpoczecie i wynik trwalego zapisu;
+- dokladny tekst statusu Archiwum i koncowego podsumowania.
+
+Przed zmiana kodu nalezy odtworzyc na danych syntetycznych co najmniej:
+
+1. jeden blad przy pozostalych sukcesach, aby potwierdzic roznice miedzy paskiem przetworzenia a licznikiem sukcesow;
+2. dzien z 51 listami, w ktorym docelowy rekord znajduje sie poza dostepna strona;
+3. pozna odpowiedz po timeoutcie przed i po zwolnieniu blokady;
+4. pozna odpowiedz starej sesji w trakcie nowej;
+5. reconnect w kazdym etapie z kontrola zapisu, braku nakladania operacji i gagowania;
+6. pusta tablice tresci po technicznie zakonczonym odczycie;
+7. opoznione timery z pomiarem czasu kazdego etapu, bez zgadywania polityki przegladarki.
+
+### 16.10. Koncowe wnioski
+
+1. **Nie ma w ArkMailu celowego spowalniania po przelaczeniu okna.** Jest natomiast rozlegla zaleznosc od timerow. Korelacja z aktywnym oknem jest zgodna z mozliwym opoznianiem timerow przez srodowisko, ale wymaga pomiaru.
+2. **Wznawianie dziala jako ponowny wybor pustych rekordow, nie jako dokladnie jednokrotne wykonanie.** Sukcesy niepustych tresci sa zachowywane, bledy i anulowania zostawiaja kandydatow. Trwaly zapis ma osobna kolejke i osobne ryzyko.
+3. **Jeden rekord po pelnym pasku jest zgodny z pojedynczym bledem.** `failed` wchodzi w postep, ale nie daje tresci. Przy dniu z ponad 50 listami szczegolnie istotna jest potwierdzona sciezka luki re-kotwiczenia. Inne mozliwosci to przerwanie, pusta tablica tresci albo brak daty; po restarcie takze zapis trwaly.
+4. **Istnieje potwierdzona w kodzie sciezka widocznosci poznych odpowiedzi.** Gagowanie konczy sie przy zwolnieniu blokady, nie po wygasnieciu mozliwosci dostarczenia starej odpowiedzi. Konkretnego zdarzenia nie mozna przypisac tej sciezce bez czasow i klas linii.
+5. **Sam filtr widocznosci nie wystarczy.** Pozna linia moze trafic do nowej sesji przed decyzja o gagowaniu, poniewaz odpowiedzi nie sa powiazane z operacja. Ta kwestia wymaga osobnego testu i projektu poprawki.
+6. **Obecna diagnostyka jest niewystarczajaca do pewnego postmortem.** `fetchArchiveBody()` redukuje rozne wyjatki do jednego `error`. Przed implementacja trzeba zachowac kategorie i etap bledu oraz odtworzyc wymienione scenariusze na danych syntetycznych.
+
+Nie wykonano implementacji, zmiany wersji, wydania ani publikacji. Decyzja o zakresie poprawek wymaga osobnego zatwierdzenia po przedstawieniu planu opartego na powyzszych dowodach.
