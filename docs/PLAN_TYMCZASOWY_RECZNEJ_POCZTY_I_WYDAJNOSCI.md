@@ -1204,6 +1204,13 @@ Blad, brak daty, brak listu, reconnect, zmiana postaci lub przerwanie pozostawia
 
 Ponowna indeksacja listingu sama w sobie nie uzupelnia naglowkow. Zachowuje dopasowane rekordy, tresc i wczesniejszy komplet oraz nie tworzy duplikatow. Operacja obejmujaca pelny odczyt uzupelnia naglowki tylko dla rzeczywiscie odczytanych i zwalidowanych listow. Rekordow z trescia nie pobiera sie ponownie tylko dla migracji.
 
+Nalezy rozroznic cztery mechanizmy, ktore korzystaja z Archiwum, ale nie maja tego samego kontraktu:
+
+1. `indexAllBoxes()` jest operacja sieciowa. Pobiera listingi przez `mailbox.fetch()`; pelny przebieg moze przejsc wszystkie strony, a inkrementalny zatrzymuje sie na stronie w calosci znanej. Nie wolno opisywac calej indeksacji jako lokalnej przebudowy bazy.
+2. `restoreArchiveTail()` jest juz zaimplementowanym etapem lokalnym po zatrzymaniu inkrementalnym. Po restarcie dokleja starsze wiersze z Archiwum bez dodatkowych komend paginacji, zachowuje swieza pierwsza strone, rozdziela blizniacze rekordy i nie zmienia Archiwum. `tests/indexViewRestore.test.ts` potwierdza tez, ze anulowanie, niekompletny przebieg i zwykle odswiezenie nie uruchamiaja tego odtwarzania. Dodanie `headers` nie moze oslabic tych zabezpieczen; pseudo-wpisy nie moga otrzymywac zgadnietych naglowkow.
+3. `rebuildContacts()` oraz zapis i scalanie rekordow sa lokalnymi etapami, ale moga byc wywolywane w trakcie operacji sieciowej. Samo ich wykonanie nie wysyla komend; nie dowodzi to, ze otaczajaca operacja jest offline. Aktualizacje store wywoluja ponadto renderowanie aktywnej zakladki.
+4. Problem podobny do przygotowania eksportu ZIP wystepuje podczas renderowania Archiwum i nadal nie jest naprawiony. `archiveExportEntries(state.archive)` sortuje rekordy z trescia, tworzy nazwy oraz pelne TXT wszystkich eksportowalnych listow mimo braku polecenia eksportu. Kolejne aktualizacje podczas indeksacji moga wiec powtarzac ten koszt. Nie jest to jednak pelne generowanie ZIP: render nie wykonuje `TextEncoder`, `buildZip()` ani pobierania pliku i sam nie wysyla komend. Rozwiazaniem pozostaje punkt 1 sekcji 9: w widoku liczyc tylko dostepne i pomijane rekordy, a pelne dane eksportowe tworzyc wylacznie po poleceniu eksportu. Nie wymaga to migracji bazy ani zmiany indeksacji.
+
 Danych, ktorych stara wersja nie zapisala, nie da sie wiarygodnie odtworzyc bez oryginalnego listu na serwerze. Wtedy tresc zostaje, a nieznane naglowki pozostaja nieznane. Eksport takiego rekordu moze byc niekompletny i ma to byc widoczne w podsumowaniu.
 
 ### 16.20. Scalanie, storage i downgrade
@@ -1360,7 +1367,7 @@ Wszystkie dane sa syntetyczne. Zakazane sa prawdziwe nazwy postaci, nicki, temat
 
 90. Sama indeksacja listingu nie uzupelnia naglowkow.
 91. Pelny odczyt podczas pobierania uzupelnia tylko rzeczywiscie odczytane rekordy.
-92. Ponowna indeksacja zachowuje tresc, komplet i identyfikatory oraz nie tworzy duplikatow.
+92. Ponowna indeksacja zachowuje tresc, komplet i identyfikatory oraz nie tworzy duplikatow. Inkrementalny przebieg po restarcie odtwarza starsze wiersze z Archiwum bez dodatkowych komend paginacji i bez zmiany rekordow; anulowanie, wynik niekompletny i zwykle odswiezenie nie uruchamiaja tego odtwarzania.
 93. Rekordy z trescia nie sa pobierane ponownie tylko dla migracji.
 94. Listing bez naglowkow nie kasuje kompletu.
 95. Upsert bez pola nie kasuje kompletu.
@@ -1445,6 +1452,8 @@ Prace sa zakonczone dopiero po spelnieniu calego ponizszego zestawu:
 - pelne naglowki przezywaja zapis, restart, indeksacje, upsert i scalanie;
 - stare Archiwum dziala bez recznej migracji i masowego pobierania;
 - sama indeksacja nie jest przedstawiana jako uzupelnienie naglowkow;
+- lokalne odtwarzanie starszych wierszy po indeksacji inkrementalnej pozostaje bez dodatkowych komend i nie zmienia Archiwum;
+- render Archiwum nie przygotowuje pelnych TXT bez polecenia eksportu, a wlasciwy eksport nadal dziala lokalnie;
 - eksport jest pelny albo uczciwie raportuje historyczne braki;
 - zadne nieznane dane nie sa zgadywane;
 - kontakty, liczniki i filtry nie zmieniaja sie bez osobnej decyzji;
