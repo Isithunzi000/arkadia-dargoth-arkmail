@@ -1,24 +1,32 @@
-# Tymczasowa analiza recznej poczty i wydajnosci
+# Glowny tymczasowy plan analiz, poprawek i optymalizacji ArkMaila
 
 ## 1. Status i zakres
 
-Dokument zawiera wyniki analizy ArkMaila 1.30.5 dotyczacej:
+Dokument jest jedynym scalonym planem wszystkich dotychczasowych analiz, ustalen, poprawek i optymalizacji ArkMaila 1.30.5. Obejmuje:
 
-- sporadycznej odpowiedzi `Slucham?` po pierwszym recznym `r`;
-- mozliwej kolizji automatycznych operacji pocztowych z recznym pagerem gracza;
-- zgloszonej blokady klienta trwajacej okolo 7-8 sekund;
-- kosztow wydajnosciowych odswiezania, archiwum i interfejsu;
-- wariantu pozostawienia samego powiadomienia o nowej poczcie, bez automatycznego sprawdzania skrzynek.
+- sporadyczna odpowiedz `Slucham?` po pierwszym recznym `r`;
+- kolizje automatycznych operacji pocztowych z recznym pagerem gracza;
+- zgloszona blokade klienta trwajaca okolo 7-8 sekund;
+- koszty wydajnosciowe odswiezania, archiwum, eksportu, zapisu i interfejsu;
+- wariant pozostawienia samego powiadomienia o nowej poczcie, bez automatycznego sprawdzania skrzynek;
+- pola dat, date i czas w Archiwum oraz czytelnosc interfejsu;
+- pobieranie tresci, reconnecty, pozne odpowiedzi, indeksacje i trwaly zapis;
+- pelne naglowki, odpowiedzi, eksport, kontakty oraz obsluge starych Archiwow;
+- docelowe kontrakty, macierz testow, kolejnosc prac i kryteria zakonczenia.
 
-Podstawa analizy: kod z HEAD `0d15414308b8b17a10c19663dcadec844e8a3e91` oraz publiczny kod natywnego modulu poczty Dargotha z rewizji `13a6dce7ed9e55df3e53e9c3515b3ab7b9e8cedc`.
+Pierwotna podstawa analizy recznej poczty i wydajnosci: kod z HEAD `0d15414308b8b17a10c19663dcadec844e8a3e91` oraz publiczny kod natywnego modulu poczty Dargotha z rewizji `13a6dce7ed9e55df3e53e9c3515b3ab7b9e8cedc`. Pozostale podstawy historyczne sa wymienione w sekcjach 13.1 i 16.1.
 
-W ramach tej analizy nie zmieniono kodu produkcyjnego ani testow. Nie przeprowadzono profilowania dzialajacego klienta i nie odtworzono konkretnego zdarzenia na zanonimizowanym logu czasow. Dlatego dokument rozroznia:
+Aktualna kontrola calego scalonego dokumentu zostala wykonana na HEAD `fae0b99e1fbbc445354682e93d530cec9f3e5e72`. Potwierdzono zgodnosc lokalnej kopii 240 plikow spoza `releases/` z drzewem tego HEAD oraz ponownie sprawdzono wszystkie sciezki i mechanizmy kodu cytowane w planie. Szczegolowy zakres i granice tej kontroli opisuje sekcja 16.1.
+
+W ramach analiz nie zmieniono kodu produkcyjnego ani testow. Nie przeprowadzono profilowania dzialajacego klienta i nie odtworzono konkretnego zdarzenia na zanonimizowanym logu czasow. Dlatego dokument rozroznia:
 
 1. fakty potwierdzone bezposrednio w kodzie;
 2. mechanizmy zgodne ze zgloszonymi objawami;
-3. kwestie, ktorych nie mozna przypisac do konkretnego zdarzenia bez pomiarow.
+3. historyczne analizy i raportowane pomiary zewnetrzne;
+4. wymagania docelowe, ktore nie sa jeszcze zaimplementowane;
+5. kwestie, ktorych nie mozna przypisac do konkretnego zdarzenia bez pomiarow.
 
-Dokument jest tymczasowy. Po pelnym wdrozeniu zatwierdzonych poprawek i zakonczeniu testow nalezy go usunac jako zbedny.
+Dokument jest tymczasowy. Po pelnym wdrozeniu calego zatwierdzonego zakresu i zakonczeniu testow nalezy usunac go jako zbedny. Nie nalezy usuwac go po zaimplementowaniu tylko jednej sekcji.
 
 ## 2. Najwazniejsze wnioski
 
@@ -448,7 +456,7 @@ Ponizsze ustalenia uzupelniaja plan i rozstrzygaja kwestie omowione po pierwszym
 
 ### 13.1. Pola dat
 
-Szczegolowy zakres poprawki pozostaje zapisany w `docs/PLAN_TYMCZASOWY_POL_DAT.md`. Analiza zrodlowa objela ArkMaila 1.30.5 (`57b0bee3b7394098e46a91bc7b458eef499991b6`) i Dargotha (`13a6dce7ed9e55df3e53e9c3515b3ab7b9e8cedc`). Aktualne `src/arkmail/ui/styles.ts` i `src/arkmail/ui/render.ts` sa bajtowo identyczne z wersjami objetymi tamta analiza.
+Ta sekcja zawiera caly dawny osobny plan pol dat; nie wymaga zadnego uzupelniajacego dokumentu. Analiza zrodlowa objela ArkMaila 1.30.5 (`57b0bee3b7394098e46a91bc7b458eef499991b6`) i Dargotha (`13a6dce7ed9e55df3e53e9c3515b3ab7b9e8cedc`). Na aktualnym HEAD `fae0b99e1fbbc445354682e93d530cec9f3e5e72` pliki `src/arkmail/ui/styles.ts` i `src/arkmail/ui/render.ts` sa bajtowo identyczne z wersjami objetymi tamta analiza, a ich aktualne deklaracje i struktura pol zostaly ponownie sprawdzone.
 
 Problem dotyczy wylacznie czytelnosci natywnej ikony kalendarza, a nie braku pickera, filtrowania, parsowania ani zakresow dat. Zakres obejmuje dokladnie szesc pol `input type="date"`:
 
@@ -456,15 +464,26 @@ Problem dotyczy wylacznie czytelnosci natywnej ikony kalendarza, a nie braku pic
 2. Archiwum: `data-filter="odDaty"` i `data-filter="doDaty"`.
 3. Usuwanie: `data-deletion-filter="odDaty"` i `data-deletion-filter="doDaty"`.
 
-Aktualny kod potwierdza lokalne `color-scheme: light dark` dla pol List i Archiwum. Tlo pochodzi z motywu klienta, ale natywna ikona moze wybrac wariant wedlug schematu systemu lub przegladarki. W Usuwaniu nie ma lokalnego nadpisania i pole dziedziczy schemat klienta. Dokument zrodlowy raportuje kontrolowana probe w Chromium 151 dla obu przeciwstawnych kombinacji; w tej kontroli porownawczej nie powtarzano pomiaru wizualnego.
+Aktualny kod potwierdza lokalne `color-scheme: light dark` dla pol List i Archiwum. Tlo pochodzi z motywu klienta, ale natywna ikona moze wybrac wariant wedlug schematu systemu lub przegladarki. W Usuwaniu nie ma lokalnego nadpisania i pole dziedziczy schemat klienta.
+
+Zrodlowa analiza raportuje kontrolowana probe w Chromium 151 dla obu przeciwstawnych kombinacji motywu i systemu. Wedlug tego raportu pole nie jest wylaczone ani tylko do odczytu, a klikniecie obszaru ikony otwiera kalendarz takze wtedy, gdy ikona jest prawie niewidoczna. W tej kontroli porownawczej nie powtarzano pomiaru wizualnego, dlatego jest to dowod historyczny, a nie nowy pomiar na aktualnym HEAD.
+
+W analizowanych zrodlach ArkMaila i globalnych stylach Dargotha nie znaleziono:
+
+- ukrywania `::-webkit-calendar-picker-indicator`;
+- wylaczania `appearance` dla pol dat;
+- blokowania zdarzen na tych polach;
+- `pointer-events: none` na tych polach.
+
+Aktualne wyszukanie w `src/arkmail` potwierdza brak `showPicker`, `calendar-picker-indicator` i `appearance: none`. Wystepujace w `styles.ts` `pointer-events: none` dotyczy `.arkmail-ghost`, a nie pol dat.
 
 Decyzja projektowa:
 
 1. Usunac oba lokalne wymuszenia `color-scheme: light dark`.
 2. Dodac jedna wspolna regule dla wszystkich pol dat ArkMaila: `color-scheme: inherit`.
 3. Nie zmieniac `input type="date"`, recznego wpisywania, formatu `RRRR-MM-DD`, walidacji, komend serwera ani filtrowania Archiwum.
-4. Nie dodawac wlasnego kalendarza, nowych przyciskow ani wywolan `showPicker()`.
-5. Nie stosowac stalego `filter: invert(...)` ani innego recznego kolorowania ikony.
+4. Nie dodawac wlasnego kalendarza, nowych przyciskow ani wywolan `showPicker()`. Zgloszenie dotyczy wylacznie czytelnosci istniejacej ikony.
+5. Nie stosowac stalego `filter: invert(...)` ani innego recznego kolorowania ikony, poniewaz takie rozwiazanie znow ignorowaloby motyw.
 6. Nie zmieniac etykiet ani innych elementow interfejsu w tej poprawce.
 
 Dowody i bramki:
@@ -473,11 +492,11 @@ Dowody i bramki:
 2. Test struktury DOM potwierdza `type="date"` dla dwoch pol w kazdej z trzech zakladek. To zielona baza regresyjna, poniewaz struktura jest juz poprawna; nie wolno sztucznie psuc jej dla uzyskania RED.
 3. Test w prawdziwym Chromium sprawdza efektywny `getComputedStyle(input).colorScheme` dla wszystkich szesciu pol w czterech kombinacjach: ciemny motyw/jasny system, ciemny motyw/ciemny system, jasny motyw/jasny system i jasny motyw/ciemny system. Przed implementacja RED dotyczy sciezek, ktorych stare wymuszenie lamie kontrakt. Usuwanie jest kontrola regresyjna i nie musi byc RED.
 4. Dowod wizualny na prawdziwym kliencie obejmuje zrzuty przed i po zmianie w obu krytycznych kombinacjach. Ikona ma byc wyrazna bez recznego kolorowania. To dowod porownawczy, nie automatyczny test RED.
-5. Klikniecie ikony i wybor dnia nadal ustawiaja wartosc ISO. Samo otwarcie pickera nie wykrywa pierwotnego bledu i nie zastepuje kontroli obliczonego stylu ani dowodu wizualnego.
+5. Test zachowania potwierdza, ze klikniecie ikony i wybor dnia nadal ustawiaja wartosc ISO. Samo otwarcie pickera nie wykrywa pierwotnego bledu i nie zastepuje kontroli obliczonego stylu ani dowodu wizualnego.
 6. Istniejace testy filtrowania pozostaja niezmienione i potwierdzaja brak regresji logiki.
 7. Po lokalnym RED nowego kontraktu i GREEN po implementacji wykonac pelny wymagany zestaw jednostkowy, `typecheck`, build i macierz E2E zgodnie z zasadami bramek projektu.
 
-Poprawke mozna zamknac dopiero, gdy wszystkie szesc pol ma czytelna ikone w jasnym i ciemnym motywie niezaleznie od schematu systemu, natywny picker i reczne wpisywanie dzialaja bez zmian, a pelne testy sa zielone. Po wdrozeniu calego zakresu pol dat usunac `docs/PLAN_TYMCZASOWY_POL_DAT.md` i zaktualizowac to odwolanie w tym samym commicie zamykajacym. Glowny tymczasowy dokument pozostaje do czasu wdrozenia calego wlasnego zakresu.
+Poprawke mozna zamknac dopiero, gdy wszystkie szesc pol ma czytelna ikone w jasnym i ciemnym motywie niezaleznie od schematu systemu, natywny picker i reczne wpisywanie dzialaja bez zmian, a pelne testy sa zielone. Ta sekcja pozostaje w glownym planie do czasu wdrozenia calego zakresu dokumentu; glowny plan usuwa sie dopiero po zakonczeniu wszystkich planowanych prac i testow.
 
 ### 13.2. Rozpoznawanie zrodla komendy
 
@@ -632,10 +651,7 @@ Obecny `tests/playerMailMode.test.ts`, ktory oczekuje drugiego listingu po reczn
 
 Plan nie obejmuje podniesienia wersji, wydania ani publikacji w marketplace bez osobnego polecenia.
 
-Po pelnym wdrozeniu i zakonczeniu testow nalezy usunac oba tymczasowe dokumenty:
-
-- `docs/PLAN_TYMCZASOWY_POL_DAT.md`;
-- `docs/PLAN_TYMCZASOWY_RECZNEJ_POCZTY_I_WYDAJNOSCI.md`.
+Po pelnym wdrozeniu calego planu i zakonczeniu testow nalezy usunac jedyny pozostaly tymczasowy dokument: `docs/PLAN_TYMCZASOWY_RECZNEJ_POCZTY_I_WYDAJNOSCI.md`. Nie wolno usuwac go po zakonczeniu pojedynczego punktu ani osobnego etapu.
 
 ## 14. Pomoc gry: potwierdzenie `q` i `x` oraz pozostale komendy
 
@@ -807,7 +823,25 @@ Podstawa poszczegolnych ustalen:
 - analiza pobierania: HEAD `73d6a729aa870ea18ffa8fddd4bfbed6451c3a9e`, caly `src/arkmail`, sesje mailbox/pager, transport, blokada, storage, re-kotwiczenie, liczniki i testy;
 - analiza reply-all: HEAD `96fe5f334e33c3aa0f1f75dc5f90f66962305198`, przyciski, `LetterContent`, parser, compose, Archiwum, cache i testy;
 - analiza podobnych utrat i migracji: HEAD `a4f8cb62eb86253fd445aa9cd4d3b0d2c6862aab`, wszystkie 38 plikow `src/`, dokumentacja protokolu, eksport, kontakty, zapis i cykl zycia postaci;
-- scalenie: HEAD `e4504df53f3b457c770eaa5f1e7479d05ccdfda1`.
+- wczesniejsze scalenie: HEAD `e4504df53f3b457c770eaa5f1e7479d05ccdfda1`;
+- aktualna kontrola calego scalonego planu: HEAD `fae0b99e1fbbc445354682e93d530cec9f3e5e72`.
+
+Aktualna kontrola miala charakter statyczny. Drzewo API zawieralo 299 blobow i nie bylo obciete. Zweryfikowano rozmiar oraz Git blob SHA1 wszystkich 240 plikow spoza `releases/`: nie bylo brakow, plikow nadmiarowych ani rozbieznosci. Nie pobierano 59 historycznych archiwow ZIP z `releases/`, poniewaz nie sa potrzebne do sprawdzenia aktualnych twierdzen o kodzie; kontrola bajtow nie obejmuje tych 59 archiwow i nie wolno przedstawiac jej jako weryfikacji wszystkich 299 blobow.
+
+Ponownie sprawdzono wszystkie 12 sciezek kodu i testow cytowanych w planie oraz aktualna zawartosc mechanizmow im przypisanych. W szczegolnosci potwierdzono:
+
+1. kolizje recznego pagera z rozpoczeta seria `fetchBoxes()`, wyslanie `q` przez `MailboxSession` po prompcie pagera oraz parkowanie tylko przyszlych odswiezen przez `playerMailMode`;
+2. kolejkowanie komend w modalu, oznaczanie odtworzonego echa jako `own`, przekazywanie linii subskrybentom przed decyzja o gagowaniu oraz obecny predykat `lock.locked && !composeVisible`;
+3. `timeoutMs = 8000`, `idleMs = 400`, `PLAYER_MAIL_MODE_IDLE_MS = 180_000`, opoznione ponowienia 10/25 s, `PAGE_PACE_MS = 400` i `ANCHOR_RETRY_WAITS_MS = [2500, 4000, 4000]`;
+4. koszt `archiveExportEntries(state.archive)` podczas renderu, pelne `root.replaceChildren(...nodes)`, serializacje calego przekazanego Archiwum przez `JSON.stringify()` oraz zapis do IndexedDB tylko zmienionych rekordow;
+5. lokalny eksport ZIP, lokalne `restoreArchiveTail()` i `rebuildContacts()` oraz istniejace testy odtwarzania starszych wierszy bez dodatkowych komend;
+6. brak pelnych `headers` w `ArchiveLetter`, utrate oryginalnych odbiorcow w reply-all, rekonstrukcje naglowkow w podgladzie z cache i eksporcie oraz zachowanie tresci przez `upsertLetters()` przy pustym `body`;
+7. przebieg `runArchiveDownload()`, postep `done + failed + missing`, EMA dla ETA, przerwanie po trzech bledach z rzedu, brak automatycznego wznowienia po reconnectcie i redukcje bledu `fetchArchiveBody()` do samego `{ kind: "error" }`;
+8. przyjecie numeru listu z odpowiedzi przez `PagerSession` bez porownania z numerem zadanym, obsluge dnia 50+ bez podstawy do falszywego `missing` oraz `clamped` uruchamiajace lokalne odtwarzanie ogona;
+9. szesc pol dat, dwie deklaracje `color-scheme: light dark`, brak `.arkmail-arch-date`, obecny format wierszy Archiwum oraz brak obslugi zdarzen widocznosci i fokusu okna;
+10. obecny stary kontrakt w `tests/playerMailMode.test.ts`, oczekujacy drugiego listingu po wejsciu gracza, oraz luki testowe dotyczace reply-all, pelnych naglowkow i eksportu.
+
+Kontrola statyczna nie jest wynikiem testow. Nie uruchomiono testow jednostkowych, `typecheck`, builda ani E2E. Nie powtorzono raportowanej proby Chromium 151, nie wykonano profilowania przegladarki i nie zmierzono zachowania dzialajacego klienta. Historyczne HEAD-y powyzej pozostaja podstawa odpowiednich wczesniejszych analiz, a nie oznaczeniem aktualnego stanu repozytorium.
 
 Nie dostarczono zanonimizowanego logu czasow, pelnych komunikatow koncowych ani rejestru klas widocznych linii. Nie wykonano profilowania przegladarki. Dlatego raport rozroznia potwierdzone zachowanie kodu, mozliwe przebiegi zgodne z objawami i kwestie wymagajace pomiaru. Nie przypisujemy konkretnego zdarzenia przegladarce, sieci, serwerowi ani IndexedDB bez dowodu.
 
