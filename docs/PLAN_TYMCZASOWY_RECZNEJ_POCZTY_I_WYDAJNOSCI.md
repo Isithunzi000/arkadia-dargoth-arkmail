@@ -426,7 +426,7 @@ Temat bedzie zamkniety dopiero, gdy:
 
 1. reczna poczta ma bezwzgledny priorytet nad automatycznymi listingami;
 2. zadna sciezka ArkMaila nie zamyka pagera gracza w opisanej kolizji;
-3. `r` nie moze zostac przeniesione z zakonczonego pagera do zwyklego trybu gry;
+3. `r` ani inna komenda zalezna od trybu czytania nie moze zostac przeniesiona z zakonczonego pagera do zwyklego trybu gry;
 4. wszystkie sciezki `mailbox.fetch()` respektuja anulowanie i wznowienie;
 5. czesciowe odpowiedzi nie zmieniaja archiwum ani znacznikow kompletu;
 6. testy maja udokumentowane lokalne RED na starym kodzie i pelne GREEN po poprawce;
@@ -503,19 +503,24 @@ Czesciowy lub anulowany listing nie moze:
 
 Wynik operacji ma byc zwiazany z jej identyfikatorem lub generacja. Pozne odpowiedzi anulowanej operacji nie moga zmieniac stanu.
 
-### 13.5. Komendy podczas automatycznego odczytu
+### 13.5. Komendy zalezne od trybu czytania podczas automatycznego odczytu
 
-Dla `r` wpisanego podczas odczytu z okna ArkMaila:
+Zasada dla `r` jest czescia ogolniejszego wymagania dla wszystkich komend zaleznych od trybu czytania poczty. Pelna liste i klasyfikacje zawiera sekcja 14.
 
-1. Jesli wlasny pager nadal jest otwarty, ArkMail przerywa automatyczny odczyt, nie wysyla `q`, przekazuje pager uzytkownikowi i wykonuje `r` dokladnie raz w tym samym pagerze.
-2. Jesli pager zostal juz zamkniety, ArkMail nie wysyla `r` do zwyklego trybu gry i pokazuje komunikat o koniecznosci powtorzenia komendy w recznej poczcie.
-3. Odtworzone `listy` i `przeczytaj...` zachowuja zrodlo uzytkownika.
-4. Wlasne `q` ArkMaila nie jest mylone z recznym wyjsciem uzytkownika.
-5. Komendy niezalezne od pagera nie sa duplikowane i zachowuja kolejnosc.
+1. Przed kolejkowaniem lub odtworzeniem komendy trzeba okreslic, czy wymaga aktywnego trybu czytania, zamyka ten tryb, czy zostala jawnie oznaczona przez `!` jako komenda spoza trybu.
+2. Jesli wlasny pager nadal jest otwarty:
+   - `q` lub `x` uzytkownika wykonuje sie dokladnie raz jako zamkniecie na zadanie uzytkownika, konczy wlasna sesje i nie odtwarza komendy drugi raz;
+   - inna komenda zalezna od trybu czytania przerywa automatyczny odczyt bez pluginowego `q`, przekazuje pager uzytkownikowi i wykonuje sie dokladnie raz w tym samym pagerze;
+   - `!<komenda>` zachowuje znaczenie jawnego wykonania poza trybem czytania i nie jest traktowana jak zwykla komenda pagerowa.
+3. Jesli pager zostal juz zamkniety, zadna komenda zalezna od trybu czytania nie moze zostac odtworzona do zwyklego trybu gry. Dotyczy to m.in. `r`, `R`, pustego Entera, nawigacji, oznaczania i kasowania listow.
+4. `!<komenda>` moze zostac wykonana poza pagerem zgodnie z jej jawnym znaczeniem. Nie wolno usuwac prefiksu `!`, traktowac jej jako zwyklej komendy pagerowej ani odrzucac wylacznie z powodu zamkniecia pagera.
+5. Odtworzone `listy` i `przeczytaj...` zachowuja zrodlo uzytkownika.
+6. Wlasne `q` ArkMaila nie jest mylone z recznym wyjsciem uzytkownika.
+7. Komendy niezalezne od pagera nie sa duplikowane i zachowuja kolejnosc.
 
-Proponowany komunikat UI bez polskich diakrytykow:
+Proponowany ogolny komunikat UI bez polskich diakrytykow:
 
-> Nie wyslano r, poniewaz pager zostal juz zamkniety. Otworz poczte recznie i powtorz komende.
+> Nie wykonano komendy pocztowej, poniewaz tryb czytania poczty zostal juz zamkniety. Otworz poczte recznie i powtorz komende.
 
 ### 13.6. Niskokosztowa optymalizacja Archiwum
 
@@ -588,7 +593,9 @@ Testy obejmuja co najmniej:
 - zakonczenie recznej sesji i powrot zwyklego promptu;
 - rozlaczenie przed wznowieniem;
 - wszystkie sciezki `mailbox.fetch()`;
-- `r` przy otwartym i zamknietym pagerze;
+- parametrowane przypadki komend zaleznych od trybu czytania przy otwartym i zamknietym pagerze, w tym `r`, `R` i pusty Enter;
+- `q` i `x` z potwierdzonym oraz bez potwierdzonego zakonczenia pagera;
+- `!<komenda>` z zachowaniem prefiksu, pojedynczego wykonania i znaczenia spoza trybu czytania;
 - zrodlo odtwarzanych komend;
 - brak zmian archiwum po anulowaniu;
 - niezaleznosc i trwalosc obu ustawien;
@@ -605,24 +612,87 @@ Po pelnym wdrozeniu i zakonczeniu testow nalezy usunac oba tymczasowe dokumenty:
 - `docs/PLAN_TYMCZASOWY_POL_DAT.md`;
 - `docs/PLAN_TYMCZASOWY_RECZNEJ_POCZTY_I_WYDAJNOSCI.md`.
 
-## 14. Doprecyzowanie `q` i `x`
+## 14. Pomoc gry: potwierdzenie `q` i `x` oraz pozostale komendy
 
-Aktualny kod `src/arkmail/index.ts` zawiera warunek:
+Przekazany fragment pomocy gry wprost okresla:
 
-```ts
-/^(?:q|x)$/i.test(cmd.trim())
+```text
+x lub q           Wyjscie z trybu czytania poczty.
 ```
 
-Dlatego obecny ArkMail rozpoznaje zarowno `q`, jak i `x` jako komende konczaca `playerMailMode`.
+**Obie komendy sa zatem potwierdzonymi sposobami wyjscia z trybu czytania poczty.** Wczesniejsza niepewnosc dotyczaca `x` zostala usunieta. Obecny warunek `/^(?:q|x)$/i` jest zgodny z pomoca gry.
 
-**Sam obecnosc `x` w tym warunku nie dowodzi, ze Arkadia obsluguje `x` jako wyjscie z pagera.** W analizie nie potwierdzono takiej komendy w dokumentacji gry. `q` jest natomiast faktycznie uzywane przez `PagerSession` do zamykania wlasnego pagera.
+Nadal zachowujemy dodatkowe wymaganie potwierdzenia powrotu zwyklego promptu przed wznowieniem automatycznych listingow. Nie wynika ono juz z watpliwosci co do `x`, lecz z bezpieczenstwa: sama wyslana komenda nie dowodzi, ze gra zakonczyla przetwarzanie i ze kolejny listing nie trafi do wciaz aktywnej sesji.
 
-Zasada do implementacji:
+### 14.1. Komendy zalezne od aktywnego trybu czytania
 
-1. Nie przedstawiac `x` jako potwierdzonej komendy wyjscia z pagera.
-2. Wznowienie automatycznych listingow nie moze zalezec wylacznie od wpisania `q` lub `x`.
-3. Po komendzie kandydujacej do zamkniecia pagera trzeba dodatkowo potwierdzic zakonczenie sesji, w szczegolnosci powrot zwyklego promptu gry.
-4. Samo `x`, po ktorym pager nadal trwa albo nie ma potwierdzonego wyjscia, nie moze wylaczyc recznego trybu ani wznowic automatycznych listingow.
-5. Testy musza objac zarowno potwierdzone `q`, jak i przypadek `x` bez potwierdzonego wyjscia, aby nie powodowal przedwczesnego wznowienia.
+Pomoc gry pokazuje, ze problem nie dotyczy wylacznie `r`.
 
-Dzieki temu ewentualne pozostawienie `x` jako komendy kandydujacej nie pogorszy bezpieczenstwa: decyduje potwierdzone zakonczenie pagera, a nie sama litera komendy.
+Nawigacja i wyswietlanie:
+
+- `h [<kogo>]` i `H [<kogo>]`;
+- `.`;
+- `<num>`;
+- `<`;
+- `>` lub pusty Enter;
+- `?`.
+
+Odpowiedzi, tworzenie i przekazywanie listow:
+
+- `r [<num>]`;
+- `R [<num>]`;
+- `m`;
+- `f [<num>] <imie>` i `F [<num>] <imie>`;
+- `a <imie>`.
+
+Oznaczanie, kasowanie i notatki:
+
+- `d [<przedzial>]` i `u [<przedzial>]`;
+- `- [<przedzial>]` i `+ [<przedzial>]`;
+- `e`;
+- `n [<num>]`.
+
+Wyjscie:
+
+- `x` lub `q`.
+
+Wszystkie argumenty musza zostac zachowane dokladnie. Szczegolnie `r` i `R` moga wystapic z opcjonalnym numerem, a same wielkie i male litery maja rozne znaczenie.
+
+### 14.2. Jawne wykonanie poza trybem czytania
+
+Pomoc okresla rowniez:
+
+```text
+!<komenda>        Wykonanie <komendy> spoza trybu czytania poczty.
+```
+
+Moze to wystapic takze podczas pisania listu.
+
+Konsekwencje:
+
+1. `!<komenda>` jest osobna klasa i nie moze byc traktowana jak komenda wymagajaca pagera.
+2. Prefiks `!` musi zostac zachowany, a komenda wykonana dokladnie raz.
+3. Zamkniecie pagera samo w sobie nie uniemozliwia wykonania `!<komenda>`, poniewaz uzytkownik jawnie chcial wykonac ja poza trybem czytania.
+4. `!r` nie jest tym samym co pagerowe `r` i nie wolno laczyc tych przypadkow.
+5. Ta informacja nie dowodzi kolizji edytorow i nie uzasadnia samodzielnie przebudowy `EditorSession`. Wymagany jest natomiast test zachowania `!` w transporcie i kolejce.
+
+### 14.3. Pusty Enter
+
+Pusty Enter w trybie czytania oznacza wyswietlenie nastepnego listu. Nie jest wiec pusta, pozbawiona znaczenia operacja.
+
+Przed implementacja trzeba sprawdzic testem transportu, czy `commandHooks` dostarcza pusta komende Enter. Nie wolno zakladac, ze tak sie dzieje bez potwierdzenia.
+
+- Jesli transport dostarcza pusty Enter, objac go tymi samymi zasadami co `>`: przekazanie otwartego pagera albo zakaz odtworzenia po jego zamknieciu.
+- Jesli transport go nie dostarcza, udokumentowac ograniczenie przed implementacja i nie deklarowac obslugi, ktorej kod nie moze potwierdzic.
+
+### 14.4. Zakres nowych testow
+
+Oprocz wczesniejszej macierzy:
+
+1. Parametrycznie sprawdzic wszystkie klasy komend z pomocy, z reprezentatywnymi argumentami opcjonalnymi i syntetycznymi identyfikatorami.
+2. Dla kazdej komendy pagerowej sprawdzic przekazanie otwartego pagera i zakaz odtworzenia po jego zamknieciu.
+3. Sprawdzic rozroznienie `r`/`R`, wielkosci liter i zachowanie argumentow.
+4. Sprawdzic pusty Enter zgodnie z rzeczywistym zachowaniem transportu.
+5. Sprawdzic `q` i `x` zarowno z powrotem zwyklego promptu, jak i bez niego.
+6. Sprawdzic `!<komenda>` podczas czytania oraz zapisu, bez usuwania prefiksu i bez duplikacji.
+7. Nie uzywac prawdziwych identyfikatorow, tresci listow ani surowych logow w testach i dokumentacji.
