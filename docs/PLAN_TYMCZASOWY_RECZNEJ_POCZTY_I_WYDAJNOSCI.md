@@ -1296,3 +1296,174 @@ Nie sa potrzebne zmiany protokolu wysylki, automatyczne wysylanie odpowiedzi, no
 Zgloszenie jest potwierdzonym bledem ArkMaila. Dla odebranych `Odpowiedz wszystkim` pomija cale oryginalne `Do`, a testy obecnie utrwalaja ten bledny kontrakt. Dodatkowo Archiwum traci `Do` i `DW` przy zapisie oraz ponownym otwarciu z cache.
 
 Poprawka ma zapewnic pelny, edytowalny prefill dla wszystkich odbiorcow, z usunieciem aktualnej postaci i duplikatow, bez automatycznej wysylki oraz bez zgadywania przy starych lub niekompletnych danych.
+
+
+## 19. Analiza: podobne utraty naglowkow i aktualizacja istniejacych Archiwow
+
+### 19.1. Zakres i glowny wniosek
+
+Analize wykonano na HEAD `a4f8cb62eb86253fd445aa9cd4d3b0d2c6862aab`. Przeszukano wszystkie 38 plikow `src/`, dokumentacje protokolu i zasad oraz testy odpowiedzi, Archiwum, cache, eksportu, kontaktow, compose, zapisu i cyklu zycia postaci. Szczegolowo przesledzono wszystkie odczyty `from`, `to`, `cc` i `party`, zapis i odczyt rekordow, normalizacje, scalanie, kolejne listingi, eksport oraz restart. Nie zmieniono kodu i nie uruchamiano nowych testow.
+
+Podobny problem wystepuje w trzech powiazanych obszarach:
+
+1. `Odpowiedz wszystkim` pomija oryginalne `Do` dla odebranych, co opisano w sekcji 18.
+2. Podglad listu z Archiwum zastepuje pelne naglowki danymi z `party` i ustawia `cc: null`.
+3. Eksport Archiwum do TXT/ZIP samodzielnie powtarza te sama rekonstrukcje z `party`, tracac `DW` oraz czesc pozostalych naglowkow.
+
+Eksport pojedynczego listu po otwarciu z cache dziedziczy problem podgladu. Swiezy eksport z pelnego odczytu jest poprawny, poniewaz `letterTxt()` przenosi wszystkie przekazane pola.
+
+Nie jest potrzebna migracja struktury IndexedDB ani reczna akcja uzytkownikow po aktualizacji. Potrzebne jest natomiast dodatkowe pole w rekordzie JSON i leniwe uzupelnianie brakujacych naglowkow z serwera. Dawnych naglowkow, ktorych obecna wersja nie zapisala, nie mozna wiarygodnie odtworzyc z lokalnego `party`.
+
+### 19.2. Mapa potwierdzonych usterek
+
+| Obszar | Potwierdzone zachowanie | Skutek |
+|---|---|---|
+| Swiezy list, `Odpowiedz wszystkim` | Dla odebranych pomija cale `Do` | Odpowiedz trafia tylko do nadawcy i ewentualnego `DW` |
+| Podglad z cache | Odebrany dostaje `from = party`, puste `to` i `cc`; wyslany dostaje puste `from`, `to = party`, puste `cc` | Widok po restarcie lub ponownym otwarciu z Archiwum jest niekompletny |
+| Odpowiedzi z cache | Przyciski korzystaja z zastepczych pol podgladu | `Odpowiedz wszystkim` ponownie gubi odbiorcow; zwykla odpowiedz i cytowanie dziedzicza braki danych, choc ich kontrakt pojedynczego adresata ma zostac bez zmian |
+| Eksport pojedynczego listu | Uzywa aktualnego stanu podgladu | Po swiezym odczycie jest pelny, po otwarciu z cache jest niekompletny |
+| Eksport calego Archiwum | `archiveLetterTxt()` tworzy `Od` albo `Do` z `party` i nigdy nie przekazuje `cc` | Odebrany TXT pomija `Do` i `DW`; wyslany TXT pomija `Od` i `DW` |
+| Zapis pelnego odczytu | `fromOpenedLetter()` zapisuje `body`, ale nie zachowuje `from`, `to`, `cc` | Pozniejszy podglad i eksport nie maja juz dostepu do pelnych danych |
+
+Wyslany tylko na `DW` jest szczegolnym przypadkiem. Protokol dopuszcza puste `Do`. Po obecnym zapisie i odczyciu z cache nie ma juz wiarygodnego rozroznienia miedzy pustym `Do`, rzeczywistym `DW` i nieznanymi naglowkami. Nie wolno wowczas zgadywac adresata z samego kierunku skrzynki.
+
+### 19.3. Co nie jest przyczyna i czego nie nalezy zmieniac
+
+1. `letterTxt()` jest poprawnym rendererem: wypisuje `Od`, `Do` i `DW`, gdy otrzyma pelne dane. Bledem jest wejscie zbudowane przez `archiveLetterTxt()` albo podglad z cache, a nie sam format TXT.
+2. Handler wysylki nie usuwa odbiorcow przygotowanych przez poprawny prefill. Rozwija jedynie lokalna grupe, wykonuje advisory i przekazuje wartosci pol do edytora. Nie nalezy dodawac pozniejszej normalizacji recznego wpisu.
+3. Zwykle `Odpowiedz` i `Odpowiedz z cytowaniem` maja zachowac kontrakt pojedynczego adresata. Nie nalezy zamieniac ich w `Odpowiedz wszystkim`.
+4. Wiersz Archiwum pokazuje `party` z listingu i nie musi stac sie pelnym podgladem naglowkow.
+5. Eksport i import JSON ksiazki adresowej nie zawieraja listow. Nie sa sciezka migracji Archiwum i pozostaja poza ta zmiana.
+6. Nie nalezy wlaczac automatycznej wysylki ani ponawiac wysylki w zwiazku z uzupelnianiem naglowkow.
+
+### 19.4. Kontakty i filtry: ograniczenia, ale nie ten sam potwierdzony blad
+
+Obie funkcje filtrowania Archiwum korzystaja z `party`. Kontakty rowniez powstaja z `party`, a `splitParty()` zaklada jednowyrazowe nazwy zlozone wylacznie z liter. Taka sama nazwa wielowyrazowa jest odrzucana jako caly segment. Inna czesc kodu, `splitRecipients()`, potrafi juz rozpoznawac znane nazwy wielowyrazowe i aliasy.
+
+To jest potwierdzone ograniczenie parsera kontaktow. Nie ma jednak w zebranych materialach dowodu, jak czesto serwerowy listing umieszcza w `party` nazwe wielowyrazowa lub alias zamiast rozstrzygnietych osob. Dlatego nie nalezy deklarowac konkretnej skali bledu ani przepisywac kontaktow bez odpowiedniego przypadku testowego.
+
+Pelne naglowki `DW` rowniez nie zasilaja obecnie kontaktow ani filtrow. Nie wiadomo z samego kodu, czy kazdy taki odbiorca jest juz uwzgledniony w `party` listingu. Zmiana licznikow i wynikow filtrowania po dodaniu `headers` bylaby wiec osobna decyzja produktowa, a nie nieskomplikowana naprawa reply-all.
+
+Rekomendacja dla poprawki naglowkow: `party`, kontakty, liczniki i filtry pozostaja niezmienione. Osobny przypadek testowy powinien rozstrzygnac nazwy wielowyrazowe i obecnosc odbiorcow `DW` w listingu, zanim zmieni sie semantyke kontaktow.
+
+### 19.5. Obecny format zapisu i rodzaj potrzebnej migracji
+
+Sterownik IndexedDB ma wersje 2. Kazdy list jest osobnym rekordem w store `letters`, identyfikowanym przez `[character, letter.id]`, a jego zawartosc jest zserializowanym JSON. `WriteThroughStorage` zapisuje caly obiekt danego listu i porownuje wartosci, dzieki czemu zmiana jednego rekordu nie wymaga przepisywania calego Archiwum.
+
+`normalizeArchive()` zachowuje nieznane pola przez spread. Dopasowanie kolejnej strony listingu zwraca istniejacy rekord zamiast zastepowac go nowym rekordem bez tresci. `upsertLetters()` rowniez zachowuje poprzednie pola, gdy przychodzacy obiekt ich nie zawiera. Te wlasnosci pozwalaja dodac naglowki bez zmiany schematu bazy.
+
+Nalezy rozroznic trzy dzialania:
+
+1. **Migracja struktury IndexedDB: niepotrzebna.** Bez nowego store, indeksu, klucza i podniesienia `DATABASE_VERSION`.
+2. **Rozszerzenie rekordu JSON: potrzebne.** Opcjonalny `headers` z kompletem `from`, `to`, `cc`, zapisywany wylacznie z poprawnie sparsowanego i zaakceptowanego `LetterContent`.
+3. **Uzupelnienie danych historycznych: leniwe, per rekord.** Nie jest to jednorazowa migracja calej bazy i nie wymaga masowego ruchu sieciowego.
+
+Nie jest potrzebny osobny numer wersji rekordu ani znacznik wykonanej migracji. Obecnosc poprawnego `headers` oznacza znany komplet; jego brak oznacza dane historyczne lub rekord tylko z listingu. Nie wolno traktowac pustego `to` albo `cc: null` jako dowodu, ze rekord jest stary.
+
+### 19.6. Zasada nieznanego nie jest pustym
+
+Komplet `headers` musi byc atomowy: wszystkie trzy pola pochodza z tego samego zaakceptowanego odczytu listu. Puste `to` i `cc: null` sa prawidlowymi wartosciami, gdy rzeczywiscie wystapily w pagerze. Natomiast brak calego `headers` oznacza, ze plugin nie zna pelnych naglowkow.
+
+W konsekwencji:
+
+- nie wolno tworzyc `headers` z `party`;
+- nie wolno przepisywac aktualnej nazwy postaci jako historycznego nadawcy;
+- nie wolno laczyc `from` z jednego rekordu z `to` lub `cc` z innego;
+- nie wolno uzupelniac brakow przez podobny list, blizniaka albo replike w innej skrzynce;
+- nie wolno przedstawiac nieznanego `Do` lub `DW` jako pustego pola;
+- nie wolno kasowac istniejacej tresci z powodu braku naglowkow.
+
+### 19.7. Macierz aktualizacji istniejacych rekordow
+
+| Stan rekordu po aktualizacji | Zachowanie docelowe |
+|---|---|
+| Bez tresci i bez `headers` | Zwykle otwarcie korzysta z istniejacej sciezki serwerowej; udany odczyt zapisuje jednoczesnie tresc i komplet naglowkow |
+| Z trescia, bez `headers` | Tresc nadal otwiera sie z cache, takze offline, bez automatycznej komendy; starych naglowkow nie zgadujemy |
+| Z trescia i poprawnym `headers` | Podglad, odpowiedzi i eksport korzystaja z kompletu bez komend |
+| Rekord tylko z listingu | Pozostaje bez `headers` do pierwszego pelnego odczytu; listing nie tworzy pozornego kompletu |
+| Bez prawidlowej daty | Brak slepych komend; automatyczne odzyskanie moze byc niemozliwe, ale tresc i pozostale dane zostaja |
+| List nieobecny na serwerze | Nie ma lokalnej rekonstrukcji; niepowodzenie uzupelnienia nie moze samo w sobie kasowac zachowanej tresci |
+| Blizniacze rekordy | Kazdy rekord uzupelnia sie przez wlasne `archiveId`; naglowkow nie kopiuje sie miedzy blizniakami |
+| Replika w innej skrzynce | Nie zmienia `id`, wlasciwosci rekordu ani innej repliki; brak przenoszenia naglowkow jako osobnej migracji |
+| Zmiana postaci w trakcie odczytu | Operacja jest odrzucana dla nowej postaci; zadne dane i prefill nie przechodza miedzy postaciami |
+| Blad trwalego zapisu | Nie wolno raportowac trwalego uzupelnienia; test zamkniecia i ponownego otwarcia sprawdza rzeczywisty stan |
+
+Istniejaca, recznie uruchamiana operacja pobierania tresci po wdrozeniu sekcji 17 rowniez zapisze naglowki dla listow, ktore rzeczywiscie odczyta. Nie nalezy jednak uruchamiac jej ponownie dla rekordow, ktore juz maja tresc, tylko po to, aby wykonac migracje.
+
+### 19.8. Leniwe odzyskanie naglowkow dla reply-all
+
+Dla starego rekordu z trescia i bez `headers` rekomendowane jest jedno kontrolowane pobranie dopiero po wybraniu `Odpowiedz wszystkim`. Zwykly podglad z cache pozostaje natychmiastowy i nie zmienia dotychczasowej zasady zero komend.
+
+Przebieg:
+
+1. Sprawdzic, czy rekord nadal jest tym samym rekordem i czy nie zmienila sie postac lub generacja polaczenia.
+2. Odnalezc wlasciwy wpis przez istniejaca kotwice i `archiveId`.
+3. Wykonac jeden odczyt pagera w ramach blokady sesji, z jasnym stanem zajetosci i bez automatycznej serii ponowien.
+4. Zaakceptowac dopiero odpowiedz zwiazana z zadanym listem, zgodnie z zabezpieczeniami z sekcji 17.
+5. Zapisac komplet naglowkow atomowo w tym samym rekordzie.
+6. Dopiero z zapisanego, pelnego `LetterContent` zbudowac edytowalny prefill.
+
+Blad, brak daty, brak listu, przelaczenie postaci albo przerwanie operacji nie moze utworzyc niepelnego prefillu. Dotychczasowa zawartosc compose zostaje nietknieta, nic nie jest wysylane, a uzytkownik dostaje konkretny komunikat. Nie wolno w takiej sytuacji wracac po cichu do samego nadawcy.
+
+Nowe rekordy oraz rekordy juz uzupelnione nie potrzebuja tej komendy. Zwykle `Odpowiedz` i cytowanie nie powinny powodowac dodatkowego pobierania tylko w celu zachowania ich obecnego kontraktu; nadal jednak nie moga przedstawiac nieznanych danych jako pewnych.
+
+### 19.9. Podglad i eksport rekordow historycznych
+
+Po dodaniu `headers` podglad i `archiveLetterTxt()` powinny uzywac kompletu jako jednej migawki. Fallback z `party` moze sluzyc wylacznie do pokazania pol rzeczywiscie zapisanych w starym listingu, a nie do tworzenia pelnego kompletu.
+
+Eksport zbiorczy powinien pozostac operacja lokalna, bez automatycznego pobierania setek listow. Dla starego rekordu nie ma uczciwego sposobu na wygenerowanie pelnego historycznego TXT bez ponownego odczytu serwera. Rekomendowane zachowanie:
+
+1. Rekord z `headers`: eksport pelny.
+2. Rekord bez `headers`: eksport tylko wiarygodnych danych z listingu i tresci, bez zgadnietych pol.
+3. Podsumowanie eksportu wskazuje liczbe rekordow z niepelnymi historycznymi naglowkami, zamiast sugerowac, ze wszystkie pliki zawieraja komplet.
+4. Brak naglowkow nie blokuje eksportu pozostalych rekordow i nie kasuje danych.
+5. Pozniejsze udane uzupelnienie rekordu powoduje, ze kolejny eksport jest juz pelny.
+
+Nie nalezy dopisywac do tresci listu technicznych ostrzezen ani zmieniac historycznej korespondencji. Informacja o ograniczeniu nalezy do podsumowania operacji eksportu.
+
+### 19.10. Niezmienniki scalania i zapisu
+
+Implementacja po osobnym poleceniu musi zapewnic:
+
+1. `fromMailboxEntry()` nigdy nie tworzy `headers`.
+2. `fromOpenedLetter()` zapisuje komplet z tego samego `LetterContent` i pod tym samym `archiveId`.
+3. Kolejny listing bez naglowkow nie usuwa wczesniej zapisanego kompletu.
+4. `upsertLetters()` nie kasuje kompletu przez rekord, w ktorym pole jest nieobecne; nowy, zaakceptowany komplet moze natomiast zastapic stary jako jedna migawka.
+5. `normalizeArchive()` zachowuje poprawne `headers`, a niepoprawny ksztalt traktuje jako brak danych zamiast zgadywac.
+6. `mergeArchiveDuplicates()` nie wybiera pustego lub niekompletnego wariantu kosztem kompletu i nie sklada naglowkow z roznych duplikatow.
+7. Pozna lub niepowiazana odpowiedz pagera nie nadpisuje naglowkow innego rekordu.
+8. Zapis, odczyt, normalizacja i restart zachowuja dokladnie puste `to` oraz `cc: null`.
+9. Zmiana naglowkow nie zmienia `id`, `party`, `contentKeyOf()`, kolejnosci, kontaktow ani filtrow.
+10. Dodanie pola nie zmienia wersji IndexedDB ani kluczy rekordow.
+
+Starsza wersja pluginu nadal bedzie ignorowac nowe pole i zachowywac stary blad. Brak podniesienia wersji bazy unika technicznej blokady otwarcia bazy, ale nie nalezy bez testow deklarowac pelnej zgodnosci przy downgrade, zwlaszcza dla scalania duplikatow.
+
+### 19.11. Wymagane testy przed implementacja
+
+Kazda nowa asercja ma najpierw zaliczyc lokalny dowod, ze pada na starym kodzie. Test i implementacja trafia do jednego commita, a przed commitem caly zestaw projektu ma przechodzic. Nie nalezy pokazywac czerwieni na CI.
+
+Zakres testow:
+
+1. Odebrany z pelnymi `Do` i `DW`: podglad z cache i TXT zachowuja wszystkie pola.
+2. Wyslany z pelnymi `Do` i `DW`: podglad i TXT zachowuja takze `Od`.
+3. Wyslany tylko na `DW`: puste `Do` pozostaje puste, a odbiorcy nie znikaja.
+4. Eksport pojedynczy po restarcie jest identyczny z eksportem po swiezym odczycie.
+5. Eksport calego Archiwum korzysta z `headers`, a nie rekonstruuje ich z `party`.
+6. Stary rekord bez `headers` zachowuje tresc i nie dostaje zgadnietych naglowkow.
+7. Reply-all na starym rekordzie wykonuje co najwyzej jeden kontrolowany odczyt i dopiero potem tworzy pelny prefill.
+8. Blad tego odczytu pozostawia compose bez zmian, nie wysyla nic i nie wpisuje samego nadawcy.
+9. Rekord z naglowkami otwiera sie i odpowiada bez komend.
+10. Restart IndexedDB zachowuje `headers`, a stara baza w wersji 2 otwiera sie bez migracji schematu.
+11. Listing i upsert bez nowego pola nie kasuja zapisanego kompletu.
+12. Normalizacja i scalanie duplikatow zachowuja komplet atomowo i deterministycznie.
+13. Blizniak uzupelnia wylacznie wlasny rekord.
+14. Zmiana postaci lub generacji odrzuca pozny wynik i nie zmienia cudzego Archiwum ani compose.
+15. Brak daty i brak listu na serwerze nie powoduja slepych komend ani kasowania zachowanej tresci.
+16. Kontakty, liczniki i filtry daja niezmienione wyniki dla dotychczasowych przypadkow.
+17. Podsumowanie eksportu poprawnie liczy historyczne rekordy bez pelnych naglowkow.
+
+### 19.12. Odpowiedz dla istniejacych uzytkownikow
+
+Aktualizacja ma byc przezroczysta: bez czyszczenia danych, bez ponownej indeksacji, bez recznej migracji i bez masowego pobierania poczty. Nowe odczyty automatycznie zachowaja wiecej danych. Stare rekordy pozostaja czytelne, a brakujace naglowki sa uzupelniane tylko przy naturalnym odczycie albo gdy uzytkownik zazada operacji wymagajacej pelnego kompletu.
+
+Nie da sie jednak przywrocic danych, ktorych stara wersja nigdy nie zapisala, bez dostepu do oryginalnego listu na serwerze. W takim przypadku plugin ma jasno zachowac niepewnosc zamiast zgadywac odbiorcow. To jest jedyna istotna granica migracji historycznych rekordow.
