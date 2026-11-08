@@ -575,7 +575,8 @@ Prace nalezy podzielic na osobne, spojne commity:
 3. wznowienie i pozostale sciezki listingow;
 4. komendy kolejkowane podczas automatycznego odczytu;
 5. optymalizacja eksportu przy renderowaniu;
-6. ustawienie automatycznego odswiezania wraz z tooltipami i komunikatem.
+6. ustawienie automatycznego odswiezania wraz z tooltipami i komunikatem;
+7. data i czas w Archiwum.
 
 Dla kazdej zmiany kodu:
 
@@ -601,7 +602,8 @@ Testy obejmuja co najmniej:
 - niezaleznosc i trwalosc obu ustawien;
 - brak zadan w tle po wylaczeniu automatycznego odswiezania;
 - dokladne teksty tooltipow i stalego komunikatu;
-- identycznosc eksportu TXT przed i po optymalizacji.
+- identycznosc eksportu TXT przed i po optymalizacji;
+- date i czas w kazdym wierszu Archiwum, zachowanie dotychczasowych metadanych oraz poprawne `brak daty` dla pustego `dateRaw`.
 
 Obecny `tests/playerMailMode.test.ts`, ktory oczekuje drugiego listingu po recznym wejsciu gracza, musi zostac przebudowany zgodnie z nowymi zasadami.
 
@@ -696,3 +698,64 @@ Oprocz wczesniejszej macierzy:
 5. Sprawdzic `q` i `x` zarowno z powrotem zwyklego promptu, jak i bez niego.
 6. Sprawdzic `!<komenda>` podczas czytania oraz zapisu, bez usuwania prefiksu i bez duplikacji.
 7. Nie uzywac prawdziwych identyfikatorow, tresci listow ani surowych logow w testach i dokumentacji.
+
+
+## 15. Data i czas w Archiwum
+
+### 15.1. Stan potwierdzony w kodzie
+
+W zakladce list kazdy wiersz ma osobny element `.arkmail-entry-date`, ktorego tekst pochodzi z `e.date.raw`. Sa to oryginalne dane z listingu, bez dodatkowej konwersji stref czasowych.
+
+W Archiwum wiersz `.arkmail-arch-entry` obecnie zawiera:
+
+- numer porzadkowy i temat w `.arkmail-arch-subject`;
+- kierunek, strone listu i skrzynke w `.arkmail-arch-meta`.
+
+Nie ma osobnego elementu z data i czasem.
+
+Rekord `ArchiveLetter` zawiera juz:
+
+- `dateRaw: string | null` z oryginalna data i czasem;
+- `sortKey` uzywany do sortowania.
+
+`fromMailboxEntry()` zapisuje `entry.date?.raw ?? null`. `fromOpenedLetter()` zapisuje date z otwartego listu. `normalizeArchive()` potrafi rowniez odzyskac `dateRaw` ze starszych zapisow na podstawie poprawnej daty na koncu osoby albo poprawnego `sortKey`.
+
+**Wniosek:** wyswietlenie daty i czasu nie wymaga nowych listingow, zmiany schematu danych, migracji IndexedDB ani dodatkowego parsowania przy kazdym renderze. Brakujacym elementem jest prezentacja w `render.ts`.
+
+### 15.2. Zakres zmiany
+
+1. Dodac do kazdego wiersza Archiwum osobny element `.arkmail-arch-date` za dotychczasowymi metadanymi.
+2. Wyswietlac pelne `dateRaw`, czyli te sama date i czas ktore zakladka list pokazuje przez `date.raw`.
+3. Zachowac bez zmian:
+   - numer porzadkowy;
+   - temat;
+   - kierunek `od/do`;
+   - strone listu;
+   - skrzynke;
+   - klikniecie otwierajace list;
+   - kolejnosc, filtrowanie i wyszukiwanie.
+4. Dla `dateRaw === null` lub wartosci pustej po usunieciu bialych znakow pokazac `brak daty` w wersji UI bez diakrytykow.
+5. Nie pokazywac sztucznego `0000-00-00 00:00:00` pochodzacego z pustego `sortKey` i nie zgadywac brakujacej daty.
+6. Nie zmieniac `dateRaw`, `sortKey`, identyfikatorow rekordow, eksportu ani danych w storage.
+7. Nie dodawac nowych odswiezen, komend pocztowych ani pelnych eksportow TXT w zwiazku z ta zmiana.
+
+### 15.3. Uklad i czytelnosc
+
+1. Data i czas maja byc osobnym tekstem, a nie dopiskiem utrudniajacym testowanie i responsywnosc `.arkmail-arch-meta`.
+2. Styl ma odpowiadac `.arkmail-entry-date`: tekst drugorzedny, czytelny w jasnym i ciemnym motywie, rozmiar zalezny od skali okna.
+3. Data i czas maja pozostac w calosci bez obcinania; na waskim oknie element ma przejsc do kolejnej linii zamiast zaslaniac temat albo metadane.
+4. Nie dodawac nowych przyciskow ani zagniezdzonych elementow interaktywnych w klikalnym wierszu.
+5. Nie zmieniac wygladu zakladki list.
+
+### 15.4. Testy i kryteria odbioru
+
+1. Nowy test w `tests/archiveRows.test.ts` ma na starym kodzie wykazac lokalne RED przez brak `.arkmail-arch-date`.
+2. Dla rekordu ze znana syntetyczna data test ma sprawdzic dokladny tekst `dateRaw`, w tym date i czas.
+3. Ten sam wiersz ma nadal zawierac numer, temat, kierunek, strone listu i skrzynke.
+4. Dla `dateRaw === null` i pustego `dateRaw` test ma sprawdzic `brak daty` oraz brak sztucznej daty zerowej.
+5. Testy maja potwierdzic niezmienione klikniecie wiersza, kolejnosc rekordow i wynik filtrowania.
+6. Test stylow ma sprawdzic brak obcinania daty i zawijanie na waskim oknie.
+7. Weryfikacja wizualna na danych syntetycznych ma objac jasny i ciemny motyw, szerokie i waskie okno oraz dlugi temat.
+8. Zrzuty i testy nie moga zawierac prawdziwych identyfikatorow, tresci listow ani danych z dostarczonych zrzutow.
+
+Kryterium odbioru: kazdy wiersz Archiwum pokazuje dotychczasowe informacje oraz date i czas z `dateRaw`, a rekord bez daty ma czytelne `brak daty`. Nie powstaja zadne nowe operacje pocztowe ani zmiany danych.
