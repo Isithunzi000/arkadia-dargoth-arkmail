@@ -440,3 +440,189 @@ Temat bedzie zamkniety dopiero, gdy:
 Kod potwierdza realna kolizje listingow z recznym pagerem oraz osobna sciezke opoznionego `r`. Potwierdza tez timeout 8000 ms i synchroniczne koszty interfejsu. Nie potwierdza natomiast, ze konkretne zgloszone zdarzenie bylo spowodowane wlasnie timeoutem albo konkretnym renderem.
 
 Do jednoznacznego przypisania konkretnego zdarzenia potrzebny bylby zanonimizowany log sekwencji komend i odpowiedzi wraz ze znacznikami czasu oraz profil dlugich zadan przegladarki. Bez takich danych najmocniejszy uczciwy wniosek brzmi: **mechanizm zgodny z objawami istnieje i wymaga naprawy, ale czas trwania oraz przyczyna jednej konkretnej blokady nie zostaly dowiedzione.**
+
+
+## 13. Doprecyzowany plan wdrozenia
+
+Ponizsze ustalenia uzupelniaja plan i rozstrzygaja kwestie omowione po pierwszym zapisie analizy. Nie oznaczaja rozpoczecia implementacji.
+
+### 13.1. Pola dat
+
+Zakres poprawki pol dat pozostaje zapisany osobno w `docs/PLAN_TYMCZASOWY_POL_DAT.md`:
+
+1. Usunac dwie lokalne deklaracje `color-scheme: light dark`.
+2. Dodac wspolne `color-scheme: inherit`.
+3. Pozostawic obecny natywny picker i sposob wpisywania dat.
+4. Nie dodawac wlasnego kalendarza, przyciskow ani `showPicker()`.
+5. Sprawdzic wszystkie pola dat w jasnym i ciemnym motywie.
+
+### 13.2. Rozpoznawanie zrodla komendy
+
+ArkMail nie moze rozpoznawac wlasciciela pagera wylacznie na podstawie jego promptu. Prompt moze pochodzic od gracza, wtyczki lub innego skryptu.
+
+Docelowo:
+
+1. Kazda komenda ma zachowac zrodlo: ArkMail, uzytkownik albo zrodlo zewnetrzne/nieznane.
+2. Komendy wyslane przez ArkMaila sa oznaczane wewnetrznie jako wlasne.
+3. Komendy przechwycone z wejscia uzytkownika zachowuja to zrodlo rowniez po kolejkowaniu i odtworzeniu.
+4. Techniczne `echo=true` i oznaczenie echa jako `own` nie moga zmienic komendy uzytkownika w komende wtyczki.
+5. Kazda komenda pocztowa spoza ArkMaila ma pierwszenstwo. Nie trzeba rozstrzygac, czy wpisal ja czlowiek, alias czy inny skrypt.
+6. Zewnetrzne `listy`, `przeczytaj...` lub inna rozpoznana komenda wejscia w poczte przerywa prace ArkMaila od razu, przed pojawieniem sie promptu pagera.
+7. Samo `r` nie sluzy do rozpoczecia wykrywania recznej poczty. Nalezy do juz rozpoznanej sesji albo do wlasnego pagera przekazywanego uzytkownikowi.
+8. Prompt pagera o nieznanym zrodle nie moze powodowac automatycznego `q`. ArkMail przerywa wlasna prace i czeka.
+9. Sprzatanie osieroconego pagera jest dopuszczalne tylko przy pozytywnym potwierdzeniu, ze ArkMail sam wczesniej otworzyl ten pager.
+
+### 13.3. Przerwanie i wznowienie listingow
+
+Po zewnetrznym wejsciu w poczte ArkMail ma:
+
+1. wlaczyc reczny tryb poczty;
+2. anulowac aktywny automatyczny `MailboxSession.fetch()`;
+3. zatrzymac wszystkie petle przed kolejna komenda skrzynki;
+4. anulowac opoznione ponowienia, w tym 10/25 s;
+5. nie wysylac `q`, nie ponawiac listingu i nie uruchamiac nowych timerow;
+6. nie przechwytywac ani nie opozniac komend gracza;
+7. wyczyscic stan `busy` bez pozornego bledu;
+8. zachowac niedokonczone automatyczne skrzynki w `pendingRefresh`, lacznie z biezaca niekompletna skrzynka;
+9. wznowic zaparkowane zadania dokladnie raz dopiero po potwierdzonym zakonczeniu recznej sesji;
+10. nie wznawiac zadan starej generacji po rozlaczeniu.
+
+Reczna operacja z UI przerwana wejsciem uzytkownika w poczte konczy sie jako anulowana i wymaga nowego polecenia. Nie wraca samoczynnie jako praca w tle.
+
+Zabezpieczenia obejmuja wszystkie sciezki `mailbox.fetch()`: automatyczne i reczne odswiezenia, indeksacje, `loadOlder()`, `loadAll()`, wyszukiwanie, ponowne ustalenie pozycji listu oraz listingi przed usunieciem.
+
+### 13.4. Spojnosc danych
+
+Czesciowy lub anulowany listing nie moze:
+
+- usuwac rekordow archiwum;
+- ustawiac znacznika pelnego pobrania;
+- przesuwac punktu kotwiczenia;
+- nadpisywac nowszego stanu;
+- powodowac koncowej przebudowy archiwum jak po udanej serii.
+
+Wynik operacji ma byc zwiazany z jej identyfikatorem lub generacja. Pozne odpowiedzi anulowanej operacji nie moga zmieniac stanu.
+
+### 13.5. Komendy podczas automatycznego odczytu
+
+Dla `r` wpisanego podczas odczytu z okna ArkMaila:
+
+1. Jesli wlasny pager nadal jest otwarty, ArkMail przerywa automatyczny odczyt, nie wysyla `q`, przekazuje pager uzytkownikowi i wykonuje `r` dokladnie raz w tym samym pagerze.
+2. Jesli pager zostal juz zamkniety, ArkMail nie wysyla `r` do zwyklego trybu gry i pokazuje komunikat o koniecznosci powtorzenia komendy w recznej poczcie.
+3. Odtworzone `listy` i `przeczytaj...` zachowuja zrodlo uzytkownika.
+4. Wlasne `q` ArkMaila nie jest mylone z recznym wyjsciem uzytkownika.
+5. Komendy niezalezne od pagera nie sa duplikowane i zachowuja kolejnosc.
+
+Proponowany komunikat UI bez polskich diakrytykow:
+
+> Nie wyslano r, poniewaz pager zostal juz zamkniety. Otworz poczte recznie i powtorz komende.
+
+### 13.6. Niskokosztowa optymalizacja Archiwum
+
+1. Przed zmiana wykonac pomiar na kilku syntetycznych archiwach o roznej liczbie listow i objetosci tresci.
+2. Usunac generowanie pelnych eksportow TXT podczas zwyklego renderowania Archiwum.
+3. Podczas renderu sprawdzac jedynie dostepnosc eksportu.
+4. Pelne TXT generowac dopiero po poleceniu eksportu.
+5. Testem potwierdzic identyczny wynik eksportu przed i po zmianie.
+6. Powtorzyc pomiar czasu renderu, najdluzszego zadania i liczby elementow DOM.
+7. Nie rozpoczynac wirtualizacji, stronicowania ani duzej przebudowy renderowania bez osobnej decyzji popartej pomiarami.
+
+### 13.7. Ustawienia i teksty UI
+
+Maja istniec dwa niezalezne ustawienia:
+
+1. **Powiadomienia o nowej poczcie** - steruja tylko komunikatem.
+2. **Automatyczne odswiezanie poczty** - steruja sprawdzaniem skrzynek w tle.
+
+Automatyczne odswiezanie jest domyslnie wlaczone, co zachowuje dotychczasowe dzialanie po aktualizacji. Ustawienie jest trwale i odtwarzane po ponownym uruchomieniu.
+
+Po wylaczeniu automatycznego odswiezania:
+
+- nowa poczta, GMCP, powrot zwierzecia i inne zdarzenia w tle nie uruchamiaja listingow;
+- nie powstaja opoznione ponowienia;
+- powiadomienia pozostaja niezalezne;
+- reczne Odswiez, indeksacja i wyszukiwanie dzialaja normalnie;
+- bezposrednie operacje uzytkownika moga wykonac swoje powiazane odswiezenie, ale nie uruchamiaja niezaleznych zadan w tle;
+- interfejs wyraznie informuje, ze archiwum, kontakty i liczniki moga byc nieaktualne.
+
+Teksty UI maja byc bez polskich diakrytykow.
+
+Tooltip **Powiadomienia o nowej poczcie**:
+
+> Pokazuje komunikat o nowej poczcie. To ustawienie nie wplywa na automatyczne odswiezanie skrzynek.
+
+Tooltip **Automatyczne odswiezanie poczty**:
+
+> Po nowej poczcie i innych zdarzeniach pocztowych ArkMail automatycznie sprawdza skrzynki oraz aktualizuje archiwum, kontakty i liczniki. Wylaczenie tej opcji zatrzymuje odswiezanie w tle, ale nie wylacza powiadomien. Dane moga byc nieaktualne do czasu recznego odswiezenia. Uzyj przycisku Odswiez, aby pobrac aktualne dane.
+
+Staly komunikat po wylaczeniu automatycznego odswiezania:
+
+> Automatyczne odswiezanie jest wylaczone. Archiwum, kontakty i liczniki moga byc nieaktualne. Uzyj przycisku Odswiez, aby pobrac aktualne dane.
+
+Tooltipy maja byc dostepne rowniez z klawiatury. Informacja o nieaktualnych danych nie moze byc dostepna wylacznie po najechaniu na ustawienie.
+
+### 13.8. Kolejnosc commitow i testow
+
+Prace nalezy podzielic na osobne, spojne commity:
+
+1. pola dat;
+2. zrodlo komend i przerwanie listingow;
+3. wznowienie i pozostale sciezki listingow;
+4. komendy kolejkowane podczas automatycznego odczytu;
+5. optymalizacja eksportu przy renderowaniu;
+6. ustawienie automatycznego odswiezania wraz z tooltipami i komunikatem.
+
+Dla kazdej zmiany kodu:
+
+1. Najpierw test przechodzi lokalnie na starym kodzie i wykazuje RED.
+2. Dowodu RED nie wykonuje sie przez CI.
+3. Dopiero potem powstaje implementacja.
+4. Przed commitem pelny odpowiedni zestaw testow, typowanie i pozostale kontrole przechodza lokalnie na zielono.
+5. Po pushu CI musi byc zielone przed zaleznym krokiem.
+
+Testy obejmuja co najmniej:
+
+- wejscie gracza przed, w trakcie i miedzy listingami;
+- pager przed naglowkiem listingu;
+- opoznione ponowienia;
+- zakonczenie recznej sesji i powrot zwyklego promptu;
+- rozlaczenie przed wznowieniem;
+- wszystkie sciezki `mailbox.fetch()`;
+- `r` przy otwartym i zamknietym pagerze;
+- zrodlo odtwarzanych komend;
+- brak zmian archiwum po anulowaniu;
+- niezaleznosc i trwalosc obu ustawien;
+- brak zadan w tle po wylaczeniu automatycznego odswiezania;
+- dokladne teksty tooltipow i stalego komunikatu;
+- identycznosc eksportu TXT przed i po optymalizacji.
+
+Obecny `tests/playerMailMode.test.ts`, ktory oczekuje drugiego listingu po recznym wejsciu gracza, musi zostac przebudowany zgodnie z nowymi zasadami.
+
+Plan nie obejmuje podniesienia wersji, wydania ani publikacji w marketplace bez osobnego polecenia.
+
+Po pelnym wdrozeniu i zakonczeniu testow nalezy usunac oba tymczasowe dokumenty:
+
+- `docs/PLAN_TYMCZASOWY_POL_DAT.md`;
+- `docs/PLAN_TYMCZASOWY_RECZNEJ_POCZTY_I_WYDAJNOSCI.md`.
+
+## 14. Doprecyzowanie `q` i `x`
+
+Aktualny kod `src/arkmail/index.ts` zawiera warunek:
+
+```ts
+/^(?:q|x)$/i.test(cmd.trim())
+```
+
+Dlatego obecny ArkMail rozpoznaje zarowno `q`, jak i `x` jako komende konczaca `playerMailMode`.
+
+**Sam obecnosc `x` w tym warunku nie dowodzi, ze Arkadia obsluguje `x` jako wyjscie z pagera.** W analizie nie potwierdzono takiej komendy w dokumentacji gry. `q` jest natomiast faktycznie uzywane przez `PagerSession` do zamykania wlasnego pagera.
+
+Zasada do implementacji:
+
+1. Nie przedstawiac `x` jako potwierdzonej komendy wyjscia z pagera.
+2. Wznowienie automatycznych listingow nie moze zalezec wylacznie od wpisania `q` lub `x`.
+3. Po komendzie kandydujacej do zamkniecia pagera trzeba dodatkowo potwierdzic zakonczenie sesji, w szczegolnosci powrot zwyklego promptu gry.
+4. Samo `x`, po ktorym pager nadal trwa albo nie ma potwierdzonego wyjscia, nie moze wylaczyc recznego trybu ani wznowic automatycznych listingow.
+5. Testy musza objac zarowno potwierdzone `q`, jak i przypadek `x` bez potwierdzonego wyjscia, aby nie powodowal przedwczesnego wznowienia.
+
+Dzieki temu ewentualne pozostawienie `x` jako komendy kandydujacej nie pogorszy bezpieczenstwa: decyduje potwierdzone zakonczenie pagera, a nie sama litera komendy.
