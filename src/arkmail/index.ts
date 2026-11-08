@@ -1390,6 +1390,7 @@ export async function init(api: PluginApi) {
                   collectedFreshIds,
                   scan.oldestSeenDay ?? "",
                 );
+                restoreArchiveTail(box);
               } else {
                 // Fala 41: kompletny przebieg = pelna prawda o skrzynce;
                 // archiwum skrzynki ZASTEPUJEMY zrzutem z widoku (glowa
@@ -1571,6 +1572,22 @@ export async function init(api: PluginApi) {
     // dokladnie w tym rekordzie.
     archiveId: letter.id,
   });
+
+  /**
+   * Po klamrze inkrementalnej widok ma swieza glowe, ale po restarcie
+   * nie ma juz starszych stron w RAM. Doklejamy brakujace rekordy z
+   * archiwum bez komend i bez nadpisywania kontekstu swiezej glowy.
+   */
+  const restoreArchiveTail = (box: MailBox): void => {
+    const entries = ui.state.archive
+      .filter((letter) => letter.box === box)
+      .sort((a, b) => {
+        if (a.sortKey !== b.sortKey) return a.sortKey < b.sortKey ? -1 : 1;
+        return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+      })
+      .map((letter) => archivePseudoEntry(letter, box));
+    ui.appendMailboxPage(box, entries, false);
+  };
 
   /**
    * Wynik doczytu tresci (Fala 17c): 'ok' = tresc pobrana; 'missing' =
