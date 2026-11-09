@@ -306,10 +306,10 @@ export const STYLES = `
 /* Fala 30a: Tresc pelna szerokosc, dzieki temu pola dat laduja para
    Od|Do w jednym rzedzie (lewo-prawo, jak czyta sie zakres). */
 .arkmail-search-row .arkmail-search-wide { grid-column: 1 / -1; }
-.arkmail-search-row input[type='date'] { color-scheme: light dark; }
 /* Pole daty z widoczna etykieta (placeholder na date nie dziala). */
 .arkmail-date-field { display: flex; flex-direction: column; gap: calc(2px * var(--window-font-scale, 1)); min-width: 0; }
 .arkmail-date-field input { width: 100%; box-sizing: border-box; }
+.arkmail-root input[type='date'] { color-scheme: inherit; }
 .arkmail-date-label { color: ${FG_DIM}; font-size: calc(11px * var(--window-font-scale, 1)); }
 .arkmail-dates-error { color: ${DANGER_TEXT}; font-size: calc(12px * var(--window-font-scale, 1)); margin-bottom: calc(6px * var(--window-font-scale, 1)); }
 .arkmail-search-banner {
@@ -701,7 +701,6 @@ export const STYLES = `
   width: auto;
   max-width: 100%;
 }
-.arkmail-arch-controls input[type='date'] { color-scheme: light dark; }
 .arkmail-contact-controls > .arkmail-ghost-wrap {
   flex: 1 1 calc(140px * var(--window-font-scale, 1));
   min-width: 0;

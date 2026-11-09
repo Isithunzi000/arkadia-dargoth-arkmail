@@ -452,7 +452,7 @@ Do jednoznacznego przypisania konkretnego zdarzenia potrzebny bylby zanonimizowa
 
 ## 13. Doprecyzowany plan wdrozenia
 
-Ponizsze ustalenia uzupelniaja plan i rozstrzygaja kwestie omowione po pierwszym zapisie analizy. Nie oznaczaja rozpoczecia implementacji.
+Ponizsze ustalenia uzupelniaja plan i rozstrzygaja kwestie omowione po pierwszym zapisie analizy. Status wykonania jest odnotowywany wylacznie przy etapach, ktore maja komplet wymaganych dowodow.
 
 ### 13.1. Pola dat
 
@@ -481,7 +481,7 @@ Decyzja projektowa:
 
 1. Usunac oba lokalne wymuszenia `color-scheme: light dark`.
 2. Dodac jedna wspolna regule dla wszystkich pol dat ArkMaila: `color-scheme: inherit`.
-3. Nie zmieniac `input type="date"`, recznego wpisywania, formatu `RRRR-MM-DD`, walidacji, komend serwera ani filtrowania Archiwum.
+3. Nie zmieniac `input type="date"`, recznego wpisywania, natywnego formatu wyswietlania daty ani technicznej wartosci ISO `RRRR-MM-DD`; bez zmian walidacji, komend serwera i filtrowania Archiwum.
 4. Nie dodawac wlasnego kalendarza, nowych przyciskow ani wywolan `showPicker()`. Zgloszenie dotyczy wylacznie czytelnosci istniejacej ikony.
 5. Nie stosowac stalego `filter: invert(...)` ani innego recznego kolorowania ikony, poniewaz takie rozwiazanie znow ignorowaloby motyw.
 6. Nie zmieniac etykiet ani innych elementow interfejsu w tej poprawce.
@@ -497,6 +497,8 @@ Dowody i bramki:
 7. Po lokalnym RED nowego kontraktu i GREEN po implementacji wykonac pelny wymagany zestaw jednostkowy, `typecheck`, build i macierz E2E zgodnie z zasadami bramek projektu.
 
 Poprawke mozna zamknac dopiero, gdy wszystkie szesc pol ma czytelna ikone w jasnym i ciemnym motywie niezaleznie od schematu systemu, natywny picker i reczne wpisywanie dzialaja bez zmian, a pelne testy sa zielone. Ta sekcja pozostaje w glownym planie do czasu wdrozenia calego zakresu dokumentu; glowny plan usuwa sie dopiero po zakonczeniu wszystkich planowanych prac i testow.
+
+Stan wykonania: WDROZONE. Nowy test najpierw wykazal lokalny RED na starym kodzie: dwie kontrole nie przeszly, a Chromium raportowalo `light dark` na czterech polach zamiast schematu klienta. Po usunieciu obu wymuszen i dodaniu wspolnego `color-scheme: inherit` obie kontrole przeszly, w tym szesc pol w czterech kombinacjach motywu klienta i schematu systemu. Pelny zestaw dal wynik 1035 testow: 1034 zaliczone, 1 pominiety i 0 niezaliczonych; niezalezna kontrola typow oraz build zakonczyly sie pomyslnie. Nie zmieniono typu pol, natywnego pickera, recznego wpisywania, technicznej wartosci ISO, filtrowania, parsowania, walidacji ani komend.
 
 ### 13.2. Rozpoznawanie zrodla komendy
 
@@ -1518,4 +1520,4 @@ Prace sa zakonczone dopiero po spelnieniu calego ponizszego zestawu:
 - tymczasowy dokument zostaje usuniety dopiero po pelnym wdrozeniu calego planowanego zakresu, nie po pojedynczej poprawce;
 - wlasny katalog roboczy zostaje usuniety po zakonczeniu.
 
-Do czasu wykonania tych krokow nie deklarujemy, ze implementacja jest zakonczona ani ze aktualizacja zostala juz zweryfikowana. Ta sekcja jest scalona analiza i planem; nie wykonano kodu produkcyjnego, testow, migracji danych, wersji, wydania ani publikacji.
+Do czasu wykonania tych krokow nie deklarujemy, ze cala implementacja jest zakonczona ani ze cala aktualizacja zostala juz zweryfikowana. Zakonczone etapy maja wlasne wpisy wykonania; pozostaly zakres nadal jest planem. Nie podniesiono wersji, nie utworzono wydania i nie wykonano publikacji.
