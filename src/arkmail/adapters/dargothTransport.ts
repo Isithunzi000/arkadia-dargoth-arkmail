@@ -80,6 +80,8 @@ export class DargothTransport implements Transport {
   private online = false;
   /** Fala 16j: kiedy tlumic linie pocztowe (index.ts: blokada sesji). */
   private gagWhen: (() => boolean) | null = null;
+  /** Niepotwierdzony koniec odpowiedzi: mail gagowany do promptu gry. */
+  private recovering = false;
 
   constructor(private readonly api: PluginApi) {}
 
@@ -108,10 +110,18 @@ export class DargothTransport implements Transport {
     source: CommandSource = 'arkmail',
   ): Promise<void> {
     if (!this.online) return Promise.reject(new Error('transport offline'));
+    if (source === 'arkmail' && this.recovering) {
+      return Promise.reject(new Error('operacja anulowana'));
+    }
     const generation = this.connectionGeneration;
     const task = this.commandQueue.then(async () => {
       if (!this.online || generation !== this.connectionGeneration) {
         throw new Error('transport offline: wysylka anulowana');
+      }
+      // Sprawdzenie takze w kolejce: timeout mogl nastapic po enqueue,
+      // zanim poprzednia komenda zakonczyla sie i zwolnila ten task.
+      if (source === 'arkmail' && this.recovering) {
+        throw new Error('operacja anulowana');
       }
       let echoEntry: PendingEcho | undefined;
       if (echo) {
@@ -163,8 +173,14 @@ export class DargothTransport implements Transport {
   }
 
   openSession(): SessionScope {
+    if (this.recovering) throw new Error('operacja anulowana');
     this.armTrigger();
     return this.sessions.openSession();
+  }
+
+  beginRecovery(): void {
+    this.recovering = true;
+    this.armTrigger();
   }
 
   subscribe(cb: (line: ProtoLine) => void): () => void {
@@ -244,6 +260,7 @@ export class DargothTransport implements Transport {
     this.online = online;
     if (online) return;
     this.connectionGeneration++;
+    if (this.sessions.hasActive) this.beginRecovery();
     this.sessions.reconnect();
     this.commandQueue = Promise.resolve();
     this.clearPendingEchoes();
@@ -268,6 +285,7 @@ export class DargothTransport implements Transport {
     this.sessions.closeAll();
     this.queue = [];
     this.clearPendingEchoes();
+    this.recovering = false;
     this.connectionGeneration++;
     this.commandQueue = Promise.resolve();
   }
@@ -284,6 +302,10 @@ export class DargothTransport implements Transport {
       // (Fala 8a, dowod: Triggers.ts TriggerCallback + newMail.ts).
       (line: AnsiAwareBuffer, _matches: RegExpMatchArray, type: string, originalLine?: string) => {
         const proto: ProtoLine = { text: originalLine ?? line.text, cls: type ?? '' };
+        // Zwykly prompt potwierdza koniec strumienia i zdejmuje odzyskiwanie.
+        if (this.recovering && (proto.cls === 'prompt' || isPromptLine(proto.text))) {
+          this.recovering = false;
+        }
         // Fala 42: echo wlasnej komendy (wysylka z echem) oznaczamy own
         // po dopasowaniu FIFO do zarejestrowanego tekstu - hook wejscia
         // w poczte gracza rozroznia wtedy gracza od pluginu takze pod
@@ -320,7 +342,7 @@ export class DargothTransport implements Transport {
         // Fala 16j: subskrybenci (parser) dostaja linie ZAWSZE; zwrot
         // null tlumi tylko wyswietlanie w glownym oknie gry, i to
         // wylacznie podczas operacji pluginowej (blokada sesji).
-        if (type === 'mail' && this.gagWhen?.()) return null;
+        if (type === 'mail' && (this.recovering || this.gagWhen?.())) return null;
         return line;
       },
       'arkmail',

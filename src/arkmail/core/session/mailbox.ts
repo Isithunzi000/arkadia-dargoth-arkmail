@@ -5,8 +5,8 @@
  *
  * Przenosnosc: zywy PluginApi daje triggerom SAM tekst linii (bez klas
  * gmcp_msgs), wiec koniec listingu wykrywamy tez po samej tresci:
- * echo komendy ("→ ..."), prompt ("> ") oraz idle-flush (bezpiecznik,
- * gdy prompt w ogole nie dojdzie do triggerow).
+ * echo komendy ("→ ...") oraz prompt ("> "). Cisza nie jest sukcesem:
+ * po jej uplywie sesja przechodzi w odzyskiwanie do zwyklego promptu.
  */
 
 import {
@@ -33,12 +33,12 @@ const MAIL_ERROR_RE = /^Data zostala podana w zlym formacie\./;
 
 /** Retry po komunikacie "Listy sa w tej chwili ladowane." (ms). */
 export const LISTS_LOADING_RETRY_MS = 2000;
-/** Domyslny idle-flush gdy opts.idleMs nie podano (ms). */
+/** Domyslny limit ciszy przed odrzuceniem operacji (ms). */
 export const DEFAULT_IDLE_FLUSH_MS = 600;
 
 export interface SessionOptions {
   timeoutMs: number;
-  /** Idle-flush po ciszy; bezpiecznik, gdy prompt nie dociera. */
+  /** Limit ciszy; po nim operacja jest odrzucana, nie zatwierdzana. */
   idleMs?: number;
   /** Rejestracja natychmiastowego anulowania przy zmianie polaczenia. */
   onCancel?: (cb: () => void) => () => void;
@@ -143,16 +143,18 @@ export class MailboxSession {
         resolve(r);
       };
 
-      /** Bezpiecznik: cisza po naglowku = koniec listingu. */
+      /** Cisza nie potwierdza konca odpowiedzi. Czekamy na prompt gry. */
       const armIdle = () => {
         if (idleTimer) clearTimeout(idleTimer);
         idleTimer = setTimeout(() => {
           if (done || !header) return;
-          finish({ kind: 'lista', header, entries });
+          this.transport.beginRecovery();
+          fail(new Error(`timeout: mailbox fetch ${box}`));
         }, idleMs);
       };
 
       const timer = setTimeout(() => {
+        this.transport.beginRecovery();
         cleanup();
         reject(new Error(`timeout: mailbox fetch ${box}`));
       }, this.opts.timeoutMs);

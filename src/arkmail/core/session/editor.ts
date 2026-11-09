@@ -42,6 +42,7 @@ export class EditorSession {
 
   send(input: ComposeInput): Promise<ComposeOutcome> {
     return new Promise((resolve, reject) => {
+      const session = this.transport.openSession();
       let stage: Stage = 'adresat';
       let done = false;
       let editorReady = false;
@@ -55,6 +56,7 @@ export class EditorSession {
         clearTimeout(timer);
         cancelUnsub();
         unsub();
+        session.close();
       };
       const finish = (r: ComposeOutcome) => {
         cleanup();
@@ -74,6 +76,7 @@ export class EditorSession {
       };
 
       const timer = setTimeout(() => {
+        this.transport.beginRecovery();
         cleanup();
         resolve({ result: 'blad', error: { kind: 'timeout' } });
       }, this.opts.timeoutMs);
@@ -103,7 +106,7 @@ export class EditorSession {
         if (!done) await sendLine('**');
       };
 
-      const unsub = this.transport.subscribe((line: ProtoLine) => {
+      const unsub = session.subscribe((line: ProtoLine) => {
         // Echo wlasnych komend: po klasie albo po samej tresci
         // (przenosnosc: zywy PluginApi nie daje klas gmcp_msgs).
         if (done || line.cls === 'command' || isEchoLine(line.text)) return;

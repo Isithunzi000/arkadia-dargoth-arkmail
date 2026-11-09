@@ -5,8 +5,8 @@
  * Wszystkie operacje pagerowe (delete/forward/read) dziela ten szkielet.
  *
  * Przenosnosc: koniec transakcji wykrywamy po klasie 'prompt' ALBO po
- * samej tresci ("> "), a gdy prompt w ogole nie dojdzie do triggerow -
- * idle-flush po wejsciu w stan 'closing'.
+ * samej tresci ("> "). Cisza moze pomoc wykryc niewidoczny prompt pagera
+ * i wyslac q, ale nigdy nie potwierdza zamkniecia transakcji.
  */
 
 import {
@@ -149,13 +149,15 @@ export class PagerSession {
         .sort((a, b) => a - b);
       const complete = requested.length > 0 && unexpectedNumbers.length === 0 &&
         requested.every((n) => deletedNumbers.includes(n));
-      const status: DeleteStatus = complete
-        ? 'complete'
-        : deletedNumbers.length > 0
-          ? 'partial'
-          : uncertain || selectionAccepted
-            ? 'unknown'
-            : 'none';
+      const status: DeleteStatus = uncertain
+        ? 'unknown'
+        : complete
+          ? 'complete'
+          : deletedNumbers.length > 0
+            ? 'partial'
+            : selectionAccepted
+              ? 'unknown'
+              : 'none';
       return { status, deleted: deletedNumbers.length > 0, deletedNumbers, selectedNumbers, unexpectedNumbers };
     };
     return this.run(
@@ -244,8 +246,8 @@ export class PagerSession {
    * Otwiera pager na liscie `numer`, wykonuje akcje, zamyka "q".
    * onPager: odpalane przy pierwszym pager prompt (wyslij akcje).
    * onLine: moze zwrocic 'close' -> wysylamy "q" przy najblizszym
-   * pager prompcie. Konczy sie na linii promptu (klasa albo tresc)
-   * albo idle-flush po "q".
+   * pager prompcie. Konczy sie wylacznie na zwyklym promptcie gry
+   * (klasa albo tresc); cisza po "q" odrzuca niepotwierdzony wynik.
    */
   private run<T>(
     numer: number,
@@ -316,20 +318,22 @@ export class PagerSession {
 
       /** Fala 17a: Przerwij w trakcie sesji (shouldAbort z zewnnatrz). */
       let aborted = false;
-      const finish = () => {
+      const finish = (confirmed = true) => {
         cleanup();
         if (aborted) {
           reject(new Error(`pager session list ${numer}: przerwano`));
           return;
         }
         if (ambiguous !== null) {
-          clearPagerOrphan();
+          if (confirmed) clearPagerOrphan();
+          else suspectPagerOrphan();
           reject(new AmbiguousResponseError(ambiguous));
           return;
         }
         // Fala 24g: czyste zamkniecie transakcji = komendy dochodza,
         // sieroty po nas nie ma - zdejmij podejrzenie straznika.
-        clearPagerOrphan();
+        if (confirmed) clearPagerOrphan();
+        else suspectPagerOrphan();
         resolve(build(letter, pager));
       };
 
@@ -352,11 +356,18 @@ export class PagerSession {
         reject(new Error(`pager session list ${numer}: przerwano`));
       };
 
-      /** Bezpiecznik: cisza po wyslaniu "q" = transakcja zakonczona. */
+      /** Cisza po q nie potwierdza zamkniecia. Sukces wymaga promptu gry. */
       const armIdle = () => {
         if (idleTimer) clearTimeout(idleTimer);
         idleTimer = setTimeout(() => {
-          if (!done && state === 'closing') finish();
+          if (done || state !== 'closing') return;
+          this.transport.beginRecovery();
+          suspectPagerOrphan();
+          if (aborted || ambiguous !== null) {
+            finish(false);
+            return;
+          }
+          fail(new Error(`timeout: pager session list ${numer}`));
         }, idleMs);
       };
 
@@ -417,6 +428,7 @@ export class PagerSession {
         // podejrzenie: przy najblizszym promptcie pagera poza sesja
         // domknie sierote (bez podejrzenia prompt = sesja gracza).
         if (state === 'closing') {
+          this.transport.beginRecovery();
           suspectPagerOrphan();
           cleanup();
           reject(new Error(`timeout: pager session list ${numer}`));
@@ -428,6 +440,7 @@ export class PagerSession {
         send('q');
         if (!done) {
           graceTimer = setTimeout(() => {
+            this.transport.beginRecovery();
             suspectPagerOrphan();
             cleanup();
             reject(new Error(`timeout: pager session list ${numer}`));

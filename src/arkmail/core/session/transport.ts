@@ -4,6 +4,8 @@
  * odtwarzajacy golden fixtures. Port WWW/Mudlet: wlasna implementacja.
  */
 
+import { isPromptLine } from './lines.js';
+
 export interface ProtoLine {
   cls: string;
   text: string;
@@ -61,6 +63,10 @@ export class SessionScopeRegistry {
   private nextId = 0;
   private generation = 0;
 
+  get hasActive(): boolean {
+    return this.sessions.size > 0;
+  }
+
   openSession(): SessionScope {
     const session = new RegisteredSession(
       ++this.nextId,
@@ -92,6 +98,8 @@ export interface Transport {
   send(line: string, echo?: boolean): void | Promise<void>;
   /** Otwiera rejestracje rozdzielajaca sesje i generacje polaczenia. */
   openSession(): SessionScope;
+  /** Pozostawia odpowiedzi mail gagowane do potwierdzonego promptu gry. */
+  beginRecovery(): void;
   /** Globalna subskrypcja linii; zwraca unsubscribe. */
   subscribe(cb: (line: ProtoLine) => void): () => void;
 }
@@ -102,18 +110,27 @@ export class MockTransport implements Transport {
   readonly sentEcho: boolean[] = [];
   private subs = new Set<(line: ProtoLine) => void>();
   private readonly sessions = new SessionScopeRegistry();
+  private recovering = false;
 
   send(line: string, echo = false): void {
+    if (this.recovering) throw new Error('operacja anulowana');
     this.sent.push(line);
     this.sentEcho.push(echo);
   }
 
   openSession(): SessionScope {
+    if (this.recovering) throw new Error('operacja anulowana');
     return this.sessions.openSession();
   }
 
+  beginRecovery(): void {
+    this.recovering = true;
+  }
+
   setOnline(online: boolean): void {
-    if (!online) this.sessions.reconnect();
+    if (online) return;
+    if (this.sessions.hasActive) this.beginRecovery();
+    this.sessions.reconnect();
   }
 
   subscribe(cb: (line: ProtoLine) => void): () => void {
@@ -124,6 +141,9 @@ export class MockTransport implements Transport {
   }
 
   emit(line: ProtoLine): void {
+    if (this.recovering && (line.cls === 'prompt' || isPromptLine(line.text))) {
+      this.recovering = false;
+    }
     for (const cb of [...this.subs]) cb(line);
     this.sessions.dispatch(line);
   }

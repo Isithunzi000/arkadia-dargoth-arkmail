@@ -401,15 +401,17 @@ test('przenosnosc: editor compose dziala bez klas', async () => {
   assert.equal(res.result, 'wyslany');
 });
 
-test('przenosnosc: pager konczy sie idle-flush gdy prompt nie dochodzi', async () => {
+test('przenosnosc: kasowanie bez promptu ma wynik niepotwierdzony', async () => {
   const t = new MockTransport();
   const s = new PagerSession(t, { timeoutMs: 500, idleMs: 40 });
-  const bezPromptu = fixture('kasowanie').filter((l) => !(l.cls === 'prompt'));
+  const bezPromptu = fixture('kasowanie').filter((l) => l.cls !== 'prompt' && l.text.trim() !== '>');
   const op = s.deleteLetters(1, '1');
   await t.replay(bezKlas(bezPromptu));
   const res = await op;
-  assert.equal(res.deleted, true);
+  assert.equal(res.status, 'unknown');
+  assert.equal(res.deleted, true, 'fizyczne potwierdzenie kasowania zostaje zachowane');
   assert.deepEqual(res.deletedNumbers, [1]);
+  await assert.rejects(s.deleteLetters(1, '1'), /operacja anulowana/);
 });
 
 test('mailbox: strona "Wybrane listy" (paginacja) zbiera wpisy', async () => {

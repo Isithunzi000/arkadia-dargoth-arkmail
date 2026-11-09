@@ -78,6 +78,8 @@ test('transport: sesje maja odrebne identyfikatory, a reconnect zamyka stara gen
   scoped.setOnline(false);
   scoped.setOnline(true);
   assert.equal(second.active, false, 'reconnect logicznie zamyka stara sesje');
+  assert.throws(() => open(), /operacja anulowana/);
+  await t.replay([{ cls: 'prompt', text: '> ' }]);
 
   const third = open();
   assert.ok(third.generation > second.generation, 'nowa sesja ma nowa generacje polaczenia');

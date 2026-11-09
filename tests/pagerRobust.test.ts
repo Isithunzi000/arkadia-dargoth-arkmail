@@ -50,15 +50,15 @@ const FRAMED_LETTER: ProtoLine[] = [
   { cls: 'mail', text: ' +--------------------------------------------------------------------+ ' },
 ];
 
-test('odczyt bez widocznego promptu pagera: idle-completion domyka sesje (q + resolve)', async () => {
+test('odczyt bez widocznego promptu pagera: q wymaga potwierdzenia zwyklym promptem', async () => {
   const t = new MockTransport();
   const s = new PagerSession(t, OPTS);
   const op = settle(s.readLetter(1));
   await t.replay(FRAMED_LETTER);
   // Prompt pagera nigdy nie dociera (linia bez \n trzymana przez klienta).
-  // Najpierw 3 proby advance (cisza = more-prompt moze czekac), dopiero
-  // potem dawne idle-completion domyka pager "q".
-  await sleep(650); // > 3x idleMs (advance) + idleMs (close)
+  // Po trzech probach advance plugin wysyla q, ale koniec transakcji
+  // potwierdza dopiero zwykly prompt gry.
+  for (let i = 0; i < 180 && !t.sent.includes('q'); i++) await sleep(5);
   assert.ok(
     t.sent.filter((c) => c === '').length >= 3,
     'przed domknieciem wyczerpane proby advance',
@@ -66,7 +66,7 @@ test('odczyt bez widocznego promptu pagera: idle-completion domyka sesje (q + re
   assert.ok(t.sent.includes('q'), 'po ciszy wyslano q mimo braku promptu pagera');
   await t.replay([{ cls: 'prompt', text: '> ' }]);
   const out = await op;
-  assert.ok(out.ok, 'odczyt rozwiazany mimo niedoszlego promptu');
+  assert.ok(out.ok, 'odczyt rozwiazany po zwyklym prompcie');
   if (!out.ok) return;
   assert.equal(out.value.letter.from, 'Gracz');
   assert.equal(out.value.letter.to, 'Waldo');
@@ -109,9 +109,10 @@ test('odczyt listu stronicowanego: cisza po stronie = advance, pelna tresc bez o
   await t.replay([
     ...page2,
     { cls: 'mail', text: '[1-1 adefFhHmnqrsRux.!?-+] (aktualny: 1) -- ' },
+    { cls: 'prompt', text: '> ' },
   ]);
   const out = await op;
-  assert.ok(out.ok, 'odczyt rozwiazany po przejsciu obu stron');
+  assert.ok(out.ok, 'odczyt rozwiazany po dwoch stronach i zwyklym prompcie');
   if (!out.ok) return;
   assert.equal(out.value.letter.body.length, 65, 'pelna tresc: obie strony w body');
   assert.ok(

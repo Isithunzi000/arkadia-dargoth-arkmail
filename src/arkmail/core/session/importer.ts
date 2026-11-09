@@ -1,10 +1,11 @@
 /**
  * ImportSession: transakcja odczytu ksiazki adresowej z gry.
- * Wysyla komende, zbiera linie do promptu/echa/ciszy i parsuje:
+ * Wysyla komende, zbiera linie do promptu lub echa i parsuje:
  *  - "zapamietani" / "przedstawieni" -> lista imion z jednej linii,
  *  - "aliasy pocztowe" -> blok naglowka (parseAliasesBlock).
  * Odpowiedzi to pojedyncze linie - bez pagera; koniec po promptzie
- * ("> "), echu komendy gracza albo ciszy (idle-flush jak w mailbox).
+ * ("> ") albo echu komendy gracza. Cisza odrzuca operacje i uruchamia
+ * odzyskiwanie do zwyklego promptu.
  */
 import {
   parseAliasesBlock,
@@ -17,7 +18,7 @@ import type { ProtoLine, Transport } from './transport.js';
 
 export interface ImportSessionOptions {
   timeoutMs: number;
-  /** Idle-flush po ciszy; bezpiecznik, gdy prompt nie dociera. */
+  /** Limit ciszy; po nim import jest odrzucany, nie zatwierdzany. */
   idleMs?: number;
   onCancel?: (cb: () => void) => () => void;
 }
@@ -37,6 +38,7 @@ export class ImportSession {
 
   private collect(command: string): Promise<string[]> {
     return new Promise<string[]>((resolve, reject) => {
+      const session = this.transport.openSession();
       const lines: string[] = [];
       let done = false;
       let cleaned = false;
@@ -48,6 +50,7 @@ export class ImportSession {
         if (idle !== undefined) clearTimeout(idle);
         unsubscribe();
         cancelUnsub?.();
+        session.close();
       };
       const finish = (): void => {
         if (done) return;
@@ -62,7 +65,7 @@ export class ImportSession {
         reject(err);
       };
 
-      const unsubscribe = this.transport.subscribe((line: ProtoLine) => {
+      const unsubscribe = session.subscribe((line: ProtoLine) => {
         if (done) return;
         const text = line.text;
         if (isPromptLine(text) || (isEchoLine(text) && !line.own)) {
@@ -73,11 +76,15 @@ export class ImportSession {
         lines.push(text);
         if (this.opts.idleMs !== undefined) {
           if (idle !== undefined) clearTimeout(idle);
-          idle = setTimeout(finish, this.opts.idleMs);
+          idle = setTimeout(() => {
+            this.transport.beginRecovery();
+            fail(new Error(`import ${command}: timeout`));
+          }, this.opts.idleMs);
         }
       });
       let idle: ReturnType<typeof setTimeout> | undefined;
       const timeout = setTimeout(() => {
+        this.transport.beginRecovery();
         fail(new Error(`import ${command}: timeout`));
       }, this.opts.timeoutMs);
       cancelUnsub = this.opts.onCancel?.(() => {

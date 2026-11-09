@@ -16,6 +16,8 @@ test('reconnect anuluje stary listing i wznawia odswiezenie po sygnale wznowieni
     // Fala 25: sam connect odpala tez na ekranie logowania, wiec
     // odswiezenie dopiero po faktycznym wznowieniu sesji w grze.
     f.fireEvent('proxy.session', { resumed: true, upstreamClosed: false });
+    // Nowa operacja czeka na potwierdzony, zwykly prompt po reconnectcie.
+    f.fire('> ', 'prompt');
 
     await waitFor(
       () => f.sent.filter((c) => c === 'listy odebrane').length > before,

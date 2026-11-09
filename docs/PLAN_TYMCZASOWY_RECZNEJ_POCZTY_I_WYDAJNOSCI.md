@@ -1542,6 +1542,20 @@ Stan wykonania: WDROZONE.
 
 Ustalony koniec odpowiedzi, pozne linie po zakonczeniu i bezpieczne wygaszenie gagowania pozostaja odrebnym zakresem kroku 3. Nie wykonano testu w prawdziwej grze. Nie zmieniono wersji, nie utworzono wydania i nie wykonano publikacji.
 
+#### Wynik kroku 3: potwierdzony koniec odpowiedzi i bezpieczne odzyskiwanie
+
+Stan wykonania: WDROZONE.
+
+- RED na starym kodzie: 6 testow, 0 zaliczonych i 6 niezaliczonych. Wykazaly konczenie mailbox, pagera i importu po samej ciszy, brak gagowania poznych linii, brak blokady nowej sesji oraz brak odzyskiwania po timeoutcie compose. Dodatkowy test komendy oczekujacej w kolejce transportu dal 1 niepowodzenie, a przypadek kasowania wykazal bledne nadpisanie stanu niepewnego przez `complete`.
+- GREEN po implementacji: 7/7 nowych testow odzyskiwania oraz 66/66 w koncowej powiazanej regresji adaptera, reconnectu, mailbox, pagera, compose i symulacji edge.
+- Timeout i reconnect z aktywna sesja uruchamiaja odzyskiwanie do zwyklego promptu. Pozne linie `mail` pozostaja gagowane takze po zwolnieniu blokady, klasy inne niz `mail` pozostaja widoczne, a nowa sesja lub komenda pluginu konczy sie jako przerwana zamiast zgadywac stan odpowiedzi.
+- Mailbox, pager i import nie traktuja ciszy jako sukcesu. Pager nadal moze wyslac `q` po wykryciu niewidocznego promptu pagera, ale zamkniecie transakcji wymaga zwyklego promptu gry. Editor i import uzywaja rejestrowanych sesji, wiec stara odpowiedz nie trafia do nowego compose ani importu.
+- Transport sprawdza odzyskiwanie rowniez przy pobieraniu komendy z kolejki, nie tylko przy jej dodawaniu. Niepotwierdzone kasowanie zachowuje fizyczne dowody usuniecia, ale ma wynik `unknown`, nie `complete`.
+- Pierwszy pelny zestaw mial 1077 testow, 1074 zaliczone, 2 niezaliczone i 1 pominiety. Jednym bledem bylo stare oczekiwanie nowej sesji bez promptu po reconnectcie; przypadek odtwarzania Archiwum przeszedl nastepnie bez zmian kodu w izolacji. Oba powiazane pliki osiagnely 10/10, a caly zestaw zostal powtorzony.
+- Koncowy pelny zestaw na Node 26: 1077 testow, 1076 zaliczonych, 0 niezaliczonych i 1 pominiety; kod wyjscia 0. Niezalezny `tsc --noEmit -p tsconfig.test.json` oraz build zakonczyly sie pomyslnie.
+
+Nie wykonano testu w prawdziwej grze. Nie zmieniono wersji, nie utworzono wydania i nie wykonano publikacji.
+
 Kroki 1-6 zabezpieczaja odczyt przed leniwym uzupelnianiem z kroku 10. Kroki 7-9 moga byc testowane na pelnych danych bez czekania na migracje historyczna, ale calosc nie jest zakonczona przed zamknieciem wszystkich krokow.
 
 Kazdy krok:

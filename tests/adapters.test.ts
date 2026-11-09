@@ -168,6 +168,8 @@ test('adapter: rejestracja sesji ma identyfikator i generacje, reconnect zamyka 
   t.setOnline(false);
   t.setOnline(true);
   assert.equal(second.active, false);
+  assert.throws(() => t.openSession(), /operacja anulowana/);
+  f.fireLine('> ', 'prompt');
 
   const third = t.openSession();
   assert.ok(third.generation > second.generation);

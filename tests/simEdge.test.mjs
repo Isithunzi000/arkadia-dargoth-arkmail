@@ -123,15 +123,26 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok('E5b humanize', humanizeMailError(err?.message ?? '') === 'Serwer nie odpowiedzial na czas - sprobuj ponownie.');
 }
 
-// --- E6: idle-flush: wpisy bez promptu -> domkniecie po idleMs ---------------
+// --- E6: wpisy bez promptu -> timeout i odzyskiwanie do promptu --------------
 {
   const t = new MockTransport();
   const mb = new MailboxSession(t, { timeoutMs: 3000, idleMs: 300 });
   const p = mb.fetch('odebrane');
-  await t.replay(load('listing-odebrane-male.json').slice(3, -1)); // bez promptu koncowego
-  const res = await p;
-  ok('E6 idle-flush zbiera wpisy', res.kind === 'lista' && res.entries.length === 3,
-    res.kind === 'lista' ? `entries=${res.entries.length}` : res.kind);
+  await t.replay(load('listing-odebrane-male.json').slice(3, 10)); // same wpisy, bez promptu
+  let err = null;
+  try { await p; } catch (e) { err = e; }
+  ok('E6 cisza nie konczy sukcesem', err !== null && /^timeout: mailbox fetch odebrane$/.test(err.message), err?.message);
+  let blocked = false;
+  try { await mb.fetch('odebrane'); } catch (e) { blocked = /operacja anulowana/.test(e.message); }
+  ok('E6b nowa operacja czeka na prompt', blocked);
+  t.emit({ cls: 'prompt', text: '> ' });
+  const next = mb.fetch('odebrane');
+  await t.replay([
+    { cls: 'mail', text: 'Nie masz zadnych otrzymanych listow.' },
+    { cls: 'prompt', text: '> ' },
+  ]);
+  const res = await next;
+  ok('E6c wznowienie po zwyklym prompcie', res.kind === 'pusta');
 }
 
 // --- E7: pager: zly numer listu ----------------------------------------------
@@ -155,8 +166,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const t = new MockTransport();
   const mb = new MailboxSession(t, OPTS);
   const p = mb.fetch('odebrane');
-  // E8 nie testuje idle-flushu (robi to E6). Synchroniczne ramki domykaja
-  // listing promptem przed obsluga zegarow, wiec opoznienie srodowiska nie
+  // E8 nie testuje odrzucenia po ciszy (robi to E6). Synchroniczne ramki
+  // domykaja listing promptem przed obsluga zegarow, wiec opoznienie srodowiska nie
   // moze zwrocic pustego, czesciowego wyniku przed odtworzeniem wpisow.
   for (const line of [
     { cls: 'command', text: '→ wesprzyj Arkadie' }, // echo recznej komendy gracza
