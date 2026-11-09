@@ -82,6 +82,26 @@ test('tryb poczty gracza parkuje odswiezenia, wyjscie "q" odpala drenaz (Fala 24
     // Wyjscie "q": zaparkowane odswiezenie + obowiazkowy refresh
     // inboxa (gracz mogl czytac/kasowac).
     f.fire('→ q');
+    f.fire('> ', 'prompt');
+    await answerEmpty(h, 'odebrane');
+    await answerEmpty(h, 'nieprzeczytane');
+    await waitIdle(h);
+  } finally {
+    await stopHarness();
+  }
+});
+
+test('wyjscie q czeka na zwykly prompt przed wznowieniem listingow', async () => {
+  answered.clear();
+  const h = await startHarness();
+  const { f } = h;
+  try {
+    f.fire('→ listy');
+    f.fire('→ q');
+    f.fire('[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ', 'mail');
+    await sleep(300);
+    assert.deepEqual(f.sent, [], 'echo q i prompt pagera nie wznawiaja komend pluginu');
+    f.fire('> ', 'prompt');
     await answerEmpty(h, 'odebrane');
     await answerEmpty(h, 'nieprzeczytane');
     await waitIdle(h);
@@ -115,6 +135,7 @@ test('komenda gracza przerywa aktywna serie listingow i zachowuje prace do wznow
     await sleep(300);
     assert.deepEqual(f.sent, ['listy odebrane'], 'nowe zdarzenie pozostaje zaparkowane');
     f.fire('→ q');
+    f.fire('> ', 'prompt');
     await answerNext('odebrane');
     await answerNext('nieprzeczytane');
     await waitIdle(h);
@@ -138,6 +159,7 @@ test('kasowanie w trybie poczty gracza parkuje, po wyjsciu drenaz 4 skrzynek (Fa
     assert.deepEqual(f.sent, [], 'kasowanie zaparkowane w trybie gracza');
     // Po wyjsciu drenaz obejmuje wszystkie 4 skrzynki.
     f.fire('→ q');
+    f.fire('> ', 'prompt');
     await answerEmpty(h, 'odebrane');
     await answerEmpty(h, 'nieprzeczytane');
     await answerEmpty(h, 'wyslane');

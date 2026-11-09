@@ -539,6 +539,8 @@ Reczna operacja z UI przerwana wejsciem uzytkownika w poczte konczy sie jako anu
 
 Zabezpieczenia obejmuja wszystkie sciezki `mailbox.fetch()`: automatyczne i reczne odswiezenia, indeksacje, `loadOlder()`, `loadAll()`, wyszukiwanie, ponowne ustalenie pozycji listu oraz listingi przed usunieciem.
 
+Stan wykonania: WDROZONE potwierdzenie zwyklego promptu po `q`/`x`. Nowy test najpierw wykazal lokalny RED na starym kodzie: 6 testow, 5 zaliczonych i 1 niezaliczony; po samym `→ q` wyslano `listy odebrane`, mimo oczekiwanego braku komend. Po implementacji oczekiwania na zwykly prompt i wzmocnieniu przypadku o posredni prompt pagera powiazany zestaw przeszedl 12/12. Pelna regresja zakonczyla sie kodem 0: 1038 testow, 1037 zaliczone, 1 pominiety i 0 niezaliczonych. Niezalezny typecheck i build zakonczyly sie pomyslnie.
+
 ### 13.4. Spojnosc danych
 
 Czesciowy lub anulowany listing nie moze:

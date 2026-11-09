@@ -20,7 +20,7 @@ import {
 } from "./meta";
 import type { MailBox, MailError } from "./core/protocol/types";
 import { parseNotification, extractPagerPrompt, parseMailDate } from "./core/protocol/parser";
-import { isEchoLine } from "./core/session/lines";
+import { isEchoLine, isPromptLine } from "./core/session/lines";
 import { clearPagerOrphan, isPagerOrphanSuspected } from "./core/session/orphanPager";
 import {
   olderListingCommand,
@@ -822,6 +822,7 @@ export async function init(api: PluginApi) {
   const onClientDisconnect = (): void => {
     cancelConnectionOperations();
     playerMailMode = false;
+    awaitingPlayerMailPrompt = false;
     clearPlayerMailModeTimer();
   };
   const onSystemLogin = (): void => {
@@ -858,6 +859,7 @@ export async function init(api: PluginApi) {
    * (mechanika Fali 17a/24g).
    */
   let playerMailMode = false;
+  let awaitingPlayerMailPrompt = false;
   const scheduleRefresh = (boxes: MailBox[]): void => {
     for (const b of boxes) pendingRefresh.add(b);
     // Fala 24f2: w recznym trybie poczty gracza zadna komenda pluginu
@@ -893,6 +895,7 @@ export async function init(api: PluginApi) {
   const exitPlayerMailMode = (): void => {
     if (!playerMailMode) return;
     playerMailMode = false;
+    awaitingPlayerMailPrompt = false;
     clearPlayerMailModeTimer();
     // Fala 24f2: po sesji gracza inbox na pewno wymaga weryfikacji
     // (mogl czytac/kasowac) + drenaz wszystkiego, co zaparkowane
@@ -908,10 +911,11 @@ export async function init(api: PluginApi) {
   };
   const enterPlayerMailMode = (): void => {
     if (playerMailMode) {
-      armPlayerMailModeIdle();
+      if (!awaitingPlayerMailPrompt) armPlayerMailModeIdle();
       return;
     }
     playerMailMode = true;
+    awaitingPlayerMailPrompt = false;
     armPlayerMailModeIdle();
     // Gracz przejmuje poczte natychmiast. Sesje same sprzataja
     // subskrypcje i timery; petle dostaja flage stop przed kolejna
@@ -2657,9 +2661,15 @@ export async function init(api: PluginApi) {
         // i trybu nie wlacza).
         if (!line.own) enterPlayerMailMode();
       } else if (playerMailMode && !line.own && /^(?:q|x)$/i.test(cmd.trim())) {
-        // Fala 24f2: q/x konczy reczny tryb poczty gracza.
-        exitPlayerMailMode();
+        // Samo echo q/x nie dowodzi, ze serwer zamknal pager. Wznowienie
+        // czeka na zwykly prompt gry; kolejny prompt pagera go nie zastepuje.
+        awaitingPlayerMailPrompt = true;
+        clearPlayerMailModeTimer();
       }
+      return;
+    }
+    if (awaitingPlayerMailPrompt) {
+      if (line.cls === "prompt" || isPromptLine(line.text)) exitPlayerMailMode();
       return;
     }
     if (!extractPagerPrompt(line.text)) return;

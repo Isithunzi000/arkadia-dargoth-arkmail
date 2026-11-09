@@ -223,6 +223,7 @@ test('archiwum: start pobierania odmowny, gdy gracz ma otwarta poczte w grze (Fa
     );
     // Gracz wychodzi z poczty: zaparkowane odswiezenie schodzi.
     f.fire('→ q');
+    f.fire('> ', 'prompt');
     await answerEmptyBox(h, 'odebrane');
     await answerEmptyBox(h, 'nieprzeczytane');
     await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji');
@@ -254,6 +255,7 @@ test('archiwum: wejscie gracza anuluje biezace pobieranie bez wznowienia', async
     // Wyjscie gracza odpala tylko zwykle, zaparkowane odswiezenie.
     // Odpowiedz listingiem zgodnym z archiwum.
     f.fire('→ q');
+    f.fire('> ', 'prompt');
     await answerListing3(h);
     await answerEmptyBox(h, 'nieprzeczytane');
     await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji');
