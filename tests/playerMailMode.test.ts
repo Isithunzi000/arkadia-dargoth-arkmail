@@ -90,31 +90,36 @@ test('tryb poczty gracza parkuje odswiezenia, wyjscie "q" odpala drenaz (Fala 24
   }
 });
 
-test('komenda gracza pod blokada sesji tez wlacza tryb poczty (Fala 42)', async () => {
+test('komenda gracza przerywa aktywna serie listingow i zachowuje prace do wznowienia', async () => {
   answered.clear();
   const h = await startHarness();
   const { f } = h;
+  const answerNext = async (box: MailBox): Promise<void> => {
+    const cmd = `listy ${box}`;
+    const before = f.sent.filter((c) => c === cmd).length;
+    await h.waitFor(() => f.sent.filter((c) => c === cmd).length > before, `wznowienie ${cmd}`);
+    f.fire(`Nie masz zadnych ${GENITIVE[box]} listow.`, 'mail');
+  };
   try {
-    // Powiadomienie startuje indeksacje - blokada sesji stoi.
     f.fire(' [ POCZTA ] Masz nowa poczte od Foo.', 'mail');
-    await h.waitFor(() => f.sent.includes('listy odebrane'), 'start indeksacji');
-    // Gracz otwiera poczte recznie W TRAKCIE naszej operacji.
+    await h.waitFor(() => f.sent.includes('listy odebrane'), 'start automatycznego odswiezenia');
     f.fire('→ listy');
     f.fire('Nie masz zadnych odebranych listow.', 'mail');
-    await h.waitFor(() => f.sent.includes('listy nieprzeczytane'), 'druga skrzynka indeksu');
-    f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
-    await waitIdle(h);
-    // W trybie gracza (wlaczonym pod blokada) kolejne powiadomienie
-    // NIE wysyla komend - odswiezenie parkuje do jego wyjscia.
-    const base = f.sent.length;
+    await sleep(300);
+    assert.deepEqual(
+      f.sent,
+      ['listy odebrane'],
+      'wejscie gracza zatrzymuje serie przed druga skrzynka i nie wysyla q',
+    );
     f.fire(' [ POCZTA ] Masz nowa poczte od Foo.', 'mail');
     await sleep(300);
-    assert.equal(f.sent.length, base, 'zero komend pluginu w trybie gracza');
-    // Wyjscie "q": zaparkowane odswiezenie + obowiazkowy refresh inboxa.
+    assert.deepEqual(f.sent, ['listy odebrane'], 'nowe zdarzenie pozostaje zaparkowane');
     f.fire('→ q');
-    await answerEmpty(h, 'odebrane');
-    await answerEmpty(h, 'nieprzeczytane');
+    await answerNext('odebrane');
+    await answerNext('nieprzeczytane');
     await waitIdle(h);
+    assert.equal(f.sent.filter((c) => c === 'listy odebrane').length, 2, 'jedno wznowienie biezacej skrzynki');
+    assert.equal(f.sent.filter((c) => c === 'listy nieprzeczytane').length, 1, 'jedno wznowienie kolejnej skrzynki');
   } finally {
     await stopHarness();
   }

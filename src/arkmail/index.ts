@@ -556,10 +556,35 @@ export async function init(api: PluginApi) {
    * Kontrakt sync: ui/store.ts syncMailboxPage, tests/syncMailbox.test.ts.
    */
   /** Wnetrze refreshBoxes: pobranie i zastosowanie listingow (pod lockiem). */
-  const fetchBoxes = async (boxes: MailBox[], mode: "sync" | "replace"): Promise<void> => {
-    for (const box of boxes) {
+  const fetchBoxes = async (
+    boxes: MailBox[],
+    mode: "sync" | "replace",
+    source: "auto" | "manual",
+  ): Promise<void> => {
+    for (let index = 0; index < boxes.length; index++) {
+      const box = boxes[index]!;
+      const parkRemaining = (): void => {
+        if (source !== "auto" || !playerMailMode) return;
+        for (const pending of boxes.slice(index)) pendingRefresh.add(pending);
+      };
+      if (playerMailMode) {
+        parkRemaining();
+        throw new Error("operacja anulowana");
+      }
       ui.setBusy(`Pobieram skrzynke ${box}...`);
-      const res = await mailbox.fetch(box);
+      let res: MailboxResult;
+      try {
+        res = await mailbox.fetch(box);
+      } catch (error: unknown) {
+        if (isOperationCancelled(error)) parkRemaining();
+        throw error;
+      }
+      // Wejscie gracza moze nastapic miedzy rozwiazaniem sesji a tym
+      // krokiem. Anulowanego wyniku nie wolno zastosowac do archiwum.
+      if (playerMailMode) {
+        parkRemaining();
+        throw new Error("operacja anulowana");
+      }
       // Fala 30b: granica dnia strony (najstarszy dzien swiezego
       // listingu) - przy UCIETYM listingu wpisy scisle nowsze, ktorych
       // strona nie raportuje, na pewno nie ma ich juz w skrzynce
@@ -671,9 +696,15 @@ export async function init(api: PluginApi) {
     if (ui.state.tab === "usuwanie") ui.resetDeletion();
     ui.clearSearchBoxes(boxes);
     const generation = connectionGeneration;
-    void runExclusive(() => fetchBoxes(boxes, mode))
+    let completed = false;
+    let cancelled = false;
+    void runExclusive(async () => {
+      await fetchBoxes(boxes, mode, source);
+      completed = true;
+    })
       .catch((err: unknown) => {
-        if (source === "manual" && !isOperationCancelled(err)) {
+        cancelled = isOperationCancelled(err);
+        if (source === "manual" && !cancelled) {
           notify(api, humanizeMailError(err instanceof Error ? err.message : String(err)), {
             title: "Blad odswiezania",
             level: "error",
@@ -683,7 +714,8 @@ export async function init(api: PluginApi) {
       .finally(() => {
         if (generation !== connectionGeneration) return;
         ui.setBusy(null);
-        finalizeArchiveChange();
+        if (completed) finalizeArchiveChange();
+        if (cancelled && source === "auto" && pendingRefresh.size > 0) scheduleRefresh([]);
       });
   };
 
@@ -834,17 +866,19 @@ export async function init(api: PluginApi) {
     if (drainScheduled) return;
     drainScheduled = true;
     const generation = connectionGeneration;
+    let completed = false;
     void runExclusive(async () => {
         const batch = [...pendingRefresh];
         pendingRefresh.clear();
         ui.clearSearchBoxes(batch);
-        await fetchBoxes(batch, "sync");
+        await fetchBoxes(batch, "sync", "auto");
+        completed = true;
       })
       .catch(() => {})
       .finally(() => {
         if (generation !== connectionGeneration) return;
         ui.setBusy(null);
-        finalizeArchiveChange();
+        if (completed) finalizeArchiveChange();
         drainScheduled = false;
         if (pendingRefresh.size > 0) scheduleRefresh([]);
       });
@@ -873,8 +907,27 @@ export async function init(api: PluginApi) {
     }, PLAYER_MAIL_MODE_IDLE_MS);
   };
   const enterPlayerMailMode = (): void => {
+    if (playerMailMode) {
+      armPlayerMailModeIdle();
+      return;
+    }
     playerMailMode = true;
     armPlayerMailModeIdle();
+    // Gracz przejmuje poczte natychmiast. Sesje same sprzataja
+    // subskrypcje i timery; petle dostaja flage stop przed kolejna
+    // komenda. Automatyczne listingi wracaja przez pendingRefresh,
+    // natomiast reczne operacje UI koncza sie bez wznowienia.
+    lock.cancelWaiting();
+    for (const cancel of [...cancelListeners]) cancel();
+    if (loadAllFlag) loadAllFlag.cancelled = true;
+    if (indexFlag) indexFlag.cancelled = true;
+    if (archiveDownloadFlag) archiveDownloadFlag.cancelled = true;
+    for (const timer of delayedInboxTimers) clearTimeout(timer);
+    delayedInboxTimers = [];
+    ui.setBusy(null);
+    ui.setLoadAll(null);
+    ui.setIndexRun(null);
+    ui.setArchiveDownload(null);
   };
 
   /** Fala 16a: retry refreshu odebranych po lagu serwera (szczegoly przy

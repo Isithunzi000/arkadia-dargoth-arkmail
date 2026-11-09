@@ -322,6 +322,10 @@ Czesciowy lub anulowany listing nie moze:
 
 Przetwarzanie wyniku powinno byc zwiazane z identyfikatorem operacji lub generacji, aby pozne odpowiedzi nie mogly zmienic stanu po anulowaniu.
 
+Stan wykonania: WDROZONE dla wspolnego mechanizmu 8.1-8.3. `DargothTransport` zachowuje zrodlo komendy uzytkownika przy technicznym echo, `MailboxSession` anuluje listing po prompcie pagera nieznanego pochodzenia bez `q`, retry, nowych timerow i oznaczania sieroty, a centralne wejscie gracza w poczte anuluje aktywne sesje, zatrzymuje petle, czysci opoznione odswiezenia i stan busy. `fetchBoxes()` nie stosuje wyniku po anulowaniu, automatyczne skrzynki wracaja przez `pendingRefresh` w jednej kolejce, a reczne pobieranie tresci konczy sie bez automatycznego wznowienia. Koncowa aktualizacja Archiwum po `fetchBoxes()` wykonuje sie wylacznie po sukcesie.
+
+Dowody: trzy nowe testy wykazaly najpierw lokalny RED na starym kodzie (`53` testy, `50` zaliczonych, `3` niezaliczone). Po implementacji i dostosowaniu czterech starych testow oczekujacych poprzedniego, niebezpiecznego kontraktu rozszerzony zestaw dal `70/70`. Koncowa pelna regresja: `1037` testow, `1036` zaliczonych, `1` pominiety, `0` niezaliczonych; niezalezna kontrola typow i build zakonczyly sie pomyslnie. Ten wpis nie zamyka specjalistycznych sciezek z 8.4, potwierdzenia zwyklego promptu przed wznowieniem ani kolejnych prac z planu.
+
 ### 8.4. Wszystkie sciezki listingow
 
 Te same zabezpieczenia musza obejmowac:

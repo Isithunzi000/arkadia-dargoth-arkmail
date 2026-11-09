@@ -24,7 +24,7 @@ import type {
   MailDate,
 } from '../protocol/types.js';
 import { isEchoLine, isPromptLine } from './lines.js';
-import { clearPagerOrphan, suspectPagerOrphan } from './orphanPager.js';
+import { clearPagerOrphan } from './orphanPager.js';
 import type { ProtoLine, Transport } from './transport.js';
 
 /** Linie-bledy serwera przerywajace transakcje (log 2026-10-17/18). */
@@ -106,12 +106,6 @@ export class MailboxSession {
        *  ladowane." (serwer nie zdazyl zbudowac listingu). */
       let loadRetried = false;
       let loadRetryTimer: ReturnType<typeof setTimeout> | null = null;
-      /** Fala 17a: jeden retry po sierocym pagerze (zgloszenie pkt 4).
-       *  Pager konsumuje nasza komende i odpowiada wlasnym promptem
-       *  "[1-50 ...] -- " - domykamy go "q" i po prompcie gry powtarzamy
-       *  komende. Powtorka promptu = pager przetrwal "q" - blad. */
-      let pagerRetried = false;
-      let awaitingPromptAfterQ = false;
       const idleMs = this.opts.idleMs ?? DEFAULT_IDLE_FLUSH_MS;
       let idleTimer: ReturnType<typeof setTimeout> | null = null;
       let cancelUnsub: () => void = () => {};
@@ -157,10 +151,6 @@ export class MailboxSession {
       };
 
       const timer = setTimeout(() => {
-        // Fala 24g: timeout w stanie awaitingPromptAfterQ = wyslalismy
-        // "q" do sieroty i nie doczekalismy sie potwierdzenia - pager
-        // moze trwac. Podejrzenie dla straznika.
-        if (awaitingPromptAfterQ) suspectPagerOrphan();
         cleanup();
         reject(new Error(`timeout: mailbox fetch ${box}`));
       }, this.opts.timeoutMs);
@@ -197,32 +187,10 @@ export class MailboxSession {
         if (!header) {
           // Echo wlasnej komendy: po klasie albo po samej tresci.
           if (line.cls === 'command' || isEchoLine(line.text)) return;
-          // Fala 17a: prompt gry po naszym "q" = sieroca domknieta;
-          // powtarzamy komende listingu (zobacz pagerRetried nizej).
-          if (awaitingPromptAfterQ) {
-            if (line.cls === 'prompt' || isPromptLine(line.text)) {
-              awaitingPromptAfterQ = false;
-              send(cmd);
-            }
-            return;
-          }
-          // Fala 17a: sierocy pager (po przerwanej petli / timeoutcie
-          // sesji) zjadl komende "listy" - odpowiada wlasnym promptem.
-          // extractPagerPrompt znajduje tez prompt sklejony z inna
-          // trescia w jednej linii (klient trzyma linie bez \n).
+          // Prompt pagera bez potwierdzonego zrodla moze nalezec do
+          // gracza. Listing przerywamy bez q, retry i oznaczania sieroty.
           if (extractPagerPrompt(line.text)) {
-            if (pagerRetried) {
-              // Fala 24g: sierota przetrwala pierwsze "q" i odpowiedziala
-              // kolejnym promptem - trwa nadal. Podejrzenie dla
-              // straznika (domknie ja przy kolejnym promptcie).
-              suspectPagerOrphan();
-              cleanup();
-              reject(new Error(`sierocy pager podczas fetch ${box}`));
-              return;
-            }
-            pagerRetried = true;
-            awaitingPromptAfterQ = true;
-            send('q');
+            fail(new Error('operacja anulowana'));
             return;
           }
           const empty = parseEmptyListing(line.text);

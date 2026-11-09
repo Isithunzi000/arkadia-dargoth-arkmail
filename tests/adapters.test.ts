@@ -288,6 +288,20 @@ test('adapter: modal-guard odtwarza komendy gracza z echem', async () => {
   ]);
 });
 
+test('adapter: echo odtworzonej komendy gracza zachowuje zrodlo uzytkownika', async () => {
+  const f = new FakeApi();
+  const t = armedTransport(f);
+  const seen: ProtoLine[] = [];
+  t.subscribe((line) => seen.push(line));
+  t.beginModal();
+  f.hookCb!('listy');
+  t.endModal();
+  await new Promise((r) => setImmediate(r));
+  f.fireLine('→ listy', 'info');
+  assert.equal(seen.length, 1);
+  assert.notEqual(seen[0]!.own, true, 'techniczne echo nie zmienia gracza w plugin');
+});
+
 test('adapter: modal-guard - poczatek/koniec idempotentne', () => {
   const f = new FakeApi();
   const t = new DargothTransport(f.api);

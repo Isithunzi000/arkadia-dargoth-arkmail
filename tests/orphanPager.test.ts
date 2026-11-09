@@ -45,26 +45,15 @@ test('timeout sesji pagerowej stawia podejrzenie sieroty', async () => {
   clearPagerOrphan();
 });
 
-test('sierocy pager przetrwaly q w fetchu stawia podejrzenie', async () => {
+test('pager nieznanego pochodzenia w fetchu nie stawia podejrzenia', async () => {
   clearPagerOrphan();
   const t = new MockTransport();
   const mailbox = new MailboxSession(t, { timeoutMs: 500, idleMs: 20 });
   const p = mailbox.fetch('odebrane');
-  const run = (async () => {
-    // Sierota zjada komende i odpowiada wlasnym promptem (17a)...
-    t.emit({ cls: 'mail', text: '[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 3) -- ' });
-    await new Promise((r) => setImmediate(r));
-    // ...nasze "q" zostalo potwierdzone promptem gry, komenda poszla
-    // ponownie...
-    t.emit({ cls: 'prompt', text: '> ' });
-    await new Promise((r) => setImmediate(r));
-    // ...ale pager przetrwal: zamiast listingu znowu jego prompt.
-    t.emit({ cls: 'mail', text: '[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 3) -- ' });
-  })();
-  await assert.rejects(p, /sierocy pager/, 'fetch odrzucony przez sierote');
-  await run;
-  assert.equal(isPagerOrphanSuspected(), true, 'przetrwala sierota stawia podejrzenie');
-  clearPagerOrphan();
+  t.emit({ cls: 'mail', text: '[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 3) -- ' });
+  await assert.rejects(p, /operacja anulowana/, 'fetch zostaje anulowany');
+  assert.ok(!t.sent.includes('q'), 'plugin nie wysyla q');
+  assert.equal(isPagerOrphanSuspected(), false, 'brak przypisania sieroty bez dowodu');
 });
 
 test('udany fetch zdejmuje podejrzenie', async () => {

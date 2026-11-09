@@ -67,14 +67,32 @@ test('mailbox: odrzucenie pierwszej komendy konczy fetch i sprzata zasoby', asyn
   assert.equal(cancellations, 0, 'rejestracja anulowania zdjeta');
 });
 
-test('mailbox: odrzucenie awaryjnego q konczy fetch i sprzata subskrypcje', async () => {
+test('mailbox: pager konczy fetch bez proby wyslania odrzucanego q', async () => {
   const t = new RejectingTransport((line) => line === 'q');
   const mailbox = new MailboxSession(t, { timeoutMs: 100, idleMs: 20 });
   const operation = mailbox.fetch('odebrane');
-  const rejected = assert.rejects(operation, /transport offline/);
+  const rejected = assert.rejects(operation, /operacja anulowana/);
   t.emit({ cls: 'mail', text: '[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ' });
   await rejected;
-  assert.equal(t.activeSubscriptions, 0, 'subskrypcja zdjeta po bledzie q');
+  assert.deepEqual(t.sent, ['listy odebrane'], 'q nie zostalo wyslane');
+  assert.equal(t.activeSubscriptions, 0, 'subskrypcja zdjeta');
+});
+
+test('mailbox: pager nieznanego pochodzenia anuluje bez q, retry i nowych timerow', async () => {
+  const t = new RejectingTransport(() => false);
+  const mailbox = new MailboxSession(t, { timeoutMs: 100, idleMs: 20 });
+  const operation = mailbox.fetch('odebrane');
+  const rejected = assert.rejects(operation, /operacja anulowana/);
+  t.emit({ cls: 'mail', text: '[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ' });
+  await rejected;
+  assert.deepEqual(t.sent, ['listy odebrane'], 'bez automatycznego q i ponowienia');
+  assert.equal(t.activeSubscriptions, 0, 'subskrypcja zdjeta');
+  const sent = [...t.sent];
+  await t.replay([
+    { cls: 'prompt', text: '> ' },
+    { cls: 'mail', text: 'Listy sa w tej chwili ladowane.' },
+  ]);
+  assert.deepEqual(t.sent, sent, 'pozne linie nie uruchamiaja zadnych komend');
 });
 
 test('pager: odrzucenie pierwszej komendy konczy odczyt i sprzata zasoby', async () => {

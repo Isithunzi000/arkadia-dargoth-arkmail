@@ -23,9 +23,12 @@ const MODAL_HOOK_PRIORITY = 100;
 const PENDING_ECHO_CAP = 10;
 const PENDING_ECHO_TTL_MS = 10_000;
 
+type CommandSource = 'arkmail' | 'user';
+
 interface PendingEcho {
   id: number;
   line: string;
+  source: CommandSource;
   timer: ReturnType<typeof setTimeout>;
 }
 
@@ -71,7 +74,11 @@ export class DargothTransport implements Transport {
   }
 
   /** Jedna komenda czeka na zakonczenie przetwarzania poprzedniej. */
-  private enqueue(line: string, echo: boolean | undefined): Promise<void> {
+  private enqueue(
+    line: string,
+    echo: boolean | undefined,
+    source: CommandSource = 'arkmail',
+  ): Promise<void> {
     if (!this.online) return Promise.reject(new Error('transport offline'));
     const generation = this.connectionGeneration;
     const task = this.commandQueue.then(async () => {
@@ -85,6 +92,7 @@ export class DargothTransport implements Transport {
         const entry: PendingEcho = {
           id: this.nextEchoId++,
           line,
+          source,
           timer: setTimeout(() => this.removePendingEcho(entry), PENDING_ECHO_TTL_MS),
         };
         (entry.timer as unknown as { unref?: () => void }).unref?.();
@@ -161,7 +169,7 @@ export class DargothTransport implements Transport {
     for (const command of pending) {
       // Fala 42: odtworzenie Z echem - to komenda gracza, wiec straznik
       // wejscia w poczte musi ja zobaczyc tak jak wpisana recznie.
-      void this.enqueue(command, true).catch(() => {});
+      void this.enqueue(command, true, 'user').catch(() => {});
     }
   }
 
@@ -219,8 +227,9 @@ export class DargothTransport implements Transport {
           if (echoed !== null) {
             const i = this.pendingEchoSends.findIndex((entry) => entry.line === echoed);
             if (i >= 0) {
-              this.removePendingEcho(this.pendingEchoSends[i]!);
-              proto.own = true;
+              const entry = this.pendingEchoSends[i]!;
+              this.removePendingEcho(entry);
+              if (entry.source === 'arkmail') proto.own = true;
             }
           }
         }

@@ -7,8 +7,9 @@
  * promptem "[1-50 ...] -- "; 22:37:11 i 22:38:44 gracz musial recznie
  * wysylac "q" ("Slucham?" dopiero po domknieciu). Trzy dziury:
  *
- *  a) mailbox.fetch nie poznawal promptu pagera - wisial do timeoutu,
- *     zamiast domknac sierote ("q") i powtorzyc komende;
+ *  a) mailbox.fetch nie poznawal promptu pagera - wisial do timeoutu;
+ *     obecny kontrakt anuluje listing bez q i bez ponowienia, bo prompt
+ *     nieznanego pochodzenia moze nalezec do recznej poczty gracza;
  *  b) w fetchArchiveBody resolveEntry bylo POZA try - wyjatek z
  *     re-kotwicy zabijal cala petle pobierania ("Blad pobierania
  *     tresci do archiwum."), zamiast policzyc pojedyncza porazke
@@ -44,49 +45,35 @@ const settle = <T>(p: Promise<T>): Promise<Settled<T>> =>
 
 const PAGER_PROMPT = '[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 23) -- ';
 
-test('mailbox: sierocy pager zjada "listy" - q, prompt gry i powtorka komendy', async () => {
+test('mailbox: pager nieznanego pochodzenia anuluje bez q i ponowienia', async () => {
   const t = new MockTransport();
   const m = new MailboxSession(t, OPTS);
   const op = settle(m.fetch('odebrane'));
-  // Sierocy pager konsumuje nasza komende i odpowiada wlasnym promptem.
   await t.replay([{ cls: 'mail', text: PAGER_PROMPT }]);
-  assert.ok(t.sent.includes('q'), 'wyslano q do sierocy pagera');
-  // Domkniecie pagera = prompt gry; komenda listingu powinna byc powtorzona.
-  await t.replay([{ cls: 'prompt', text: '> ' }]);
-  assert.equal(
-    t.sent.filter((s) => s === 'listy odebrane').length,
-    2,
-    'komenda listingu powtorzona po domknieciu sieroty',
-  );
+  const out = await op;
+  assert.ok(!out.ok, 'prompt pagera odrzuca listing');
+  if (out.ok) return;
+  assert.match(String(out.error), /operacja anulowana/);
+  assert.deepEqual(t.sent, ['listy odebrane'], 'bez q i drugiego listingu');
   await t.replay([
+    { cls: 'prompt', text: '> ' },
     { cls: 'mail', text: 'Listy odebrane (prezentowane jest pierwsze 50):' },
-    { cls: 'mail', text: ' 1. *R* Temat: najnowszy' },
-    { cls: 'mail', text: 'Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12' },
     { cls: 'prompt', text: '> ' },
   ]);
-  const out = await op;
-  assert.ok(out.ok, 'listing dojechal po domknieciu sieroty');
-  if (!out.ok) return;
-  assert.equal(out.value.kind, 'lista');
-  if (out.value.kind !== 'lista') return;
-  assert.equal(out.value.entries.length, 1, 'wpis z powtorzonego listingu');
+  assert.deepEqual(t.sent, ['listy odebrane'], 'pozne linie nie powoduja wysylek');
 });
 
-test('mailbox: sierocy pager przetrwal q - powtorka promptu = blad, bez trzeciego q', async () => {
+test('mailbox: kolejny prompt po anulowaniu nie otwiera nowej sesji', async () => {
   const t = new MockTransport();
   const m = new MailboxSession(t, OPTS);
   const op = settle(m.fetch('odebrane'));
   await t.replay([{ cls: 'mail', text: PAGER_PROMPT }]);
-  assert.ok(t.sent.includes('q'), 'pierwsze q do sieroty');
-  await t.replay([{ cls: 'prompt', text: '> ' }]);
-  await t.replay([{ cls: 'mail', text: PAGER_PROMPT }]); // pager wciaz zywy
   const out = await op;
-  assert.ok(!out.ok, 'powtorka promptu pagera odrzuca fetch');
-  assert.equal(
-    t.sent.filter((s) => s === 'q').length,
-    1,
-    'po pierwszym q zadnych kolejnych',
-  );
+  assert.ok(!out.ok, 'pierwszy prompt konczy fetch');
+  await t.replay([{ cls: 'prompt', text: '> ' }]);
+  await t.replay([{ cls: 'mail', text: PAGER_PROMPT }]);
+  assert.equal(t.sent.filter((s) => s === 'listy odebrane').length, 1, 'bez retry');
+  assert.ok(!t.sent.includes('q'), 'zadnego q do pagera nieznanego pochodzenia');
 });
 
 test('pager: shouldAbort w toku odczytu - domkniecie q i odrzucenie "przerwano"', async () => {

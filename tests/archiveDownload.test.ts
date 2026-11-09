@@ -231,7 +231,7 @@ test('archiwum: start pobierania odmowny, gdy gracz ma otwarta poczte w grze (Fa
   }
 });
 
-test('archiwum: pobieranie przerywa, gdy gracz otworzy poczte w trakcie (Fala 42)', async () => {
+test('archiwum: wejscie gracza anuluje biezace pobieranie bez wznowienia', async () => {
   const h = await startHarness();
   const { f } = h;
   try {
@@ -240,32 +240,25 @@ test('archiwum: pobieranie przerywa, gdy gracz otworzy poczte w trakcie (Fala 42
     clickDownload(h); // uzbrojenie
     clickDownload(h); // start
     await waitRt(() => f.sent.includes('listy odebrane przed 25 VIII 1999'), 're-kotwica pierwszego');
-    // Gracz otwiera poczte recznie, gdy blokada pobierania stoi.
+    // Gracz przejmuje poczte natychmiast. Nie ma domykania odczytu
+    // przez plugin ani automatycznego powrotu do petli po q.
     f.fire('→ listy');
-    replayListing3(h);
-    await waitRt(() => f.sent.includes('przeczytaj list 1'), 'odczyt pierwszego (biezacy sie domyka)');
-    replayLetter(h, 1, 'najnowszy', 'Tresc pierwszego.');
-    // Po domknieciu biezacego listu petla staje: zadna kolejna komenda.
     await waitRt(() => notifyText(f, 'Przerwano pobieranie'), 'toast przerwania');
-    assert.ok(notifyText(f, 'Pobrano: 1 z 3'), 'podsumowanie z liczba pobranych');
+    assert.ok(notifyText(f, 'Pobrano: 0 z 3'), 'anulowany rekord nie jest sukcesem');
+    assert.ok(!f.sent.includes('przeczytaj list 1'), 'brak odczytu po anulowaniu kotwicy');
     assert.ok(!f.sent.includes('przeczytaj list 2'), 'brak odczytu drugiego listu');
     await waitRt(
       () => downloadBtn(h).textContent === 'Pobierz tresci do archiwum',
       'koniec petli',
     );
-    // Gracz wychodzi z poczty: zaparkowane odswiezenie schodzi. Odpowiedz
-    // listingiem zgodnym z archiwum (pusta skrzynka oznaczylaby listy
-    // jako znikniete z serwera).
+    // Wyjscie gracza odpala tylko zwykle, zaparkowane odswiezenie.
+    // Odpowiedz listingiem zgodnym z archiwum.
     f.fire('→ q');
     await answerListing3(h);
     await answerEmptyBox(h, 'nieprzeczytane');
     await waitRt(() => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec sesji');
-    // Tresc pobranego przed przerwaniem listu zostaje w bazie (podglad z
-    // pamieci, zero komend).
-    const base = f.sent.length;
-    await clickArchiveRowWhen(h, 'najnowszy');
-    await waitRt(() => letterBodyShows(h, 'Tresc pierwszego.'), 'tresc zachowana po przerwaniu');
-    assert.equal(f.sent.length, base, 'podglad z cache bez komend');
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    assert.ok(!f.sent.some((command) => command.startsWith('przeczytaj list ')), 'reczna operacja nie wraca w tle');
   } finally {
     await stopHarness();
   }
