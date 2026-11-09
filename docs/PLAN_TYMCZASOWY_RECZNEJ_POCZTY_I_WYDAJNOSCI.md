@@ -572,6 +572,8 @@ Proponowany ogolny komunikat UI bez polskich diakrytykow:
 
 > Nie wykonano komendy pocztowej, poniewaz tryb czytania poczty zostal juz zamkniety. Otworz poczte recznie i powtorz komende.
 
+Stan wykonania: WDROZONE. Nowy zestaw najpierw wykazal lokalny RED na starym kodzie: 7 testow, 1 zaliczony i 6 niezaliczonych. Dowody obejmowaly pluginowe `q` mimo przejecia pagera przez `r`, odtworzenie `r` po zamknieciu, zduplikowane `q` oraz odtwarzanie komend pagerowych do zwyklego trybu gry. Po implementacji pierwsze 7 testow przeszlo 7/7, a powiazana regresja 51/51. Dodatkowy osmy przypadek sprawdza `!r` w zwyklym modalu edytora. Pelna regresja z wszystkimi 8 nowymi przypadkami zakonczyla sie kodem 0: 1046 testow, 1045 zaliczonych, 1 pominiety i 0 niezaliczonych; niezalezny typecheck i build zakonczyly sie pomyslnie. Parametryczne przypadki obejmuja 22 komendy, pusty Enter dostarczony do hooka, zachowanie argumentow, wielkosci liter, zrodla uzytkownika, prefiksu `!` i kolejnosci. Nie wykonano testu w prawdziwej grze; obsluga pustego Entera jest potwierdzona dla zdarzenia przekazanego do `commandHooks`, a nie dla niezaleznego pomiaru wejscia klienta gry.
+
 ### 13.6. Niskokosztowa optymalizacja Archiwum
 
 1. Przed zmiana wykonac pomiar na kilku syntetycznych archiwach o roznej liczbie listow i objetosci tresci.

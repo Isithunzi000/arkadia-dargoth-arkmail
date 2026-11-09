@@ -933,6 +933,18 @@ export async function init(api: PluginApi) {
     ui.setIndexRun(null);
     ui.setArchiveDownload(null);
   };
+  const beginPagerModal = (): void => {
+    transport!.beginModal({
+      pager: {
+        onUserCommand: enterPlayerMailMode,
+        onCommandDropped: () => notify(
+          api,
+          "Nie wykonano komendy pocztowej, poniewaz tryb czytania poczty zostal juz zamkniety. Otworz poczte recznie i powtorz komende.",
+          { level: "warning" },
+        ),
+      },
+    });
+  };
 
   /** Fala 16a: retry refreshu odebranych po lagu serwera (szczegoly przy
    *  DELAYED_INBOX_RETRY_MS). Koalescencja przez sam scheduleRefresh. */
@@ -1575,7 +1587,7 @@ export async function init(api: PluginApi) {
       // kontekstu; brak wpisu = zadna komenda nie wylatuje.
       const fresh = await resolveEntry(box, entry);
       if (!fresh) return;
-      transport!.beginModal();
+      beginPagerModal();
       try {
         const res = await pager.readLetter(fresh.number);
         ui.openLetter(box, res.letter, fresh);
@@ -1679,7 +1691,7 @@ export async function init(api: PluginApi) {
       try {
         const fresh = await resolveEntry(box, pseudo);
         if (!fresh) return { kind: "missing" };
-        transport!.beginModal();
+        beginPagerModal();
         try {
           const res = await pager.readLetter(fresh.number, opts?.shouldAbort);
           const merged = upsertLetters(ui.state.archive, [
@@ -2017,7 +2029,7 @@ export async function init(api: PluginApi) {
     let deleteStarted = false;
     ui.setBusy("Sprawdzam zaznaczone listy...");
     void runExclusive(async () => {
-      transport!.beginModal();
+      beginPagerModal();
       try {
         const fresh = await mailbox.fetch(box, command);
         if (generation !== connectionGeneration) return;
@@ -2562,7 +2574,7 @@ export async function init(api: PluginApi) {
       void runExclusive(async () => {
           const fresh = await resolveEntry(box, entry);
           if (!fresh) return;
-          transport!.beginModal();
+          beginPagerModal();
           try {
             const res = await pager.deleteLetters(fresh.number, String(fresh.number));
             if (res.deleted) {
@@ -2599,7 +2611,7 @@ export async function init(api: PluginApi) {
       void runExclusive(async () => {
           const fresh = await resolveEntry(box, entry);
           if (!fresh) return;
-          transport!.beginModal();
+          beginPagerModal();
           try {
             const res = await pager.forwardLetter(fresh.number, adresat);
             if (res.queued) {

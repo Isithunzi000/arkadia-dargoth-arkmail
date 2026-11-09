@@ -15,6 +15,15 @@
 import type PluginApi from 'plugin-api';
 import type { AnsiAwareBuffer } from 'plugin-api';
 import type { ProtoLine, Transport } from '../core/session/transport.js';
+import { extractPagerPrompt } from '../core/protocol/parser.js';
+import { isPromptLine } from '../core/session/lines.js';
+
+export interface PagerModalHooks {
+  /** Gracz przejmuje wlasny pager; sesja pluginu konczy sie bez q. */
+  onUserCommand: () => void;
+  /** Komende czytania odrzucono, bo pager jest juz zamkniety. */
+  onCommandDropped: () => void;
+}
 
 /** Priorytet hooka modalnego: wysoko, zanim aliasy/inne wtyczki. */
 const MODAL_HOOK_PRIORITY = 100;
@@ -32,11 +41,24 @@ interface PendingEcho {
   timer: ReturnType<typeof setTimeout>;
 }
 
+/** Komendy z pomocy trybu czytania. Wykrzyknik jawnie wykonuje komende
+ *  poza pagerem, wiec zachowuje zwykle odtwarzanie po modalu. */
+const isPagerCommand = (command: string): boolean => {
+  const value = command.trim();
+  if (value.startsWith('!')) return false;
+  if (value === '') return true;
+  if (/^(?:\.|<|>|\?|\d+|m|e|q|x)$/i.test(value)) return true;
+  if (/^[-+](?:\s+.*)?$/s.test(value)) return true;
+  return /^(?:h|r|f|a|d|u|n)(?:\s+.*)?$/is.test(value);
+};
+
 export class DargothTransport implements Transport {
   private readonly subscribers = new Set<(line: ProtoLine) => void>();
   private triggerArmed = false;
   private modalActive = false;
   private hookId: string | null = null;
+  private pagerModal: PagerModalHooks | null = null;
+  private pagerOpen = false;
   private queue: string[] = [];
   private commandQueue: Promise<void> = Promise.resolve();
   private connectionGeneration = 0;
@@ -70,6 +92,10 @@ export class DargothTransport implements Transport {
   }
 
   send(line: string, echo = false): Promise<void> {
+    // Wlasne q/x sesji oznacza, ze automatyczne zamykanie juz sie
+    // rozpoczelo. Komendy gracza nie moga zostac wyslane do takiego
+    // pagera jako jego dalsza nawigacja.
+    if (this.pagerModal && /^(?:q|x)$/i.test(line.trim())) this.pagerOpen = false;
     return this.enqueue(line, echo);
   }
 
@@ -147,30 +173,63 @@ export class DargothTransport implements Transport {
     return this.queue.length;
   }
 
-  beginModal(): void {
+  beginModal(options?: { pager?: PagerModalHooks }): void {
     if (this.modalActive) return;
     this.modalActive = true;
+    this.pagerModal = options?.pager ?? null;
+    this.pagerOpen = false;
     this.hookId = this.api.commandHooks.register((command: string) => {
       if (this.sendingOwn) return undefined;
-      this.queue.push(command);
+      if (this.pagerModal && this.pagerOpen && isPagerCommand(command)) {
+        const hooks = this.pagerModal;
+        if (/^(?:q|x)$/i.test(command.trim())) this.pagerOpen = false;
+        // Przejecie najpierw anuluje sesje, wiec PagerSession nie wysle
+        // wlasnego q. Komenda gracza idzie raz, z zachowanym zrodlem.
+        hooks.onUserCommand();
+        void this.enqueue(command, true, 'user').catch(() => {});
+      } else {
+        this.queue.push(command);
+      }
       return null; // stlumienie: pager/edytor konsumuje wejscie
     }, MODAL_HOOK_PRIORITY);
+  }
+
+  /** Przekazuje pierwsza odlozona komende czytania do wlasnie
+   *  otwartego pagera, zanim sesja pluginu zdazy wyslac q. */
+  private takeoverQueuedPagerCommand(): void {
+    if (!this.pagerModal) return;
+    const index = this.queue.findIndex(isPagerCommand);
+    if (index < 0) return;
+    const command = this.queue.splice(index, 1)[0]!;
+    const hooks = this.pagerModal;
+    if (/^(?:q|x)$/i.test(command.trim())) this.pagerOpen = false;
+    hooks.onUserCommand();
+    void this.enqueue(command, true, 'user').catch(() => {});
   }
 
   endModal(): void {
     if (!this.modalActive) return;
     this.modalActive = false;
+    const pagerHooks = this.pagerModal;
+    this.pagerModal = null;
+    this.pagerOpen = false;
     if (this.hookId !== null) {
       this.api.commandHooks.unregister(this.hookId);
       this.hookId = null;
     }
     const pending = this.queue.splice(0);
     if (!this.online) return;
+    let dropped = false;
     for (const command of pending) {
+      if (pagerHooks && isPagerCommand(command)) {
+        dropped = true;
+        continue;
+      }
       // Fala 42: odtworzenie Z echem - to komenda gracza, wiec straznik
       // wejscia w poczte musi ja zobaczyc tak jak wpisana recznie.
       void this.enqueue(command, true, 'user').catch(() => {});
     }
+    if (dropped) pagerHooks?.onCommandDropped();
   }
 
   /** Odcina stare wysylki i porzuca kolejke bez drenowania. */
@@ -185,6 +244,8 @@ export class DargothTransport implements Transport {
       this.hookId = null;
     }
     this.modalActive = false;
+    this.pagerModal = null;
+    this.pagerOpen = false;
     this.queue = [];
   }
 
@@ -231,6 +292,16 @@ export class DargothTransport implements Transport {
               this.removePendingEcho(entry);
               if (entry.source === 'arkmail') proto.own = true;
             }
+          }
+        }
+        if (this.modalActive && this.pagerModal) {
+          if (extractPagerPrompt(proto.text)) {
+            this.pagerOpen = true;
+            // Prompt jest dowodem otwarcia wlasnego pagera. Odlozona
+            // komenda gracza ma pierwszenstwo przed automatycznym q.
+            this.takeoverQueuedPagerCommand();
+          } else if (proto.cls === 'prompt' || isPromptLine(proto.text)) {
+            this.pagerOpen = false;
           }
         }
         for (const cb of [...this.subscribers]) cb(proto);

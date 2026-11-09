@@ -14,10 +14,12 @@ import type { ArchiveLetter } from '../src/arkmail/core/archive';
 import type { MailBox } from '../src/arkmail/core/protocol/types';
 
 export type TriggerCb = (line: { text: string }, matches: unknown, type: string) => unknown;
+export type HookCb = (command: string, echo: boolean) => string | null | undefined;
 
 export class FakeApi {
   sent: string[] = [];
   triggerCb: TriggerCb | null = null;
+  hookCb: HookCb | null = null;
   emitted: { event: string; args: unknown[] }[] = [];
   shown: unknown[] = [];
   popupConfig: {
@@ -54,9 +56,12 @@ export class FakeApi {
   readonly api = {
     command: {
       send: (command: string, echo?: boolean): Promise<void> => {
-        this.sent.push(command);
+        const hooked = this.hookCb?.(command, echo ?? false);
+        if (hooked === null) return Promise.resolve();
+        const delivered = typeof hooked === 'string' ? hooked : command;
+        this.sent.push(delivered);
         this.sentEcho.push(echo ?? false);
-        return this.sendImpl?.(command) ?? Promise.resolve();
+        return this.sendImpl?.(delivered) ?? Promise.resolve();
       },
       addSuggestions: () => {},
       removeSuggestions: () => {},
@@ -70,8 +75,14 @@ export class FakeApi {
       removeByTag: () => {},
     },
     commandHooks: {
-      register: () => 'hook-1',
-      unregister: () => true,
+      register: (cb: HookCb) => {
+        this.hookCb = cb;
+        return 'hook-1';
+      },
+      unregister: () => {
+        this.hookCb = null;
+        return true;
+      },
     },
     character: {
       getName: () => this.characterName,
