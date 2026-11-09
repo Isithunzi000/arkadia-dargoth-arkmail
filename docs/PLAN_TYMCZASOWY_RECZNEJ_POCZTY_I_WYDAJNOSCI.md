@@ -1199,6 +1199,8 @@ Stan wykonania: WDROZONE. Nowy zestaw najpierw wykazal lokalny RED na starym kod
 - ETA i postep wynikaja z rzeczywiscie zakonczonych rekordow, nie z samego uplywu czasu.
 - Timery sa sprzatane przy sukcesie, bledzie, anulowaniu, reconnectcie i zamknieciu.
 
+Stan wykonania: WDROZONE. Dwa glowne testy najpierw wykazaly lokalny RED na starym kodzie: 7 testow, 5 zaliczonych i 2 niezaliczone. Stary kod utworzyl timer `50 ms` zamiast jednego `400 ms`, a po `visibilitychange` pozostawil stara prognoze w UI. Po implementacji wspolnego `waitOrCancel()` kazda pauza ma jeden timer, jednokrotne sprzatanie, anulowanie przez flage i nasluch sesji oraz techniczna diagnostyke `plannedMs`, `actualMs`, etapu i wyniku bez danych listow. `DownloadEta` liczy EMA wylacznie po zakonczonych rekordach, a zmiana widocznosci resetuje probke, zachowuje `done/total` i natychmiast usuwa stare ETA. Stara operacja nie kasuje ETA nowej, a dezaktywacja usuwa nasluch widocznosci. Testy potwierdzaja jeden timer `400 ms`, pomiar `400/475 ms`, anulowanie po `125 ms`, brak timera nadrabiajacego, jedna kolejna komende po opoznieniu, brak komend podtrzymujacych aktywnosc, reset EMA i sprzatanie po zamknieciu. Powiazane zestawy przechodza 10/10 i 4/4. Koncowa pelna regresja zakonczyla sie kodem 0: 1094 testy, 1093 zaliczone, 1 pominiety i 0 niezaliczonych; niezalezny typecheck, build i higiena zakonczyly sie pomyslnie. Nie wykonano testu w prawdziwej grze.
+
 ### 16.16. Docelowy kontrakt odpowiedzi
 
 Zwykle `Odpowiedz` oraz `Odpowiedz z cytowaniem` pozostaja bez zmian. Temat i tresc zwyklego `Odpowiedz wszystkim` pozostaja puste. Klikniecie tylko wypelnia formularz i nie wysyla listu.

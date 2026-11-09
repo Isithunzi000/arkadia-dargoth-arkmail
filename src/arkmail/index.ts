@@ -74,6 +74,7 @@ import {
   type FetchBodyResult,
 } from "./core/archiveDownload";
 import { totalLive } from "./core/archiveStats";
+import { cancelFlag, DownloadEta, waitOrCancel } from "./core/timing";
 import { MailboxSession, type ListingCtx, type MailboxEntry, type MailboxResult } from "./core/session/mailbox";
 import { AmbiguousResponseError } from "./core/session/errors";
 import { humanizeMailError, isOperationCancelled } from "./core/errors";
@@ -383,6 +384,7 @@ export async function init(api: PluginApi) {
     const runExclusive = <T,>(operation: () => Promise<T>): Promise<T> =>
       trackTask(lock.runExclusive(operation));
   let connectionGeneration = 0;
+  let archiveDownloadEta: DownloadEta | null = null;
   const cancelListeners = new Set<() => void>();
   const sessionOpts = {
     ...SESSION_OPTS,
@@ -750,9 +752,10 @@ export async function init(api: PluginApi) {
     transport!.setOnline(false);
     lock.cancelWaiting();
     for (const cancel of [...cancelListeners]) cancel();
-    if (loadAllFlag) loadAllFlag.cancelled = true;
-    if (indexFlag) indexFlag.cancelled = true;
-    if (archiveDownloadFlag) archiveDownloadFlag.cancelled = true;
+    if (loadAllFlag) cancelFlag(loadAllFlag);
+    if (indexFlag) cancelFlag(indexFlag);
+    if (archiveDownloadFlag) cancelFlag(archiveDownloadFlag);
+    archiveDownloadEta = null;
     loadAllFlag = null;
     indexFlag = null;
     archiveDownloadFlag = null;
@@ -948,9 +951,10 @@ export async function init(api: PluginApi) {
     // natomiast reczne operacje UI koncza sie bez wznowienia.
     lock.cancelWaiting();
     for (const cancel of [...cancelListeners]) cancel();
-    if (loadAllFlag) loadAllFlag.cancelled = true;
-    if (indexFlag) indexFlag.cancelled = true;
-    if (archiveDownloadFlag) archiveDownloadFlag.cancelled = true;
+    if (loadAllFlag) cancelFlag(loadAllFlag);
+    if (indexFlag) cancelFlag(indexFlag);
+    if (archiveDownloadFlag) cancelFlag(archiveDownloadFlag);
+    archiveDownloadEta = null;
     for (const timer of delayedInboxTimers) clearTimeout(timer);
     delayedInboxTimers = [];
     ui.setBusy(null);
@@ -1151,7 +1155,7 @@ export async function init(api: PluginApi) {
     const generation = connectionGeneration;
     const flag = { cancelled: false };
     const offCancel = sessionOpts.onCancel(() => {
-      flag.cancelled = true;
+      cancelFlag(flag);
     });
     let fresh: MailboxEntry | null = null;
     try {
@@ -1160,7 +1164,7 @@ export async function init(api: PluginApi) {
         initialCommand: olderListingCommand(box, nextDay(entry.date)),
         cancelled: () => flag.cancelled || generation !== connectionGeneration,
         fetchPage: (command) => mailbox.fetch(box, command),
-        wait: (ms) => sleepOrCancel(ms, flag),
+        wait: (ms) => sleepOrCancel(ms, flag, "skan"),
         onBaseRefresh: () => bumpCtx(box),
         onEmpty: () => bumpCtx(box),
         onGap: (day) => recordArchiveGap(box, day),
@@ -1220,7 +1224,7 @@ export async function init(api: PluginApi) {
           singlePage: true,
           cancelled: () => flag.cancelled || generation !== connectionGeneration,
           fetchPage: (command) => mailbox.fetch(box, command),
-          wait: (ms) => sleepOrCancel(ms, flag),
+          wait: (ms) => sleepOrCancel(ms, flag, "skan"),
           onBaseRefresh: () => bumpCtx(box),
           onGap: (day) => recordArchiveGap(box, day),
           onEmpty: () => bumpCtx(box),
@@ -1278,18 +1282,17 @@ export async function init(api: PluginApi) {
   /** Flaga biezacej petli "Wczytaj wszystkie" (jedna na raz; null = brak). */
   let loadAllFlag: { cancelled: boolean } | null = null;
 
-  /** Pauza miedzy stronami, przerywalna flaga (plastry po 50 ms). */
-  const sleepOrCancel = async (ms: number, flag: { cancelled: boolean }): Promise<void> => {
-    const step = 50;
-    for (let t = 0; t < ms && !flag.cancelled; t += step) {
-      await new Promise((r) => setTimeout(r, Math.min(step, ms - t)));
-    }
-  };
+  /** Jedna anulowalna pauza z pomiarem planowanego i rzeczywistego czasu. */
+  const sleepOrCancel = async (
+    ms: number,
+    flag: { cancelled: boolean },
+    stage: string,
+  ): Promise<void> => waitOrCancel(ms, flag, stage, sessionOpts.onCancel);
 
   /** Wczytuje starsze strony bez sztywnego limitu ich liczby. */
   const loadAll = (box: MailBox): void => {
     if (loadAllFlag) {
-      loadAllFlag.cancelled = true;
+      cancelFlag(loadAllFlag);
       return;
     }
     if (lock.locked) {
@@ -1310,7 +1313,7 @@ export async function init(api: PluginApi) {
             initialCommand: olderListingCommand(box, nextDay(oldest.date)),
             cancelled: () => flag.cancelled || generation !== connectionGeneration,
             fetchPage: (command) => mailbox.fetch(box, command),
-            wait: (ms) => sleepOrCancel(ms, flag),
+            wait: (ms) => sleepOrCancel(ms, flag, "skan"),
             onBaseRefresh: () => bumpCtx(box),
             onGap: (day) => recordArchiveGap(box, day),
             onEmpty: () => bumpCtx(box),
@@ -1386,7 +1389,7 @@ export async function init(api: PluginApi) {
 
   const indexAllBoxes = (): void => {
     if (indexFlag) {
-      indexFlag.cancelled = true;
+      cancelFlag(indexFlag);
       return;
     }
     if (lock.locked) {
@@ -1440,7 +1443,7 @@ export async function init(api: PluginApi) {
               box,
               cancelled: () => flag.cancelled || generation !== connectionGeneration,
               fetchPage: (command) => mailbox.fetch(box, command),
-              wait: (ms) => sleepOrCancel(ms, flag),
+              wait: (ms) => sleepOrCancel(ms, flag, "skan"),
               onGap: (day) => recordArchiveGap(box, day),
               onBaseRefresh: (res) => {
                 if (res.kind === "lista") {
@@ -1778,6 +1781,14 @@ export async function init(api: PluginApi) {
   /** Flaga biezacej petli pobierania tresci (jedna na raz; null = brak). */
   let archiveDownloadFlag: { cancelled: boolean } | null = null;
   let archiveDownloadOperationCounter = 0;
+  const onVisibilityChange = (): void => {
+    const eta = archiveDownloadEta;
+    const progress = ui.state.archiveDownload;
+    if (!eta || !progress) return;
+    eta.reset(Date.now());
+    ui.setArchiveDownload({ done: progress.done, total: progress.total, etaMs: null });
+  };
+  document.addEventListener("visibilitychange", onVisibilityChange);
 
   /**
    * Prog circuit breakera petli pobierania (Fala 31a): tyle bledow
@@ -1805,7 +1816,7 @@ export async function init(api: PluginApi) {
    */
   const runArchiveDownload = (): void => {
     if (archiveDownloadFlag) {
-      archiveDownloadFlag.cancelled = true;
+      cancelFlag(archiveDownloadFlag);
       return;
     }
     if (lock.locked) {
@@ -1847,9 +1858,10 @@ export async function init(api: PluginApi) {
     // Fala 18d (zgloszenie pkt 2): ETA z EMA po czasach ukonczen
     // kolejnych listow (fetch + pacing = realne tempo petli); alpha
     // 0.3 laguje pojedyncze dlugie odczyty. Pokazywane od 3
-    // ukonczonych - wczesniej jest losowe.
-    let emaMs: number | null = null;
-    let lastAt = Date.now();
+    // ukonczonych - wczesniej jest losowe. Zmiana widocznosci resetuje
+    // probke, ale zachowuje rzeczywisty postep done/total.
+    const eta = new DownloadEta(Date.now());
+    archiveDownloadEta = eta;
     ui.setArchiveDownload({ done: 0, total, etaMs: null });
     ui.setBusy(`Pobieram tresci do archiwum (0/${total})...`);
     const generation = connectionGeneration;
@@ -1870,14 +1882,7 @@ export async function init(api: PluginApi) {
         let playerEntry = false;
         const reportProgress = (): void => {
           const processed = done + failed + missing;
-          const now = Date.now();
-          const dt = now - lastAt;
-          lastAt = now;
-          emaMs = emaMs === null ? dt : 0.3 * dt + 0.7 * emaMs;
-          const etaMs =
-            processed >= 3 && emaMs !== null
-              ? Math.max(1000, Math.round(emaMs * (total - processed)))
-              : null;
+          const etaMs = eta.sample(Date.now(), processed, total);
           ui.setArchiveDownload({ done: processed, total, etaMs });
           ui.setBusy(`Pobieram tresci do archiwum (${processed}/${total})...`);
         };
@@ -1949,7 +1954,7 @@ export async function init(api: PluginApi) {
             if (breakerTripped) break;
             if (flag.cancelled) break;
             if (playerEntry) break;
-            await sleepOrCancel(LOAD_ALL_PACE_MS, flag);
+            await sleepOrCancel(LOAD_ALL_PACE_MS, flag, "pobieranie");
           }
           const remaining = Math.max(0, total - done - failed - missing);
           const summary = buildDownloadSummary({ done, total, failed, missing, remaining });
@@ -1981,8 +1986,9 @@ export async function init(api: PluginApi) {
             );
           }
         } finally {
+          if (archiveDownloadEta === eta) archiveDownloadEta = null;
           if (generation !== connectionGeneration) return;
-          archiveDownloadFlag = null;
+          if (archiveDownloadFlag === flag) archiveDownloadFlag = null;
           ui.setArchiveDownload(null);
           ui.setBusy(null);
         }
@@ -2829,6 +2835,7 @@ export async function init(api: PluginApi) {
     refreshPopup();
     deactivateActiveCharacter = async (): Promise<void> => {
       cancelConnectionOperations();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
       api.events.off("client.connect", onClientConnect);
       api.events.off("client.disconnect", onClientDisconnect);
       api.events.off("gmcp.mail.state", onMailState);
