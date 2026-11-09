@@ -22,6 +22,7 @@ import { mountMailUi, type MailUiHandlers } from '../src/arkmail/ui/render';
 import { MailUiStore } from '../src/arkmail/ui/store';
 import type { MailboxEntry } from '../src/arkmail/core/session/mailbox';
 import type { MailBox } from '../src/arkmail/core/protocol/types';
+import { validateCompose } from '../src/arkmail/core/composeValidation';
 
 const window = new Window();
 const document = window.document;
@@ -57,6 +58,7 @@ function mount(store: MailUiStore) {
     onClearSearch: rec('clear-search'),
     onDeleteLetter: rec('del'),
     onForwardLetter: rec('fwd'),
+    onReplyAllEmpty: rec('reply-all-empty'),
   } as unknown as MailUiHandlers);
   return { container, calls, off };
 }
@@ -122,25 +124,28 @@ test('ui: Odpowiedz z odebranych wypelnia nadawce i przelacza na Napisz', () => 
   off();
 });
 
-test('ui: Odpowiedz wszystkim doklada oryginalne DW', () => {
+test('ui: Odpowiedz wszystkim doklada pozostalych odbiorcow i oryginalne DW', () => {
   const s = new MailUiStore();
   const { container, off } = mount(s);
   openLetter(s, 'nieprzeczytane', { from: 'Foo', to: 'Gracz', cc: 'Qux' });
   clickEl(container.querySelector('.arkmail-reply-all')!);
   assert.equal(s.state.tab, 'napisz');
-  assert.equal(field(container, 'adresat'), 'Foo', 'adresat = nadawca');
+  assert.equal(field(container, 'adresat'), 'Foo, Gracz', 'adresat = nadawca i pozostali z Do');
   assert.equal(field(container, 'dw'), 'Qux', 'DW = oryginalne DW');
   off();
 });
 
-test('ui: Odpowiedz wszystkim bez DW dziala jak zwykle Odpowiedz', () => {
+test('ui: Odpowiedz wszystkim bez DW zachowuje pozostalych odbiorcow', () => {
   const s = new MailUiStore();
-  const { container, off } = mount(s);
+  const { container, calls, off } = mount(s);
   openLetter(s, 'odebrane', { from: 'Foo', to: 'Gracz', cc: null });
   clickEl(container.querySelector('.arkmail-reply-all')!);
   assert.equal(s.state.tab, 'napisz');
-  assert.equal(field(container, 'adresat'), 'Foo');
+  assert.equal(field(container, 'adresat'), 'Foo, Gracz', 'bez znamej postaci nikt nie jest usuwany');
   assert.equal(field(container, 'dw'), '', 'brak DW -> pole DW puste');
+  assert.equal(field(container, 'temat'), '', 'reply-all nie zmienia pustego tematu');
+  assert.equal(field(container, 'tresc'), '', 'reply-all nie zmienia pustej tresci');
+  assert.equal(sends(calls).length, 0, 'klikniecie nie wysyla listu');
   off();
 });
 
@@ -291,3 +296,94 @@ test('ui: cytat z separatorami zostaje nietkniety i wymaga recznej poprawy', () 
   off();
 });
 
+
+
+test('ui: reply-all usuwa aktualna postac i zachowuje pozostalych', () => {
+  const s = new MailUiStore({ characterName: 'Gracz' } as Partial<import('../src/arkmail/ui/store').MailUiState>);
+  const { container, off } = mount(s);
+  openLetter(s, 'odebrane', { from: 'Foo', to: 'gracz, Bar', cc: 'GRACZ i Baz' });
+  clickEl(container.querySelector('.arkmail-reply-all'));
+  assert.equal(field(container, 'adresat'), 'Foo, Bar');
+  assert.equal(field(container, 'dw'), 'Baz');
+  off();
+});
+
+test('ui: reply-all parsuje koncowy spojnik i przechodzi walidacje compose', () => {
+  const s = new MailUiStore({ characterName: 'Gracz' } as Partial<import('../src/arkmail/ui/store').MailUiState>);
+  const { container, off } = mount(s);
+  openLetter(s, 'nieprzeczytane', { from: 'Foo', to: 'Gracz, Bar i Baz', cc: 'Qux i Quux' });
+  clickEl(container.querySelector('.arkmail-reply-all'));
+  const input = {
+    adresat: field(container, 'adresat'),
+    temat: 'Syntetyczny temat',
+    dw: field(container, 'dw'),
+    tresc: 'Syntetyczna tresc',
+  };
+  assert.deepEqual([input.adresat, input.dw], ['Foo, Bar, Baz', 'Qux, Quux']);
+  assert.equal(validateCompose(input), null);
+  off();
+});
+
+test('ui: reply-all deduplikuje bez wielkosci liter i zachowuje pierwsza nazwe', () => {
+  const s = new MailUiStore();
+  const { container, off } = mount(s);
+  openLetter(s, 'odebrane', { from: 'Foo', to: 'foo, Bar i bar', cc: 'BAR i Qux' });
+  clickEl(container.querySelector('.arkmail-reply-all'));
+  assert.equal(field(container, 'adresat'), 'Foo, Bar');
+  assert.equal(field(container, 'dw'), 'Qux');
+  off();
+});
+
+test('ui: reply-all nie dzieli znanej nazwy wielowyrazowej', () => {
+  const s = new MailUiStore({
+    characterName: 'Gracz',
+    people: ['Foo Bar'],
+  } as Partial<import('../src/arkmail/ui/store').MailUiState>);
+  const { container, off } = mount(s);
+  openLetter(s, 'odebrane', { from: 'Zork', to: 'Foo Bar i Gracz', cc: null });
+  clickEl(container.querySelector('.arkmail-reply-all'));
+  assert.equal(field(container, 'adresat'), 'Zork, Foo Bar');
+  assert.equal(field(container, 'dw'), '');
+  off();
+});
+
+test('ui: reply-all z odebranych zachowuje odbiorcow tylko z DW', () => {
+  const s = new MailUiStore({ characterName: 'Gracz' } as Partial<import('../src/arkmail/ui/store').MailUiState>);
+  const { container, off } = mount(s);
+  openLetter(s, 'odebrane', { from: 'Foo', to: '', cc: 'Gracz i Bar' });
+  clickEl(container.querySelector('.arkmail-reply-all'));
+  assert.equal(field(container, 'adresat'), 'Foo');
+  assert.equal(field(container, 'dw'), 'Bar');
+  off();
+});
+
+test('ui: reply-all z wyslanych tylko na DW przenosi ich do Adresat', () => {
+  const s = new MailUiStore({ characterName: 'Gracz' } as Partial<import('../src/arkmail/ui/store').MailUiState>);
+  const { container, off } = mount(s);
+  openLetter(s, 'wyslane', { from: 'Gracz', to: '', cc: 'Gracz i Bar' });
+  clickEl(container.querySelector('.arkmail-reply-all'));
+  assert.equal(field(container, 'adresat'), 'Bar');
+  assert.equal(field(container, 'dw'), '');
+  off();
+});
+
+test('ui: reply-all po odjeciu aktualnej postaci uzupelnia Adresat z DW', () => {
+  const s = new MailUiStore({ characterName: 'Gracz' } as Partial<import('../src/arkmail/ui/store').MailUiState>);
+  const { container, off } = mount(s);
+  openLetter(s, 'niewyslane', { from: 'Gracz', to: 'gracz', cc: 'Bar' });
+  clickEl(container.querySelector('.arkmail-reply-all'));
+  assert.equal(field(container, 'adresat'), 'Bar');
+  assert.equal(field(container, 'dw'), '');
+  off();
+});
+
+test('ui: reply-all bez odbiorcow nie otwiera poprawnego prefillu ani nie wysyla', () => {
+  const s = new MailUiStore({ characterName: 'Gracz' } as Partial<import('../src/arkmail/ui/store').MailUiState>);
+  const { container, calls, off } = mount(s);
+  openLetter(s, 'odebrane', { from: 'Gracz', to: 'gracz', cc: 'GRACZ' });
+  clickEl(container.querySelector('.arkmail-reply-all'));
+  assert.equal(s.state.tab, 'list', 'brak odbiorcow nie przelacza do Napisz');
+  assert.equal(calls.filter((call) => call.name === 'reply-all-empty').length, 1);
+  assert.equal(sends(calls).length, 0);
+  off();
+});

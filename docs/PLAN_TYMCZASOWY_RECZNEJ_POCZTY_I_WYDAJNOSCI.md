@@ -1226,6 +1226,8 @@ Dla wyslanych i niewyslanych:
 
 Deduplikacja dotyczy wylacznie nowo generowanego prefillu. Po przejsciu do `Napisz` uzytkownik moze edytowac pola, a handler wysylki nie wykonuje nowej normalizacji recznego wpisu. Arkadia ostatecznie weryfikuje odbiorcow.
 
+Stan wykonania: WDROZONE. Nowa czysta funkcja core buduje prefill z jednej pelnej migawki `LetterContent`, uzywa wspolnego parsera znanych nazw i aliasow, usuwa aktualna postac tylko przy znanej nazwie oraz deduplikuje globalnie bez wielkosci liter. Zwykla odpowiedz i cytowanie pozostaly jednoadresowe. Pusty wynik nie przelacza do `Napisz`, pokazuje konkretny komunikat i nie wysyla listu. Lokalny RED na starym kodzie wyniosl 18 testow, 8 zaliczonych i 10 niezaliczonych; powiazany GREEN to 51/51, a pelna regresja zakonczyla sie kodem 0: 1108 testow, 1107 zaliczonych, 1 pominiety i 0 niezaliczonych. Niezalezny typecheck, build oraz 12 kontroli higieny przeszly pomyslnie. Nie wykonano testu w prawdziwej grze.
+
 ### 16.17. Model naglowkow i zasada nieznanego
 
 Istniejacy JSON rekordu zostaje rozszerzony o opcjonalny `headers` z `from`, `to` i `cc`.
@@ -1559,6 +1561,19 @@ Stan wykonania: WDROZONE.
 - Transport sprawdza odzyskiwanie rowniez przy pobieraniu komendy z kolejki, nie tylko przy jej dodawaniu. Niepotwierdzone kasowanie zachowuje fizyczne dowody usuniecia, ale ma wynik `unknown`, nie `complete`.
 - Pierwszy pelny zestaw mial 1077 testow, 1074 zaliczone, 2 niezaliczone i 1 pominiety. Jednym bledem bylo stare oczekiwanie nowej sesji bez promptu po reconnectcie; przypadek odtwarzania Archiwum przeszedl nastepnie bez zmian kodu w izolacji. Oba powiazane pliki osiagnely 10/10, a caly zestaw zostal powtorzony.
 - Koncowy pelny zestaw na Node 26: 1077 testow, 1076 zaliczonych, 0 niezaliczonych i 1 pominiety; kod wyjscia 0. Niezalezny `tsc --noEmit -p tsconfig.test.json` oraz build zakonczyly sie pomyslnie.
+
+Nie wykonano testu w prawdziwej grze. Nie zmieniono wersji, nie utworzono wydania i nie wykonano publikacji.
+
+#### Wynik kroku 7: czysta funkcja odbiorcow i poprawny reply-all
+
+Stan wykonania: WDROZONE.
+
+- RED na starym kodzie: 18 testow, 8 zaliczonych i 10 niezaliczonych. Niezaliczone byly wylacznie nowe lub zmienione przypadki reply-all; zwykla odpowiedz i cytowanie pozostaly zielone.
+- GREEN po implementacji: 6/6 testow czystej funkcji oraz 51/51 w powiazanym zestawie przyciskow, walidacji compose, UX i ochrony wysylki.
+- Reply-all dla odebranych laczy nadawce i odbiorcow `Do`, zachowuje `DW`, usuwa znana aktualna postac i deduplikuje bez wielkosci liter. Dla wyslanych nie dodaje nadawcy. Puste `Adresat` powoduje promocje `DW`, a calkowity brak odbiorcow zwraca `null` i komunikat bez przejscia do compose oraz bez wysylki.
+- Naglowkowe przecinki i koncowy spojnik ` i ` sa parsowane do poprawnego formularza. Znane nazwy wielowyrazowe i aliasy nie sa dzielone. Nieznana aktualna postac nie powoduje zgadywania ani usuwania odbiorcow.
+- Zwykla odpowiedz i cytowanie zachowaly stary kontrakt. Temat i tresc reply-all pozostaja puste, klikniecie tylko wypelnia formularz, a reczny wpis nie jest pozniej normalizowany.
+- Koncowy pelny zestaw na Node 26: 1108 testow, 1107 zaliczonych, 0 niezaliczonych i 1 pominiety; kod wyjscia 0. Niezalezny `tsc --noEmit -p tsconfig.test.json`, build oraz 12 kontroli higieny zakonczyly sie pomyslnie.
 
 Nie wykonano testu w prawdziwej grze. Nie zmieniono wersji, nie utworzono wydania i nie wykonano publikacji.
 

@@ -40,6 +40,7 @@ import {
   type LetterTemplate,
 } from '../core/letterRender.js';
 import { validateCompose, type ComposeSendInput } from '../core/composeValidation.js';
+import { buildReplyAllPrefill, knownRecipientNames } from '../core/replyRecipients.js';
 import type { MailUiState, MailUiStore, UiTab } from './store.js';
 import { allBoxesIndexed, formatBadgeSuffix, INDEX_BOXES } from './store.js';
 import { STYLES } from './styles.js';
@@ -67,6 +68,8 @@ export interface MailUiHandlers {
   onClearSearch(box: MailBox): void;
   onDeleteLetter(box: MailBox, entry: MailboxEntry): void;
   onForwardLetter(box: MailBox, entry: MailboxEntry, adresat: string): void;
+  /** Pusty wynik reply-all wymaga komunikatu z warstwy integracyjnej. */
+  onReplyAllEmpty?(): void;
   /**
    * Klik w wpis archiwum (Fala 16h): wpis z trescia w cache otwiera
    * sie z pamieci (zero komend); bez tresci - re-kotwica po dacie
@@ -1349,13 +1352,26 @@ const filterClearClass = (viewClass?: string): string =>
     // Fala 15a: Odpowiedz / Odpowiedz wszystkim - pierwsze w pasku.
     // Czysta operacja UI: prefill composeDraft + przelaczenie na Napisz,
     // zero komend do serwera, wiec dziala tez bez wpisu-zrodla.
-    // Adresat: odebrane -> nadawca; wyslane -> odbiorca (puste "Do" =
-    // list tylko na DW -> adresat = DW). Reply-all doklada oryginalne
-    // DW; brak DW -> jak zwykle Odpowiedz. Temat i tresc puste.
+    // Zwykla odpowiedz zachowuje stary, jednoadresowy kontrakt.
+    // Reply-all korzysta z pelnej migawki naglowkow i nie wysyla listu.
     const replyTo = (all: boolean): void => {
       const received = l.box === 'odebrane' || l.box === 'nieprzeczytane';
-      composeDraft.adresat = received ? l.from : l.to || l.cc || '';
-      composeDraft.dw = all && l.cc ? l.cc : '';
+      if (all) {
+        const prefill = buildReplyAllPrefill(
+          l,
+          store.state.characterName,
+          knownRecipientNames(store.state),
+        );
+        if (!prefill) {
+          handlers.onReplyAllEmpty?.();
+          return;
+        }
+        composeDraft.adresat = prefill.adresat;
+        composeDraft.dw = prefill.dw;
+      } else {
+        composeDraft.adresat = received ? l.from : l.to || l.cc || '';
+        composeDraft.dw = '';
+      }
       composeDraft.temat = '';
       composeDraft.tresc = '';
       store.setTab('napisz');

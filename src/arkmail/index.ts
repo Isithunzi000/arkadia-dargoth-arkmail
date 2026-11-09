@@ -75,6 +75,7 @@ import {
 } from "./core/archiveDownload";
 import { totalLive } from "./core/archiveStats";
 import { cancelFlag, DownloadEta, waitOrCancel } from "./core/timing";
+import { knownRecipientNames } from "./core/replyRecipients";
 import { MailboxSession, type ListingCtx, type MailboxEntry, type MailboxResult } from "./core/session/mailbox";
 import { AmbiguousResponseError } from "./core/session/errors";
 import { humanizeMailError, isOperationCancelled } from "./core/errors";
@@ -208,27 +209,6 @@ const ARCHIVE_GAPS_KEY = "luki-archiwum";
  * pocztowe + czlonkowie grup ksiazki adresowej. Porownanie
  * case-insensitive.
  */
-const knownRecipientNames = (state: {
-  contacts: { name: string; mailAlias?: string }[];
-  people: string[];
-  importedAliases: { name: string }[];
-  groups: { members: string[] }[];
-}): Set<string> => {
-  const known = new Set<string>();
-  const add = (name: string): void => {
-    const key = name.trim().toLowerCase();
-    if (key) known.add(key);
-  };
-  for (const c of state.contacts) {
-    add(c.name);
-    if (c.mailAlias) add(c.mailAlias);
-  }
-  for (const name of state.people) add(name);
-  for (const alias of state.importedAliases) add(alias.name);
-  for (const group of state.groups) for (const member of group.members) add(member);
-  return known;
-};
-
 /** Dokladna nazwa niekolidujacej grupy jest jedynym przeksztalceniem listy. */
 const expandLocalGroup = (
   value: string,
@@ -412,6 +392,7 @@ export async function init(api: PluginApi) {
   storage.setLetters(archive);
   const composePrefs = storage.getJSON<{ template?: LetterTemplate; width?: number }>(COMPOSE_KEY);
   store = new MailUiStore({
+    characterName: character,
     notifyEnabled: storage.getJSON<boolean>(NOTIFY_KEY) ?? true,
     autoRefreshEnabled: storage.getJSON<boolean>(AUTO_REFRESH_KEY) ?? true,
     archive,
@@ -2279,6 +2260,11 @@ export async function init(api: PluginApi) {
       openArchiveFromServer(letter);
     },
     onDownloadArchiveBodies: () => runArchiveDownload(),
+    onReplyAllEmpty: () => notify(
+      api,
+      "Nie mozna przygotowac odpowiedzi wszystkim, poniewaz lista odbiorcow jest pusta.",
+      { level: "warning" },
+    ),
     // Indeksacja wszystkich skrzynek jako osobna operacja.
     onIndexAll: () => indexAllBoxes(),
     // Fala UI-2: import bazy osob i aliasow z gry (pule ksiazki

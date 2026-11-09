@@ -94,6 +94,8 @@ export interface MailUiState {
   tab: UiTab;
   /** szeroki podzial (popup >= 900px): list obok listingu */
   wide: boolean;
+  /** Aktualna postac sluzy wylacznie do nowego prefillu reply-all. */
+  characterName: string | null;
   activeBox: MailBox;
   boxes: Partial<Record<MailBox, BoxView>>;
   badge: number;
@@ -178,6 +180,7 @@ export const allBoxesIndexed = (meta: Partial<Record<MailBox, string>>): boolean
 const DEFAULT_STATE: MailUiState = {
   tab: 'listy',
   wide: false,
+  characterName: null,
   activeBox: 'odebrane',
   boxes: {},
   badge: 0,
