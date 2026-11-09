@@ -68,6 +68,11 @@ import {
   upsertLetters,
   type ArchiveLetter,
 } from "./core/archive";
+import {
+  recordArchiveDownloadDiagnostic,
+  type ArchiveDownloadStage,
+  type FetchBodyResult,
+} from "./core/archiveDownload";
 import { totalLive } from "./core/archiveStats";
 import { MailboxSession, type ListingCtx, type MailboxEntry, type MailboxResult } from "./core/session/mailbox";
 import { humanizeMailError, isOperationCancelled } from "./core/errors";
@@ -1680,17 +1685,6 @@ export async function init(api: PluginApi) {
   };
 
   /**
-   * Wynik doczytu tresci (Fala 17c): 'ok' = tresc pobrana; 'missing' =
-   * listu nie ma na swiezym listingu (kto go usunal - caller
-   * oznacza rekord i pomija go w kolejnych uruchomieniach); 'error' =
-   * porazka przejsciowa (timeout, sierocy pager, przerwanie).
-   */
-  type FetchBodyResult =
-    | { kind: "ok"; body: string[] }
-    | { kind: "missing" }
-    | { kind: "error" };
-
-  /**
    * Doczyt tresci jednego rekordu archiwum (Fala 16i): ta sama sciezka
    * co openWithResolve (re-kotwica + druga szansa 16c), ale BEZ
    * otwierania listu w UI. WYMAGA locka (caller).
@@ -1708,37 +1702,53 @@ export async function init(api: PluginApi) {
   ): Promise<FetchBodyResult> => {
     const box = opts?.box ?? letter.box;
     const pseudo = archivePseudoEntry(letter, box);
+    let stage: ArchiveDownloadStage = "kotwiczenie";
+    const aborted = (): boolean => opts?.shouldAbort?.() === true || playerMailMode;
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
+        stage = "kotwiczenie";
+        if (aborted()) return { kind: "anulowano", stage };
         const fresh = await resolveEntry(box, pseudo);
-        if (!fresh) return { kind: "missing" };
+        if (aborted()) return { kind: "anulowano", stage };
+        if (!fresh) return { kind: "nie_ma_w_skrzynce", stage: "kotwiczenie" };
+        stage = "odczyt";
         beginPagerModal();
         try {
           const res = await pager.readLetter(fresh.number, opts?.shouldAbort);
+          if (res.letter.body.every((line) => line.trim().length === 0)) {
+            return { kind: "pusta_tresc", stage: "odczyt" };
+          }
+          stage = "zapis";
           const merged = upsertLetters(ui.state.archive, [
             fromOpenedLetter(box, res.letter, fresh),
           ]);
           ui.setArchive(merged.letters);
           persistArchive();
-          return { kind: "ok", body: res.letter.body };
+          return { kind: "pobrano", stage: "zapis", body: res.letter.body };
         } finally {
           transport!.endModal();
         }
       } catch (err) {
+        if (aborted()) return { kind: "anulowano", stage };
         const msg = err instanceof Error ? err.message : String(err);
         const listingGone = /nie zostaly wybrane|Zly numer listu/.test(msg);
         if (attempt === 0 && listingGone) {
           bumpCtx(box); // wymuszenie re-kotwicy w drugiej probie
           continue;
         }
-        return { kind: "error" };
+        if (stage === "zapis") return { kind: "blad_zapisu", stage: "zapis" };
+        if (stage === "kotwiczenie") {
+          return { kind: "blad_kotwiczenia", stage: "kotwiczenie" };
+        }
+        return { kind: "blad_odczytu", stage: "odczyt" };
       }
     }
-    return { kind: "error" };
+    return { kind: "blad_kotwiczenia", stage: "kotwiczenie" };
   };
 
   /** Flaga biezacej petli pobierania tresci (jedna na raz; null = brak). */
   let archiveDownloadFlag: { cancelled: boolean } | null = null;
+  let archiveDownloadOperationCounter = 0;
 
   /**
    * Prog circuit breakera petli pobierania (Fala 31a): tyle bledow
@@ -1760,7 +1770,8 @@ export async function init(api: PluginApi) {
    * wielowystapieniowa Fali 35c wypada z runtime'u).
    * Fala 31a: circuit breaker - 3 bledy z rzedu (siec/serwer lezy)
    * zatrzymuja petle z jasnym komunikatem, zamiast mielic reszte
-   * kandydatow do konca. Sukces i 'missing' licznik resetuja.
+   * kandydatow do konca. Pobranie i brak rekordu w skrzynce resetuja
+   * serie bledow.
    * Uzywa aktualnej bazy; nie uruchamia indeksacji automatycznie.
    */
   const runArchiveDownload = (): void => {
@@ -1813,6 +1824,7 @@ export async function init(api: PluginApi) {
     ui.setArchiveDownload({ done: 0, total, etaMs: null });
     ui.setBusy(`Pobieram tresci do archiwum (0/${total})...`);
     const generation = connectionGeneration;
+    const operationId = ++archiveDownloadOperationCounter;
     void runExclusive(async () => {
         let done = 0;
         let failed = 0;
@@ -1841,10 +1853,10 @@ export async function init(api: PluginApi) {
           ui.setBusy(`Pobieram tresci do archiwum (${processed}/${total})...`);
         };
         try {
-          for (const record of candidates) {
+          for (const [candidateIndex, record] of candidates.entries()) {
             if (flag.cancelled || breakerTripped) break;
-            // Fala 42: sesja pocztowa gracza ma pierwszenstwo - stajemy
-            // przed wyslaniem jakiejkolwiek kolejnej komendy.
+            // Sesja pocztowa gracza ma pierwszenstwo - stajemy przed
+            // wyslaniem jakiejkolwiek kolejnej komendy.
             if (playerMailMode) {
               playerEntry = true;
               break;
@@ -1856,61 +1868,53 @@ export async function init(api: PluginApi) {
             const order = (
               [record.box, "odebrane", "nieprzeczytane", "wyslane", "niewyslane"] as MailBox[]
             ).filter((b, i, arr) => arr.indexOf(b) === i);
-            let result: FetchBodyResult = { kind: "error" };
+            let result: FetchBodyResult = { kind: "anulowano", stage: "kotwiczenie" };
             let attempted = false;
             for (const box of order) {
               if (flag.cancelled || playerMailMode) break;
               attempted = true;
-              // Fala 17a: Przerwij domyka tez pager w toku (shouldAbort).
               result = await fetchArchiveBody(record, {
                 shouldAbort: () => flag.cancelled,
                 box,
               });
-              if (result.kind === "ok") break;
-              // 'missing' z jednej skrzynki nie konczy prob - replica
-              // moze nadal istniec w innej skrzynce. Blad (timeout,
-              // blad serwera) KONCZY proby tego rekordu: ta sama siec
-              // i ten sam serwer obsluguja wszystkie skrzynki, wiec
-              // powtarzanie nie ma sensu - a przy padnietym serwerze
-              // czterokrotniloby komendy do zera.
-              if (result.kind === "error") break;
+              if (result.kind === "pobrano") break;
+              // Brak w jednej skrzynce nie konczy prob - replica moze
+              // istniec w innej. Kazdy inny wynik konczy probe rekordu.
+              if (result.kind !== "nie_ma_w_skrzynce") break;
             }
-            // Fala 42: tryb gracza wlaczyl sie zanim rekord dostal
-            // jakakolwiek probe - nietkniety, bez liczenia porazki.
             if (playerMailMode && !attempted) {
               playerEntry = true;
               break;
             }
-            // Fala 42: tryb gracza wlaczyl sie miedzy skrzynkami albo
-            // w trakcie proby - ta probe domykamy i liczymy normalnie
-            // (jej komendy juz wyszly, wynik jest prawda), po niej
-            // stajemy cale.
             if (playerMailMode) playerEntry = true;
-            if (result.kind === "ok") {
+            if ((flag.cancelled || playerMailMode) && result.kind !== "pobrano") {
+              result = { kind: "anulowano", stage: result.stage };
+            }
+            if (result.kind === "pobrano") {
               done += 1;
               consecutiveErrors = 0;
-              // Tresc z pagera wplynela przez fetchArchiveBody ->
-              // fromOpenedLetter(fresh z archiveId rekordu) -> upsert
-              // DOKLADNIE na ten rekord (blizniak nietkniety).
-            } else if (result.kind === "missing" && !flag.cancelled) {
+            } else if (result.kind === "nie_ma_w_skrzynce") {
               missing += 1;
               consecutiveErrors = 0;
-              // Fala 28: brak na serwerze -> fizyczny purge TYLKO tego
-              // rekordu (blizniak o tych samych metadanych zostaje).
-              ui.setArchive(ui.state.archive.filter((l) => l.id !== record.id));
-              persistArchive();
-              // Fala 31: domkniecie parowania - martwy wiersz znika tez
-              // z widoku skrzynki (bez tego wiersz byl klikalny i liczyl
-              // sie w badge). Przeczesujemy WSZYSTKIE skrzynki: wiersz
-              // siedzi w widoku skrzynki rekordu, a petla prob mogla
-              // skonczyc sie na innej skrzynce.
-              for (const b of ["odebrane", "nieprzeczytane", "wyslane", "niewyslane"] as MailBox[]) {
-                pruneGoneFromView(b, new Set([record.id]));
-              }
-            } else if (!flag.cancelled) {
+            } else if (result.kind !== "anulowano") {
               failed += 1;
               consecutiveErrors += 1;
               if (consecutiveErrors >= DOWNLOAD_BREAKER_LIMIT) breakerTripped = true;
+            }
+            recordArchiveDownloadDiagnostic({
+              operationId,
+              generation,
+              recordAlias: `rekord-${candidateIndex + 1}`,
+              outcome: result,
+              consecutiveErrors,
+            });
+            if (result.kind === "nie_ma_w_skrzynce") {
+              // Brak na serwerze usuwa wylacznie wskazany rekord.
+              ui.setArchive(ui.state.archive.filter((l) => l.id !== record.id));
+              persistArchive();
+              for (const b of ["odebrane", "nieprzeczytane", "wyslane", "niewyslane"] as MailBox[]) {
+                pruneGoneFromView(b, new Set([record.id]));
+              }
             }
             reportProgress();
             if (breakerTripped) break;
@@ -1918,26 +1922,27 @@ export async function init(api: PluginApi) {
             if (playerEntry) break;
             await sleepOrCancel(LOAD_ALL_PACE_MS, flag);
           }
+          const remaining = Math.max(0, total - done - failed - missing);
+          const summary = buildDownloadSummary({ done, total, failed, missing, remaining });
           if (playerEntry) {
             notify(
               api,
-              `Poczta zostala otwarta w grze. Pobrano: ${done} z ${total}.`,
+              `Poczta zostala otwarta w grze. ${summary.text}`,
               { title: "Przerwano pobieranie", level: "warning" },
             );
           } else if (breakerTripped) {
             notify(
               api,
-              "Serwer poczty nie odpowiada. Pobrane tresci sa zapisane - sprobuj ponownie pozniej.",
+              `Serwer poczty nie odpowiada. ${summary.text} Sprobuj ponownie pozniej.`,
               { title: "Przerwano pobieranie", level: "warning" },
             );
           } else if (flag.cancelled) {
             notify(
               api,
-              `Pobrano: ${done} z ${total}.`,
+              summary.text,
               { title: "Przerwano pobieranie", level: "warning" },
             );
           } else {
-            const summary = buildDownloadSummary({ done, total, failed, missing });
             notify(
               api,
               summary.text,

@@ -1515,6 +1515,19 @@ Kolejnosc zachowuje zaleznosci i dzieli prace na male, kompletne jednostki:
 9. Podglad z cache oraz eksport pojedynczy i zbiorczy.
 10. Leniwe odzyskiwanie starych rekordow i zachowanie ponownej indeksacji.
 
+#### Wynik kroku 1: wyniki per rekord, pusta tresc i podsumowanie
+
+Stan wykonania: WDROZONE.
+
+- RED na starym kodzie: 6 testow, 1 zaliczony i 5 niezaliczonych. Testy wykazaly brak pozostalych rekordow w podsumowaniu, brak diagnostyki, zaliczanie pustej tresci jako sukces oraz kontynuowanie odczytu po anulowaniu kotwiczenia.
+- GREEN po implementacji: 6/6. Kazdy rozpoczety rekord ma jeden z osmiu dozwolonych wynikow oraz etap; pusta lub bialoznakowa tresc jest bledem odczytu bez upsertu, a anulowanie nie jest normalnym zakonczeniem.
+- Pierwsza powiazana regresja: 52 testy, 51 zaliczonych i 1 niezaliczony. Stare oczekiwanie nie uwzglednialo rzeczywiscie pozostalych rekordow. Po zaktualizowaniu dwoch oczekiwanych komunikatow zgodnie z nowym kontraktem koncowa powiazana regresja przeszla 23/23.
+- Podsumowanie rozdziela pobrane, nieudane, znikniete i pozostale rekordy. `Do pobrania` nadal pochodzi z rzeczywistego Archiwum, a diagnostyka zawiera wylacznie techniczne pseudonimy, kategorie, etapy i liczniki bez danych listow.
+- Pelny zestaw na Node 26: 1062 testy, 1061 zaliczonych, 0 niezaliczonych i 1 pominiety; kod wyjscia 0.
+- Niezalezny `tsc --noEmit -p tsconfig.test.json` oraz build zakonczyly sie pomyslnie.
+
+Nie wykonano testu w prawdziwej grze. Nie zmieniono wersji, nie utworzono wydania i nie wykonano publikacji.
+
 Kroki 1-6 zabezpieczaja odczyt przed leniwym uzupelnianiem z kroku 10. Kroki 7-9 moga byc testowane na pelnych danych bez czekania na migracje historyczna, ale calosc nie jest zakonczona przed zamknieciem wszystkich krokow.
 
 Kazdy krok:

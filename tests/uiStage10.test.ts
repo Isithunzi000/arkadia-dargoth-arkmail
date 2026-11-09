@@ -76,11 +76,11 @@ test('etap 10: wspolny budowniczy rozroznia pelny sukces i wynik czesciowy', asy
   );
   assert.deepEqual(
     buildDownloadSummary({ done: 1, total: 5, failed: 0, missing: 2 }),
-    { text: 'Pobrano: 1 z 5. Nie ma juz w skrzynce: 2.', level: 'warning' },
+    { text: 'Pobrano: 1 z 5. Nie ma juz w skrzynce: 2. Pozostale: 2.', level: 'warning' },
   );
   assert.deepEqual(
     buildDownloadSummary({ done: 1, total: 5, failed: 2, missing: 1 }),
-    { text: 'Pobrano: 1 z 5. Nieudane: 2. Nie ma juz w skrzynce: 1.', level: 'warning' },
+    { text: 'Pobrano: 1 z 5. Nieudane: 2. Nie ma juz w skrzynce: 1. Pozostale: 1.', level: 'warning' },
   );
   for (const count of [0, 1, 2, 4, 5, 21, 22, 25]) {
     assert.deepEqual(
