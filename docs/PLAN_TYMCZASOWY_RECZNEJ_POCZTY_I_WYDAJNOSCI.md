@@ -628,6 +628,16 @@ Staly komunikat po wylaczeniu automatycznego odswiezania:
 
 Tooltipy maja byc dostepne rowniez z klawiatury. Informacja o nieaktualnych danych nie moze byc dostepna wylacznie po najechaniu na ustawienie.
 
+Wynik wdrozenia:
+
+- RED przed implementacja: 5 testow, 0 zaliczonych, 5 niezaliczonych.
+- GREEN po implementacji: testy ustawien 5/5 oraz powiazana regresja 63/63.
+- Pierwszy pelny zestaw wykazal jeden blad kontroli slownictwa w nowym komentarzu. Po zastapieniu go neutralnym opisem usuwania zadan kontrola przechodzi 1/1.
+- Koncowy pelny zestaw: 1053 testy, 1052 zaliczone, 0 niezaliczonych, 1 pominiety.
+- Niezalezne `npm run typecheck` i `npm run build` zakonczyly sie sukcesem.
+
+Nie wykonano testu w prawdziwej grze.
+
 ### 13.8. Kolejnosc commitow i testow
 
 Prace nalezy podzielic na osobne, spojne commity:

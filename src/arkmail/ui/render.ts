@@ -1046,17 +1046,46 @@ const filterClearClass = (viewClass?: string): string =>
     // Fala 21b/24h: zakres czyszczenia wyjasniony w tooltipie przycisku
     // (powyzej), bez stalego napisu w panelu.
 
-    // Przelacznik powiadomien o nowej poczcie (trwale w storage).
+    // Dwa niezalezne ustawienia. Tooltip jest takze na samym polu,
+    // wiec opis pozostaje powiazany z kontrolka dostepna z klawiatury.
+    const notifyTitle =
+      'Pokazuje komunikat o nowej poczcie. To ustawienie nie wplywa na automatyczne odswiezanie skrzynek.';
     const notifyRow = doc.createElement('label');
     notifyRow.className = 'arkmail-dim';
+    notifyRow.setAttribute('title', notifyTitle);
     const chk = doc.createElement('input');
     chk.setAttribute('type', 'checkbox');
     chk.className = 'arkmail-notify-toggle';
+    chk.setAttribute('title', notifyTitle);
     chk.checked = state.notifyEnabled;
     chk.addEventListener('click', () => store.setNotifyEnabled(!store.state.notifyEnabled));
     notifyRow.appendChild(chk);
-    notifyRow.appendChild(doc.createTextNode(' Powiadom o nowej poczcie'));
+    notifyRow.appendChild(doc.createTextNode(' Powiadomienia o nowej poczcie'));
     pane.appendChild(notifyRow);
+
+    const autoRefreshTitle =
+      'Po nowej poczcie i innych zdarzeniach pocztowych ArkMail automatycznie sprawdza skrzynki oraz aktualizuje archiwum, kontakty i liczniki. Wylaczenie tej opcji zatrzymuje odswiezanie w tle, ale nie wylacza powiadomien. Dane moga byc nieaktualne do czasu recznego odswiezenia. Uzyj przycisku Odswiez, aby pobrac aktualne dane.';
+    const autoRefreshRow = doc.createElement('label');
+    autoRefreshRow.className = 'arkmail-dim';
+    autoRefreshRow.setAttribute('title', autoRefreshTitle);
+    const autoRefreshToggle = doc.createElement('input');
+    autoRefreshToggle.setAttribute('type', 'checkbox');
+    autoRefreshToggle.className = 'arkmail-auto-refresh-toggle';
+    autoRefreshToggle.setAttribute('title', autoRefreshTitle);
+    autoRefreshToggle.checked = state.autoRefreshEnabled;
+    autoRefreshToggle.addEventListener('click', () =>
+      store.setAutoRefreshEnabled(!store.state.autoRefreshEnabled));
+    autoRefreshRow.appendChild(autoRefreshToggle);
+    autoRefreshRow.appendChild(doc.createTextNode(' Automatyczne odswiezanie poczty'));
+    pane.appendChild(autoRefreshRow);
+    if (!state.autoRefreshEnabled) {
+      const warning = doc.createElement('div');
+      warning.className = 'arkmail-dim arkmail-auto-refresh-warning';
+      warning.setAttribute('role', 'status');
+      warning.textContent =
+        'Automatyczne odswiezanie jest wylaczone. Archiwum, kontakty i liczniki moga byc nieaktualne. Uzyj przycisku Odswiez, aby pobrac aktualne dane.';
+      pane.appendChild(warning);
+    }
 
     // Pasek szukania serwerowego (komenda "listy" z filtrami, skladnia
     // ?listy). Pola niekontrolowane (bez rerendera przy pisaniu).

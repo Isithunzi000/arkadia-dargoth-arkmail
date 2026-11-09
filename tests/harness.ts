@@ -187,6 +187,7 @@ export async function startHarness(
   options: {
     archive?: ArchiveLetter[];
     notifyEnabled?: boolean;
+    autoRefreshEnabled?: boolean;
     indexMeta?: Partial<Record<MailBox, string>>;
     // Fala 27: true = pominac domyslne uzbrojenie bramy po init
     // (symulacja install/enable pluginu W GRZE - sygnaly obecnosci
@@ -211,7 +212,7 @@ export async function startHarness(
       disconnect(): void {}
     };
   }
-  if (options.archive || options.notifyEnabled !== undefined || options.indexMeta) {
+  if (options.archive || options.notifyEnabled !== undefined || options.autoRefreshEnabled !== undefined || options.indexMeta) {
     const seed = new IndexedDbStorageDriver(globalThis.indexedDB);
     if (options.archive) {
       await seed.putLetters(
@@ -221,6 +222,9 @@ export async function startHarness(
     }
     if (options.notifyEnabled !== undefined) {
       await seed.put('arkmail.foo.powiadomienia', JSON.stringify(options.notifyEnabled));
+    }
+    if (options.autoRefreshEnabled !== undefined) {
+      await seed.put('arkmail.foo.automatyczne-odswiezanie', JSON.stringify(options.autoRefreshEnabled));
     }
     if (options.indexMeta) {
       await seed.put('arkmail.foo.indeks', JSON.stringify(options.indexMeta));

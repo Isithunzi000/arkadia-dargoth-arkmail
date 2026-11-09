@@ -190,6 +190,7 @@ export const ANIMAL_TIMING = { flightTimeoutMs: 60000, sluchamWindowMs: 2000 };
 let listingCtxSeq = 0;
 let listingCtx: ListingCtx | null = null;
 const NOTIFY_KEY = "powiadomienia";
+const AUTO_REFRESH_KEY = "automatyczne-odswiezanie";
 const COMPOSE_KEY = "compose";
 const INDEX_KEY = "indeks";
 const ARCHIVE_GAPS_KEY = "luki-archiwum";
@@ -404,6 +405,7 @@ export async function init(api: PluginApi) {
   const composePrefs = storage.getJSON<{ template?: LetterTemplate; width?: number }>(COMPOSE_KEY);
   store = new MailUiStore({
     notifyEnabled: storage.getJSON<boolean>(NOTIFY_KEY) ?? true,
+    autoRefreshEnabled: storage.getJSON<boolean>(AUTO_REFRESH_KEY) ?? true,
     archive,
     composeTemplate: composePrefs?.template ?? "plain",
     composeWidth: composePrefs?.width ?? 60,
@@ -560,13 +562,18 @@ export async function init(api: PluginApi) {
     boxes: MailBox[],
     mode: "sync" | "replace",
     source: "auto" | "manual",
+    automatic = false,
   ): Promise<void> => {
+    // Flaga automatic dotyczy wylacznie zadan w tle. Operacje powiazane
+    // z recznym dzialaniem moga odswiezyc skrzynki takze przy opcji off.
+    const autoDisabled = (): boolean => automatic && !ui.state.autoRefreshEnabled;
     for (let index = 0; index < boxes.length; index++) {
       const box = boxes[index]!;
       const parkRemaining = (): void => {
         if (source !== "auto" || !playerMailMode) return;
         for (const pending of boxes.slice(index)) pendingRefresh.add(pending);
       };
+      if (autoDisabled()) throw new Error("operacja anulowana");
       if (playerMailMode) {
         parkRemaining();
         throw new Error("operacja anulowana");
@@ -581,6 +588,8 @@ export async function init(api: PluginApi) {
       }
       // Wejscie gracza moze nastapic miedzy rozwiazaniem sesji a tym
       // krokiem. Anulowanego wyniku nie wolno zastosowac do archiwum.
+      // To samo dotyczy wylaczenia zadan w tle podczas ostatniego fetcha.
+      if (autoDisabled()) throw new Error("operacja anulowana");
       if (playerMailMode) {
         parkRemaining();
         throw new Error("operacja anulowana");
@@ -692,14 +701,16 @@ export async function init(api: PluginApi) {
     boxes: MailBox[],
     mode: "sync" | "replace" = "sync",
     source: "auto" | "manual" = "auto",
+    automatic = false,
   ): void => {
+    if (automatic && !ui.state.autoRefreshEnabled) return;
     if (ui.state.tab === "usuwanie") ui.resetDeletion();
     ui.clearSearchBoxes(boxes);
     const generation = connectionGeneration;
     let completed = false;
     let cancelled = false;
     void runExclusive(async () => {
-      await fetchBoxes(boxes, mode, source);
+      await fetchBoxes(boxes, mode, source, automatic);
       completed = true;
     })
       .catch((err: unknown) => {
@@ -805,7 +816,7 @@ export async function init(api: PluginApi) {
     if (s?.resumed === true && !s?.upstreamClosed) {
       lastUpstreamClosed = false;
       armGameTransport();
-      refreshBoxes(["odebrane", "nieprzeczytane", "wyslane", "niewyslane"]);
+      refreshBoxes(["odebrane", "nieprzeczytane", "wyslane", "niewyslane"], "sync", "auto", true);
     } else if (s?.upstreamClosed === true) {
       // Fala 26: proxy wprost mowi, ze gra zamknela polaczenie (kick:
       // ramka 'ended' albo 'attached' z upstreamClosed=true - obie
@@ -861,6 +872,9 @@ export async function init(api: PluginApi) {
   let playerMailMode = false;
   let awaitingPlayerMailPrompt = false;
   const scheduleRefresh = (boxes: MailBox[]): void => {
+    // Wylaczenie nie parkuje nowych zadan na pozniej: zdarzenia w tle
+    // zostaja bez komend az do recznej operacji lub ponownego wlaczenia.
+    if (!ui.state.autoRefreshEnabled) return;
     for (const b of boxes) pendingRefresh.add(b);
     // Fala 24f2: w recznym trybie poczty gracza zadna komenda pluginu
     // nie wychodzi - parkujemy do jego wyjscia z trybu.
@@ -870,10 +884,15 @@ export async function init(api: PluginApi) {
     const generation = connectionGeneration;
     let completed = false;
     void runExclusive(async () => {
+        // Zadanie moglo czekac na locka w chwili wylaczenia opcji.
+        if (!ui.state.autoRefreshEnabled) {
+          pendingRefresh.clear();
+          return;
+        }
         const batch = [...pendingRefresh];
         pendingRefresh.clear();
         ui.clearSearchBoxes(batch);
-        await fetchBoxes(batch, "sync", "auto");
+        await fetchBoxes(batch, "sync", "auto", true);
         completed = true;
       })
       .catch(() => {})
@@ -950,6 +969,8 @@ export async function init(api: PluginApi) {
    *  DELAYED_INBOX_RETRY_MS). Koalescencja przez sam scheduleRefresh. */
   const scheduleDelayedInboxRefresh = (): void => {
     for (const t of delayedInboxTimers) clearTimeout(t);
+    delayedInboxTimers = [];
+    if (!ui.state.autoRefreshEnabled) return;
     delayedInboxTimers = DELAYED_INBOX_RETRY_MS.map((ms) =>
       setTimeout(() => scheduleRefresh(["odebrane", "nieprzeczytane"]), ms),
     );
@@ -2751,13 +2772,24 @@ export async function init(api: PluginApi) {
   });
 
   // Badge na klawiszu stopki.
+  let previousAutoRefreshEnabled = ui.state.autoRefreshEnabled;
   unsubBadge = ui.subscribe((s) => {
+    if (previousAutoRefreshEnabled && !s.autoRefreshEnabled) {
+      // Zadania odlozone na locka i retry sa usuwane natychmiast.
+      // Juz wyslana komenda konczy sie bez kolejnej skrzynki i bez
+      // zastosowania czesciowego wyniku - pilnuje tego fetchBoxes().
+      pendingRefresh.clear();
+      for (const timer of delayedInboxTimers) clearTimeout(timer);
+      delayedInboxTimers = [];
+    }
+    previousAutoRefreshEnabled = s.autoRefreshEnabled;
     // Fala 14d: '(u)' albo '(u/n)' (nieprzeczytane/niewyslane);
     // podswietlenie, gdy cokolwiek czeka.
     footerHandle?.update({ label: PLUGIN_NAME + formatBadgeSuffix(s.badge, s.badgeUnsent) });
     api.ui.setFooterButtonState(FOOTER_STATE, s.badge > 0 || s.badgeUnsent > 0);
     storage.setJSON(COMPOSE_KEY, { template: s.composeTemplate, width: s.composeWidth });
     storage.setJSON(NOTIFY_KEY, s.notifyEnabled);
+    storage.setJSON(AUTO_REFRESH_KEY, s.autoRefreshEnabled);
   });
 
     refreshPopup();

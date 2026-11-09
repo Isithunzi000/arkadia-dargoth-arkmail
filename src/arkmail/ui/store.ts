@@ -130,6 +130,8 @@ export interface MailUiState {
   groups: ContactGroup[];
   archive: ArchiveLetter[];
   notifyEnabled: boolean;
+  /** Niezalezne od powiadomien automatyczne listingi w tle. */
+  autoRefreshEnabled: boolean;
   /** Lot zwierzecia pocztowego w toku (Fala 13b): przycisk nieaktywny. */
   animalFlying: boolean;
   /**
@@ -191,6 +193,7 @@ const DEFAULT_STATE: MailUiState = {
   groups: [],
   archive: [],
   notifyEnabled: true,
+  autoRefreshEnabled: true,
   animalFlying: false,
   unsentFlash: false,
   composeTemplate: 'plain',
@@ -687,7 +690,7 @@ export class MailUiStore {
    * Czysci pamiec podreczna pluginu (Fala 12e): widoki skrzynek,
    * archiwum (RAM; storage kasuje caller), kontakty, schowek wynikow
    * szukania i tryb szukania. ZACHOWUJE ustawienia (powiadomienia,
-   * szablon/szerokosc compose) i otwarty list.
+   * automatyczne odswiezanie, szablon/szerokosc compose) i otwarty list.
    */
   clearCacheData(): void {
     for (const b of Object.keys(this.stashedViews)) {
@@ -736,6 +739,10 @@ export class MailUiStore {
 
   setNotifyEnabled(notifyEnabled: boolean): void {
     this.update({ notifyEnabled });
+  }
+
+  setAutoRefreshEnabled(autoRefreshEnabled: boolean): void {
+    this.update({ autoRefreshEnabled });
   }
 
   setAnimalFlying(animalFlying: boolean): void {
