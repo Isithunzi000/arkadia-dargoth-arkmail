@@ -11,12 +11,88 @@ export interface ProtoLine {
   own?: boolean;
 }
 
+/** Rejestracja jednej sesji wiazana z generacja polaczenia. */
+export interface SessionScope {
+  readonly id: number;
+  readonly generation: number;
+  readonly active: boolean;
+  subscribe(cb: (line: ProtoLine) => void): () => void;
+  close(): void;
+}
+
+class RegisteredSession implements SessionScope {
+  private readonly callbacks = new Set<(line: ProtoLine) => void>();
+  private open = true;
+
+  constructor(
+    readonly id: number,
+    readonly generation: number,
+    private readonly onClose: (session: RegisteredSession) => void,
+  ) {}
+
+  get active(): boolean {
+    return this.open;
+  }
+
+  subscribe(cb: (line: ProtoLine) => void): () => void {
+    if (!this.open) return () => {};
+    this.callbacks.add(cb);
+    return () => {
+      this.callbacks.delete(cb);
+    };
+  }
+
+  dispatch(line: ProtoLine): void {
+    if (!this.open) return;
+    for (const cb of [...this.callbacks]) cb(line);
+  }
+
+  close(): void {
+    if (!this.open) return;
+    this.open = false;
+    this.callbacks.clear();
+    this.onClose(this);
+  }
+}
+
+/** Wspolny rejestr identyfikatorow i generacji dla adapterow transportu. */
+export class SessionScopeRegistry {
+  private readonly sessions = new Set<RegisteredSession>();
+  private nextId = 0;
+  private generation = 0;
+
+  openSession(): SessionScope {
+    const session = new RegisteredSession(
+      ++this.nextId,
+      this.generation,
+      (closed) => this.sessions.delete(closed),
+    );
+    this.sessions.add(session);
+    return session;
+  }
+
+  dispatch(line: ProtoLine): void {
+    for (const session of [...this.sessions]) session.dispatch(line);
+  }
+
+  reconnect(): void {
+    this.generation++;
+    this.closeAll();
+  }
+
+  closeAll(): void {
+    for (const session of [...this.sessions]) session.close();
+  }
+}
+
 export interface Transport {
   /** Wysyla jedna linie do gry. echo=true: linia pokazuje sie w oknie
    *  gry jak wpisana recznie (Fala 28h: compose i "wyslij zwierze" sa
    *  widoczne dla gracza); domyslnie bez echa (operacje pluginowe). */
   send(line: string, echo?: boolean): void | Promise<void>;
-  /** Subskrypcja linii przychodzacych; zwraca unsubscribe. */
+  /** Otwiera rejestracje rozdzielajaca sesje i generacje polaczenia. */
+  openSession(): SessionScope;
+  /** Globalna subskrypcja linii; zwraca unsubscribe. */
   subscribe(cb: (line: ProtoLine) => void): () => void;
 }
 
@@ -25,10 +101,19 @@ export class MockTransport implements Transport {
   /** Flagi echa rownolegle do sent (Fala 28h). */
   readonly sentEcho: boolean[] = [];
   private subs = new Set<(line: ProtoLine) => void>();
+  private readonly sessions = new SessionScopeRegistry();
 
   send(line: string, echo = false): void {
     this.sent.push(line);
     this.sentEcho.push(echo);
+  }
+
+  openSession(): SessionScope {
+    return this.sessions.openSession();
+  }
+
+  setOnline(online: boolean): void {
+    if (!online) this.sessions.reconnect();
   }
 
   subscribe(cb: (line: ProtoLine) => void): () => void {
@@ -40,6 +125,7 @@ export class MockTransport implements Transport {
 
   emit(line: ProtoLine): void {
     for (const cb of [...this.subs]) cb(line);
+    this.sessions.dispatch(line);
   }
 
   /** Odtwarzanie fixture'a: po kazdej linii oddaje sterowanie do

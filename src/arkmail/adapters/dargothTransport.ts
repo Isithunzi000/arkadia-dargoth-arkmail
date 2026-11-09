@@ -14,7 +14,8 @@
 
 import type PluginApi from 'plugin-api';
 import type { AnsiAwareBuffer } from 'plugin-api';
-import type { ProtoLine, Transport } from '../core/session/transport.js';
+import { SessionScopeRegistry } from '../core/session/transport.js';
+import type { ProtoLine, SessionScope, Transport } from '../core/session/transport.js';
 import { extractPagerPrompt } from '../core/protocol/parser.js';
 import { isPromptLine } from '../core/session/lines.js';
 
@@ -54,6 +55,7 @@ const isPagerCommand = (command: string): boolean => {
 
 export class DargothTransport implements Transport {
   private readonly subscribers = new Set<(line: ProtoLine) => void>();
+  private readonly sessions = new SessionScopeRegistry();
   private triggerArmed = false;
   private modalActive = false;
   private hookId: string | null = null;
@@ -160,6 +162,11 @@ export class DargothTransport implements Transport {
     this.pendingEchoSends = [];
   }
 
+  openSession(): SessionScope {
+    this.armTrigger();
+    return this.sessions.openSession();
+  }
+
   subscribe(cb: (line: ProtoLine) => void): () => void {
     this.armTrigger();
     this.subscribers.add(cb);
@@ -237,6 +244,7 @@ export class DargothTransport implements Transport {
     this.online = online;
     if (online) return;
     this.connectionGeneration++;
+    this.sessions.reconnect();
     this.commandQueue = Promise.resolve();
     this.clearPendingEchoes();
     if (this.hookId !== null) {
@@ -257,6 +265,7 @@ export class DargothTransport implements Transport {
       this.triggerArmed = false;
     }
     this.subscribers.clear();
+    this.sessions.closeAll();
     this.queue = [];
     this.clearPendingEchoes();
     this.connectionGeneration++;
@@ -304,6 +313,9 @@ export class DargothTransport implements Transport {
             this.pagerOpen = false;
           }
         }
+        // Najpierw wlasciciel sesji. Globalny subskrybent moze ja zamknac
+        // i otworzyc kolejna, ale nie moze przejac biezacej linii.
+        this.sessions.dispatch(proto);
         for (const cb of [...this.subscribers]) cb(proto);
         // Fala 16j: subskrybenci (parser) dostaja linie ZAWSZE; zwrot
         // null tlumi tylko wyswietlanie w glownym oknie gry, i to

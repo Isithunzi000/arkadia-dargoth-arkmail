@@ -75,6 +75,7 @@ import {
 } from "./core/archiveDownload";
 import { totalLive } from "./core/archiveStats";
 import { MailboxSession, type ListingCtx, type MailboxEntry, type MailboxResult } from "./core/session/mailbox";
+import { AmbiguousResponseError } from "./core/session/errors";
 import { humanizeMailError, isOperationCancelled } from "./core/errors";
 import { archiveExportEntries, letterTxt, txtFileName } from "./core/exportTxt";
 import { buildZip } from "./core/zipStore";
@@ -1737,6 +1738,9 @@ export async function init(api: PluginApi) {
           continue;
         }
         if (stage === "zapis") return { kind: "blad_zapisu", stage: "zapis" };
+        if (err instanceof AmbiguousResponseError) {
+          return { kind: "niejednoznaczna_odpowiedz", stage };
+        }
         if (stage === "kotwiczenie") {
           return { kind: "blad_kotwiczenia", stage: "kotwiczenie" };
         }

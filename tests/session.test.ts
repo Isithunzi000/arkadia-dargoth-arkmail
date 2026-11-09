@@ -8,7 +8,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { MockTransport, type ProtoLine } from '../src/arkmail/core/session/transport';
+import {
+  MockTransport,
+  type ProtoLine,
+  type SessionScope,
+} from '../src/arkmail/core/session/transport';
 import { MailboxSession } from '../src/arkmail/core/session/mailbox';
 import { PagerSession } from '../src/arkmail/core/session/pager';
 import { EditorSession } from '../src/arkmail/core/session/editor';
@@ -38,16 +42,22 @@ class RejectingTransport extends MockTransport {
       : Promise.resolve();
   }
 
-  override subscribe(cb: (line: ProtoLine) => void): () => void {
+  override openSession(): SessionScope {
     this.activeSubscriptions++;
-    const unsubscribe = super.subscribe(cb);
+    const session = super.openSession();
     let active = true;
-    return () => {
-      if (active) {
-        active = false;
-        this.activeSubscriptions--;
-      }
-      unsubscribe();
+    return {
+      get id() { return session.id; },
+      get generation() { return session.generation; },
+      get active() { return session.active; },
+      subscribe: (cb) => session.subscribe(cb),
+      close: () => {
+        if (active) {
+          active = false;
+          this.activeSubscriptions--;
+        }
+        session.close();
+      },
     };
   }
 }

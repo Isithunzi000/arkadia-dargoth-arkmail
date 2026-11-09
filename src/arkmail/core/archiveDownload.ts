@@ -28,7 +28,7 @@ export type FetchBodyResult =
   | ArchiveDownloadOutcome<'nie_ma_w_skrzynce', 'kotwiczenie'>
   | ArchiveDownloadOutcome<'blad_kotwiczenia', 'kotwiczenie'>
   | ArchiveDownloadOutcome<'blad_odczytu', 'odczyt'>
-  | ArchiveDownloadOutcome<'niejednoznaczna_odpowiedz', 'odczyt'>
+  | ArchiveDownloadOutcome<'niejednoznaczna_odpowiedz', 'kotwiczenie' | 'odczyt'>
   | ArchiveDownloadOutcome<'pusta_tresc', 'odczyt'>
   | ArchiveDownloadOutcome<'blad_zapisu', 'zapis'>
   | ArchiveDownloadOutcome<'anulowano'>;

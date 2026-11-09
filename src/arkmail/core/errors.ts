@@ -47,7 +47,8 @@ const RULES: Rule[] = [
   {
     // Straznik desynchronizacji (Fala 14d/17b): surowy format
     // "pusta <skrzynka> podczas fetch <skrzynka>" / "listing ...".
-    re: /^(?:pusta|listing) (\S+) podczas fetch (\S+)$/,
+    // Krok 16.2 moze poprzedzic go typem niejednoznacznej odpowiedzi.
+    re: /^(?:niejednoznaczna_odpowiedz: )?(?:pusta|listing) (\S+) podczas fetch (\S+)$/,
     msg: (m) =>
       `Serwer odpowiedzial za inna skrzynke (${m[1]} zamiast ${m[2]}) - sprobuj ponownie.`,
   },

@@ -73,6 +73,10 @@ test('humanize: mismatch skrzynki i przerwanie po ludzku', () => {
     humanizeMailError('listing wyslane podczas fetch odebrane'),
     'Serwer odpowiedzial za inna skrzynke (wyslane zamiast odebrane) - sprobuj ponownie.',
   );
+  assert.equal(
+    humanizeMailError('niejednoznaczna_odpowiedz: pusta wyslane podczas fetch odebrane'),
+    'Serwer odpowiedzial za inna skrzynke (wyslane zamiast odebrane) - sprobuj ponownie.',
+  );
   assert.equal(humanizeMailError('pager session list 7: przerwano'), 'Przerwano odczyt listu.');
 });
 

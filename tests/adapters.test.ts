@@ -150,6 +150,56 @@ test('adapter: unsubscribe odcina strumien', () => {
   assert.deepEqual(seen.map((l) => l.text), ['a']);
 });
 
+test('adapter: rejestracja sesji ma identyfikator i generacje, reconnect zamyka stara', () => {
+  const f = new FakeApi();
+  const t = armedTransport(f);
+  const first = t.openSession();
+  const firstSeen: string[] = [];
+  first.subscribe((line) => firstSeen.push(line.text));
+  f.fireLine('pierwsza', 'mail');
+  assert.deepEqual(firstSeen, ['pierwsza']);
+  first.close();
+
+  const second = t.openSession();
+  const secondSeen: string[] = [];
+  second.subscribe((line) => secondSeen.push(line.text));
+  assert.ok(second.id > first.id);
+  assert.equal(second.generation, first.generation);
+  t.setOnline(false);
+  t.setOnline(true);
+  assert.equal(second.active, false);
+
+  const third = t.openSession();
+  assert.ok(third.generation > second.generation);
+  f.fireLine('po reconnectcie', 'mail');
+  assert.deepEqual(firstSeen, ['pierwsza']);
+  assert.deepEqual(secondSeen, []);
+  third.close();
+  t.dispose();
+});
+
+test('adapter: reentrantny subskrybent globalny nie przekierowuje linii do nowej sesji', () => {
+  const f = new FakeApi();
+  const t = armedTransport(f);
+  const first = t.openSession();
+  const firstSeen: string[] = [];
+  const secondSeen: string[] = [];
+  first.subscribe((line) => firstSeen.push(line.text));
+  let second: ReturnType<DargothTransport['openSession']> | null = null;
+  t.subscribe(() => {
+    first.close();
+    second = t.openSession();
+    second.subscribe((line) => secondSeen.push(line.text));
+  });
+
+  f.fireLine('stara odpowiedz', 'mail');
+  assert.deepEqual(firstSeen, ['stara odpowiedz']);
+  assert.deepEqual(secondSeen, [], 'linia nie zmienia wlasciciela w trakcie dystrybucji');
+  assert.ok(second);
+  (second as ReturnType<DargothTransport['openSession']>).close();
+  t.dispose();
+});
+
 test('adapter: modal-guard tlumi komendy gracza, przepuszcza wlasne', async () => {
   const f = new FakeApi();
   const t = armedTransport(f);

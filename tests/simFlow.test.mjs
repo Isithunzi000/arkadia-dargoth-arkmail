@@ -187,7 +187,8 @@ const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 {
   const t = new MockTransport();
   const pg = new PagerSession(t, OPTS);
-  const p = pg.forwardLetter(2, 'bar');
+  // Ramki pochodza z odczytu listu 23; numer zadania musi do nich pasowac.
+  const p = pg.forwardLetter(23, 'bar');
   await t.replay(load('forward-dialog-bledy.json'));
   const res = await p;
   ok('S10a f+pusta', t.sent.includes('f bar') && t.sent.includes(''), t.sent.join(' | '));

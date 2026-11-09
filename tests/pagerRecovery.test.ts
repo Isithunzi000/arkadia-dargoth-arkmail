@@ -43,7 +43,7 @@ const settle = <T>(p: Promise<T>): Promise<Settled<T>> =>
     (error) => ({ ok: false as const, error }),
   );
 
-const PAGER_PROMPT = '[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 23) -- ';
+const PAGER_PROMPT = '[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ';
 
 test('mailbox: pager nieznanego pochodzenia anuluje bez q i ponowienia', async () => {
   const t = new MockTransport();

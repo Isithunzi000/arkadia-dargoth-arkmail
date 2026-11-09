@@ -25,6 +25,7 @@ import type {
 } from '../protocol/types.js';
 import { isEchoLine, isPromptLine } from './lines.js';
 import { clearPagerOrphan } from './orphanPager.js';
+import { AmbiguousResponseError } from './errors.js';
 import type { ProtoLine, Transport } from './transport.js';
 
 /** Linie-bledy serwera przerywajace transakcje (log 2026-10-17/18). */
@@ -98,6 +99,7 @@ export class MailboxSession {
    */
   fetch(box: MailBox, command?: string): Promise<MailboxResult> {
     return new Promise((resolve, reject) => {
+      const session = this.transport.openSession();
       const cmd = command ?? `listy ${box}`;
       let header: ListingHeader | null = null;
       const entries: MailboxEntry[] = [];
@@ -116,7 +118,7 @@ export class MailboxSession {
         if (idleTimer) clearTimeout(idleTimer);
         if (loadRetryTimer) clearTimeout(loadRetryTimer);
         cancelUnsub();
-        unsub();
+        session.close();
       };
       const fail = (error: unknown): void => {
         if (done) return;
@@ -155,7 +157,7 @@ export class MailboxSession {
         reject(new Error(`timeout: mailbox fetch ${box}`));
       }, this.opts.timeoutMs);
 
-      const unsub = this.transport.subscribe((line: ProtoLine) => {
+      session.subscribe((line: ProtoLine) => {
         if (done) return;
 
         // Linia-blad serwera (np. "Data zostala podana w zlym formacie...")
@@ -203,8 +205,9 @@ export class MailboxSession {
             // genityw "otrzymanych" pasuje do odebranych i nieprzeczytanych
             // (parser zwraca zbior; zgloszenie pkt 5/6).
             if (!empty.boxes.includes(box)) {
-              cleanup();
-              reject(new Error(`pusta ${empty.boxes.join('/')} podczas fetch ${box}`));
+              fail(new AmbiguousResponseError(
+                `pusta ${empty.boxes.join('/')} podczas fetch ${box}`,
+              ));
               return;
             }
             // Zaakceptowany pusty wynik raportuje skrzynke ZADANA.
@@ -214,8 +217,7 @@ export class MailboxSession {
           const h = parseListingHeader(line.text);
           if (h) {
             if (h.box !== box) {
-              cleanup();
-              reject(new Error(`listing ${h.box} podczas fetch ${box}`));
+              fail(new AmbiguousResponseError(`listing ${h.box} podczas fetch ${box}`));
               return;
             }
             // Fala 20a: serwer dostarczyl listing mimo throttle'u -

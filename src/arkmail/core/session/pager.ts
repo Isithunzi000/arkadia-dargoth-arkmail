@@ -18,6 +18,7 @@ import {
 import type { MailError, PagerPrompt } from '../protocol/types.js';
 import { isEchoLine, isPromptLine } from './lines.js';
 import { clearPagerOrphan, suspectPagerOrphan } from './orphanPager.js';
+import { AmbiguousResponseError } from './errors.js';
 import type { ProtoLine, Transport } from './transport.js';
 import type { SessionOptions } from './mailbox.js';
 import { DEFAULT_IDLE_FLUSH_MS, LISTS_LOADING_RETRY_MS } from './mailbox.js';
@@ -260,6 +261,7 @@ export class PagerSession {
     shouldAbort?: () => boolean,
   ): Promise<T> {
     return new Promise((resolve, reject) => {
+      const session = this.transport.openSession();
       const letter: LetterContent = {
         number: numer, from: '', subject: '', to: '', cc: null, date: null, body: [],
       };
@@ -276,6 +278,7 @@ export class PagerSession {
       let loadRetried = false;
       let loadRetryTimer: ReturnType<typeof setTimeout> | null = null;
       let done = false;
+      let ambiguous: string | null = null;
       /** Kolejne proby advance po ciszy; zeruje kazda linia body albo
        *  prompt pagera (serwer odpowiada = strona nie czeka). */
       let advances = 0;
@@ -292,7 +295,7 @@ export class PagerSession {
         if (graceTimer) clearTimeout(graceTimer);
         if (loadRetryTimer) clearTimeout(loadRetryTimer);
         cancelUnsub();
-        unsub();
+        session.close();
       };
       const fail = (error: unknown): void => {
         if (done) return;
@@ -317,6 +320,11 @@ export class PagerSession {
         cleanup();
         if (aborted) {
           reject(new Error(`pager session list ${numer}: przerwano`));
+          return;
+        }
+        if (ambiguous !== null) {
+          clearPagerOrphan();
+          reject(new AmbiguousResponseError(ambiguous));
           return;
         }
         // Fala 24g: czyste zamkniecie transakcji = komendy dochodza,
@@ -436,7 +444,7 @@ export class PagerSession {
         if (!done) armIdle();
       };
 
-      const unsub = this.transport.subscribe((line: ProtoLine) => {
+      session.subscribe((line: ProtoLine) => {
         // Echo wlasnych komend: po klasie albo po samej tresci.
         if (done || line.cls === 'command' || isEchoLine(line.text)) return;
 
@@ -517,6 +525,11 @@ export class PagerSession {
         // z inna trescia w jednej linii (isPagerPrompt bylby slepy).
         const pp = extractPagerPrompt(line.text);
         if (pp) {
+          if (pp.current !== numer) {
+            ambiguous = `prompt pagera list ${pp.current} podczas odczytu ${numer}`;
+            enterClosing();
+            return;
+          }
           advances = 0; // prompt pagera = serwer odpowiedzial
           if (quietTimer) clearTimeout(quietTimer);
           pager = pp;
@@ -541,8 +554,15 @@ export class PagerSession {
         if (state === 'letter' && !headersDone) {
           const h = parseLetterHeaderLine(line.text);
           if (h) {
-            if (h.field === 'numer') letter.number = Number(h.value);
-            else if (h.field === 'od') letter.from = h.value;
+            if (h.field === 'numer') {
+              const received = Number(h.value);
+              if (received !== numer) {
+                ambiguous = `naglowek list ${h.value} podczas odczytu ${numer}`;
+                enterClosing();
+                return;
+              }
+              letter.number = received;
+            } else if (h.field === 'od') letter.from = h.value;
             else if (h.field === 'temat') letter.subject = h.value;
             else if (h.field === 'do') letter.to = h.value;
             else if (h.field === 'dw') letter.cc = h.value;

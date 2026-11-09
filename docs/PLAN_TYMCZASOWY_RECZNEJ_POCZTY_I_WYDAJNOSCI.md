@@ -1528,6 +1528,20 @@ Stan wykonania: WDROZONE.
 
 Nie wykonano testu w prawdziwej grze. Nie zmieniono wersji, nie utworzono wydania i nie wykonano publikacji.
 
+#### Wynik kroku 2: identyfikacja sesji i niejednoznaczne odpowiedzi
+
+Stan wykonania: WDROZONE.
+
+- RED na starym kodzie: podstawowy zestaw 5 testow zakonczyl sie 5 niepowodzeniami; osobny test niezgodnego promptu na starym pagerze dal 1 niepowodzenie, a test reentrantnej dystrybucji dal kolejne 1 niepowodzenie. Wykazaly przyjmowanie cudzego numeru, brak rejestracji sesji, zwykly blad zamiast niejednoznacznosci, zapis cudzej tresci i przekierowanie biezacej linii do nowej sesji.
+- GREEN po implementacji: nowe testy 6/6, lacznie z testami adaptera 27/27, a powiazana regresja przed ostatnimi dwoma przypadkami 110/110.
+- Mailbox i pager uzywaja odrebnych rejestracji z identyfikatorem oraz generacja polaczenia. Reconnect zamyka stare rejestracje, sprzatanie jest idempotentne, a wlasciciel sesji otrzymuje linie przed globalnymi subskrybentami.
+- Pager porownuje `List : N` oraz `(aktualny: N)` z numerem zadanym. Niezgodnosc powoduje bezpieczne `q`, zakonczenie na zwyklym prompcie i `niejednoznaczna_odpowiedz`; taka tresc nie trafia do Archiwum ani do innego rekordu.
+- Pierwszy pelny zestaw wykazal 3 regresje: dwie dotyczyly mapowania nowego typu bledu na komunikat uzytkownika, a jedna niespojnego numeru zadania z zachowanymi ramkami forwardu. Po osobnym RED 2/2 i poprawce mappera oraz zgodnosci zadania z ramkami regresja przeszla 9/9 bez zmiany zachowanej fixtury.
+- Koncowy pelny zestaw na Node 26: 1070 testow, 1069 zaliczonych, 0 niezaliczonych i 1 pominiety; kod wyjscia 0. Wczesniejszy przebieg mial 3 niezaliczone kontrole higieny wylacznie z powodu braku indeksu Git w tymczasowej kopii; po odtworzeniu indeksu same kontrole przeszly 4/4, a caly zestaw zostal powtorzony z powyzszym wynikiem.
+- Niezalezny `tsc --noEmit -p tsconfig.test.json` oraz build zakonczyly sie pomyslnie.
+
+Ustalony koniec odpowiedzi, pozne linie po zakonczeniu i bezpieczne wygaszenie gagowania pozostaja odrebnym zakresem kroku 3. Nie wykonano testu w prawdziwej grze. Nie zmieniono wersji, nie utworzono wydania i nie wykonano publikacji.
+
 Kroki 1-6 zabezpieczaja odczyt przed leniwym uzupelnianiem z kroku 10. Kroki 7-9 moga byc testowane na pelnych danych bez czekania na migracje historyczna, ale calosc nie jest zakonczona przed zamknieciem wszystkich krokow.
 
 Kazdy krok:
