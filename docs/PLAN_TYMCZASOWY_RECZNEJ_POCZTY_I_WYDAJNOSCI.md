@@ -829,6 +829,16 @@ Rekord `ArchiveLetter` zawiera juz:
 
 Kryterium odbioru: kazdy wiersz Archiwum pokazuje dotychczasowe informacje oraz date i czas z `dateRaw`, a rekord bez daty ma czytelne `brak daty`. Nie powstaja zadne nowe operacje pocztowe ani zmiany danych.
 
+### 15.5. Wynik wdrozenia
+
+- RED na starym kodzie: 40 testow, 37 zaliczonych, 3 niezaliczone. Dwa testy wykazaly brak elementu daty, a trzeci brak jej reguly stylu.
+- GREEN po implementacji: 40/40; powiazana regresja Archiwum i UI 148/148.
+- Weryfikacja wizualna na danych syntetycznych objela jasny i ciemny motyw, szeroki i waski widok oraz dlugi temat. Wszystkie daty mieszcza sie w wierszach, nie sa obcinane ani lamane w srodku.
+- Pelny zestaw: 1056 testow, 1055 zaliczonych, 0 niezaliczonych, 1 pominiety.
+- Niezalezne `npm run typecheck` i `npm run build` zakonczyly sie sukcesem.
+
+Nie wykonano testu w prawdziwej grze.
+
 
 ## 16. Scalona analiza i kompletny plan pobierania, naglowkow, odpowiedzi i migracji
 

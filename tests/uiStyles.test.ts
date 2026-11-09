@@ -186,6 +186,21 @@ test('style: karty Archiwum nie maja ozdobnych strzalek', () => {
   assert.ok(!STYLES.includes("content: '›'"));
 });
 
+test('style: data Archiwum jest czytelna, cala i zawija sie z wierszem', () => {
+  const row = ruleBody(/^\.arkmail-arch-entry\s*/);
+  assert.ok(row, 'wiersz Archiwum ma samodzielna regule');
+  assert.match(row!, /flex-wrap:\s*wrap/, 'wiersz przenosi date do kolejnej linii');
+
+  const date = ruleBody(/\.arkmail-arch-date\s*/);
+  assert.ok(date, 'data Archiwum ma wlasna regule');
+  assert.match(date!, new RegExp(`color:\\s*${VAR}`), 'kolor pochodzi z motywu');
+  assert.match(date!, /font-size:\s*calc\(11px \* var\(--window-font-scale, 1\)\)/);
+  assert.match(date!, /white-space:\s*nowrap/, 'data i czas nie sa lamane w srodku');
+  assert.match(date!, /flex:\s*0\s+0\s+auto/, 'data nie jest sciskana');
+  assert.match(date!, /max-width:\s*100%/, 'data nie wyjdzie poza wiersz');
+  assert.doesNotMatch(date!, /overflow:\s*hidden|text-overflow:\s*ellipsis/, 'data nie jest obcinana');
+});
+
 // Waski popup: wiersz ksiazki trzyma checkbox, imie i oba przyciski
 // w jednej linii (imie sie skraca, nie wypycha przyciskow); head grupy
 // zawija kontrolki zamiast je ucinac.

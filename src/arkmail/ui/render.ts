@@ -3256,6 +3256,11 @@ const filterClearClass = (viewClass?: string): string =>
           const dir = l.box === 'odebrane' || l.box === 'nieprzeczytane' ? 'od' : 'do';
           meta.textContent = `${dir} ${l.party} | ${l.box}`;
           row.appendChild(meta);
+          const date = doc.createElement('span');
+          date.className = 'arkmail-arch-date';
+          // Pelne oryginalne dateRaw; biale znaki nie tworza sztucznej daty.
+          date.textContent = l.dateRaw && l.dateRaw.trim().length > 0 ? l.dateRaw : 'brak daty';
+          row.appendChild(date);
           // Fala 16h: archiwum klikalne (zgloszenie pkt 9) - tresc
           // z cache albo doczyt z serwera po re-kotwicy (index.ts).
           makeClickable(row, () => handlers.onOpenArchiveLetter?.(l));

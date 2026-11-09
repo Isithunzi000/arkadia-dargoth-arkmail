@@ -649,6 +649,13 @@ export const STYLES = `
   max-width: 100%;
   overflow-wrap: anywhere;
 }
+.arkmail-arch-date {
+  flex: 0 0 auto;
+  max-width: 100%;
+  color: ${FG_DIM};
+  font-size: calc(11px * var(--window-font-scale, 1));
+  white-space: nowrap;
+}
 .arkmail-contact-controls {
   display: flex;
   flex-wrap: wrap;

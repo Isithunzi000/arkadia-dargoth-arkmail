@@ -113,3 +113,46 @@ test('archiwum: rekord pojedynczy bez zmian', () => {
     m.off();
   }
 });
+
+test('archiwum: kazdy wiersz pokazuje date i czas oraz zachowuje metadane', () => {
+  const second = archived('t2', ['Tresc drugiego.']);
+  const m = mount([archived('t1', ['Tresc pierwszego.']), second]);
+  try {
+    assert.equal(
+      text(m.container, '.arkmail-arch-date'),
+      'Wt, 24 VIII 1999, 00:11:12\nWt, 24 VIII 1999, 00:11:12',
+    );
+    assert.equal(
+      text(m.container, '.arkmail-arch-subject'),
+      '1. Wspolny temat\n2. Wspolny temat',
+      'kolejnosc, numeracja i temat bez zmian',
+    );
+    assert.equal(
+      text(m.container, '.arkmail-arch-meta'),
+      'od Goniec | odebrane\nod Goniec | odebrane',
+      'kierunek, strona listu i skrzynka bez zmian',
+    );
+    const rows = Array.from(
+      m.container.querySelectorAll('.arkmail-arch-entry') as unknown as ArrayLike<{
+        dispatchEvent(e: unknown): void;
+      }>,
+    );
+    rows[1]!.dispatchEvent(new window.Event('click'));
+    assert.deepEqual(m.opened, [second], 'klik nadal otwiera wlasciwy rekord');
+  } finally {
+    m.off();
+  }
+});
+
+test('archiwum: brak daty jest jawny i nie tworzy daty zerowej', () => {
+  const m = mount([
+    { ...archived('no-date', ['Tresc.']), dateRaw: null },
+    { ...archived('blank-date', ['Tresc.']), dateRaw: '   ' },
+  ]);
+  try {
+    assert.equal(text(m.container, '.arkmail-arch-date'), 'brak daty\nbrak daty');
+    assert.ok(!text(m.container, '.arkmail-arch-entry').includes('0000-00-00'));
+  } finally {
+    m.off();
+  }
+});
