@@ -169,6 +169,12 @@ export async function scanMailboxPages(options: PageScanOptions): Promise<PageSc
       if (gapDays.length > 0) return incompleteWithGaps();
       return finish('partial');
     }
+    // Stop dotyczy znalezienia konkretnego archiveId, takze na powtorzonej
+    // stronie blizniakow. Nie wolno kontynuowac ponawiania duplikatow.
+    if (visit.stop) {
+      if (gapDays.length > 0) return incompleteWithGaps();
+      return finish('clamped');
+    }
 
     if (freshCount === 0) {
       const oldestDuplicate = oldestEntry(all);
@@ -198,10 +204,6 @@ export async function scanMailboxPages(options: PageScanOptions): Promise<PageSc
     wallProbed = false;
     probePending = false;
     probeDay = null;
-    if (visit.stop) {
-      if (gapDays.length > 0) return incompleteWithGaps();
-      return finish('clamped');
-    }
     const oldest = oldestEntry(all);
     if (!oldest?.date) return finish('incomplete', 'brak daty w wpisach');
     await options.wait(PAGE_PACE_MS);

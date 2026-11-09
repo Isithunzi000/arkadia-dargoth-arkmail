@@ -1186,6 +1186,8 @@ Naprawa obejmuje skan, nie tylko komunikat:
 
 Jesli ograniczenie serwera uniemozliwia pelne wyliczenie dnia, rekord pozostaje, a uzytkownik dostaje konkretny powod. Ograniczenia nie wolno zamieniac na falszywy `missing`.
 
+Stan wykonania: WDROZONE. Nowy zestaw najpierw wykazal lokalny RED na starym kodzie: 2 testy, 1 zaliczony i 1 niezaliczony. Po znalezieniu celu na powtorzonej stronie blizniakow stary kod ignorowal `visit.stop` w galezi duplikatow i probowal pobrac kolejna strone. Po przeniesieniu obslugi zatrzymania przed ponawianie duplikatow skan konczy sie natychmiast po znalezieniu wlasciwego `archiveId`, bez dodatkowych kotwic. Drugi test tworzy 51 syntetycznych listow jednego dnia i cel poza pierwsza strona; potwierdza dokladnie 9 komend obejmujacych strony, trzy ponowienia kotwicy i sonde wykluczajaca dzien, wynik `blad_kotwiczenia`, brak odczytu innego listu, brak falszywego `missing`, zachowanie rekordu oraz usuniecie znacznika kompletnej indeksacji. Istniejace testy potwierdzaja ponadto pelny skan bez rekordu jako `nie_ma_w_skrzynce` oraz rozroznianie blizniakow po `archiveId`. Powiazana regresja przeszla 32/32. Koncowa pelna regresja zakonczyla sie kodem 0: 1085 testow, 1084 zaliczone, 1 pominiety i 0 niezaliczonych; niezalezny typecheck i build zakonczyly sie pomyslnie. Nie wykonano testu w prawdziwej grze.
+
 ### 16.15. Timery, widocznosc i ETA
 
 - Osiem timerow 50 ms pauzy zostaje zastapionych jednym anulowalnym timerem 400 ms.
