@@ -29,11 +29,18 @@ export function buildDownloadSummary(result: {
 }
 
 /** Komunikat rozpoczetej obslugi ZIP; nie jest gwarancja zapisu na dysku. */
-export function buildExportSummary(fileCount: number, skipped: number): OperationSummary {
+export function buildExportSummary(
+  fileCount: number,
+  skipped: number,
+  incompleteHeaders = 0,
+): OperationSummary {
+  const gaps = incompleteHeaders > 0
+    ? ` Niepelne historyczne naglowki: ${incompleteHeaders}.`
+    : '';
   return {
     text:
       `Zapisano pliki TXT do ZIP. Liczba plikow: ${fileCount}. ` +
-      `Pominiete bez tresci: ${skipped}.`,
-    level: 'success',
+      `Pominiete bez tresci: ${skipped}.${gaps}`,
+    level: incompleteHeaders > 0 ? 'warning' : 'success',
   };
 }

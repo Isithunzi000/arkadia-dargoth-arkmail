@@ -58,6 +58,7 @@ import {
 } from "./core/addressBook";
 import { ImportSession, type PeopleImportKind } from "./core/session/importer";
 import {
+  archiveLetterContent,
   fromMailboxEntry,
   fromOpenedLetter,
   mergeListingPage,
@@ -79,7 +80,12 @@ import { knownRecipientNames } from "./core/replyRecipients";
 import { MailboxSession, type ListingCtx, type MailboxEntry, type MailboxResult } from "./core/session/mailbox";
 import { AmbiguousResponseError } from "./core/session/errors";
 import { humanizeMailError, isOperationCancelled } from "./core/errors";
-import { archiveExportEntries, letterTxt, txtFileName } from "./core/exportTxt";
+import {
+  archiveExportEntries,
+  archiveExportHeaderGaps,
+  letterTxt,
+  txtFileName,
+} from "./core/exportTxt";
 import { buildZip } from "./core/zipStore";
 import { downloadBlob } from "./ui/download";
 import { buildDownloadSummary, buildExportSummary } from "./ui/operationSummary";
@@ -2004,7 +2010,11 @@ export async function init(api: PluginApi) {
       `_${p2(now.getHours())}${p2(now.getMinutes())}.zip`;
     // buildZip alokuje bufor dokladnie na wynik - buffer jest ArrayBuffer.
     const ok = downloadBlob(name, new Blob([zip.buffer as ArrayBuffer], { type: "application/zip" }));
-    const summary = buildExportSummary(entries.length, skipped);
+    const summary = buildExportSummary(
+      entries.length,
+      skipped,
+      archiveExportHeaderGaps(ui.state.archive),
+    );
     notify(
       api,
       ok
@@ -2243,16 +2253,7 @@ export async function init(api: PluginApi) {
       // Fala 16h: klikalne archiwum (zgloszenie pkt 9). Wpis z trescia
       // w cache otwiera sie z pamieci - ZERO komend do serwera.
       if (letter.body.length > 0) {
-        const senderBox = letter.box === "odebrane" || letter.box === "nieprzeczytane";
-        ui.openLetter(letter.box, {
-          number: letter.number,
-          from: senderBox ? letter.party : "",
-          subject: letter.subject,
-          to: senderBox ? "" : letter.party,
-          cc: null,
-          date: letter.dateRaw,
-          body: letter.body,
-        });
+        ui.openLetter(letter.box, archiveLetterContent(letter));
         return;
       }
       // Bez tresci: pseudo-wpis (ctx undefined -> zawsze re-kotwica po

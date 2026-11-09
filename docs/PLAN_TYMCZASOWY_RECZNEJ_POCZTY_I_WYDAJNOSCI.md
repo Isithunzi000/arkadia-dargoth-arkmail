@@ -1279,6 +1279,8 @@ Eksport zbiorczy pozostaje operacja lokalna:
 6. Pozniejsze uzupelnienie powoduje, ze kolejny eksport jest pelny.
 7. Eksport nie uruchamia automatycznego pobierania setek listow.
 
+Stan wykonania: WDROZONE. Wspolna funkcja `archiveLetterContent()` zwraca zapisany komplet albo wiarygodny fallback listingu bez tworzenia pozornych naglowkow. Ten sam kontrakt obsluguje podglad z cache i `archiveLetterTxt()`, wiec pojedynczy TXT po cache jest zgodny z danymi pelnego odczytu. Eksport zbiorczy pozostaje lokalny, a podsumowanie liczy eksportowane rekordy z trescia bez `headers` i sygnalizuje je ostrzezeniem poza trescia listow. Lokalny RED wyniosl 7 testow, 1 zaliczony i 6 niezaliczonych; powiazany GREEN to 51/51, a pelna regresja to 1129 testow, 1128 zaliczonych, 1 pominiety, 0 niezaliczonych i 0 anulowanych. Niezalezny typecheck i build zakonczyly sie kodem 0. Nie wykonano testu w prawdziwej grze.
+
 ### 16.19. Stare Archiwa, leniwe uzupelnianie i ponowna indeksacja
 
 Aktualizacja uzytkownika jest przezroczysta: instaluje nowa wersje, a plugin otwiera istniejaca baze bez czyszczenia, recznej migracji i wymuszonej re-indeksacji.
@@ -1590,6 +1592,19 @@ Stan wykonania: WDROZONE.
 - Upsert bez `headers` nie kasuje kompletu, a nowy komplet podmienia stary atomowo. Scalanie duplikatow jest deterministyczne, wybiera jedna cala migawke i nie laczy pol z roznych rekordow. Blizniak i ponowna indeksacja nie zmieniaja innych rekordow.
 - Potwierdzony zapis i ponowne otwarcie magazynu zachowuja komplet. `contentKeyOf()`, `id`, `party`, klucz IndexedDB i `DATABASE_VERSION = 2` pozostaly bez zmian.
 - Koncowy pelny zestaw na Node 26: 1122 testy, 1121 zaliczonych, 0 niezaliczonych i 1 pominiety; kod wyjscia 0. Niezalezny `tsc --noEmit -p tsconfig.test.json`, build oraz 12 kontroli higieny zakonczyly sie pomyslnie.
+
+Nie wykonano testu w prawdziwej grze. Nie zmieniono wersji, nie utworzono wydania i nie wykonano publikacji.
+
+#### Wynik kroku 9: podglad z cache oraz eksport pojedynczy i zbiorczy
+
+Stan wykonania: WDROZONE.
+
+- RED na starym kodzie: 7 testow, 1 zaliczony i 6 niezaliczonych. Podglad tracil `Do` i `DW`, eksport rekonstruowal naglowki z `party`, a podsumowanie nie pokazywalo historycznych brakow. Kontrolny stary rekord zachowal wiarygodne dane i tresc bez ostrzezen.
+- GREEN po implementacji: 7/7 nowych testow oraz 51/51 w powiazanym zestawie naglowkow, Archiwum, otwarcia, eksportu pojedynczego i zbiorczego.
+- `archiveLetterContent()` jest wspolnym zrodlem migawki dla podgladu i `archiveLetterTxt()`. Rekord z `headers` uzywa dokladnie `from`, `to` i `cc`; rekord historyczny zachowuje stary fallback listingu bez zapisu pozornego kompletu.
+- Pojedynczy TXT po cache jest zgodny z pelnymi danymi odczytu. Kolejny eksport po uzupelnieniu jest pelny bez zmiany tresci listu. Podglad i eksport nie wysylaja komend ani nie uruchamiaja pobierania.
+- `buildExportSummary()` zachowuje stary kontrakt dwoch argumentow. Opcjonalny licznik obejmuje tylko eksportowane rekordy z trescia bez `headers`; komunikat ZIP ma poziom ostrzezenia, a techniczne informacje nie trafiaja do TXT.
+- Pelna regresja na Node 26: 1129 testow, 1128 zaliczonych, 1 pominiety, 0 niezaliczonych i 0 anulowanych. Niezalezny `tsc --noEmit -p tsconfig.test.json` oraz build zakonczyly sie kodem 0.
 
 Nie wykonano testu w prawdziwej grze. Nie zmieniono wersji, nie utworzono wydania i nie wykonano publikacji.
 

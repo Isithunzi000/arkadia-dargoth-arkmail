@@ -255,6 +255,21 @@ export function fromOpenedLetter(
   };
 }
 
+/** Pelna migawka z cache albo wiarygodny fallback samego listingu. */
+export function archiveLetterContent(letter: ArchiveLetter): LetterContent {
+  const sender = SENDER_BOXES.has(letter.box);
+  const headers = letter.headers;
+  return {
+    number: letter.number,
+    from: headers?.from ?? (sender ? letter.party : ''),
+    subject: letter.subject,
+    to: headers?.to ?? (sender ? '' : letter.party),
+    cc: headers ? headers.cc : null,
+    date: letter.dateRaw,
+    body: letter.body,
+  };
+}
+
 const ARCHIVE_DATE_SUFFIX_RE = /\s+([A-Za-z]+, \d{1,2} (?:XII|XI|IX|VIII|VII|VI|IV|V|III|II|I|X) \d{4}, \d{2}:\d{2}:\d{2})$/;
 const ARCHIVE_SORT_KEY_RE = /^(\d{4})-(\d{2})-(\d{2}) ((?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d)$/;
 const ARCHIVE_WEEKDAYS = ['N', 'Pn', 'Wt', 'Sr', 'Cz', 'Pt', 'So'];

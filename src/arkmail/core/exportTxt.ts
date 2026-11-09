@@ -9,7 +9,7 @@
  * niebezpiecznymi dla systemu plikow).
  */
 
-import type { ArchiveLetter } from './archive.js';
+import { archiveLetterContent, type ArchiveLetter } from './archive.js';
 import { parseMailDate } from './protocol/parser.js';
 import type { MailBox } from './protocol/types.js';
 
@@ -42,19 +42,9 @@ export function letterTxt(l: LetterTxtInput): string {
   return lines.join('\n') + '\n';
 }
 
-const SENDER_BOXES: ReadonlySet<MailBox> = new Set(['odebrane', 'nieprzeczytane']);
-
-/** Rekord archiwum -> TXT (strona listu po kierunku skrzynki). */
+/** Rekord archiwum -> TXT; pelne naglowki lub wiarygodny fallback listingu. */
 export function archiveLetterTxt(l: ArchiveLetter): string {
-  const sender = SENDER_BOXES.has(l.box);
-  return letterTxt({
-    subject: l.subject,
-    from: sender ? l.party : '',
-    to: sender ? '' : l.party,
-    date: l.dateRaw,
-    box: l.box,
-    body: l.body,
-  });
+  return letterTxt({ ...archiveLetterContent(l), box: l.box });
 }
 
 /** Slug ASCII do nazwy pliku (fallback 'list' dla pustego). */
@@ -95,6 +85,15 @@ export function archiveExportStats(letters: readonly ArchiveLetter[]): {
     else skipped += 1;
   }
   return { count, skipped };
+}
+
+/** Liczba eksportowanych rekordow bez kompletu naglowkow z pagera. */
+export function archiveExportHeaderGaps(letters: readonly ArchiveLetter[]): number {
+  let gaps = 0;
+  for (const letter of letters) {
+    if (letter.body.length > 0 && !letter.headers) gaps += 1;
+  }
+  return gaps;
 }
 
 /**
