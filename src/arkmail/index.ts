@@ -1039,6 +1039,10 @@ export async function init(api: PluginApi) {
     storage.setLetters(ui.state.archive);
   };
 
+  const persistArchiveConfirmed = async (letters: readonly ArchiveLetter[]): Promise<void> => {
+    await storage.setLettersConfirmed(letters);
+  };
+
   /** Wspolny koniec zmiany archiwum: zapis i natychmiastowa przebudowa osob. */
   const finalizeArchiveChange = (): void => {
     persistArchive();
@@ -1720,11 +1724,25 @@ export async function init(api: PluginApi) {
             return { kind: "pusta_tresc", stage: "odczyt" };
           }
           stage = "zapis";
-          const merged = upsertLetters(ui.state.archive, [
+          const previousArchive = ui.state.archive;
+          const merged = upsertLetters(previousArchive, [
             fromOpenedLetter(box, res.letter, fresh),
           ]);
           ui.setArchive(merged.letters);
-          persistArchive();
+          try {
+            await persistArchiveConfirmed(merged.letters);
+          } catch (error) {
+            // Wynik w RAM nie moze zaslonic odrzuconego zapisu. Cofamy go
+            // tylko wtedy, gdy zadna nowsza operacja nie zmienila Archiwum.
+            if (ui.state.archive === merged.letters) {
+              ui.setArchive(previousArchive);
+              persistArchive();
+            }
+            throw error;
+          }
+          // Zapis moze zakonczyc sie juz po reconnectcie. Dane trwale zostaja,
+          // ale przerwana petla nie raportuje nowego normalnego sukcesu.
+          if (aborted()) return { kind: "anulowano", stage: "zapis" };
           return { kind: "pobrano", stage: "zapis", body: res.letter.body };
         } finally {
           transport!.endModal();
@@ -1737,7 +1755,14 @@ export async function init(api: PluginApi) {
           bumpCtx(box); // wymuszenie re-kotwicy w drugiej probie
           continue;
         }
-        if (stage === "zapis") return { kind: "blad_zapisu", stage: "zapis" };
+        if (stage === "zapis") {
+          notify(
+            api,
+            "Nie udalo sie zapisac pobranej tresci w IndexedDB. Rekord pozostal do ponowienia.",
+            { title: "Blad zapisu archiwum", level: "error" },
+          );
+          return { kind: "blad_zapisu", stage: "zapis" };
+        }
         if (err instanceof AmbiguousResponseError) {
           return { kind: "niejednoznaczna_odpowiedz", stage };
         }

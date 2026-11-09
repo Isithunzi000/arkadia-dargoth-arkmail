@@ -1170,6 +1170,8 @@ Dla kazdego rekordu:
 - kolejka write-through nie jest przedstawiana jako gwarancja trwalosci przed zamknieciem strony;
 - zamkniecie i ponowne otwarcie sprawdzaja rzeczywisty stan, nie tylko RAM.
 
+Stan wykonania: WDROZONE. Glowny nowy zestaw najpierw wykazal lokalny RED na starym kodzie: 5 testow, 1 zaliczony i 4 niezaliczone; stary kod zwracal `pobrano` przed zakonczeniem zapisu oraz po bledzie IndexedDB i reconnectcie, a magazyn nie mial potwierdzonego zapisu. Dodatkowy przypadek magazynu awaryjnego RAM takze najpierw dal RED, poniewaz falszywie potwierdzal trwalosc. Po implementacji 6 nowych testow przechodzi 6/6. `setLettersConfirmed()` oczekuje na zapis tylko zmienionych rekordow bez pelnego `flush()`, propaguje blad konkretnej operacji i nie przerywa pozniejszej kolejki. Pobieranie wycofuje niepotwierdzona zmiane RAM, zwraca `blad_zapisu` z konkretnym komunikatem i pozostawia rekord do ponowienia. Testy odczytuja baze przed i po zapisie, sprawdzaja reconnect, restart, magazyn wylacznie RAM oraz ponowny wybor wylacznie rekordow bez tresci. Koncowa pelna regresja zakonczyla sie kodem 0: 1083 testy, 1082 zaliczone, 1 pominiety i 0 niezaliczonych; niezalezny typecheck i build zakonczyly sie pomyslnie. Nie wykonano testu w prawdziwej grze.
+
 ### 16.14. Dzien z ponad 50 listami i kompletnosc indeksacji
 
 Naprawa obejmuje skan, nie tylko komunikat:

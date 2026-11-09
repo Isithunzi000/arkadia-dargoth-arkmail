@@ -35,6 +35,7 @@ export class WriteThroughStorage {
     initialValues: Record<string, string>,
     initialLetters: LettersByCharacter,
     private readonly onError: () => void,
+    private readonly durable: boolean,
   ) {
     this.values = new Map(Object.entries(initialValues));
     for (const [character, letters] of Object.entries(initialLetters)) {
@@ -42,12 +43,16 @@ export class WriteThroughStorage {
     }
   }
 
-  static async open(driver: StorageDriver, onError: () => void): Promise<WriteThroughStorage> {
+  static async open(
+    driver: StorageDriver,
+    onError: () => void,
+    durable = true,
+  ): Promise<WriteThroughStorage> {
     const [values, letters] = await Promise.all([
       driver.loadAll(),
       driver.loadAllLetters ? driver.loadAllLetters() : Promise.resolve({}),
     ]);
-    return new WriteThroughStorage(driver, values, letters, onError);
+    return new WriteThroughStorage(driver, values, letters, onError, durable);
   }
 
   get(key: string): string | null {
@@ -70,6 +75,26 @@ export class WriteThroughStorage {
   }
 
   setLetters(character: string, letters: readonly LetterValue[]): void {
+    // Zapis w tle zglasza blad przez onError. Odrzucenie operacji jest tu
+    // obsluzone, wiec istniejace wywolania synchroniczne nie tworza unhandled rejection.
+    void this.writeLetters(character, letters, true).catch(() => {});
+  }
+
+  /** Potwierdza trwaly zapis zmienionych rekordow bez pelnego flush magazynu. */
+  async setLettersConfirmed(character: string, letters: readonly LetterValue[]): Promise<void> {
+    if (!this.durable) {
+      throw new Error("Nie mozna potwierdzic trwalego zapisu, poniewaz IndexedDB nie dziala.");
+    }
+    // Wywolujacy otrzymuje blad konkretnej operacji. Kolejka nadal moze
+    // wykonac pozniejsze zapisy, a ogolny onError nie dubluje komunikatu.
+    await this.writeLetters(character, letters, false);
+  }
+
+  private writeLetters(
+    character: string,
+    letters: readonly LetterValue[],
+    reportError: boolean,
+  ): Promise<void> {
     const current = this.letters.get(character) ?? new Map<string, string>();
     this.letters.set(character, current);
     let changed = false;
@@ -96,11 +121,15 @@ export class WriteThroughStorage {
       this.pendingLetters.delete(JSON.stringify([character, id]));
     }
     for (const id of removed) current.delete(id);
-    if (changed || retryPending) this.enqueue(() => this.flushPendingLetters());
+    const operations: Promise<void>[] = [];
+    if (changed || retryPending) {
+      operations.push(this.enqueue(() => this.flushPendingLetters(), reportError));
+    }
     if (removed.length > 0) {
       const batch = removed;
-      this.enqueue(() => this.driver.deleteLetters(character, batch));
+      operations.push(this.enqueue(() => this.driver.deleteLetters(character, batch), reportError));
     }
+    return Promise.all(operations).then(() => {});
   }
 
   delete(key: string): void {
@@ -167,12 +196,14 @@ export class WriteThroughStorage {
     }
   }
 
-  private enqueue(operation: () => Promise<void>): void {
-    this.queue = this.queue.then(operation).catch(() => {
-      if (this.errorReported) return;
+  private enqueue(operation: () => Promise<void>, reportError = true): Promise<void> {
+    const pending = this.queue.then(operation);
+    this.queue = pending.catch(() => {
+      if (!reportError || this.errorReported) return;
       this.errorReported = true;
       this.onError();
     });
+    return pending;
   }
 }
 
@@ -187,6 +218,6 @@ export async function openWriteThroughStorage(
   } catch {
     await persistent.close();
     onError();
-    return WriteThroughStorage.open(new MemoryStorageDriver(), onError);
+    return WriteThroughStorage.open(new MemoryStorageDriver(), onError, false);
   }
 }

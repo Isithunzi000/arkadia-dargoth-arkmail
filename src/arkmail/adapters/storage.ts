@@ -48,6 +48,10 @@ export class CharStorage {
     this.storage.setLetters(this.char, letters);
   }
 
+  async setLettersConfirmed(letters: readonly ArchiveLetter[]): Promise<void> {
+    await this.storage.setLettersConfirmed(this.char, letters);
+  }
+
   clearLetters(): void {
     this.storage.clearLetters(this.char);
   }
