@@ -15,6 +15,13 @@ import { fromISODate } from './protocol/commands.js';
 import type { MailboxEntry } from './session/mailbox.js';
 import type { LetterContent } from './session/pager.js';
 
+/** Komplet naglowkow pochodzacy z jednego zaakceptowanego odczytu pagera. */
+export interface ArchiveHeaders {
+  from: string;
+  to: string;
+  cc: string | null;
+}
+
 export interface ArchiveLetter {
   /**
    * Stabilny identyfikator rekordu. Fala 41: FNV-1a(box|scanKey|pozycja) -
@@ -42,6 +49,8 @@ export interface ArchiveLetter {
   sortKey: string;
   read: boolean;
   body: string[];
+  /** Brak pola oznacza naglowki nieznane; puste to i cc=null sa danymi. */
+  headers?: ArchiveHeaders;
   /**
    * LEGACY (Fala 35, wycofane Fala 41): dawniej liczba wystapien
    * scalonego rekordu. Runtime nie czyta tego pola; zostaje w typie
@@ -211,6 +220,11 @@ export function fromOpenedLetter(
   letter: LetterContent,
   entry?: MailboxEntry,
 ): ArchiveLetter {
+  const headers: ArchiveHeaders = {
+    from: letter.from,
+    to: letter.to,
+    cc: letter.cc,
+  };
   if (entry) {
     // Fala 41: swiezy wpis niesie archiveId rekordu z listingu - tresc
     // trafia do DOKLADNIE tego rekordu (blizniak o tych samych
@@ -221,7 +235,7 @@ export function fromOpenedLetter(
           id: entry.archiveId,
         }
       : fromMailboxEntry(box, entry);
-    return { ...base, read: true, body: letter.body };
+    return { ...base, read: true, body: letter.body, headers };
   }
   const party = SENDER_BOXES.has(box) ? letter.from : letter.to;
   const dateRaw = letter.date;
@@ -237,6 +251,7 @@ export function fromOpenedLetter(
     sortKey: sortKeyOf(parsed),
     read: true,
     body: letter.body,
+    headers,
   };
 }
 
@@ -269,6 +284,15 @@ function compareText(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
 }
 
+/** Dane z dysku sa niezaufane; niepelny komplet jest traktowany jako brak. */
+function validArchiveHeaders(value: unknown): ArchiveHeaders | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+  const candidate = value as Record<string, unknown>;
+  if (typeof candidate.from !== 'string' || typeof candidate.to !== 'string') return undefined;
+  if (candidate.cc !== null && typeof candidate.cc !== 'string') return undefined;
+  return { from: candidate.from, to: candidate.to, cc: candidate.cc };
+}
+
 function mergeArchiveDuplicates(group: ArchiveLetter[]): ArchiveLetter {
   if (group.length === 1) return group[0];
   const ordered = [...group].sort((a, b) => compareText(JSON.stringify(a), JSON.stringify(b)));
@@ -292,6 +316,10 @@ function mergeArchiveDuplicates(group: ArchiveLetter[]): ArchiveLetter {
     read: group.some((letter) => letter.read),
     body,
   };
+  // Wybieramy cala jedna migawke, nigdy pol From/Do/DW z roznych rekordow.
+  const headers = ordered.find((letter) => letter.headers)?.headers;
+  if (headers) merged.headers = { ...headers };
+  else delete merged.headers;
   return merged;
 }
 
@@ -312,8 +340,11 @@ export function normalizeArchive(letters: readonly ArchiveLetter[]): ArchiveLett
     const date = directDate ?? suffixDate ?? dateFromSortKey(letter.sortKey);
     const party = suffixDate ? letter.party.slice(0, suffix!.index).trimEnd() : letter.party;
     const dateRaw = date?.raw ?? letter.dateRaw;
+    const { headers: rawHeaders, ...withoutHeaders } = letter;
+    const headers = validArchiveHeaders(rawHeaders);
     const normalized: ArchiveLetter = {
-      ...letter,
+      ...withoutHeaders,
+      ...(headers ? { headers } : {}),
       party,
       dateRaw,
       sortKey: date ? sortKeyOf(date) : letter.sortKey,
@@ -467,11 +498,15 @@ export function upsertLetters(
       added++;
       continue;
     }
-    map.set(inc.id, {
+    const merged: ArchiveLetter = {
       ...prev,
       ...inc,
       body: inc.body.length > 0 ? inc.body : prev.body,
-    });
+    };
+    const headers = inc.headers ?? prev.headers;
+    if (headers) merged.headers = { ...headers };
+    else delete merged.headers;
+    map.set(inc.id, merged);
     updated++;
   }
   return { letters: [...map.values()].sort(byNewest), added, updated };

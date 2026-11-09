@@ -1248,6 +1248,8 @@ Nie wolno tworzic `headers` z `party`, przepisywac aktualnej postaci jako histor
 
 To jest rozszerzenie rekordu JSON, nie zmiana schematu IndexedDB. Store `letters`, klucz `[character, letter.id]` i `DATABASE_VERSION = 2` pozostaja bez zmian. `normalizeArchive()` zachowuje nieznane pola, a `WriteThroughStorage` zapisuje caly obiekt danego listu, wiec nowy store, indeks i klucz nie sa potrzebne. Zapis porownuje JSON i zmienia tylko zmienione rekordy; `close()` wykonuje `flush()` przed zamknieciem sterownika, ale nie zastepuje to potwierdzenia trwalego zapisu per rekord w trakcie pobierania.
 
+Stan wykonania: WDROZONE. Rekord ma opcjonalny `headers` z jedna migawka `from`, `to` i `cc`. Swiezy odczyt zapisuje komplet pod wlasciwym `archiveId`, listing go nie tworzy, upsert bez pola zachowuje poprzedni komplet, a nowy komplet zastepuje stary w calosci. Normalizacja odrzuca niepoprawny ksztalt bez usuwania tresci ani innych pol, a scalanie wybiera deterministycznie jedna pelna migawke zamiast skladac pola z duplikatow. Testy obejmuja puste `to`, `cc: null`, blizniaki, ponowna indeksacje, niezmienione klucze oraz zapis i ponowne otwarcie magazynu. Lokalny RED wyniosl 12 testow, 8 zaliczonych i 4 niezaliczone; koncowy powiazany GREEN to 62/62, a pelna regresja zakonczyla sie kodem 0: 1122 testy, 1121 zaliczonych, 1 pominiety i 0 niezaliczonych. Niezalezny typecheck, build oraz 12 kontroli higieny przeszly pomyslnie. Nie wykonano testu w prawdziwej grze.
+
 ### 16.18. Docelowy podglad i eksport
 
 Rekord z `headers`:
@@ -1574,6 +1576,20 @@ Stan wykonania: WDROZONE.
 - Naglowkowe przecinki i koncowy spojnik ` i ` sa parsowane do poprawnego formularza. Znane nazwy wielowyrazowe i aliasy nie sa dzielone. Nieznana aktualna postac nie powoduje zgadywania ani usuwania odbiorcow.
 - Zwykla odpowiedz i cytowanie zachowaly stary kontrakt. Temat i tresc reply-all pozostaja puste, klikniecie tylko wypelnia formularz, a reczny wpis nie jest pozniej normalizowany.
 - Koncowy pelny zestaw na Node 26: 1108 testow, 1107 zaliczonych, 0 niezaliczonych i 1 pominiety; kod wyjscia 0. Niezalezny `tsc --noEmit -p tsconfig.test.json`, build oraz 12 kontroli higieny zakonczyly sie pomyslnie.
+
+Nie wykonano testu w prawdziwej grze. Nie zmieniono wersji, nie utworzono wydania i nie wykonano publikacji.
+
+#### Wynik kroku 8: atomowe naglowki, normalizacja, upsert i magazyn
+
+Stan wykonania: WDROZONE.
+
+- RED na starym kodzie: 12 testow, 8 zaliczonych i 4 niezaliczone. Brakowalo zapisu kompletu przy swiezym odczycie, odrzucania niepoprawnego ksztaltu oraz wyboru pelnej migawki podczas scalania.
+- GREEN po implementacji: 14/14 nowych testow oraz 62/62 w powiazanym zestawie Archiwum, normalizacji, otwarcia, upsertu, sterownikow i trwalego magazynu.
+- `ArchiveLetter.headers` jest opcjonalna, kompletna migawka `from`, `to` i `cc`. `fromOpenedLetter()` zapisuje ja z kazdego zaakceptowanego odczytu pod wlasciwym identyfikatorem; `fromMailboxEntry()` pozostawia naglowki nieznane.
+- Puste `to` oraz `cc: null` zachowuja znaczenie. Niepoprawny ksztalt jest usuwany przy normalizacji bez kasowania tresci, identyfikatora ani nieznanych pol rekordu.
+- Upsert bez `headers` nie kasuje kompletu, a nowy komplet podmienia stary atomowo. Scalanie duplikatow jest deterministyczne, wybiera jedna cala migawke i nie laczy pol z roznych rekordow. Blizniak i ponowna indeksacja nie zmieniaja innych rekordow.
+- Potwierdzony zapis i ponowne otwarcie magazynu zachowuja komplet. `contentKeyOf()`, `id`, `party`, klucz IndexedDB i `DATABASE_VERSION = 2` pozostaly bez zmian.
+- Koncowy pelny zestaw na Node 26: 1122 testy, 1121 zaliczonych, 0 niezaliczonych i 1 pominiety; kod wyjscia 0. Niezalezny `tsc --noEmit -p tsconfig.test.json`, build oraz 12 kontroli higieny zakonczyly sie pomyslnie.
 
 Nie wykonano testu w prawdziwej grze. Nie zmieniono wersji, nie utworzono wydania i nie wykonano publikacji.
 
