@@ -83,6 +83,20 @@ export interface ExportEntry {
   txt: string;
 }
 
+/** Same liczniki do podgladu; nie sortuje rekordow i nie tworzy TXT. */
+export function archiveExportStats(letters: readonly ArchiveLetter[]): {
+  count: number;
+  skipped: number;
+} {
+  let count = 0;
+  let skipped = 0;
+  for (const letter of letters) {
+    if (letter.body.length > 0) count += 1;
+    else skipped += 1;
+  }
+  return { count, skipped };
+}
+
 /**
  * Eksport calego archiwum (Fala 41): jeden plik na REKORD. Kazdy
  * wylistowany wpis to osobny rekord i osobny plik w folderze swojej

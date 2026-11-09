@@ -584,6 +584,16 @@ Stan wykonania: WDROZONE. Nowy zestaw najpierw wykazal lokalny RED na starym kod
 6. Powtorzyc pomiar czasu renderu, najdluzszego zadania i liczby elementow DOM.
 7. Nie rozpoczynac wirtualizacji, stronicowania ani duzej przebudowy renderowania bez osobnej decyzji popartej pomiarami.
 
+Stan wykonania: WDROZONE. Nowy zestaw najpierw wykazal lokalny RED na starym kodzie: 2 testy, 1 zaliczony i 1 niezaliczony. Slad bledu prowadzil z `renderArchiwum()` przez `archiveExportEntries()` i `archiveLetterTxt()` do serializacji `body.map(...)`; drugi test potwierdzil dokladna nazwe i zawartosc wlasciwego eksportu TXT. Po dodaniu `archiveExportStats()` render oblicza wylacznie liczbe rekordow z trescia i pominietych, a pelne TXT powstaja nadal dopiero w `runExportArchive()`. Nowy test i powiazana regresja przeszly 18/18. Pelna regresja zakonczyla sie kodem 0: 1048 testow, 1047 zaliczonych, 1 pominiety i 0 niezaliczonych; niezalezny typecheck i build zakonczyly sie pomyslnie.
+
+Pomiar wykonano w tym samym srodowisku harnessu `happy-dom`, na danych syntetycznych, po 5 probek na przypadek. Format: srednia, mediana, najdluzsze zadanie i liczba elementow DOM przed -> po:
+
+- 100 listow po 20 linii po 80 znakow: 15,54 -> 16,21 ms; 13,78 -> 16,70 ms; 25,43 -> 20,92 ms; 357 -> 357. Ten najmniejszy przypadek nie wykazal poprawy sredniej ani mediany.
+- 500 listow po 100 linii po 80 znakow: 60,16 -> 43,28 ms; 51,57 -> 37,07 ms; 88,46 -> 63,08 ms; 1557 -> 1557.
+- 1000 listow po 200 linii po 80 znakow: 127,34 -> 77,84 ms; 111,65 -> 76,60 ms; 196,35 -> 83,41 ms; 3057 -> 3057.
+
+Pomiar nie jest testem w prawdziwej grze ani pomiarem przegladarki produkcyjnej. Nie zmieniono wirtualizacji, stronicowania, struktury DOM ani samej funkcji `archiveExportEntries()`.
+
 ### 13.7. Ustawienia i teksty UI
 
 Maja istniec dwa niezalezne ustawienia:

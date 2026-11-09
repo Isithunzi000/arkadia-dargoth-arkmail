@@ -25,7 +25,7 @@ import {
   totalLive,
 } from '../core/archiveStats.js';
 import { parseMailDate } from '../core/protocol/parser.js';
-import { archiveExportEntries } from '../core/exportTxt.js';
+import { archiveExportStats } from '../core/exportTxt.js';
 import { viewContacts, type ContactSort } from '../core/contacts.js';
 import {
   parseAddressBookExport,
@@ -3097,11 +3097,13 @@ const filterClearClass = (viewClass?: string): string =>
         : pendingBody > 0
           ? `Czesciowo: liczba listow z trescia ${withBody}. Do pobrania: ${pendingBody}. Bez tresci i bez prawidlowej daty: ${undatedBody}.`
           : `Liczba listow z trescia: ${withBody}. Do pobrania nie nadaja sie: ${undatedBody} (brak prawidlowej daty).`;
-    const exportable = archiveExportEntries(state.archive);
+    // Podglad potrzebuje tylko licznikow. Pelne nazwy i tresci TXT
+    // powstaja dopiero po poleceniu eksportu w runExportArchive().
+    const exportable = archiveExportStats(state.archive);
     const exportStatus =
-      exportable.entries.length === 0
+      exportable.count === 0
         ? 'Brak listow z trescia - nie ma czego zapisywac.'
-        : `Do zapisu: ${exportable.entries.length}. Pominiete bez tresci: ${exportable.skipped}.`;
+        : `Do zapisu: ${exportable.count}. Pominiete bez tresci: ${exportable.skipped}.`;
     // Fala 31d/28: agregat nad lista - globalny (nie zalezy od filtra),
     // Agregat = totalLive (suma MAX na klucz tresci w kazdej skrzynce),
     // a nie liczba grup kluczy: dwa rekordy tej samej skrzynki o
@@ -3116,7 +3118,7 @@ const filterClearClass = (viewClass?: string): string =>
     }
     const indexStep = makeStep('1. Indeksacja', indexStatus, state.indexRun ? 'active' : allBoxesIndexed(state.indexMeta) ? (gapCount > 0 ? 'warning' : 'done') : indexedCount > 0 || gapCount > 0 ? 'incomplete' : 'idle');
     const downloadStep = makeStep('2. Pobranie tresci', downloadStatus, state.archiveDownload ? 'active' : pendingBody > 0 ? 'incomplete' : undatedBody > 0 ? 'warning' : withBody > 0 ? 'done' : 'idle');
-    const exportStep = makeStep('3. Zapis ZIP', exportStatus, exportable.entries.length > 0 ? (exportable.skipped > 0 ? 'warning' : 'done') : 'idle');
+    const exportStep = makeStep('3. Zapis ZIP', exportStatus, exportable.count > 0 ? (exportable.skipped > 0 ? 'warning' : 'done') : 'idle');
 
     // Fala 18c (zgloszenie 2026-10-20 pkt 1): indeksacja wszystkich
     // skrzynek - pelny listing kazdej (z paginacja kotwicowa) = kompletna
