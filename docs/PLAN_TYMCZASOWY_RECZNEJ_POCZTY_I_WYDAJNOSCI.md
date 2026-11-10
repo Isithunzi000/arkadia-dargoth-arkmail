@@ -1322,6 +1322,8 @@ Nalezy rozroznic cztery mechanizmy, ktore korzystaja z Archiwum, ale nie maja te
 
 Danych, ktorych stara wersja nie zapisala, nie da sie wiarygodnie odtworzyc bez oryginalnego listu na serwerze. Wtedy tresc zostaje, a nieznane naglowki pozostaja nieznane. Eksport takiego rekordu moze byc niekompletny i ma to byc widoczne w podsumowaniu.
 
+Stan wykonania leniwego reply-all: WDROZONE. List otwarty z Archiwum przechowuje `archiveId`, a reply-all zawsze uzywa aktualnego rekordu. Komplet jest obslugiwany lokalnie; brak kompletu uruchamia jedna kotwice i jeden odczyt pagera bez drugiej proby. Prefill powstaje dopiero po potwierdzonym zapisie, a zmieniony recznie draft nie jest nadpisywany. Brak daty, brak listu, blad odczytu, reconnect, zmiana postaci i blad zapisu nie daja fallbacku do samego nadawcy. Testy potwierdzaja zachowanie tresci oraz izolacje blizniaka i repliki. Lokalny RED wyniosl 9 testow, 1 zaliczony i 8 niezaliczonych; nowy GREEN to 9/9, powiazany zestaw to 120/120, a pelna regresja zakonczyla sie kodem 0: 1138 testow, 1137 zaliczonych, 1 pominiety, 0 niezaliczonych i 0 anulowanych. Niezalezny typecheck i build zakonczyly sie kodem 0. Nie wykonano testu w prawdziwej grze.
+
 ### 16.20. Scalanie, storage i downgrade
 
 Implementacja musi zachowac nastepujace niezmienniki:
@@ -1605,6 +1607,20 @@ Stan wykonania: WDROZONE.
 - Pojedynczy TXT po cache jest zgodny z pelnymi danymi odczytu. Kolejny eksport po uzupelnieniu jest pelny bez zmiany tresci listu. Podglad i eksport nie wysylaja komend ani nie uruchamiaja pobierania.
 - `buildExportSummary()` zachowuje stary kontrakt dwoch argumentow. Opcjonalny licznik obejmuje tylko eksportowane rekordy z trescia bez `headers`; komunikat ZIP ma poziom ostrzezenia, a techniczne informacje nie trafiaja do TXT.
 - Pelna regresja na Node 26: 1129 testow, 1128 zaliczonych, 1 pominiety, 0 niezaliczonych i 0 anulowanych. Niezalezny `tsc --noEmit -p tsconfig.test.json` oraz build zakonczyly sie kodem 0.
+
+Nie wykonano testu w prawdziwej grze. Nie zmieniono wersji, nie utworzono wydania i nie wykonano publikacji.
+
+#### Wynik kroku 10: leniwe odzyskiwanie historycznych naglowkow dla reply-all
+
+Stan wykonania: WDROZONE.
+
+- RED na starym kodzie: 9 testow, 1 zaliczony i 8 niezaliczonych. Kontrola pelnego rekordu przechodzila; pozostale przypadki wykazaly brak kontrolowanego odczytu i wymaganych zabezpieczen.
+- GREEN po implementacji: 9/9 nowych testow oraz 120/120 w powiazanym zestawie reply-all, Archiwum, pagera, trwalego zapisu, reconnectu, cyklu zycia i widokow.
+- `OpenLetter.archiveId` wiaze podglad z cache z rekordem. Reply-all z Archiwum korzysta z aktualnego rekordu: komplet daje lokalny prefill, a brak kompletu uruchamia jedna kotwice i jeden odczyt z `retry: false`. Zwykle otwieranie listu zachowuje swoja dotychczasowa druga probe.
+- Odczyt jest wykonywany pod blokada i z jasnym stanem zajetosci. Prefill powstaje dopiero po zaakceptowanej odpowiedzi i potwierdzonym zapisie atomowego kompletu. Kolejne otwarcie i reply-all sa lokalne.
+- Blad numeru nie jest ponawiany. Brak poprawnej daty oznacza zero komend. Brak listu nie kasuje tresci, a blad odczytu lub zapisu nie powoduje fallbacku do samego nadawcy ani wysylki. Reczny draft pozostaje nietkniety przy niepowodzeniu, a zmiana draftu w trakcie odczytu blokuje pozny prefill.
+- Reconnect i zmiana postaci odrzucaja pozny wynik. Blizniak oraz replika zachowuja wlasne tresci i brak naglowkow; komplet trafia wylacznie do zadanego `archiveId`.
+- Pelna regresja na Node 26 zakonczyla sie kodem 0: 1138 testow, 1137 zaliczonych, 1 pominiety, 0 niezaliczonych i 0 anulowanych. Niezalezny `tsc --noEmit -p tsconfig.test.json` oraz build zakonczyly sie kodem 0.
 
 Nie wykonano testu w prawdziwej grze. Nie zmieniono wersji, nie utworzono wydania i nie wykonano publikacji.
 

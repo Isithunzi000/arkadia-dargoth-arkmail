@@ -40,7 +40,11 @@ import {
   type LetterTemplate,
 } from '../core/letterRender.js';
 import { validateCompose, type ComposeSendInput } from '../core/composeValidation.js';
-import { buildReplyAllPrefill, knownRecipientNames } from '../core/replyRecipients.js';
+import {
+  buildReplyAllPrefill,
+  knownRecipientNames,
+  type ReplyAllPrefill,
+} from '../core/replyRecipients.js';
 import type { MailUiState, MailUiStore, UiTab } from './store.js';
 import { allBoxesIndexed, formatBadgeSuffix, INDEX_BOXES } from './store.js';
 import { STYLES } from './styles.js';
@@ -70,6 +74,14 @@ export interface MailUiHandlers {
   onForwardLetter(box: MailBox, entry: MailboxEntry, adresat: string): void;
   /** Pusty wynik reply-all wymaga komunikatu z warstwy integracyjnej. */
   onReplyAllEmpty?(): void;
+  /**
+   * Reply-all z Archiwum uzywa aktualnego rekordu. Brak kompletu moze
+   * wymagac jednego odczytu; apply odrzuca nadpisanie zmienionego draftu.
+   */
+  onReplyAllArchive?(
+    archiveId: string,
+    apply: (prefill: ReplyAllPrefill) => boolean,
+  ): void;
   /**
    * Klik w wpis archiwum (Fala 16h): wpis z trescia w cache otwiera
    * sie z pamieci (zero komend); bez tresci - re-kotwica po dacie
@@ -1350,13 +1362,32 @@ const filterClearClass = (viewClass?: string): string =>
     ops.appendChild(danger);
     const source = l.source;
     // Fala 15a: Odpowiedz / Odpowiedz wszystkim - pierwsze w pasku.
-    // Czysta operacja UI: prefill composeDraft + przelaczenie na Napisz,
-    // zero komend do serwera, wiec dziala tez bez wpisu-zrodla.
     // Zwykla odpowiedz zachowuje stary, jednoadresowy kontrakt.
-    // Reply-all korzysta z pelnej migawki naglowkow i nie wysyla listu.
+    // Pelny rekord daje lokalny prefill; stary rekord Archiwum przechodzi
+    // przez integracje, ktora moze najpierw odzyskac pelne naglowki.
     const replyTo = (all: boolean): void => {
       const received = l.box === 'odebrane' || l.box === 'nieprzeczytane';
       if (all) {
+        if (l.archiveId && handlers.onReplyAllArchive) {
+          const before = { ...composeDraft };
+          handlers.onReplyAllArchive(l.archiveId, (prefill) => {
+            if (
+              composeDraft.adresat !== before.adresat ||
+              composeDraft.temat !== before.temat ||
+              composeDraft.dw !== before.dw ||
+              composeDraft.tresc !== before.tresc
+            ) {
+              return false;
+            }
+            composeDraft.adresat = prefill.adresat;
+            composeDraft.dw = prefill.dw;
+            composeDraft.temat = '';
+            composeDraft.tresc = '';
+            store.setTab('napisz');
+            return true;
+          });
+          return;
+        }
         const prefill = buildReplyAllPrefill(
           l,
           store.state.characterName,

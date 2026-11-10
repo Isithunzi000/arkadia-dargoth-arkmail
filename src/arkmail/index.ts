@@ -76,7 +76,7 @@ import {
 } from "./core/archiveDownload";
 import { totalLive } from "./core/archiveStats";
 import { cancelFlag, DownloadEta, waitOrCancel } from "./core/timing";
-import { knownRecipientNames } from "./core/replyRecipients";
+import { buildReplyAllPrefill, knownRecipientNames } from "./core/replyRecipients";
 import { MailboxSession, type ListingCtx, type MailboxEntry, type MailboxResult } from "./core/session/mailbox";
 import { AmbiguousResponseError } from "./core/session/errors";
 import { humanizeMailError, isOperationCancelled } from "./core/errors";
@@ -1693,7 +1693,7 @@ export async function init(api: PluginApi) {
    */
   const fetchArchiveBody = async (
     letter: ArchiveLetter,
-    opts?: { shouldAbort?: () => boolean; box?: MailBox },
+    opts?: { shouldAbort?: () => boolean; box?: MailBox; retry?: boolean },
   ): Promise<FetchBodyResult> => {
     const box = opts?.box ?? letter.box;
     const pseudo = archivePseudoEntry(letter, box);
@@ -1741,7 +1741,7 @@ export async function init(api: PluginApi) {
         if (aborted()) return { kind: "anulowano", stage };
         const msg = err instanceof Error ? err.message : String(err);
         const listingGone = /nie zostaly wybrane|Zly numer listu/.test(msg);
-        if (attempt === 0 && listingGone) {
+        if (attempt === 0 && listingGone && opts?.retry !== false) {
           bumpCtx(box); // wymuszenie re-kotwicy w drugiej probie
           continue;
         }
@@ -2253,7 +2253,7 @@ export async function init(api: PluginApi) {
       // Fala 16h: klikalne archiwum (zgloszenie pkt 9). Wpis z trescia
       // w cache otwiera sie z pamieci - ZERO komend do serwera.
       if (letter.body.length > 0) {
-        ui.openLetter(letter.box, archiveLetterContent(letter));
+        ui.openLetter(letter.box, archiveLetterContent(letter), undefined, letter.id);
         return;
       }
       // Bez tresci: pseudo-wpis (ctx undefined -> zawsze re-kotwica po
@@ -2261,6 +2261,107 @@ export async function init(api: PluginApi) {
       openArchiveFromServer(letter);
     },
     onDownloadArchiveBodies: () => runArchiveDownload(),
+    onReplyAllArchive: (archiveId, apply) => {
+      const applyRecord = (record: ArchiveLetter): void => {
+        const prefill = buildReplyAllPrefill(
+          { ...archiveLetterContent(record), box: record.box },
+          ui.state.characterName,
+          knownRecipientNames(ui.state),
+        );
+        if (!prefill) {
+          notify(
+            api,
+            "Nie mozna przygotowac odpowiedzi wszystkim, poniewaz lista odbiorcow jest pusta.",
+            { level: "warning" },
+          );
+          return;
+        }
+        if (!apply(prefill)) {
+          notify(
+            api,
+            "Nie ustawiono odpowiedzi, poniewaz formularz zostal zmieniony w trakcie odczytu.",
+            { level: "warning" },
+          );
+        }
+      };
+      const letter = ui.state.archive.find((record) => record.id === archiveId);
+      if (!letter) {
+        notify(api, "Nie znaleziono rekordu Archiwum. Formularz nie zostal zmieniony.", {
+          level: "error",
+        });
+        return;
+      }
+      if (letter.headers) {
+        applyRecord(letter);
+        return;
+      }
+      if (lock.locked) {
+        notify(api, SESSION_BUSY_MSG, { level: "warning" });
+        return;
+      }
+      if (!letter.dateRaw || !parseMailDate(letter.dateRaw)) {
+        notify(
+          api,
+          "Nie mozna odzyskac naglowkow bez poprawnej daty listu. Formularz nie zostal zmieniony.",
+          { level: "warning" },
+        );
+        return;
+      }
+      const generation = connectionGeneration;
+      ui.setBusy(`Odzyskuje naglowki listu: ${letter.subject}...`);
+      void runExclusive(() => fetchArchiveBody(letter, {
+        retry: false,
+        shouldAbort: () => generation !== connectionGeneration || lifecycleDestroyed,
+      }))
+        .then((result) => {
+          if (generation !== connectionGeneration || lifecycleDestroyed) return;
+          if (result.kind === "pobrano") {
+            const current = ui.state.archive.find((record) => record.id === archiveId);
+            if (current?.headers) applyRecord(current);
+            else {
+              notify(
+                api,
+                "Nie mozna odzyskac pelnych naglowkow listu. Formularz nie zostal zmieniony.",
+                { level: "error" },
+              );
+            }
+            return;
+          }
+          if (result.kind === "blad_zapisu") return;
+          if (result.kind === "anulowano") {
+            notify(api, "Odzyskiwanie naglowkow przerwano. Formularz nie zostal zmieniony.", {
+              level: "warning",
+            });
+            return;
+          }
+          if (result.kind === "nie_ma_w_skrzynce") {
+            notify(
+              api,
+              "Listu nie ma w skrzynce. Nie odzyskano naglowkow i nie zmieniono formularza.",
+              { level: "warning" },
+            );
+            return;
+          }
+          notify(
+            api,
+            "Nie mozna odzyskac pelnych naglowkow listu. Formularz nie zostal zmieniony.",
+            { level: "error" },
+          );
+        })
+        .catch((err: unknown) => {
+          if (generation !== connectionGeneration || lifecycleDestroyed) return;
+          if (!isOperationCancelled(err)) {
+            notify(
+              api,
+              "Nie mozna odzyskac pelnych naglowkow listu. Formularz nie zostal zmieniony.",
+              { level: "error" },
+            );
+          }
+        })
+        .finally(() => {
+          if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
+        });
+    },
     onReplyAllEmpty: () => notify(
       api,
       "Nie mozna przygotowac odpowiedzi wszystkim, poniewaz lista odbiorcow jest pusta.",

@@ -88,6 +88,8 @@ export interface OpenLetter extends LetterContent {
    * zrodla (operacje wylaczone w UI).
    */
   source?: MailboxEntry;
+  /** Tozsamosc rekordu Archiwum dla leniwego odzyskania reply-all. */
+  archiveId?: string;
 }
 
 export interface MailUiState {
@@ -675,9 +677,11 @@ export class MailUiStore {
    * kod w trybie szerokim zostawial zakladke bez zmian - klik w wpis
    * archiwum ladowal list niewidoczny dla gracza (zgloszenie pkt 2).
    */
-  openLetter(box: MailBox, letter: LetterContent, source?: MailboxEntry): void {
+  openLetter(box: MailBox, letter: LetterContent, source?: MailboxEntry, archiveId?: string): void {
     if (this.current.tab !== 'list') this.letterReturnTab = this.current.tab;
-    const next: Partial<MailUiState> = { letter: { ...letter, box, source } };
+    const opened: OpenLetter = { ...letter, box, source };
+    if (archiveId) opened.archiveId = archiveId;
+    const next: Partial<MailUiState> = { letter: opened };
     next.tab = this.current.wide ? 'listy' : 'list';
     this.update(next);
   }
