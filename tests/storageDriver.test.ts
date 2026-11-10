@@ -4,6 +4,7 @@ import { IDBFactory } from 'fake-indexeddb';
 
 interface StorageDriver {
   loadAll(): Promise<Record<string, string>>;
+  loadAllLetters(): Promise<Record<string, Record<string, string>>>;
   put(key: string, value: string): Promise<void>;
   putMany(values: Readonly<Record<string, string>>): Promise<void>;
   delete(key: string): Promise<void>;
@@ -70,6 +71,57 @@ test('IndexedDB: dane i przestrzenie kluczy przetrwaja ponowne otwarcie', async 
     'arkmail.Foo.archiwum': '["Foo"]',
     'arkmail.Foo.indeks': '{"odebrane":"2026-10-24"}',
   });
+});
+
+test('IndexedDB: istniejaca baza w wersji 2 otwiera sie bez migracji schematu', async (t) => {
+  const realFactory = new IDBFactory();
+  const databaseName = `arkmail-test-${databaseSequence++}`;
+  const opening = realFactory.open(databaseName, 2);
+  opening.onupgradeneeded = () => {
+    const database = opening.result;
+    database.createObjectStore('state');
+    const letters = database.createObjectStore('letters', { keyPath: ['character', 'id'] });
+    letters.createIndex('character', 'character', { unique: false });
+  };
+  const original = await new Promise<IDBDatabase>((resolve, reject) => {
+    opening.onsuccess = () => resolve(opening.result);
+    opening.onerror = () => reject(opening.error);
+  });
+  await new Promise<void>((resolve, reject) => {
+    const transaction = original.transaction('letters', 'readwrite');
+    transaction.objectStore('letters').put({
+      character: 'foo',
+      id: 'historyczny',
+      value: JSON.stringify({ id: 'historyczny', body: ['Zachowana tresc'] }),
+    });
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+  });
+  original.close();
+
+  const versions: number[] = [];
+  let upgrades = 0;
+  const factory = {
+    open(name: string, version?: number): IDBOpenDBRequest {
+      if (version !== undefined) versions.push(version);
+      const request = version === undefined ? realFactory.open(name) : realFactory.open(name, version);
+      request.addEventListener('upgradeneeded', () => { upgrades += 1; });
+      return request;
+    },
+  } as IDBFactory;
+  const driver = new drivers.IndexedDbStorageDriver(factory, databaseName);
+  t.after(async () => {
+    await driver.close();
+    await removeDatabase(realFactory, databaseName);
+  });
+
+  const saved = await driver.loadAllLetters();
+  assert.deepEqual(JSON.parse(saved.foo?.historyczny ?? '{}'), {
+    id: 'historyczny',
+    body: ['Zachowana tresc'],
+  });
+  assert.deepEqual(versions, [2], 'sterownik nadal otwiera baze w wersji 2');
+  assert.equal(upgrades, 0, 'otwarcie starej bazy nie uruchamia migracji schematu');
 });
 
 test('sterownik RAM: zapis wsadowy zapisuje wszystkie klucze', async () => {

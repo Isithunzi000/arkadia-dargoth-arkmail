@@ -423,6 +423,59 @@ test('pobieranie: anulowanie pauzy zdejmuje timer bez kolejnych komend', async (
   }
 });
 
+test('pobieranie: reconnect podczas pauzy zdejmuje timer i blokuje pozna komende', async () => {
+  const h = await startHarness();
+  const { f } = h;
+  const realSetTimeout = globalThis.setTimeout;
+  const realClearTimeout = globalThis.clearTimeout;
+  const timers: Array<{ callback: () => void; ms: number; cancelled: boolean }> = [];
+  try {
+    clearWaitDiagnostics();
+    await loadBox4(h);
+    click(h, '[data-tab="archiwum"]');
+    click(h, '.arkmail-arch-download');
+    click(h, '.arkmail-arch-download');
+    await waitRt(() => f.sent.includes('listy odebrane przed 25 VIII 1999'), 'reconnect pauzy: kotwica');
+    replayListing4(h);
+    await waitRt(() => f.sent.includes('przeczytaj list 1'), 'reconnect pauzy: odczyt');
+    replayLetterAt(h, 1, 'najnowszy', 'Wt, 24 VIII 1999, 00:11:12');
+
+    globalThis.setTimeout = ((callback: () => void, ms = 0) => {
+      const timer = { callback, ms, cancelled: false };
+      timers.push(timer);
+      return timer as unknown as ReturnType<typeof setTimeout>;
+    }) as typeof setTimeout;
+    globalThis.clearTimeout = ((timer: ReturnType<typeof setTimeout>) => {
+      (timer as unknown as { cancelled: boolean }).cancelled = true;
+    }) as typeof clearTimeout;
+    for (let index = 0; index < 100 && timers.length === 0; index += 1) {
+      await new Promise((resolve) => realSetTimeout(resolve, 0));
+    }
+    assert.deepEqual(timers.map((timer) => timer.ms), [400]);
+
+    const before = f.sent.length;
+    f.fireEvent('client.disconnect', undefined);
+    f.fireEvent('client.connect', undefined);
+    timers[0]!.callback();
+    globalThis.setTimeout = realSetTimeout;
+    globalThis.clearTimeout = realClearTimeout;
+    await waitRt(
+      () => readWaitDiagnostics().some((item) => item.stage === 'pobieranie' && item.outcome === 'anulowano'),
+      'anulowanie pauzy przez reconnect',
+    );
+    await new Promise((resolve) => realSetTimeout(resolve, 50));
+
+    assert.equal(timers[0]?.cancelled, true, 'reconnect wywoluje clearTimeout');
+    assert.deepEqual(f.sent.slice(before), [], 'pozny callback nie wysyla kolejnej kotwicy');
+    assert.equal(f.sent.includes('przeczytaj list 2'), false, 'pobieranie nie przechodzi do kolejnego listu');
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+    globalThis.clearTimeout = realClearTimeout;
+    clearWaitDiagnostics();
+    await stopHarness();
+  }
+});
+
 test('widocznosc: dezaktywacja postaci usuwa nasluch zdarzenia', async () => {
   const h = await startHarness();
   let removed = 0;

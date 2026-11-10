@@ -82,7 +82,7 @@ function replayListing(h: Harness): void {
   h.f.fire('> ', 'prompt');
 }
 
-function replayLetter(h: Harness): void {
+function replayLetter(h: Harness, normalPrompt = true): void {
   h.f.fire('List : 1', 'mail');
   h.f.fire('Od   : Corge', 'mail');
   h.f.fire('Temat: Syntetyczny temat', 'mail');
@@ -90,7 +90,7 @@ function replayLetter(h: Harness): void {
   h.f.fire('', 'mail');
   h.f.fire(BODY, 'mail');
   h.f.fire('[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ', 'mail');
-  h.f.fire('> ', 'prompt');
+  if (normalPrompt) h.f.fire('> ', 'prompt');
 }
 
 function clickDownload(h: Harness): void {
@@ -125,6 +125,60 @@ function deferred(): { promise: Promise<void>; release: () => void } {
   });
   return { promise, release };
 }
+
+test('reconnect podczas re-kotwiczenia odrzuca pozny listing i zatrzymuje pobieranie', async () => {
+  const h = await startHarness({ archive: [record()] });
+  try {
+    clearArchiveDownloadDiagnostics();
+    clickDownload(h);
+    await waitRt(
+      () => h.f.sent.some((command) => command.startsWith('listy odebrane przed')),
+      're-kotwica przed reconnectem',
+    );
+    const commandsBefore = h.f.sent.length;
+
+    h.f.fireEvent('client.disconnect', undefined);
+    h.f.fireEvent('client.connect', undefined);
+    replayListing(h);
+    await waitRt(
+      () => readArchiveDownloadDiagnostics().length === 1,
+      'wynik anulowania podczas re-kotwiczenia',
+    );
+
+    assert.equal(readArchiveDownloadDiagnostics()[0]?.result, 'anulowano');
+    assert.equal(readArchiveDownloadDiagnostics()[0]?.stage, 'kotwiczenie');
+    assert.deepEqual(h.f.sent.slice(commandsBefore), [], 'pozny listing nie otwiera listu');
+    assert.deepEqual((await readBack())?.body, [], 'pozny listing nie zapisuje tresci');
+  } finally {
+    await stopHarness();
+  }
+});
+
+test('reconnect podczas zamykania pagera nie potwierdza odczytu po poznym prompcie', async () => {
+  const h = await startHarness({ archive: [record()] });
+  try {
+    await beginOneRecordDownload(h);
+    replayLetter(h, false);
+    await waitRt(() => h.f.sent.at(-1) === 'q', 'zamykanie pagera przed reconnectem');
+    const commandsBefore = h.f.sent.length;
+
+    h.f.fireEvent('client.disconnect', undefined);
+    h.f.fireEvent('client.connect', undefined);
+    h.f.fire('> ', 'prompt');
+    await waitRt(
+      () => readArchiveDownloadDiagnostics().length === 1,
+      'wynik anulowania podczas zamykania pagera',
+    );
+
+    assert.equal(readArchiveDownloadDiagnostics()[0]?.result, 'anulowano');
+    assert.equal(readArchiveDownloadDiagnostics()[0]?.stage, 'odczyt');
+    assert.deepEqual(h.f.sent.slice(commandsBefore), [], 'stara sesja nie wysyla kolejnych komend');
+    assert.deepEqual((await readBack())?.body, [], 'pozny prompt nie zatwierdza tresci');
+    assert.equal(notifyText(h.f, 'Pobrano: 1 z 1.'), false);
+  } finally {
+    await stopHarness();
+  }
+});
 
 test('pobrano czeka na trwaly zapis rekordu, a odczyt bazy potwierdza jego tresc', async () => {
   const h = await startHarness({ archive: [record()] });
