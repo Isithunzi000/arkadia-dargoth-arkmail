@@ -151,7 +151,11 @@ test('smoke: init rejestruje kontrakt, destroy zdejmuje rejestracje', async () =
   assert.equal(typeof mod.destroy, 'function', 'dist eksportuje destroy()');
 
   const prevDoc = globalThis.document;
-  globalThis.document = { createElement: makeElement };
+  globalThis.document = {
+    createElement: makeElement,
+    addEventListener() {},
+    removeEventListener() {},
+  };
   try {
     const capture = { removed: [] };
     const api = makeMockApi(capture);
@@ -212,7 +216,11 @@ test('smoke: powiadomienie odswieza skrzynki i badge stopki', async () => {
     JSON.parse(fs.readFileSync(path.join(REPO, 'tests/fixtures', name + '.json'), 'utf8')).lines;
 
   const prevDoc = globalThis.document;
-  globalThis.document = { createElement: makeElement };
+  globalThis.document = {
+    createElement: makeElement,
+    addEventListener() {},
+    removeEventListener() {},
+  };
   try {
     const capture = { removed: [] };
     const api = makeMockApi(capture);
@@ -235,6 +243,16 @@ test('smoke: powiadomienie odswieza skrzynki i badge stopki', async () => {
       }
       assert.fail(`timeout: ${what}`);
     };
+    // Fixture zawiera takze pozniejsze, reczne czytanie listu przez gracza.
+    // Ten test obejmuje wylacznie odpowiedz na automatyczne "listy ...";
+    // zwykly prompt konczy listing przed komendami "list 1" i "q".
+    const listingResponse = (name, header) => {
+      const lines = fixture(name);
+      const start = lines.findIndex((l) => l.text === header);
+      const end = lines.findIndex((l, index) => index > start && l.cls === 'command');
+      assert.ok(start >= 0 && end > start, `fixture zawiera kompletny listing: ${name}`);
+      return [...lines.slice(start, end), { cls: 'prompt', text: '> ' }];
+    };
 
     fire(' [ POCZTA ] Masz nowa poczte od Foo.');
     await waitFor(
@@ -244,10 +262,7 @@ test('smoke: powiadomienie odswieza skrzynki i badge stopki', async () => {
     // echo wysylki jest wyciszone (echo=false)
     assert.ok((capture.sent || []).every(([, echo]) => echo === false), 'echo=false');
 
-    // replay listing odebranych (od echa komendy) przez prawdziwa sesje
-    const odebrane = fixture('listing-odebrane-male');
-    const idx = odebrane.findIndex((l) => l.text === '→ listy odebrane');
-    for (const l of odebrane.slice(idx)) {
+    for (const l of listingResponse('listing-odebrane-male', 'Listy odebrane:')) {
       fire(l.text, l.cls);
       await tick();
     }
@@ -255,7 +270,7 @@ test('smoke: powiadomienie odswieza skrzynki i badge stopki', async () => {
       () => (capture.sent || []).some(([c]) => c === 'listy nieprzeczytane'),
       'komenda listy nieprzeczytane po odebranych',
     );
-    for (const l of fixture('listing-nieprzeczytane')) {
+    for (const l of listingResponse('listing-nieprzeczytane', 'Listy nieprzeczytane:')) {
       fire(l.text, l.cls);
       await tick();
     }
