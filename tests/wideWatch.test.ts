@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 
 import { startHarness, stopHarness } from './harness';
 
-type ROEntry = { contentRect: { width: number } };
+type ROEntry = { target?: unknown; contentRect: { width: number } };
 type ROCallback = (entries: ROEntry[], obs: unknown) => void;
 
 class FakeRO {
@@ -48,6 +48,38 @@ test('wide-watch: ResizeObserver ustawia uklad, startowy rozmiar dwupanelowy', a
     assert.ok(!h.content.querySelector('.arkmail-wide'), '< 900px: jeden panel');
     await stopHarness();
     assert.ok(ro.disconnected, 'destroy odpina obserwatora');
+  } finally {
+    delete (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
+  }
+});
+
+test('wide-watch: zmiana skali przy stalej szerokosci przelacza uklad i sprzata sonde', async () => {
+  FakeRO.instances = [];
+  (globalThis as { ResizeObserver?: unknown }).ResizeObserver = FakeRO;
+  try {
+    const h = await startHarness();
+    type DomElement = InstanceType<typeof h.window.HTMLElement>;
+    const root = h.content as unknown as DomElement;
+    const parent = h.window.document.createElement('div');
+    root.style.setProperty('--window-font-scale', '1');
+    parent.appendChild(root);
+    const ro = FakeRO.instances[0]!;
+
+    ro.cb([{ target: root, contentRect: { width: 1000 } }], ro);
+    assert.ok(root.querySelector('.arkmail-wide'), 'skala 1: dwa panele');
+    const probe = parent.querySelector('[data-arkmail-scale-probe]') as DomElement | null;
+    assert.ok(probe, 'sonda skali jest obok roota, nie w jego renderowanych dzieciach');
+    assert.equal(probe.parentElement, parent);
+    assert.equal(root.querySelector('[data-arkmail-scale-probe]'), null);
+    assert.ok(ro.observed.includes(probe), 'obserwator sledzi zmiane skali');
+
+    ro.cb([{ target: probe, contentRect: { width: 3 } }], ro);
+    assert.ok(!root.querySelector('.arkmail-wide'), 'skala 3: 1000px daje jeden panel');
+    ro.cb([{ target: probe, contentRect: { width: 0.3 } }], ro);
+    assert.ok(root.querySelector('.arkmail-wide'), 'skala 0,3: 1000px znow daje dwa panele');
+
+    await stopHarness();
+    assert.equal(parent.querySelector('[data-arkmail-scale-probe]'), null, 'destroy usuwa sonde');
   } finally {
     delete (globalThis as { ResizeObserver?: unknown }).ResizeObserver;
   }

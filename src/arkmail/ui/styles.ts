@@ -14,30 +14,45 @@
  * byloby bledne - liczy sie szerokosc samego okna).
  */
 
-// Zgloszenie 2026-11-05 (A3): pelna migracja na natywne UI klienta
-// Dargoth - kolory WYLACZNIE ze zmiennych var(--popup-...), zero hex
-// (dokumentacja: PLUGINS.md, sekcja "Wyglad Interfejsu (UI)"). Plugin
-// podaza za motywem klienta, w tym za jasnym. Mapowanie 1:1 wg rol:
-const BG = 'var(--popup-bg)'; // tlo glowne
-const BG_PANEL = 'var(--popup-section-bg)'; // panele, karty
-const BG_RAISED = 'var(--popup-control-bg)'; // przyciski, hover
-const BG_INPUT = 'var(--popup-input-bg)'; // pola tekstowe
-const FG = 'var(--popup-text)'; // tekst glowny
-const FG_DIM = 'var(--popup-text-dim)'; // tekst przytlumiony
-const BORDER = 'var(--popup-border)'; // obramowania
-const ACCENT = 'var(--popup-accent)'; // akcent (aktywne, wysylka, kropki, obwodki)
-const ACCENT_FG = 'var(--popup-bg)'; // tekst na wypelnieniu akcentu (konwencja klienta)
-const DANGER_TEXT = 'var(--popup-danger)'; // tekst bledow na panelu
-const BG_UNREAD = 'var(--popup-accent-subtle-bg)'; // tlo wiersza nieprzeczytanego
-const HOVER_BASE = 'var(--popup-control-hover-bg)';
+// Motyw klienta zostaje zrodlem kolorow. ArkMail mapuje je wylacznie
+// na wlasne role na .arkmail-root, bez nadpisywania tokenow --popup-*.
+const BG = 'var(--arkmail-bg)';
+const BG_PANEL = 'var(--arkmail-panel-bg)';
+const BG_RAISED = 'var(--arkmail-raised-bg)';
+const BG_INPUT = 'var(--arkmail-input-bg)';
+const FG = 'var(--arkmail-text)';
+const FG_DIM = 'var(--arkmail-secondary)';
+const BORDER = 'var(--arkmail-border)';
+const CONTROL_BORDER = 'var(--arkmail-control-border)';
+const ACCENT = 'var(--arkmail-accent)';
+const ACCENT_FG = 'var(--arkmail-on-accent)';
+const DANGER_TEXT = 'var(--arkmail-danger-text)';
+const BG_UNREAD = 'var(--arkmail-unread-bg)';
+const UNREAD_MARKER = 'var(--arkmail-unread-marker)';
 
 export const STYLES = `
 /* Naglowek jest poza .arkmail-root; selektor ogranicza sie do jednej klasy. */
 .arkmail-animal-send.popup-header-btn {
-  color: ${ACCENT};
-  background: ${BG_UNREAD};
+  color: var(--popup-accent);
+  background: var(--popup-accent-subtle-bg);
 }
 .arkmail-root {
+  --arkmail-bg: var(--popup-bg);
+  --arkmail-panel-bg: var(--popup-section-bg);
+  --arkmail-raised-bg: var(--popup-control-bg);
+  --arkmail-input-bg: var(--popup-input-bg);
+  --arkmail-text: var(--popup-text);
+  --arkmail-secondary: color-mix(in oklab, var(--popup-text) 95%, transparent);
+  --arkmail-placeholder: color-mix(in oklab, var(--popup-text) 95%, transparent);
+  --arkmail-border: var(--popup-border);
+  --arkmail-control-border: color-mix(in oklab, var(--popup-text) 60%, transparent);
+  --arkmail-accent: var(--popup-accent);
+  --arkmail-on-accent: black;
+  --arkmail-danger-text: color-mix(in oklab, var(--popup-danger) 60%, var(--popup-text) 40%);
+  --arkmail-danger-bg: var(--popup-danger-bg);
+  --arkmail-unread-bg: var(--popup-accent-subtle-bg);
+  --arkmail-unread-marker: color-mix(in oklab, var(--popup-accent) 60%, var(--popup-text) 40%);
+  --arkmail-focus: var(--popup-text);
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -53,6 +68,9 @@ export const STYLES = `
 }
 .arkmail-version-footer {
   flex: 0 0 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
   color: ${FG_DIM};
   font-size: calc(11px * var(--window-font-scale, 1));
   line-height: 1.3;
@@ -62,31 +80,33 @@ export const STYLES = `
   box-sizing: border-box;
 }
 
-/* --- kontrolki bazowe: JAWNE kolory (bug bialy-na-bialym) --- */
-.arkmail-root button:not(.popup-btn):not(.dialog-tab) {
-  background: ${BG_RAISED};
-  color: ${FG};
-  border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
-  border-radius: calc(6px * var(--window-font-scale, 1));
-  padding: calc(4px * var(--window-font-scale, 1)) calc(12px * var(--window-font-scale, 1));
-  font: inherit;
-  cursor: pointer;
-  /* Fala 16k: etykiety przyciskow nie lamia sie w waskim popupie. */
-  white-space: nowrap;
-  /* Fala 17e: jednolita wysokosc i centrowanie etykiety niezaleznie
-   * od jej dlugosci (zgloszenie pkt 1: obwodka spojna wielkosciowo). */
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: calc(26px * var(--window-font-scale, 1));
+/* Kazdy przycisk ma natywne klasy klienta. Lokalne reguly zmieniaja
+ * wylacznie uklad albo udowodnione stany kontrastu. */
+.arkmail-root :is(button, input, textarea, select, [tabindex]):focus-visible {
+  outline: calc(2px * var(--window-font-scale, 1)) solid var(--arkmail-focus);
+  outline-offset: calc(1px * var(--window-font-scale, 1));
 }
-.arkmail-root button:not(.popup-btn):not(.dialog-tab):hover { background: ${HOVER_BASE}; }
-.arkmail-root button:not(.popup-btn):not(.dialog-tab):not([data-armed="1"]):active { background: ${HOVER_BASE}; }
-.arkmail-root button:not(.popup-btn):focus-visible,
-.arkmail-root .arkmail-tab:focus-visible,
-.arkmail-root .arkmail-box:focus-visible,
-.arkmail-root .arkmail-contact-dir:focus-visible,
-.arkmail-root .arkmail-contact-addbook:focus-visible { outline: calc(2px * var(--window-font-scale, 1)) solid ${ACCENT}; outline-offset: calc(1px * var(--window-font-scale, 1)); }
+.arkmail-root button.popup-btn--solid,
+.arkmail-root button.popup-btn.popup-btn--solid:hover:not(:disabled),
+.arkmail-root button.popup-btn--solid:active {
+  background: ${ACCENT};
+  border-color: ${ACCENT};
+  color: ${ACCENT_FG};
+  filter: none;
+}
+.arkmail-root button.popup-btn--control:not(.popup-btn--ghost),
+.arkmail-root .popup-input--control {
+  border-color: ${CONTROL_BORDER};
+}
+.arkmail-root .dialog-tabs {
+  border-color: ${CONTROL_BORDER};
+}
+.arkmail-root .dialog-tab.is-active,
+.arkmail-root .dialog-tab.is-active:hover {
+  background: ${ACCENT};
+  border-color: ${ACCENT};
+  color: ${ACCENT_FG};
+}
 
 /* Zgloszenie 2026-11-05 (A3): poziomy przyciskow to klasy natywnego
  * UI klienta (popup-btn--control/solid/danger/ghost) - zero wlasnych
@@ -96,16 +116,35 @@ export const STYLES = `
  * z daleka, wyraznie odroznialny od ghosta w spoczynku. Selektor ma
  * wyzsza specyficznosc niz .popup-btn--danger.ghost klienta. */
 .arkmail-root button.popup-btn--danger[data-armed="1"] {
-  background: var(--popup-danger-bg);
-  border-color: var(--popup-danger-border);
-  color: var(--popup-danger);
-  outline: calc(2px * var(--window-font-scale, 1)) solid var(--popup-danger-border);
+  background: var(--arkmail-danger-bg);
+  border-color: ${DANGER_TEXT};
+  color: ${DANGER_TEXT};
+  outline: calc(2px * var(--window-font-scale, 1)) solid ${DANGER_TEXT};
   outline-offset: calc(1px * var(--window-font-scale, 1));
 }
 /* Zgloszenie 2026-11-05 (F4c): pola tekstowe uzywaja natywnych klas
  * klienta (popup-input popup-input--control) - tlo, obwodka, fokus
  * i placeholder pilnuje motyw klienta. Zostaja tylko checkboxy. */
 .arkmail-root input[type='checkbox'] { accent-color: ${ACCENT}; }
+.arkmail-root .popup-input::placeholder {
+  color: var(--arkmail-placeholder);
+  opacity: 1;
+}
+.arkmail-root select.popup-input {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, ${FG_DIM} 50%),
+    linear-gradient(135deg, ${FG_DIM} 50%, transparent 50%);
+  background-position:
+    right calc(16px * var(--window-font-scale, 1)) top 50%,
+    right calc(11px * var(--window-font-scale, 1)) top 50%;
+  background-size:
+    calc(5px * var(--window-font-scale, 1)) calc(5px * var(--window-font-scale, 1)),
+    calc(5px * var(--window-font-scale, 1)) calc(5px * var(--window-font-scale, 1));
+  background-repeat: no-repeat;
+  border-color: ${CONTROL_BORDER};
+  padding-right: calc(28px * var(--window-font-scale, 1));
+}
 
 /* --- zakladki: segmentowana belka --- */
 /* Zgloszenie 2026-11-05 (F4c): belka zakladek to klasy natywnego UI
@@ -113,6 +152,21 @@ export const STYLES = `
  * i hover pilnuje motyw klienta. */
 
 /* --- pasek operacji --- */
+.arkmail-root .arkmail-tabs.dialog-tabs {
+  flex: 0 0 auto;
+  align-self: stretch;
+  width: 100%;
+  flex-wrap: wrap;
+  overflow-x: visible;
+}
+.arkmail-root .arkmail-tabs .arkmail-tab {
+  flex: 1 1 calc(110px * var(--window-font-scale, 1));
+  height: auto;
+  min-height: calc(32px * var(--window-font-scale, 1));
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .arkmail-busy {
   padding: calc(5px * var(--window-font-scale, 1)) calc(10px * var(--window-font-scale, 1));
   border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
@@ -130,6 +184,7 @@ export const STYLES = `
 .arkmail-status {
   flex: 0 0 auto;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: flex-end;
   gap: calc(8px * var(--window-font-scale, 1));
@@ -162,13 +217,13 @@ export const STYLES = `
   border-radius: calc(8px * var(--window-font-scale, 1));
   padding: calc(8px * var(--window-font-scale, 1));
 }
-/* Fala UI-1 (zgloszenie 2026-11-03): zakladka Listy - panel kolumnowy,
-   scrolluje sie wylacznie .arkmail-list-scroll; naglowek (skrzynki,
-   operacje, szukajka) widoczny zawsze (sugestia 3 z Discorda). */
+/* W zwyklym ukladzie naglowek zostaje na miejscu, a liste przewija
+   .arkmail-list-scroll. Gdy duza skala nie zostawia na liste zadnego
+   miejsca, caly panel moze sie przewinac zamiast ukryc wiersze. */
 .arkmail-listy {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: auto;
 }
 /* Etap 8: semantyczne podpanele nie zmieniaja ukladu Archiwum;
    Kontakty zachowuja kolumnowy uklad listy w dodatkowym kontenerze. */
@@ -181,8 +236,8 @@ export const STYLES = `
 }
 .arkmail-contact-subpanel-scroll { overflow: auto; }
 .arkmail-list-scroll {
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 1 0 calc(96px * var(--window-font-scale, 1));
+  min-height: calc(96px * var(--window-font-scale, 1));
   overflow: auto;
 }
 /* Wydanie 1.30.1 (zgloszenia 2/3): klient daje natywnym kontrolkom
@@ -204,11 +259,7 @@ export const STYLES = `
 .arkmail-root button.arkmail-box {
   border-radius: calc(999px * var(--window-font-scale, 1));
   padding: calc(3px * var(--window-font-scale, 1)) calc(12px * var(--window-font-scale, 1));
-  background: ${BG};
-  color: ${FG_DIM};
-  border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
 }
-.arkmail-root button.arkmail-box:hover { color: ${FG}; background: ${BG_RAISED}; }
 .arkmail-root button.arkmail-box-active {
   background: ${ACCENT};
   border-color: ${ACCENT};
@@ -234,10 +285,8 @@ export const STYLES = `
   padding-top: calc(8px * var(--window-font-scale, 1));
 }
 .arkmail-box-ops button { flex: 0 1 auto; }
-.arkmail-root button:not(.popup-btn):not(.dialog-tab):disabled { opacity: 0.45; cursor: default; }
-.arkmail-root button:not(.popup-btn):not(.dialog-tab):disabled:hover { background: ${BG_RAISED}; }
-/* Zgloszenie 2026-11-05: klawisze natywne klienta (popup-btn) tez
- * gasna po wylaczeniu - bez reguly wygladaja na aktywne. */
+/* Wszystkie klawisze maja popup-btn, wiec jeden stan disabled
+ * obejmuje tez skrzynki i miniakcje. */
 .arkmail-root .popup-btn:disabled { opacity: 0.45; cursor: default; }
 /* Zgloszenie 2026-11-05 (Etap 9): wybor pliku importu otwiera klawisz
  * - sama kontrolka pliku jest niewidoczna. */
@@ -274,10 +323,27 @@ export const STYLES = `
   color: ${FG_DIM};
 }
 .arkmail-entry-date { color: ${FG_DIM}; font-size: calc(11px * var(--window-font-scale, 1)); white-space: nowrap; }
+.arkmail-root:not(.arkmail-wide) .arkmail-entry { flex-wrap: wrap; }
+.arkmail-root:not(.arkmail-wide) .arkmail-entry-party {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.arkmail-root:not(.arkmail-wide) .arkmail-entry-subject {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.arkmail-root:not(.arkmail-wide) .arkmail-entry-date {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 /* Fala 16f: nieprzeczytany wiersz dodatkowo JASNIEJSZY (pkt 8: kropka +
    pogrubienie + rozjasnienie; po odczyciu listing daje *R* i wiersz
    wraca do normalnego). */
-.arkmail-unread { background: ${BG_UNREAD}; box-shadow: inset calc(3px * var(--window-font-scale, 1)) 0 0 ${ACCENT}; }
+.arkmail-unread { background: ${BG_UNREAD}; box-shadow: inset calc(3px * var(--window-font-scale, 1)) 0 0 ${UNREAD_MARKER}; }
 .arkmail-unread .arkmail-entry-party, .arkmail-unread .arkmail-entry-subject {
   color: ${FG};
   font-weight: 700;
@@ -288,7 +354,7 @@ export const STYLES = `
   width: calc(7px * var(--window-font-scale, 1));
   height: calc(7px * var(--window-font-scale, 1));
   border-radius: 50%;
-  background: ${ACCENT};
+  background: ${UNREAD_MARKER};
   flex: none;
 }
 
@@ -435,6 +501,7 @@ export const STYLES = `
   border-radius: calc(8px * var(--window-font-scale, 1));
   padding: calc(10px * var(--window-font-scale, 1)) calc(12px * var(--window-font-scale, 1));
   color: ${FG};
+  overflow-wrap: anywhere;
 }
 .arkmail-letter-ops { display: flex; flex-wrap: wrap; gap: calc(6px * var(--window-font-scale, 1)); margin-top: calc(8px * var(--window-font-scale, 1)); align-items: center; }
 .arkmail-letter-ops input { flex: 1; }
@@ -447,7 +514,7 @@ export const STYLES = `
 .arkmail-compose-setting { min-width: 0; }
 .arkmail-wide .arkmail-compose-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .arkmail-compose-actions { margin-top: calc(10px * var(--window-font-scale, 1)); }
-.arkmail-form label { display: block; margin: calc(6px * var(--window-font-scale, 1)) 0 calc(3px * var(--window-font-scale, 1)); color: ${FG_DIM}; font-size: calc(12px * var(--window-font-scale, 1)); }
+.arkmail-form label { display: block; min-width: 0; overflow-wrap: anywhere; margin: calc(6px * var(--window-font-scale, 1)) 0 calc(3px * var(--window-font-scale, 1)); color: ${FG_DIM}; font-size: calc(12px * var(--window-font-scale, 1)); }
 .arkmail-form input, .arkmail-form textarea, .arkmail-form select {
   width: 100%;
 }
@@ -473,6 +540,7 @@ export const STYLES = `
    pre na calym popupie. Belka z przyciskiem nad podgladem. */
 .arkmail-preview-bar {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: calc(8px * var(--window-font-scale, 1));
@@ -581,15 +649,10 @@ export const STYLES = `
 }
 /* Rodzina mini: kompaktowy wariant poziomu action (jeden jezyk przyciskow). */
 .arkmail-root button.arkmail-contact-dir, .arkmail-root button.arkmail-contact-addbook {
-  background: ${BG_RAISED};
-  color: ${FG};
-  border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
   border-radius: calc(6px * var(--window-font-scale, 1));
   padding: calc(1px * var(--window-font-scale, 1)) calc(8px * var(--window-font-scale, 1));
   font-size: calc(11px * var(--window-font-scale, 1));
-  cursor: pointer;
 }
-.arkmail-root button.arkmail-contact-dir:hover, .arkmail-root button.arkmail-contact-addbook:hover { background: ${HOVER_BASE}; border-color: ${ACCENT}; color: ${ACCENT}; }
 /* Etap 9 (A1): panel osob uzywa calej dostepnej wysokosci.
  * Jedynym przewijanym obszarem jest sama lista. */
 .arkmail-root .arkmail-arch-people-panel {
@@ -656,6 +719,10 @@ export const STYLES = `
   font-size: calc(11px * var(--window-font-scale, 1));
   white-space: nowrap;
 }
+.arkmail-root:not(.arkmail-wide) .arkmail-arch-date {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .arkmail-contact-controls {
   display: flex;
   flex-wrap: wrap;
@@ -691,7 +758,7 @@ export const STYLES = `
 .arkmail-archive-step button { width: 100%; margin: 0; margin-top: auto; }
 .arkmail-step-active { border-left-color: ${ACCENT}; }
 .arkmail-step-done { border-left-color: var(--popup-success); }
-.arkmail-step-warning, .arkmail-step-incomplete { border-left-color: var(--popup-warning); }
+.arkmail-step-warning, .arkmail-step-incomplete { border-left-color: ${CONTROL_BORDER}; }
 .arkmail-arch-controls {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

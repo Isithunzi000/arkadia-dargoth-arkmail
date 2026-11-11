@@ -135,17 +135,20 @@ test('style: nieprzeczytany wiersz ma jasniejsze tlo (zmienna natywna)', () => {
   // Zgloszenie 2026-11-05 (A3): tlo nieprzeczytanych ze zmiennej UI.
   const m = STYLES.match(/\.arkmail-unread\s*\{([^}]*)\}/);
   assert.ok(m, 'regula .arkmail-unread istnieje');
-  assert.match(m[1], /background:\s*var\(--popup-accent-subtle-bg\)/, 'jawne jasniejsze tlo wiersza');
+  assert.match(m[1], /background:\s*var\(--arkmail-unread-bg\)/, 'jawne jasniejsze tlo z lokalnej roli');
+  assert.match(STYLES, /--arkmail-unread-bg:\s*var\(--popup-accent-subtle-bg\)/, 'lokalna rola zachowuje natywne tlo akcentu');
 });
 
 test('style: nieprzeczytany wiersz ma pasek akcentowy z lewej', () => {
   const m = STYLES.match(/\.arkmail-unread\s*\{([^}]*)\}/);
   assert.ok(m, 'regula .arkmail-unread istnieje');
-  assert.match(m[1], /inset calc\(3px \* var\(--window-font-scale, 1\)\) 0 0 var\(--popup-accent\)/, 'pasek akcentowy z lewej (kontrast pilnuje motyw klienta, WCAG 1.4.11)');
+  assert.match(m[1], /inset calc\(3px \* var\(--window-font-scale, 1\)\) 0 0 var\(--arkmail-unread-marker\)/, 'pasek akcentowy z lokalna rola kontrastu');
+  assert.match(STYLES, /--arkmail-unread-marker:\s*color-mix\(in oklab, var\(--popup-accent\) 60%, var\(--popup-text\) 40%\)/, 'znacznik laczy natywny akcent z tekstem motywu');
 });
 
 test('style: akcent skrzynki to obwodka w kolorze akcentu', () => {
   const m = STYLES.match(/\.arkmail-box-attention\s*\{([^}]*)\}/);
   assert.ok(m, 'regula .arkmail-box-attention istnieje');
-  assert.match(m[1], /border-color:\s*var\(--popup-accent\)/, 'obwodka ACCENT');
+  assert.match(m[1], /border-color:\s*var\(--arkmail-accent\)/, 'obwodka z lokalnej roli akcentu');
+  assert.match(STYLES, /--arkmail-accent:\s*var\(--popup-accent\)/, 'lokalny akcent zachowuje natywny kolor');
 });

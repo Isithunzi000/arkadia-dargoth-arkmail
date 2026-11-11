@@ -98,6 +98,7 @@ import { STORAGE_WRITE_ERROR } from "./adapters/writeThroughStorage";
 import { notify } from "./adapters/notify";
 import { INDEX_BOXES, MailUiStore, formatBadgeSuffix } from "./ui/store";
 import { mountMailUi, type MailUiHandlers } from "./ui/render";
+import { installThemeColors } from "./ui/themeColors";
 import { createAnimalHeader, type AnimalHeaderControl } from "./ui/animalHeader";
 import { applyConfirmedDeletions, matchSelectionOnFreshListing } from "./core/bulkDelete";
 import { formatListCount } from "./ui/deletion";
@@ -110,6 +111,33 @@ const SESSION_OPTS = { timeoutMs: 8000, idleMs: 400 };
 /** Prog szerokosci popupu dla ukladu dwupanelowego (Fala 10): >= 900px
  *  lista z lewej + podglad z prawej, nizej jeden panel (komorka). */
 export const WIDE_MIN_WIDTH = 900;
+/** Skala powieksza tez minimalna szerokosc potrzebna do dwoch paneli. */
+export const shouldUseWideLayout = (width: number, fontScale: number): boolean => {
+  const scale = Number.isFinite(fontScale) && fontScale > 0 ? fontScale : 1;
+  return width >= WIDE_MIN_WIDTH * scale;
+};
+
+/** Odczytuje prosta liczbe albo wylicza calc() ustawiane przez klienta. */
+const readWindowFontScale = (root: HTMLElement): number => {
+  const view = root.ownerDocument.defaultView;
+  if (!view) return 1;
+  const raw = view.getComputedStyle(root).getPropertyValue('--window-font-scale').trim();
+  const direct = Number(raw);
+  if (Number.isFinite(direct) && direct > 0) return direct;
+
+  const probe = root.ownerDocument.createElement('span');
+  probe.style.position = 'absolute';
+  probe.style.visibility = 'hidden';
+  probe.style.pointerEvents = 'none';
+  probe.style.width = 'calc(1px * var(--window-font-scale, 1))';
+  root.appendChild(probe);
+  try {
+    const measured = Number.parseFloat(view.getComputedStyle(probe).width);
+    return Number.isFinite(measured) && measured > 0 ? measured : 1;
+  } finally {
+    probe.remove();
+  }
+};
 export const LOAD_ALL_PACE_MS = PAGE_PACE_MS;
 /**
  * Fala 20d podniosla tempo stron w INDEKSACJI do 800 ms (zgloszenie
@@ -244,6 +272,8 @@ let unsubBadge: (() => void) | null = null;
 let unsubAnimalHeader: (() => void) | null = null;
 let animalHeader: AnimalHeaderControl | null = null;
 let wideObserver: ResizeObserver | null = null;
+let scaleProbe: HTMLElement | null = null;
+let themeColorCleanup: (() => void) | null = null;
 /** Timer bezpiecznika lotu zwierzecia (Fala 13b) - czyszczony w destroy. */
 let animalTimer: ReturnType<typeof setTimeout> | null = null;
 /** Timer okna "Slucham?" po naszym wyslaniu (Fala 13d) - czyszczony w destroy. */
@@ -272,6 +302,8 @@ function createContent(): HTMLDivElement {
   // i panele nie scrolluja sie niezaleznie.
   root.style.height = "100%";
   root.style.minHeight = "0";
+  themeColorCleanup?.();
+  themeColorCleanup = null;
   if (unmount) {
     unmount();
     unmount = null;
@@ -280,16 +312,49 @@ function createContent(): HTMLDivElement {
     wideObserver.disconnect();
     wideObserver = null;
   }
+  scaleProbe?.remove();
+  scaleProbe = null;
   if (store && handlersRef) {
     unmount = mountMailUi(root, store, handlersRef);
+    const themedRoot = root.querySelector<HTMLElement>(".arkmail-root");
+    if (themedRoot) themeColorCleanup = installThemeColors(themedRoot);
     // Szerokosc popupu -> uklad (Fala 10): >= WIDE_MIN_WIDTH dwa panele,
     // nizej jeden. ResizeObserver strzela od razu po observe, wiec uklad
     // startuje poprawny. Srodowisko bez ResizeObserver zostaje na waskim.
     if (typeof ResizeObserver !== "undefined") {
       const s = store;
+      let rootWidth = 0;
+      let measuredScale = 1;
       wideObserver = new ResizeObserver((entries) => {
-        const w = entries[0]?.contentRect.width ?? 0;
-        s.setWide(w >= WIDE_MIN_WIDTH);
+        for (const entry of entries) {
+          if (entry.target === scaleProbe) measuredScale = entry.contentRect.width;
+          else if (entry.target === root || entry.target === undefined) rootWidth = entry.contentRect.width;
+        }
+        // Sonda jest rodzenstwem kontenera: repaint mountMailUi wymienia
+        // dzieci kontenera, ale nie moze jej usunac. Jej szerokosc w pikselach
+        // jest liczbowa skala, takze gdy klient zapisze ja jako calc(...).
+        if (!scaleProbe && root.parentElement) {
+          const probe = root.ownerDocument.createElement('span');
+          probe.setAttribute('data-arkmail-scale-probe', '');
+          probe.setAttribute('aria-hidden', 'true');
+          probe.style.position = 'absolute';
+          probe.style.visibility = 'hidden';
+          probe.style.pointerEvents = 'none';
+          probe.style.width = 'calc(1px * var(--window-font-scale, 1))';
+          probe.style.height = '0';
+          probe.style.padding = '0';
+          probe.style.border = '0';
+          root.parentElement.appendChild(probe);
+          scaleProbe = probe;
+          const initial = Number.parseFloat(
+            root.ownerDocument.defaultView?.getComputedStyle(probe).width ?? '',
+          );
+          if (Number.isFinite(initial) && initial > 0) measuredScale = initial;
+          wideObserver?.observe(probe);
+        } else if (!scaleProbe) {
+          measuredScale = readWindowFontScale(root);
+        }
+        s.setWide(shouldUseWideLayout(rootWidth, measuredScale));
       });
       wideObserver.observe(root);
     }
@@ -2960,6 +3025,10 @@ export async function init(api: PluginApi) {
         wideObserver.disconnect();
         wideObserver = null;
       }
+      scaleProbe?.remove();
+      scaleProbe = null;
+      themeColorCleanup?.();
+      themeColorCleanup = null;
       handlersRef = null;
       store = null;
       if (transport) {
@@ -3043,6 +3112,10 @@ export async function destroy() {
     wideObserver.disconnect();
     wideObserver = null;
   }
+  scaleProbe?.remove();
+  scaleProbe = null;
+  themeColorCleanup?.();
+  themeColorCleanup = null;
   if (transport) {
     transport.dispose();
     transport = null;

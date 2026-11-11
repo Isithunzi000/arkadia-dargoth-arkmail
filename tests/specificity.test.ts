@@ -24,8 +24,7 @@ test('specyficznosc: rodzina skrzynek (box) w postaci button.<klasa>', () => {
   const base = ruleBody(/\.arkmail-root\s+button\.arkmail-box(?![\w-])/);
   assert.ok(base, 'regula button.arkmail-box istnieje');
   assert.match(base!, /border-radius/, 'pigulka ma zaokraglenie');
-  const hover = ruleBody(/\.arkmail-root\s+button\.arkmail-box:hover/);
-  assert.ok(hover, 'regula hover istnieje');
+  assert.doesNotMatch(STYLES, /button\.arkmail-box:hover/, 'zwykly hover zostawiony klasie natywnej');
   const active = ruleBody(/\.arkmail-root\s+button\.arkmail-box-active/);
   assert.ok(active, 'regula aktywnej istnieje');
   assert.match(active!, /font-weight:\s*600/, 'aktywna wyrozniona');
@@ -44,8 +43,12 @@ test('specyficznosc: mini rodzina w postaci button.<klasa>', () => {
       /font-size:\s*calc\(11px \* var\(--window-font-scale, 1\)\)/,
       `${cls} ma kompaktowa czcionke 11px skalowana`,
     );
-    const hover = ruleBody(new RegExp(`\\.arkmail-root\\s+button\\.${cls}:hover`));
-    assert.ok(hover, `regula hover ${cls} istnieje`);
+    assert.doesNotMatch(body!, /background:|color:|border:/, `${cls}: kolory z klasy natywnej`);
+    assert.doesNotMatch(
+      STYLES,
+      new RegExp(`button\\.${cls}:hover`),
+      `${cls}: hover z klasy natywnej`,
+    );
   }
 });
 

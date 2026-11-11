@@ -3,10 +3,8 @@
  * skan w 1.30.2, Etap 1) - piny regresji C: kazdy przycisk pluginu ma
  * miec klasy natywne klienta (popup-btn popup-btn--control albo
  * dialog-tab), inaczej nie dziedziczy wysokosci var(--ui-ctrl),
- * skalowania i wariantow. Wyjatki dozwolone: pigulka skrzynki
- * (.arkmail-box - komponent z wlasna rodzina styli) i mini rodzina
- * pomocnicza (.arkmail-contact-dir, .arkmail-contact-addbook - celowo
- * kompaktowa, pin w specificity.test.ts).
+ * skalowania i wariantow. Nie ma wyjatkow: takze skrzynki i miniakcje
+ * uzywaja natywnego poziomu control, a plugin zmienia tylko ich uklad.
  * Wydanie 1.30.2 (Etap 1): skan twardy - className musi nalezec do
  * TEJ zmiennej przycisku (dziura: 14-liniowe okno lapalo className
  * sasiedniego elementu, np. labelu, i wpuszczalo przycisk bez klas).
@@ -23,7 +21,7 @@ const SRC = readFileSync(
   'utf-8',
 );
 
-const ALLOWED = ['arkmail-box', 'arkmail-contact-dir', 'arkmail-contact-addbook'];
+const ALLOWED: string[] = [];
 
 test('render: kazdy przycisk ma klasy natywne klienta', () => {
   const lines = SRC.split('\n');

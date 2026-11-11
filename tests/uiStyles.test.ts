@@ -14,7 +14,7 @@ import { join } from 'node:path';
 
 import { STYLES } from '../src/arkmail/ui/styles';
 
-const VAR = 'var\\(\\--popup-[a-z-]+\\)';
+const VAR = 'var\\(\\--arkmail-[a-z-]+\\)';
 const HEX = '#[0-9a-fA-F]{3,8}\\b';
 
 /** Zwraca cialo pierwszej reguly pasujacej do selektora (regex). */
@@ -26,28 +26,29 @@ function ruleBody(selectorRe: RegExp): string | null {
 test('style: root ma jawne tlo i kolor tekstu ze zmiennych klienta', () => {
   // Zgloszenie 2026-11-05 (A3): natywne UI - tlo i tekst roota ze
   // zmiennych motywu; zero hex.
-  const body = ruleBody(/\.arkmail-root\s*/);
+  const body = ruleBody(/^\.arkmail-root\s*/);
   assert.ok(body, 'regula .arkmail-root istnieje');
   assert.match(body!, new RegExp(`background:\\s*${VAR}`), 'tlo roota ze zmiennej');
   assert.match(body!, new RegExp(`color:\\s*${VAR}`), 'tekst roota ze zmiennej');
   assert.doesNotMatch(body!, new RegExp(HEX), 'root bez hex');
 });
 
-test('style: wszystkie przyciski maja jawne tlo i kolor (catch-all)', () => {
-  const body = ruleBody(/\.arkmail-root\s+button\b/);
-  assert.ok(body, 'istnieje catch-all .arkmail-root button');
-  assert.match(body!, new RegExp(`background:\\s*${VAR}`), 'tlo przyciskow ze zmiennej');
-  assert.match(body!, new RegExp(`color:\\s*${VAR}`), 'kolor przyciskow ze zmiennej');
-  assert.doesNotMatch(body!, new RegExp(HEX), 'przyciski bez hex');
+test('style: przyciski maja kolory natywne, bez konkurencyjnego catch-alla', () => {
+  assert.doesNotMatch(STYLES, /button:not\(\.popup-btn\):not\(\.dialog-tab\)/);
+  const solid = ruleBody(/\.arkmail-root\s+button\.popup-btn--solid\b/);
+  assert.ok(solid, 'solid ma lokalny, bezpieczny stan koloru');
+  assert.match(solid!, new RegExp(`background:\\s*${VAR}`), 'tlo przycisku ze zmiennej');
+  assert.match(solid!, new RegExp(`color:\\s*${VAR}`), 'kolor przycisku ze zmiennej');
+  assert.doesNotMatch(solid!, new RegExp(HEX), 'przyciski bez hex');
 });
 
-test('style: pola tekstowe bez wlasnych regul kolorow (klasy natywne klienta)', () => {
-  // Zgloszenie 2026-11-05 (F4c): wyglad pol pilnuja natywne klasy
-  // popup-input popup-input--control z arkusza klienta; plugin trzyma
-  // wylacznie checkboxy (accent-color).
+test('style: pola tekstowe maja natywne klasy i lokalny bezpieczny placeholder', () => {
   assert.doesNotMatch(STYLES, /\.arkmail-root\s+input\s*,\s*\.arkmail-root\s+textarea/, 'bez catch-all dla pol');
-  assert.doesNotMatch(STYLES, /\.arkmail-root\s+input:focus\b/, 'bez wlasnego fokusa pol');
-  assert.doesNotMatch(STYLES, /input::placeholder/, 'bez wlasnego placeholdera');
+  assert.doesNotMatch(STYLES, /\.arkmail-root\s+input:focus\b/, 'bez starego fokusa pol');
+  const placeholder = ruleBody(/\.arkmail-root\s+\.popup-input::placeholder/);
+  assert.ok(placeholder, 'placeholder ma lokalna role kontrastu');
+  assert.match(placeholder!, /color:\s*var\(--arkmail-placeholder\)/);
+  assert.match(placeholder!, /opacity:\s*1/);
   assert.match(STYLES, /input\[type='checkbox'\]\s*\{\s*accent-color:/, 'checkboxy: accent-color zostaje');
 });
 
@@ -86,10 +87,9 @@ test('style: szukajka uklada sie stosowo, Szukaj na calej szerokosci', () => {
   assert.match(go!, /grid-column:\s*1\s*\/\s*-1/, 'Szukaj rozpiety na caly wiersz');
 });
 
-test('style: przyciski nie lamia etykiet (nowrap w catch-all)', () => {
-  const body = ruleBody(/\.arkmail-root\s+button\b/);
-  assert.ok(body, 'regula catch-all button istnieje');
-  assert.match(body!, /white-space:\s*nowrap/, 'przyciski maja white-space: nowrap');
+test('style: etykiety przyciskow nie maja konkurencyjnej reguly pluginu', () => {
+  assert.doesNotMatch(STYLES, /button:not\(\.popup-btn\):not\(\.dialog-tab\)/);
+  assert.doesNotMatch(STYLES, /\.arkmail-root\s+button\s*\{[^}]*white-space:/);
 });
 
 test('style: pasek operacji zawija caly tekst bez ucinania', () => {
@@ -137,14 +137,8 @@ test('style: filtr i sortowanie kontaktow mieszcza sie w waskim panelu', () => {
 // (specyficznosc 0,2,1) lapala tez box-ops, a wyzerowanie istnialo tylko
 // dla older-row. Catch-all dostaje jednolita wysokosc i centrowanie,
 // zeby obwodka nie zalezela od etykiety.
-test('style: przyciski spojne wysokoscia; box-ops wolny od margin-top paginacji', () => {
-  const all = ruleBody(/\.arkmail-root\s+button\b/);
-  assert.ok(all, 'regula catch-all button istnieje');
-  assert.match(all!, /display:\s*inline-flex/, 'catch-all: inline-flex');
-  assert.match(all!, /align-items:\s*center/, 'pionowe centrowanie etykiety');
-  assert.match(all!, /justify-content:\s*center/, 'poziome centrowanie etykiety');
-  assert.match(all!, /min-height:\s*calc\(26px \* var\(--window-font-scale, 1\)\)/, 'jednolita minimalna wysokosc skalowana');
-
+test('style: natywne przyciski; box-ops wolny od margin-top paginacji', () => {
+  assert.doesNotMatch(STYLES, /button:not\(\.popup-btn\):not\(\.dialog-tab\)/);
   const boxOps = ruleBody(/\.arkmail-box-ops\s+button\.arkmail-older-all\b/);
   assert.ok(boxOps, 'regula box-ops dla Wczytaj-wszystkie istnieje');
   assert.match(boxOps!, /margin-top:\s*0/, 'box-ops bez margin-top paginacji');
@@ -224,21 +218,16 @@ test('style: wiersze ksiazki i heady grup maja uklad flex', () => {
 
 /* --- F5: tokeny systemu projektowego (hover, disabled, dividery, mini, focus) --- */
 
-test('style F5: hover tylko dla klawiszy spoza natywnych klas klienta', () => {
-  // Zgloszenie 2026-11-05 (F4b): klawisze z klasami popup-btn--* maja hovery
-  // z arkusza klienta; wlasny hover dotyczy wylacznie button:not(.popup-btn).
-  const hover = ruleBody(/button:not\(\.popup-btn\):not\(\.dialog-tab\):hover/);
-  assert.ok(hover, 'regula catch-all hover istnieje');
-  assert.match(hover!, /background:\s*var\(--popup-control-hover-bg\)/, 'catch-all hover: control-hover');
+test('style F5: natywne hovery bez konkurencyjnych regul pluginu', () => {
+  assert.doesNotMatch(STYLES, /button:not\(\.popup-btn\):not\(\.dialog-tab\):hover/);
+  assert.doesNotMatch(STYLES, /button\.arkmail-contact-(?:dir|addbook):hover/);
+  assert.doesNotMatch(STYLES, /button\.arkmail-box:hover/);
   assert.doesNotMatch(STYLES, /\.arkmail-btn-(primary|action|danger|reset):hover/, 'zero wlasnych regul hover starych poziomow');
-  assert.doesNotMatch(STYLES, /\.arkmail-tab\b[^:]*\{[^}]*background:/, 'zakladki poza hovorem catch-all');
+  assert.doesNotMatch(STYLES, /\.arkmail-tab\b[^:]*\{[^}]*background:/, 'zakladki bez starego hovera');
 });
 
-test('style F5: liczba uzyc tokenow hover w STYLES dokladna', () => {
-  // Zgloszenie 2026-11-05 (F4b): control-hover x3 (catch-all hover,
-  // catch-all :active, hover rodziny mini); danger-hover x0 (hover
-  // klawiszy danger obsluguje arkusz klienta).
-  assert.equal((STYLES.match(/var\(--popup-control-hover-bg\)/g) || []).length, 3, 'control-hover-bg: 3 reguly');
+test('style F5: surowe tokeny hover klienta nie sa rozwlekane po komponentach', () => {
+  assert.equal((STYLES.match(/var\(--popup-control-hover-bg\)/g) || []).length, 0, 'control-hover-bg: 0 regul');
   assert.equal((STYLES.match(/var\(--popup-danger-hover-bg\)/g) || []).length, 0, 'danger-hover-bg: 0 regul');
 });
 
@@ -252,62 +241,58 @@ test('style F5: disabled takze dla klawiszy natywnych popup-btn', () => {
 test('style F5: pozioma linia hr w tokenach obramowania', () => {
   const hr = ruleBody(/\.arkmail-root hr/);
   assert.ok(hr, 'regula hr istnieje');
-  assert.match(hr!, /border-top:\s*calc\(1px \* var\(--window-font-scale, 1\)\) solid var\(--popup-border\)/,
+  assert.match(hr!, /border-top:\s*calc\(1px \* var\(--window-font-scale, 1\)\) solid var\(--arkmail-border\)/,
     'hr: linia w kolorze obramowania, skalowana');
   assert.doesNotMatch(hr!, /#[0-9a-fA-F]{3,8}/, 'hr: bez sztywnych kolorow hex');
 });
 
-test('style F5: jeden mechanizm disabled (generyczny button:disabled)', () => {
+test('style F5: jeden mechanizm disabled dla wszystkich natywnych przyciskow', () => {
   assert.doesNotMatch(STYLES, /deletion-delete:disabled/, 'usuniety override deletion-delete:disabled');
   assert.doesNotMatch(STYLES, /contact-dir:disabled/, 'usuniety blok contact-dir/addbook:disabled');
   assert.doesNotMatch(STYLES, /opacity:\s*0\.4(?!\d)/, 'brak bloku opacity 0.4');
-  const disabled = ruleBody(/\.arkmail-root\s+button:not\(\.popup-btn\):not\(\.dialog-tab\):disabled\b/);
-  assert.ok(disabled, 'generyczna regula button:disabled zostaje');
-  assert.match(disabled!, /opacity:\s*0\.45/, 'generyczna przezroczystosc 0.45');
+  assert.doesNotMatch(STYLES, /button:not\(\.popup-btn\):not\(\.dialog-tab\):disabled/);
+  const disabled = ruleBody(/\.arkmail-root\s+\.popup-btn:disabled\b/);
+  assert.ok(disabled, 'wspolna regula popup-btn:disabled zostaje');
+  assert.match(disabled!, /opacity:\s*0\.45/, 'wspolna przezroczystosc 0.45');
 });
 
 test('style F5: dividery usuwania w tonie BG jak pozostale wiersze', () => {
   const results = ruleBody(/\.arkmail-deletion-results/);
   assert.ok(results, 'regula deletion-results istnieje');
-  assert.match(results!, /border-top:\s*calc\(1px \* var\(--window-font-scale, 1\)\) solid var\(--popup-bg\)/,
+  assert.match(results!, /border-top:\s*calc\(1px \* var\(--window-font-scale, 1\)\) solid var\(--arkmail-bg\)/,
     'border-top dividera w tonie tla okna');
-  assert.doesNotMatch(results!, /var\(--popup-border\)/, 'divider bez border');
+  assert.doesNotMatch(results!, /var\(--arkmail-border\)/, 'divider bez border');
 });
 
 test('style F5: krok archiwum 3px i siatka krokow 10px', () => {
   const step = ruleBody(/\.arkmail-archive-step\b/);
   assert.ok(step, 'regula archive-step istnieje');
-  assert.match(step!, /border-left:\s*calc\(3px \* var\(--window-font-scale, 1\)\) solid var\(--popup-text-dim\)/,
+  assert.match(step!, /border-left:\s*calc\(3px \* var\(--window-font-scale, 1\)\) solid var\(--arkmail-secondary\)/,
     'pasek kroku 3px (jak pasek zajetosci)');
-  assert.doesNotMatch(step!, /4px \* var\(--window-font-scale, 1\)\) solid var\(--popup-text-dim\)/,
+  assert.doesNotMatch(step!, /4px \* var\(--window-font-scale, 1\)\) solid var\(--arkmail-secondary\)/,
     'brak 4px na pasku kroku');
   const steps = ruleBody(/\.arkmail-archive-steps/);
   assert.match(steps!, /gap:\s*calc\(10px \* var\(--window-font-scale, 1\)\)/, 'siatka krokow gap 10px');
   assert.doesNotMatch(steps!, /18px/, 'siatka krokow bez 18px');
 });
 
-test('style F5: rodzina mini promien 6px i hover z tlem', () => {
+test('style F5: rodzina mini zachowuje uklad i korzysta z natywnego hovera', () => {
   const mini = ruleBody(/\.arkmail-contact-dir,/);
   assert.ok(mini, 'regula rodziny mini istnieje');
   assert.match(mini!, /border-radius:\s*calc\(6px \* var\(--window-font-scale, 1\)\)/,
     'promien rodziny mini 6px');
-  const miniHover = ruleBody(/\.arkmail-contact-dir:hover,/);
-  assert.ok(miniHover, 'hover rodziny mini istnieje');
-  assert.match(miniHover!, /background:\s*var\(--popup-control-hover-bg\)/, 'hover mini: control-hover');
-  assert.match(miniHover!, /(?:^|;)\s*color:\s*var\(--popup-accent\)/, 'hover mini: tekst w kolorze akcentu');
+  assert.doesNotMatch(mini!, /background:|color:|border:/);
+  assert.doesNotMatch(STYLES, /button\.arkmail-contact-dir:hover/);
+  assert.doesNotMatch(STYLES, /button\.arkmail-contact-addbook:hover/);
 });
 
-test('style F5: focus-visible obwodka akcentu i stan :active', () => {
-  const fv = ruleBody(/button:not\(\.popup-btn\):focus-visible,/);
-  assert.ok(fv, 'regula focus-visible istnieje');
-  assert.match(fv!, /outline:\s*calc\(2px \* var\(--window-font-scale, 1\)\) solid var\(--popup-accent\)/, 'focus-visible: 2px akcent');
+test('style F5: focus-visible obejmuje wszystkie kontrolki bezpieczna obwodka', () => {
+  const fv = ruleBody(/\.arkmail-root\s+:is\([^{]*\):focus-visible/);
+  assert.ok(fv, 'wspolna regula focus-visible istnieje');
+  assert.match(fv!, /outline:\s*calc\(2px \* var\(--window-font-scale, 1\)\) solid var\(--arkmail-focus\)/, 'focus-visible: 2px');
   assert.match(fv!, /outline-offset:\s*calc\(1px \* var\(--window-font-scale, 1\)\)/, 'focus-visible: offset 1px');
-  assert.match(STYLES, /\.arkmail-tab:focus-visible,/, 'focus-visible obejmuje zakladki');
-  assert.match(STYLES, /\.arkmail-box:focus-visible,/, 'focus-visible obejmuje skrzynki');
-  assert.match(STYLES, /\.arkmail-contact-dir:focus-visible/, 'focus-visible obejmuje rodzine mini');
-  const active = ruleBody(/button:not\(\.popup-btn\):not\(\.dialog-tab\):not\(\[data-armed="1"\]\):active/);
-  assert.ok(active, 'regula :active istnieje');
-  assert.match(active!, /background:\s*var\(--popup-control-hover-bg\)/, ':active uzywa control-hover');
+  assert.match(STYLES, /:is\(button, input, textarea, select, \[tabindex\]\):focus-visible/);
+  assert.doesNotMatch(STYLES, /button:not\(\.popup-btn\):not\(\.dialog-tab\):not\(\[data-armed="1"\]\):active/);
 });
 
 test('style F5: swiadome wyjatki bez zmian', () => {
@@ -316,12 +301,12 @@ test('style F5: swiadome wyjatki bez zmian', () => {
     'padding wysylki 18px zostaje');
   // 1.30.2 (Etap 4): arch-occ-list usuniety (martwy selektor po
   // przejsciu Archiwum na chipsy) - pin wciecia 18px odpada.
-  assert.match(STYLES, /scrollbar-thumb \{ background:\s*var\(--popup-border\); border-radius:\s*calc\(4px/,
+  assert.match(STYLES, /scrollbar-thumb \{ background:\s*var\(--arkmail-border\); border-radius:\s*calc\(4px/,
     'promien scrollbara 4px zostaje');
   const track = ruleBody(/\.arkmail-busy-track/);
   assert.match(track!, /border-radius:\s*calc\(3px/, 'promien paska postepu 3px zostaje');
   const attention = ruleBody(/\.arkmail-box-attention/);
-  assert.match(attention!, /border-color:\s*var\(--popup-accent\)/, 'obramowanie box-attention akcent zostaje');
+  assert.match(attention!, /border-color:\s*var\(--arkmail-accent\)/, 'obramowanie box-attention akcent zostaje');
 });
 
 

@@ -123,7 +123,7 @@ test('guardy: klawisze X maja poziom danger i wariant ikonowy (K1)', () => {
 
 test('guardy: uzbrojony X ma wypelnienie danger i grubsza obwodke (K2)', () => {
   // Zgloszenie 2026-11-05 (K2): stan uzbrojony wyglada inaczej niz
-  // spoczynkowy - wypelnienie danger + obrys danger-border.
+  // spoczynkowy - wypelnienie danger + obrys o lokalnym, bezpiecznym kontrascie.
   const s = new MailUiStore({ tab: 'kontakty', people: ['Fred', 'Grault'] });
   const { container } = mount(s);
   click(q(container, '[data-book-remove]'));
@@ -131,8 +131,9 @@ test('guardy: uzbrojony X ma wypelnienie danger i grubsza obwodke (K2)', () => {
   assert.ok(armed, 'uzbrojony X ma data-armed');
   const m = STYLES.match(/\.arkmail-root button\.popup-btn--danger\[data-armed="1"\]\s*\{([^}]*)\}/);
   assert.ok(m, 'regula uzbrojonego danger istnieje');
-  assert.match(m![1]!, /var\(--popup-danger-bg\)/, 'uzbrojony: wypelnienie danger');
-  assert.match(m![1]!, /var\(--popup-danger-border\)/, 'uzbrojony: obrys danger-border');
+  assert.match(m![1]!, /background:\s*var\(--arkmail-danger-bg\)/, 'uzbrojony: wypelnienie z lokalnej roli danger');
+  assert.match(STYLES, /--arkmail-danger-bg:\s*var\(--popup-danger-bg\)/, 'lokalne wypelnienie zachowuje natywny kolor danger');
+  assert.match(m![1]!, /var\(--arkmail-danger-text\)/, 'uzbrojony: obrys z lokalna rola kontrastu');
 });
 
 test('guardy: X ksiazki usuwa dopiero z drugiego klika', () => {

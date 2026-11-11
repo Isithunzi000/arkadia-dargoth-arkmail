@@ -996,7 +996,7 @@ const filterClearClass = (viewClass?: string): string =>
     for (const [box, label] of BOXES) {
       const btn = doc.createElement('button');
       btn.className =
-        'arkmail-box' +
+        'arkmail-box popup-btn popup-btn--control' +
         (state.activeBox === box ? ' arkmail-box-active' : '') +
         // Fala 14b: flash celu kolejki niewyslanych (jak zakladka Listy).
         (state.unsentFlash && box === 'niewyslane' ? ' arkmail-flash' : '') +
@@ -1005,6 +1005,7 @@ const filterClearClass = (viewClass?: string): string =>
         (state.badge > 0 && box === 'nieprzeczytane' ? ' arkmail-box-attention' : '') +
         (state.badgeUnsent > 0 && box === 'niewyslane' ? ' arkmail-box-attention' : '');
       btn.setAttribute('data-box', box);
+      btn.setAttribute('aria-pressed', String(state.activeBox === box));
       btn.textContent = label;
       btn.addEventListener('click', () => {
         store.setActiveBox(box);

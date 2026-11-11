@@ -46,15 +46,15 @@ test('style: przycisk Wyslij bez wlasnych kolorow (solid z arkusza klienta)', ()
 // Dargoth dla klas popup-btn--*; plugin nie definiuje wlasnych regul hover
 // dla natywnych klawiszy (zgloszenie 2026-11-05, F4b).
 
-test('style: nieprzeczytany wiersz ma pasek akcentowy z lewej', () => {
+test('style: nieprzeczytany wiersz ma bezpieczny pasek z lewej', () => {
   const b = ruleBody('unread');
-  assert.match(b, /box-shadow:\s*inset[^;]*var\(--popup-accent\)/, 'pasek akcentowy z lewej');
+  assert.match(b, /box-shadow:\s*inset[^;]*var\(--arkmail-unread-marker\)/, 'pasek nieprzeczytania z lewej');
 });
 
-test('style: kropka nieprzeczytania w kolorze akcentu', () => {
+test('style: kropka nieprzeczytania ma lokalny znacznik kontrastu', () => {
   const m = STYLES.match(/\.arkmail-unread::before\s*\{([^}]*)\}/);
   assert.ok(m, 'regula .arkmail-unread::before istnieje');
-  assert.match(m![1]!, /background:\s*var\(--popup-accent\)/, 'kropka akcentowa');
+  assert.match(m![1]!, /background:\s*var\(--arkmail-unread-marker\)/, 'kropka nieprzeczytania');
 });
 
 // Aktywna zakladka: klasy dialog-tabs/dialog-tab/is-active z arkusza
@@ -69,16 +69,16 @@ test('style: zero wlasnych regul kolorow zakladek', () => {
 
 test('style: aktywna skrzynka na wypelnieniu akcentu', () => {
   const b = ruleBody('box-active');
-  assert.match(b, /background:\s*var\(--popup-accent\)/, 'tlo akcentu');
-  assert.match(b, /border-color:\s*var\(--popup-accent\)/, 'obwodka akcentu');
+  assert.match(b, /background:\s*var\(--arkmail-accent\)/, 'tlo akcentu');
+  assert.match(b, /border-color:\s*var\(--arkmail-accent\)/, 'obwodka akcentu');
   const h = hoverBody('box-active');
-  assert.match(h, /background:\s*var\(--popup-accent\)/, 'hover akcentu');
+  assert.match(h, /background:\s*var\(--arkmail-accent\)/, 'hover akcentu');
 });
 
 test('style: pulsowanie flash w kolorze akcentu', () => {
   const m = STYLES.match(/@keyframes arkmailFlash[\s\S]*?50%\s*\{([^}]*)\}/);
   assert.ok(m, 'klatka 50% keyframes arkmailFlash istnieje');
-  assert.match(m![1]!, /background:\s*var\(--popup-accent\)/, 'klatka 50% akcent');
+  assert.match(m![1]!, /background:\s*var\(--arkmail-accent\)/, 'klatka 50% akcent');
 });
 
 test('style: tekst na wypelnieniu akcentu nigdy w kolorze akcentu', () => {
@@ -87,10 +87,10 @@ test('style: tekst na wypelnieniu akcentu nigdy w kolorze akcentu', () => {
   const blocks = STYLES.match(/\{[^{}]*\}/g) ?? [];
   assert.ok(blocks.length > 50, 'arkusz ma zestaw regul');
   for (const block of blocks) {
-    if (/background:\s*var\(--popup-accent\)/.test(block)) {
+    if (/background:\s*var\(--arkmail-accent\)/.test(block)) {
       assert.doesNotMatch(
         block,
-        /(^|[\s;{])color:\s*var\(--popup-accent\)/,
+        /(^|[\s;{])color:\s*var\(--arkmail-accent\)/,
         `tekst akcentowy na tle akcentu: ${block.trim().slice(0, 120)}`,
       );
     }
