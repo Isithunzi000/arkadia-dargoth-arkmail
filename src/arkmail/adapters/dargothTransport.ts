@@ -18,6 +18,7 @@ import { SessionScopeRegistry } from '../core/session/transport.js';
 import type { ProtoLine, SessionScope, Transport } from '../core/session/transport.js';
 import { extractPagerPrompt } from '../core/protocol/parser.js';
 import { isPromptLine } from '../core/session/lines.js';
+import { notify } from './notify.js';
 
 export interface PagerModalHooks {
   /** Gracz przejmuje wlasny pager; sesja pluginu konczy sie bez q. */
@@ -32,6 +33,8 @@ const MODAL_HOOK_PRIORITY = 100;
 /** Fala 42: pamiec ostatnich wysylek z echem oczekujacych na linie-echo. */
 const PENDING_ECHO_CAP = 10;
 const PENDING_ECHO_TTL_MS = 10_000;
+/** Brak promptu po tym czasie jest widoczny, ale nie otwiera kanalu. */
+const RECOVERY_LIMIT_MS = 10_000;
 
 type CommandSource = 'arkmail' | 'user';
 
@@ -82,6 +85,7 @@ export class DargothTransport implements Transport {
   private gagWhen: (() => boolean) | null = null;
   /** Niepotwierdzony koniec odpowiedzi: mail gagowany do promptu gry. */
   private recovering = false;
+  private recoveryTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private readonly api: PluginApi) {}
 
@@ -178,9 +182,36 @@ export class DargothTransport implements Transport {
     return this.sessions.openSession();
   }
 
+  private clearRecoveryTimer(): void {
+    if (this.recoveryTimer) clearTimeout(this.recoveryTimer);
+    this.recoveryTimer = null;
+  }
+
+  private finishRecovery(): void {
+    this.recovering = false;
+    this.clearRecoveryTimer();
+  }
+
   beginRecovery(): void {
+    if (this.recovering) {
+      this.armTrigger();
+      return;
+    }
     this.recovering = true;
     this.armTrigger();
+    const generation = this.connectionGeneration;
+    this.recoveryTimer = setTimeout(() => {
+      this.recoveryTimer = null;
+      if (!this.recovering || generation !== this.connectionGeneration) return;
+      notify(
+        this.api,
+        'Nie potwierdzono zakonczenia poprzedniej odpowiedzi. Poczekaj na powrot zwyklego widoku gry lub polacz ponownie.',
+        { title: 'Brak synchronizacji z gra', level: 'error' },
+      );
+      // Sam uplyw czasu nie dowodzi synchronizacji. Blokada i gag
+      // pozostaja do zwyklego promptu albo ponownego polaczenia.
+    }, RECOVERY_LIMIT_MS);
+    (this.recoveryTimer as unknown as { unref?: () => void }).unref?.();
   }
 
   subscribe(cb: (line: ProtoLine) => void): () => void {
@@ -260,7 +291,10 @@ export class DargothTransport implements Transport {
     this.online = online;
     if (online) return;
     this.connectionGeneration++;
-    if (this.sessions.hasActive) this.beginRecovery();
+    const needsRecovery = this.recovering || this.sessions.hasActive;
+    this.recovering = false;
+    this.clearRecoveryTimer();
+    if (needsRecovery) this.beginRecovery();
     this.sessions.reconnect();
     this.commandQueue = Promise.resolve();
     this.clearPendingEchoes();
@@ -285,7 +319,7 @@ export class DargothTransport implements Transport {
     this.sessions.closeAll();
     this.queue = [];
     this.clearPendingEchoes();
-    this.recovering = false;
+    this.finishRecovery();
     this.connectionGeneration++;
     this.commandQueue = Promise.resolve();
   }
@@ -304,7 +338,7 @@ export class DargothTransport implements Transport {
         const proto: ProtoLine = { text: originalLine ?? line.text, cls: type ?? '' };
         // Zwykly prompt potwierdza koniec strumienia i zdejmuje odzyskiwanie.
         if (this.recovering && (proto.cls === 'prompt' || isPromptLine(proto.text))) {
-          this.recovering = false;
+          this.finishRecovery();
         }
         // Fala 42: echo wlasnej komendy (wysylka z echem) oznaczamy own
         // po dopasowaniu FIFO do zarejestrowanego tekstu - hook wejscia

@@ -17,6 +17,7 @@ type TriggerCb = (line: { text: string }, matches: unknown, type: string) => unk
 
 class FakeApi {
   readonly sent: string[] = [];
+  readonly shown: Array<{ text: string; title?: string; level?: string }> = [];
   triggerCb: TriggerCb | null = null;
   sendImpl: ((command: string) => Promise<void>) | null = null;
 
@@ -37,6 +38,11 @@ class FakeApi {
     commandHooks: {
       register: () => 'hook-1',
       unregister: () => true,
+    },
+    notifications: {
+      show: (entry: { text: string; title?: string; level?: string }) => {
+        this.shown.push(entry);
+      },
     },
   } as unknown as PluginApi;
 
@@ -120,6 +126,67 @@ test('adapter: reconnect z aktywna sesja wymaga promptu przed nowa operacja', ()
   const second = t.openSession();
   assert.ok(second.id > first.id);
   second.close();
+  t.dispose();
+});
+
+test('adapter: limit odzyskiwania zglasza blad bez zdejmowania blokady', async (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  const f = new FakeApi();
+  const t = armedTransport(f);
+  t.beginRecovery();
+
+  context.mock.timers.tick(9_999);
+  assert.equal(f.shown.length, 0, 'przed limitem nie ma bledu');
+  context.mock.timers.tick(1);
+  assert.equal(f.shown.length, 1, 'limit ma widoczny wynik');
+  assert.equal(f.shown[0]?.title, 'Brak synchronizacji z gra');
+  assert.equal(f.shown[0]?.level, 'error');
+  assert.equal(
+    f.shown[0]?.text,
+    'Nie potwierdzono zakonczenia poprzedniej odpowiedzi. Poczekaj na powrot zwyklego widoku gry lub polacz ponownie.',
+  );
+
+  assert.equal(f.fire('Pozna odpowiedz.', 'mail'), null, 'blad nie zdejmuje gaga');
+  assert.throws(() => t.openSession(), /operacja anulowana/);
+  await assert.rejects(t.send('listy odebrane'), /operacja anulowana/);
+  context.mock.timers.tick(20_000);
+  assert.equal(f.shown.length, 1, 'limit nie powtarza komunikatu');
+
+  f.fire('> ', 'prompt');
+  const session = t.openSession();
+  session.close();
+  t.dispose();
+});
+
+test('adapter: reconnect odnawia limit, a dispose anuluje oczekujacy timer', (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  const f = new FakeApi();
+  const t = armedTransport(f);
+  t.beginRecovery();
+  context.mock.timers.tick(6_000);
+
+  t.setOnline(false);
+  t.setOnline(true);
+  context.mock.timers.tick(4_000);
+  assert.equal(f.shown.length, 0, 'stary timer nie zglasza bledu po reconnectcie');
+  context.mock.timers.tick(6_000);
+  assert.equal(f.shown.length, 1, 'nowe polaczenie ma wlasny pelny limit');
+
+  f.fire('> ', 'prompt');
+  t.beginRecovery();
+  t.dispose();
+  context.mock.timers.tick(20_000);
+  assert.equal(f.shown.length, 1, 'dispose anuluje kolejny limit');
+});
+
+test('adapter: prompt przed limitem anuluje oczekujacy komunikat', (context) => {
+  context.mock.timers.enable({ apis: ['setTimeout'] });
+  const f = new FakeApi();
+  const t = armedTransport(f);
+  t.beginRecovery();
+  f.fire('> ', 'prompt');
+  context.mock.timers.tick(20_000);
+  assert.equal(f.shown.length, 0);
   t.dispose();
 });
 
