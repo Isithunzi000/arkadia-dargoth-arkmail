@@ -4,8 +4,8 @@
  *  - "zapamietani" / "przedstawieni" -> lista imion z jednej linii,
  *  - "aliasy pocztowe" -> blok naglowka (parseAliasesBlock).
  * Odpowiedzi to pojedyncze linie - bez pagera; koniec po promptzie
- * ("> ") albo echu komendy gracza. Cisza odrzuca operacje i uruchamia
- * odzyskiwanie do zwyklego promptu.
+ * ("> ") albo echu komendy gracza. Cisza nie rozstrzyga operacji;
+ * brak zakonczenia odrzuca dopiero pelny limit czasu.
  */
 import {
   parseAliasesBlock,
@@ -18,7 +18,7 @@ import type { ProtoLine, Transport } from './transport.js';
 
 export interface ImportSessionOptions {
   timeoutMs: number;
-  /** Limit ciszy; po nim import jest odrzucany, nie zatwierdzany. */
+  /** Zachowane dla zgodnosci wywolan; cisza nie rozstrzyga importu. */
   idleMs?: number;
   onCancel?: (cb: () => void) => () => void;
 }
@@ -47,7 +47,6 @@ export class ImportSession {
         if (cleaned) return;
         cleaned = true;
         clearTimeout(timeout);
-        if (idle !== undefined) clearTimeout(idle);
         unsubscribe();
         cancelUnsub?.();
         session.close();
@@ -74,15 +73,7 @@ export class ImportSession {
         }
         // Echo wlasnej komendy otwiera transakcje, nie domyka jej.
         lines.push(text);
-        if (this.opts.idleMs !== undefined) {
-          if (idle !== undefined) clearTimeout(idle);
-          idle = setTimeout(() => {
-            this.transport.beginRecovery();
-            fail(new Error(`import ${command}: timeout`));
-          }, this.opts.idleMs);
-        }
       });
-      let idle: ReturnType<typeof setTimeout> | undefined;
       const timeout = setTimeout(() => {
         this.transport.beginRecovery();
         fail(new Error(`import ${command}: timeout`));

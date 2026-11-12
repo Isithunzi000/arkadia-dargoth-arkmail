@@ -247,7 +247,7 @@ export class PagerSession {
    * onPager: odpalane przy pierwszym pager prompt (wyslij akcje).
    * onLine: moze zwrocic 'close' -> wysylamy "q" przy najblizszym
    * pager prompcie. Konczy sie wylacznie na zwyklym promptcie gry
-   * (klasa albo tresc); cisza po "q" odrzuca niepotwierdzony wynik.
+   * (klasa albo tresc); brak promptu odrzuca dopiero pelny limit czasu.
    */
   private run<T>(
     numer: number,
@@ -285,14 +285,12 @@ export class PagerSession {
        *  prompt pagera (serwer odpowiada = strona nie czeka). */
       let advances = 0;
       const idleMs = this.opts.idleMs ?? DEFAULT_IDLE_FLUSH_MS;
-      let idleTimer: ReturnType<typeof setTimeout> | null = null;
       let quietTimer: ReturnType<typeof setTimeout> | null = null;
       let graceTimer: ReturnType<typeof setTimeout> | null = null;
       let cancelUnsub: () => void = () => {};
       const cleanup = () => {
         done = true;
         clearTimeout(timer);
-        if (idleTimer) clearTimeout(idleTimer);
         if (quietTimer) clearTimeout(quietTimer);
         if (graceTimer) clearTimeout(graceTimer);
         if (loadRetryTimer) clearTimeout(loadRetryTimer);
@@ -354,21 +352,6 @@ export class PagerSession {
         }
         cleanup();
         reject(new Error(`pager session list ${numer}: przerwano`));
-      };
-
-      /** Cisza po q nie potwierdza zamkniecia. Sukces wymaga promptu gry. */
-      const armIdle = () => {
-        if (idleTimer) clearTimeout(idleTimer);
-        idleTimer = setTimeout(() => {
-          if (done || state !== 'closing') return;
-          this.transport.beginRecovery();
-          suspectPagerOrphan();
-          if (aborted || ambiguous !== null) {
-            finish(false);
-            return;
-          }
-          fail(new Error(`timeout: pager session list ${numer}`));
-        }, idleMs);
       };
 
       /**
@@ -454,7 +437,6 @@ export class PagerSession {
         state = 'closing';
         if (quietTimer) clearTimeout(quietTimer);
         send('q');
-        if (!done) armIdle();
       };
 
       session.subscribe((line: ProtoLine) => {
@@ -470,7 +452,6 @@ export class PagerSession {
             return;
           }
           actions?.onClosingLine?.(line);
-          armIdle();
           return;
         }
 

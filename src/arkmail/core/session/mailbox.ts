@@ -5,8 +5,8 @@
  *
  * Przenosnosc: zywy PluginApi daje triggerom SAM tekst linii (bez klas
  * gmcp_msgs), wiec koniec listingu wykrywamy tez po samej tresci:
- * echo komendy ("→ ...") oraz prompt ("> "). Cisza nie jest sukcesem:
- * po jej uplywie sesja przechodzi w odzyskiwanie do zwyklego promptu.
+ * echo komendy ("→ ...") oraz prompt ("> "). Cisza nie rozstrzyga
+ * operacji; brak zakonczenia odrzuca dopiero pelny limit czasu.
  */
 
 import {
@@ -108,14 +108,11 @@ export class MailboxSession {
        *  ladowane." (serwer nie zdazyl zbudowac listingu). */
       let loadRetried = false;
       let loadRetryTimer: ReturnType<typeof setTimeout> | null = null;
-      const idleMs = this.opts.idleMs ?? DEFAULT_IDLE_FLUSH_MS;
-      let idleTimer: ReturnType<typeof setTimeout> | null = null;
       let cancelUnsub: () => void = () => {};
 
       const cleanup = () => {
         done = true;
         clearTimeout(timer);
-        if (idleTimer) clearTimeout(idleTimer);
         if (loadRetryTimer) clearTimeout(loadRetryTimer);
         cancelUnsub();
         session.close();
@@ -141,16 +138,6 @@ export class MailboxSession {
         // sieroty nie ma - zdejmij podejrzenie straznika.
         clearPagerOrphan();
         resolve(r);
-      };
-
-      /** Cisza nie potwierdza konca odpowiedzi. Czekamy na prompt gry. */
-      const armIdle = () => {
-        if (idleTimer) clearTimeout(idleTimer);
-        idleTimer = setTimeout(() => {
-          if (done || !header) return;
-          this.transport.beginRecovery();
-          fail(new Error(`timeout: mailbox fetch ${box}`));
-        }, idleMs);
       };
 
       const timer = setTimeout(() => {
@@ -231,7 +218,6 @@ export class MailboxSession {
               loadRetryTimer = null;
             }
             header = h;
-            armIdle();
           }
           return;
         }
@@ -248,7 +234,6 @@ export class MailboxSession {
           finish({ kind: 'lista', header, entries });
           return;
         }
-        armIdle();
         const entry = parseListingEntry(line.text);
         if (entry) {
           entries.push({ ...entry, party: '', partyKind: null, date: null });
