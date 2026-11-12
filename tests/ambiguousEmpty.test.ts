@@ -18,16 +18,18 @@
  * Kontrakt:
  *  - parser zwraca ZBIOR skrzynek: "otrzymanych" = [odebrane,
  *    nieprzeczytane]; pozostale genitywy jednoelementowe;
- *  - straznik mismatch w mailbox.fetch odrzuca tylko, gdy ZADNA
- *    skrzynka ze zbioru nie pasuje (jednoznaczne zachowanie Fali 14d
- *    bez zmian);
- *  - zaakceptowany pusty wynik raportuje skrzynke ZADANA, nie serwerowa;
+ *  - straznik mismatch w mailbox.fetch odrzuca, gdy ZADNA skrzynka
+ *    ze zbioru nie pasuje albo pelna pusta odpowiedz nie wskazuje
+ *    jednej skrzynki i mogla by nieslusznie wyczyscic archiwum;
+ *  - pusty wynik FILTRA nie kasuje archiwum, wiec raportuje skrzynke
+ *    ZADANA takze dla dwuznacznego genitywu;
  *  - integracja: szukanie po osobie + pusty wynik "otrzymanych" =
  *    "Brak pasujacych listow." i banner, ZADNY toast bledu.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
+import { IndexedDbStorageDriver } from '../src/arkmail/adapters/storageDriver';
 import { parseEmptyListing } from '../src/arkmail/core/protocol/parser';
 import { MockTransport } from '../src/arkmail/core/session/transport';
 import { MailboxSession } from '../src/arkmail/core/session/mailbox';
@@ -83,16 +85,15 @@ test('mailbox: pusty wynik filtra "otrzymanych" akceptowany dla odebranych', asy
   assert.deepEqual(res, { kind: 'pusta', box: 'odebrane', reason: 'filtr' });
 });
 
-test('mailbox: pusty listing "otrzymanych" akceptowany dla nieprzeczytanych', async () => {
+test('mailbox: pelna pusta odpowiedz "otrzymanych" jest odrzucana jako niejednoznaczna', async () => {
   const t = new MockTransport();
   const m = new MailboxSession(t, OPTS);
-  const op = m.fetch('nieprzeczytane');
+  const rejection = assert.rejects(m.fetch('nieprzeczytane'), /niejednoznaczna_odpowiedz/);
   await t.replay([
     { cls: 'mail', text: 'Nie masz zadnych otrzymanych listow.' },
     { cls: 'prompt', text: '> ' },
   ]);
-  const res = await op;
-  assert.deepEqual(res, { kind: 'pusta', box: 'nieprzeczytane', reason: 'puste' });
+  await rejection;
 });
 
 test('mailbox: jednoznaczny mismatch nadal odrzuca (straznik Fali 14d)', async () => {
@@ -128,6 +129,47 @@ test('szukaj integracja: pusty wynik "otrzymanych" na odebranych - brak bledu, b
     );
     assert.ok(!notifyText(f, 'Blad szukania'), 'zadnego toastu bledu szukania');
   } finally {
+    await stopHarness();
+  }
+});
+
+test('archiwum: niejednoznaczna pusta odpowiedz nie kasuje zatwierdzonych listow', async () => {
+  const h = await startHarness();
+  const driver = new IndexedDbStorageDriver(globalThis.indexedDB);
+  const { f, waitFor } = h;
+  try {
+    await loadTruncatedBox(h);
+    let before = 0;
+    for (let attempt = 0; attempt < 500; attempt += 1) {
+      before = Object.keys((await driver.loadAllLetters()).foo ?? {}).length;
+      if (before === 3) break;
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    assert.equal(before, 3, 'kontrolne archiwum jest zapisane');
+
+    click(h, '.arkmail-search-go');
+    await waitFor(
+      () => f.sent.filter((command) => command === 'listy odebrane').length === 2,
+      'reczne odswiezenie odebranych',
+    );
+    f.fire('Nie masz zadnych otrzymanych listow.', 'mail');
+    f.fire('> ', 'prompt');
+    await waitFor(
+      () => ((h.content.querySelector('.arkmail-busy') as { textContent?: string } | null)?.textContent ?? 'missing') === '',
+      'koniec niejednoznacznej odpowiedzi',
+    );
+
+    let after = before;
+    for (let attempt = 0; attempt < 500; attempt += 1) {
+      after = Object.keys((await driver.loadAllLetters()).foo ?? {}).length;
+      if (after !== before) break;
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    assert.equal(after, before, 'trwale archiwum pozostaje nietkniete');
+    click(h, '[data-tab="archiwum"]');
+    assert.equal(h.content.querySelectorAll('.arkmail-arch-entry').length, before, 'UI zachowuje archiwum');
+  } finally {
+    await driver.close();
     await stopHarness();
   }
 });

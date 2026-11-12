@@ -190,12 +190,18 @@ export class MailboxSession {
             // (desynchronizacja). Stary kod przyjmowal cudzy komunikat
             // po cichu - listing 50 odebranych ladowal jako "nieprzeczytane"
             // i badge pokazywal 50 (zgloszenie 2026-10-19, pkt 6).
-            // Fala 17b: straznik odrzuca tylko JEDNOZNACZNY mismatch -
-            // genityw "otrzymanych" pasuje do odebranych i nieprzeczytanych
-            // (parser zwraca zbior; zgloszenie pkt 5/6).
+            // Genityw "otrzymanych" pasuje do odebranych i nieprzeczytanych.
+            // Pusty wynik filtra jest bezpieczny, ale pelna pusta odpowiedz
+            // bez jednej skrzynki nie moze wyczyscic zadnego archiwum.
             if (!empty.boxes.includes(box)) {
               fail(new AmbiguousResponseError(
                 `pusta ${empty.boxes.join('/')} podczas fetch ${box}`,
+              ));
+              return;
+            }
+            if (empty.reason === 'puste' && empty.boxes.length > 1) {
+              fail(new AmbiguousResponseError(
+                `pusta ${empty.boxes.join('/')} bez jednej skrzynki podczas fetch ${box}`,
               ));
               return;
             }
