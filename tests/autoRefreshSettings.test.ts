@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { IndexedDbStorageDriver } from '../src/arkmail/adapters/storageDriver';
 import {
   click,
+  clickText,
   notifyText,
   startHarness,
   stopHarness,
@@ -123,6 +124,49 @@ test('wylaczenie w trakcie pobierania zatrzymuje kolejne skrzynki i opoznione po
       'po wylaczeniu nie ma kolejnej skrzynki ani ponowienia po 10 s',
     );
   } finally {
+    await stopHarness();
+  }
+});
+
+test('czesciowe odswiezenie: zatwierdzona skrzynka zapisuje archiwum i kontakty mimo bledu kolejnej', async () => {
+  const h = await startHarness();
+  const driver = new IndexedDbStorageDriver(globalThis.indexedDB);
+  const { f, waitFor } = h;
+  try {
+    f.sendImpl = (command) => command === 'listy nieprzeczytane'
+      ? Promise.reject(new Error('syntetyczny blad transportu'))
+      : Promise.resolve();
+    f.fire(' [ POCZTA ] Masz nowa poczte od Corge.');
+    await waitFor(() => f.sent.includes('listy odebrane'), 'pierwsza skrzynka');
+    f.fire('Listy odebrane:', 'mail');
+    f.fire(' 1. *R* Temat: syntetyczny', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
+    f.fire('> ', 'prompt');
+    await waitFor(() => f.sent.includes('listy nieprzeczytane'), 'druga skrzynka');
+    await waitFor(
+      () => ((h.content.querySelector('.arkmail-busy') as { textContent?: string } | null)?.textContent ?? 'missing') === '',
+      'koniec czesciowego odswiezenia',
+    );
+
+    let stored: Record<string, Record<string, string>> = {};
+    for (let attempt = 0; attempt < 500; attempt += 1) {
+      stored = await driver.loadAllLetters();
+      if (Object.keys(stored.foo ?? {}).length > 0) break;
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    const subjects = Object.values(stored.foo ?? {})
+      .map((raw) => JSON.parse(raw) as { subject?: string })
+      .map((letter) => letter.subject);
+    assert.ok(subjects.includes('syntetyczny'), 'pierwsza skrzynka jest trwale zapisana');
+
+    click(h, '[data-tab="archiwum"]');
+    clickText(h, '.arkmail-subpill', 'Osoby z listow');
+    const names = Array.from(
+      h.content.querySelectorAll('.arkmail-contact-name') as unknown as Iterable<{ textContent?: string }>,
+    ).map((row) => String(row.textContent ?? ''));
+    assert.ok(names.includes('Corge'), 'kontakty odpowiadaja zatwierdzonej skrzynce');
+  } finally {
+    await driver.close();
     await stopHarness();
   }
 });

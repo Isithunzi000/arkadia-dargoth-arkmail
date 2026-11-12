@@ -724,6 +724,9 @@ export async function init(api: PluginApi) {
       } else {
         ui.applyMailbox(box, res);
       }
+      // Kazda skrzynka ma wlasny punkt zatwierdzenia. Blad kolejnej
+      // nie moze oddzielic widoku i metadanych od trwalego archiwum.
+      finalizeArchiveChange();
     }
   };
 
@@ -753,7 +756,6 @@ export async function init(api: PluginApi) {
     const purged = purgeGoneLettersNewerThan(ui.state.archive, box, freshIds, boundaryDay);
     if (purged.removedIds.size === 0) return;
     ui.setArchive(purged.letters);
-    persistArchive();
     pruneGoneFromView(box, purged.removedIds);
   };
 
@@ -767,11 +769,9 @@ export async function init(api: PluginApi) {
     if (ui.state.tab === "usuwanie") ui.resetDeletion();
     ui.clearSearchBoxes(boxes);
     const generation = connectionGeneration;
-    let completed = false;
     let cancelled = false;
     void runExclusive(async () => {
       await fetchBoxes(boxes, mode, source, automatic);
-      completed = true;
     })
       .catch((err: unknown) => {
         cancelled = isOperationCancelled(err);
@@ -785,7 +785,6 @@ export async function init(api: PluginApi) {
       .finally(() => {
         if (generation !== connectionGeneration) return;
         ui.setBusy(null);
-        if (completed) finalizeArchiveChange();
         if (cancelled && source === "auto" && pendingRefresh.size > 0) scheduleRefresh([]);
       });
   };
@@ -943,7 +942,6 @@ export async function init(api: PluginApi) {
     if (drainScheduled) return;
     drainScheduled = true;
     const generation = connectionGeneration;
-    let completed = false;
     void runExclusive(async () => {
         // Zadanie moglo czekac na locka w chwili wylaczenia opcji.
         if (!ui.state.autoRefreshEnabled) {
@@ -954,13 +952,11 @@ export async function init(api: PluginApi) {
         pendingRefresh.clear();
         ui.clearSearchBoxes(batch);
         await fetchBoxes(batch, "sync", "auto", true);
-        completed = true;
       })
       .catch(() => {})
       .finally(() => {
         if (generation !== connectionGeneration) return;
         ui.setBusy(null);
-        if (completed) finalizeArchiveChange();
         drainScheduled = false;
         if (pendingRefresh.size > 0) scheduleRefresh([]);
       });
