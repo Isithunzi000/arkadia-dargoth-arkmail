@@ -1978,6 +1978,10 @@ export async function init(api: PluginApi) {
             } else if (result.kind === "nie_ma_w_skrzynce") {
               missing += 1;
               consecutiveErrors = 0;
+            } else if (result.kind === "blad_zapisu") {
+              // Lokalny IndexedDB nie jest dowodem awarii serwera. Rekord
+              // zostaje do ponowienia, a seria bledow komunikacji bez zmian.
+              failed += 1;
             } else if (result.kind !== "anulowano") {
               failed += 1;
               consecutiveErrors += 1;
