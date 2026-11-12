@@ -7,3 +7,13 @@ export class AmbiguousResponseError extends Error {
     this.name = 'AmbiguousResponseError';
   }
 }
+
+/** Listing zatrzymal pager, ktorego nie wolno automatycznie zamknac. */
+export class UnknownPagerError extends Error {
+  readonly code = 'nieznany_pager' as const;
+
+  constructor() {
+    super('nieznany_pager: przerwano listing');
+    this.name = 'UnknownPagerError';
+  }
+}

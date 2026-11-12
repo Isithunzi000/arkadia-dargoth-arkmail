@@ -53,7 +53,7 @@ test('mailbox: pager nieznanego pochodzenia anuluje bez q i ponowienia', async (
   const out = await op;
   assert.ok(!out.ok, 'prompt pagera odrzuca listing');
   if (out.ok) return;
-  assert.match(String(out.error), /operacja anulowana/);
+  assert.match(String(out.error), /nieznany_pager/);
   assert.deepEqual(t.sent, ['listy odebrane'], 'bez q i drugiego listingu');
   await t.replay([
     { cls: 'prompt', text: '> ' },

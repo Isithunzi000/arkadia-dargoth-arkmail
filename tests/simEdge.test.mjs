@@ -138,7 +138,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   t.emit({ cls: 'prompt', text: '> ' });
   const next = mb.fetch('odebrane');
   await t.replay([
-    { cls: 'mail', text: 'Nie masz zadnych otrzymanych listow.' },
+    { cls: 'mail', text: 'Nie masz zadnych odebranych listow.' },
     { cls: 'prompt', text: '> ' },
   ]);
   const res = await next;

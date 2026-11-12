@@ -23,6 +23,25 @@ test('reczne odswiezenie: blad jest widoczny, busy znika i nie ma komunikatu suk
   }
 });
 
+test('reczne odswiezenie: nieznany pager daje konkretny komunikat bez q i ponowienia', async () => {
+  const h = await startHarness();
+  try {
+    click(h, '.arkmail-search-go');
+    await h.waitFor(() => h.f.sent.includes('listy odebrane'), 'reczna komenda przed pagerem');
+    h.f.fire('[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ', 'mail');
+    await waitRefreshIdle(h);
+    assert.ok(
+      notifyText(h.f, 'Poczta jest otwarta w innym widoku - zamknij go i sprobuj ponownie.'),
+      'uzytkownik wie, co zatrzymalo reczne odswiezenie',
+    );
+    assert.ok(notifyText(h.f, 'Blad odswiezania'), 'blad ma wlasny tytul');
+    assert.ok(!h.f.sent.includes('q'), 'plugin nie zamyka pagera nieznanego pochodzenia');
+    assert.equal(h.f.sent.filter((command) => command === 'listy odebrane').length, 1);
+  } finally {
+    await stopHarness();
+  }
+});
+
 test('automatyczne odswiezenie: blad bez toastu i bez agresywnego ponawiania', async () => {
   const h = await startHarness();
   try {

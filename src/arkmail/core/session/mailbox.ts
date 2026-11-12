@@ -25,7 +25,7 @@ import type {
 } from '../protocol/types.js';
 import { isEchoLine, isPromptLine } from './lines.js';
 import { clearPagerOrphan } from './orphanPager.js';
-import { AmbiguousResponseError } from './errors.js';
+import { AmbiguousResponseError, UnknownPagerError } from './errors.js';
 import type { ProtoLine, Transport } from './transport.js';
 
 /** Linie-bledy serwera przerywajace transakcje (log 2026-10-17/18). */
@@ -181,7 +181,9 @@ export class MailboxSession {
           // Prompt pagera bez potwierdzonego zrodla moze nalezec do
           // gracza. Listing przerywamy bez q, retry i oznaczania sieroty.
           if (extractPagerPrompt(line.text)) {
-            fail(new Error('operacja anulowana'));
+            // To nie jest zwykle anulowanie: reczna operacja musi wyjasnic,
+            // dlaczego stanela, ale nie wolno wyslac q do cudzego pagera.
+            fail(new UnknownPagerError());
             return;
           }
           const empty = parseEmptyListing(line.text);

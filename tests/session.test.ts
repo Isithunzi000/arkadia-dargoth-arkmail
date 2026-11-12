@@ -81,7 +81,7 @@ test('mailbox: pager konczy fetch bez proby wyslania odrzucanego q', async () =>
   const t = new RejectingTransport((line) => line === 'q');
   const mailbox = new MailboxSession(t, { timeoutMs: 100, idleMs: 20 });
   const operation = mailbox.fetch('odebrane');
-  const rejected = assert.rejects(operation, /operacja anulowana/);
+  const rejected = assert.rejects(operation, /nieznany_pager/);
   t.emit({ cls: 'mail', text: '[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ' });
   await rejected;
   assert.deepEqual(t.sent, ['listy odebrane'], 'q nie zostalo wyslane');
@@ -92,7 +92,7 @@ test('mailbox: pager nieznanego pochodzenia anuluje bez q, retry i nowych timero
   const t = new RejectingTransport(() => false);
   const mailbox = new MailboxSession(t, { timeoutMs: 100, idleMs: 20 });
   const operation = mailbox.fetch('odebrane');
-  const rejected = assert.rejects(operation, /operacja anulowana/);
+  const rejected = assert.rejects(operation, /nieznany_pager/);
   t.emit({ cls: 'mail', text: '[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ' });
   await rejected;
   assert.deepEqual(t.sent, ['listy odebrane'], 'bez automatycznego q i ponowienia');

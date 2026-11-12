@@ -51,7 +51,7 @@ test('pager nieznanego pochodzenia w fetchu nie stawia podejrzenia', async () =>
   const mailbox = new MailboxSession(t, { timeoutMs: 500, idleMs: 20 });
   const p = mailbox.fetch('odebrane');
   t.emit({ cls: 'mail', text: '[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 3) -- ' });
-  await assert.rejects(p, /operacja anulowana/, 'fetch zostaje anulowany');
+  await assert.rejects(p, /nieznany_pager/, 'fetch zglasza nieznany pager');
   assert.ok(!t.sent.includes('q'), 'plugin nie wysyla q');
   assert.equal(isPagerOrphanSuspected(), false, 'brak przypisania sieroty bez dowodu');
 });

@@ -138,7 +138,7 @@ test('mailbox: cisza bez promptu nie jest pomyslnym zakonczeniem', async () => {
   await t.replay([{ cls: 'prompt', text: '> ' }]);
   const next = mailbox.fetch('odebrane');
   await t.replay([
-    { cls: 'mail', text: 'Nie masz zadnych otrzymanych listow.' },
+    { cls: 'mail', text: 'Nie masz zadnych odebranych listow.' },
     { cls: 'prompt', text: '> ' },
   ]);
   const result = await next;

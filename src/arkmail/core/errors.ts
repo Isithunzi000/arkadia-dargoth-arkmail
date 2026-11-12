@@ -23,6 +23,10 @@ interface Rule {
 
 const RULES: Rule[] = [
   {
+    re: /^nieznany_pager: przerwano listing$/,
+    msg: 'Poczta jest otwarta w innym widoku - zamknij go i sprobuj ponownie.',
+  },
+  {
     re: /^timeout: mailbox fetch /,
     msg: 'Serwer nie odpowiedzial na czas - sprobuj ponownie.',
   },
