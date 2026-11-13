@@ -68,6 +68,9 @@ export class SessionScopeRegistry {
   }
 
   openSession(): SessionScope {
+    // Jeden uporzadkowany kanal odpowiedzi nie moze karmic dwoch transakcji.
+    // Lokalny identyfikator nie rozstrzyga, ktorej z nich odpowiada serwer.
+    if (this.sessions.size > 0) throw new Error('operacja anulowana');
     const session = new RegisteredSession(
       ++this.nextId,
       this.generation,

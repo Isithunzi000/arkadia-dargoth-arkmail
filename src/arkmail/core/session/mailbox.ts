@@ -119,6 +119,11 @@ export class MailboxSession {
       };
       const fail = (error: unknown): void => {
         if (done) return;
+        // Odpowiedz bez pewnego zrodla zamyka te sesje, ale nie dowodzi,
+        // ze kanal jest juz pusty. Nowa komenda czeka na zwykly prompt.
+        if (error instanceof AmbiguousResponseError || error instanceof UnknownPagerError) {
+          this.transport.beginRecovery();
+        }
         cleanup();
         reject(error instanceof Error ? error : new Error(String(error)));
       };

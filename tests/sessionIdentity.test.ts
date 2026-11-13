@@ -89,6 +89,30 @@ test('transport: sesje maja odrebne identyfikatory, a reconnect zamyka stara gen
   third.close();
 });
 
+test('transport: druga rownolegla sesja jest odrzucona do zamkniecia pierwszej', async () => {
+  const t = new MockTransport();
+  const scoped = t as unknown as ScopedTransport;
+  const open = scoped.openSession?.bind(t);
+  assert.ok(open, 'transport udostepnia rejestracje sesji');
+
+  const first = open();
+  const firstSeen: string[] = [];
+  first.subscribe((line) => firstSeen.push(line.text));
+  assert.throws(() => open(), /operacja anulowana/, 'druga sesja nie dzieli strumienia');
+  await t.replay([{ cls: 'mail', text: 'odpowiedz pierwszej' }]);
+  assert.deepEqual(firstSeen, ['odpowiedz pierwszej']);
+
+  first.close();
+  const second = open();
+  const secondSeen: string[] = [];
+  second.subscribe((line) => secondSeen.push(line.text));
+  assert.ok(second.id > first.id, 'zamkniecie pierwszej sesji zwalnia kanal');
+  await t.replay([{ cls: 'mail', text: 'odpowiedz drugiej' }]);
+  assert.deepEqual(firstSeen, ['odpowiedz pierwszej']);
+  assert.deepEqual(secondSeen, ['odpowiedz drugiej']);
+  second.close();
+});
+
 test('mailbox: stara odpowiedz w nowej sesji jest niejednoznaczna', async () => {
   const t = new MockTransport();
   let cancel: () => void = () => {};
@@ -112,6 +136,66 @@ test('mailbox: stara odpowiedz w nowej sesji jest niejednoznaczna', async () => 
     { cls: 'prompt', text: '> ' },
   ]);
   await currentOperation;
+});
+
+test('mailbox: niejednoznaczna odpowiedz blokuje kolejna komende do promptu', async () => {
+  const t = new MockTransport();
+  const mailbox = new MailboxSession(t, OPTS);
+  const ambiguous = assert.rejects(
+    mailbox.fetch('wyslane'),
+    /niejednoznaczna_odpowiedz/,
+  );
+  await t.replay([
+    { cls: 'mail', text: 'Listy odebrane (prezentowane jest pierwsze 50):' },
+  ]);
+  await ambiguous;
+  assert.deepEqual(t.sent, ['listy wyslane']);
+
+  await assert.rejects(mailbox.fetch('wyslane'), /operacja anulowana/);
+  assert.deepEqual(t.sent, ['listy wyslane'], 'przed promptem nie ma nowej komendy');
+
+  await t.replay([
+    { cls: 'mail', text: 'Listy wyslane (prezentowane jest pierwsze 50):' },
+    { cls: 'mail', text: ' 1. *R* Temat: spozniony' },
+    { cls: 'mail', text: 'Odbiorca: Foo                       Wt, 24 VIII 1999, 00:11:12' },
+  ]);
+  await t.replay([{ cls: 'prompt', text: '> ' }]);
+
+  const current = mailbox.fetch('wyslane');
+  await t.replay([
+    { cls: 'mail', text: 'Listy wyslane (prezentowane jest pierwsze 50):' },
+    { cls: 'prompt', text: '> ' },
+  ]);
+  const result = await current;
+  assert.equal(result.kind, 'lista');
+  if (result.kind === 'lista') {
+    assert.deepEqual(result.entries, [], 'spoznione wpisy nie trafia do nowego wyniku');
+  }
+  assert.deepEqual(t.sent, ['listy wyslane', 'listy wyslane']);
+});
+
+test('mailbox: nieznany pager blokuje kolejna komende do zwyklego promptu', async () => {
+  const t = new MockTransport();
+  const mailbox = new MailboxSession(t, OPTS);
+  const unknownPager = assert.rejects(mailbox.fetch('odebrane'), /nieznany_pager/);
+  await t.replay([{ cls: 'mail', text: PAGER_PROMPT }]);
+  await unknownPager;
+
+  await assert.rejects(mailbox.fetch('wyslane'), /operacja anulowana/);
+  assert.deepEqual(t.sent, ['listy odebrane'], 'bez q, ponowienia i komendy przed promptem');
+
+  await t.replay([
+    { cls: 'mail', text: 'Listy odebrane (prezentowane jest pierwsze 50):' },
+    { cls: 'prompt', text: '> ' },
+  ]);
+  const current = mailbox.fetch('odebrane');
+  await t.replay([
+    { cls: 'mail', text: 'Listy odebrane (prezentowane jest pierwsze 50):' },
+    { cls: 'prompt', text: '> ' },
+  ]);
+  const result = await current;
+  assert.equal(result.kind, 'lista');
+  assert.deepEqual(t.sent, ['listy odebrane', 'listy odebrane']);
 });
 
 test('pager: List : N inny niz zadany odrzuca odpowiedz jako niejednoznaczna', async () => {
@@ -156,6 +240,19 @@ test('pager: pozna odpowiedz starej sesji nie konczy pomyslnie nowego odczytu', 
   await t.replay(replayLetter(t, 1));
   await currentOperation;
   assert.ok(!t.sent.includes('przeczytaj list 1') || t.sent.filter((s) => s === 'przeczytaj list 1').length === 1);
+});
+
+test('pager: drugi rownolegly odczyt tego samego numeru jest odrzucony', async () => {
+  const t = new MockTransport();
+  const pager = new PagerSession(t, OPTS);
+  const first = pager.readLetter(1);
+  await assert.rejects(pager.readLetter(1), /operacja anulowana/);
+  assert.deepEqual(t.sent, ['przeczytaj list 1'], 'tylko jedna komenda trafia do gry');
+
+  await t.replay(replayLetter(t, 1));
+  const result = await first;
+  assert.equal(result.letter.number, 1);
+  assert.deepEqual(t.sent, ['przeczytaj list 1', 'q']);
 });
 
 test('archiwum: niezgodny numer daje niejednoznaczna_odpowiedz i brak zapisu', async () => {
