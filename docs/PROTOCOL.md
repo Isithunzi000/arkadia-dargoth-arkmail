@@ -429,6 +429,36 @@ odczytywane przed utworzeniem UI, a zmiany zapisuje kolejka transakcji.
 Przy niedostepnej IndexedDB wtyczka uzywa RAM i zglasza brak trwalego
 zapisu. Dawne klucze localStorage sa usuwane bez migracji danych.
 
+## Konczenie operacji i spojnosc archiwum
+
+- Listing, odczyt pagera i import wymagaja jednoznacznego zakonczenia
+  zwyklym promptem. Cisza nie konczy operacji ani nie uniewaznia jej.
+  Prompt opozniony ponad 400 ms jest nadal przyjmowany przed pelnym limitem.
+  Brak jednoznacznego zakonczenia do pelnego limitu odrzuca cala odpowiedz
+  bez zapisu i uruchamia ograniczone odzyskiwanie kanalu.
+- Lokalny identyfikator sesji lub generacji porzadkuje jedynie zdarzenia
+  wtyczki; nie dowodzi pochodzenia odpowiedzi serwera. Do potwierdzenia
+  kanalu nie wolno prowadzic rownoleglych odczytow tego samego zasobu.
+  Niejednoznaczna, spozniona albo niezgodna odpowiedz nie zmienia archiwum
+  i nie jest automatycznie ponawiana.
+- Kazda poprawna skrzynka jest zatwierdzana niezaleznie. Jeden punkt
+  zatwierdzenia obejmuje listy, metadane, kontakty, UI i trwaly zapis.
+  Blad kolejnej skrzynki nie cofa wczesniejszego sukcesu, a stan blednej
+  skrzynki pozostaje niezmieniony. Magazyn awaryjny RAM nie jest traktowany
+  jako potwierdzenie trwalego zapisu.
+- Pelna pusta odpowiedz musi wskazywac jednoznaczna skrzynke. Odpowiedz
+  niejednoznaczna nie moze wyczyscic archiwum; pusty wynik jednoznacznego
+  filtra jest poprawnym wynikiem.
+- Nieznanego pagera nie wolno zamykac automatycznym `q`. Reczna operacja
+  pokazuje wyjasnienie, a kolejna komenda czeka na zwykly prompt. Reconnect
+  i `dispose()` wykonuja cichy lokalny cleanup bez `q` ani `~q`.
+- Odzyskiwanie ma ograniczony czas, a zwykly prompt konczy je jednokrotnie.
+  Nie wolno pozostawiac bezterminowej blokady ani zdejmowac jej automatycznie
+  bez synchronizacji kanalu.
+- Blad lokalnej bazy IndexedDB jest zglaszany jako blad zapisu, nie awaria
+  serwera. Nie zwieksza ani nie resetuje serii bledow komunikacji, a rekord
+  pozostaje dostepny do ponowienia zapisu.
+
 ## Reguły dla portów (WWW / Mudlet)
 
 - Klasy gmcp_msgs na oficjalnym kliencie WWW są jedynym źródłem tekstu —
