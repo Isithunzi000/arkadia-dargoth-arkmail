@@ -49,3 +49,15 @@ Zmiany obejmuja wspolna sesje listingu, zastosowanie wyniku, skan stron,
 testy i dokumentacje. Nie zmieniano UI, motywow, odpowiedzi wszystkim,
 compose, edytora, eksportu, kontaktow, aliasow, grup, dat, formatu IndexedDB
 ani zrodel klienta Dargoth.
+
+## Weryfikacja przed wydaniem
+
+- Poprawka: commit `e573ad06a455a4b0350c7fb414cdfcae4f6b02f5`; CI zielone.
+- Lokalny pelny zestaw: 1195/1195 testow zielonych; typecheck, bundle, build
+  i higiena zakonczone wynikiem `ALL-GATES-OK`.
+- Testy E2E: commit `e82629feef5e52ae64792d4ed98670f593324160`, run
+  `43673641359`; 45/45 scenariuszy zielonych, zero pominietych i zero flaky.
+- Test wersji 1.30.9 na kodzie 1.30.8: lokalny RED, 9/10 zielonych; oczekiwano
+  1.30.9, odczytano 1.30.8.
+- Po podbiciu wersji: 10/10 testow wersji zielonych. ZIP zbudowany dwukrotnie
+  z identycznym SHA-256 `f8018601fe8d4d6d94941527d2818d00cc63fa20777ba8a928b80317eadf8b9b`.
