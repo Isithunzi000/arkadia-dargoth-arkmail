@@ -160,6 +160,12 @@ export async function scanMailboxPages(options: PageScanOptions): Promise<PageSc
     addedToView += visit.addedToView ?? 0;
     archiveAdded += visit.archiveAdded ?? 0;
     if (options.cancelled()) return finish('cancelled');
+    // Cisza zwraca uzyteczna strone do scalenia, ale nie dowodzi, ze
+    // odpowiedz jest zamknieta. Skan moze pokazac wpisy, nie moze jednak
+    // oznaczyc skrzynki jako kompletnej ani kontynuowac na ich podstawie.
+    if (result.confirmed === false) {
+      return finish('incomplete', 'nie potwierdzono pelnej odpowiedzi - sprobuj ponownie');
+    }
 
     if (!result.header.truncated) {
       if (gapDays.length > 0) return incompleteWithGaps();

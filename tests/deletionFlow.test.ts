@@ -44,13 +44,13 @@ function archive(data: Row): ArchiveLetter {
   return { ...fromMailboxEntry('odebrane', entry(data)), body: ['Tresc'] };
 }
 
-function replayListing(h: Harness, entries: Row[]): void {
+function replayListing(h: Harness, entries: Row[], prompt = true): void {
   h.f.fire('Listy odebrane:', 'mail');
   for (const data of entries) {
     h.f.fire(` ${data.number}. *R* Temat: ${data.subject}`, 'mail');
     h.f.fire(`Nadawca: ${data.party.padEnd(35)}Wt, 24 VIII 1999, 00:11:12`, 'mail');
   }
-  h.f.fire('> ', 'prompt');
+  if (prompt) h.f.fire('> ', 'prompt');
 }
 
 function replayPager(h: Harness, number: number): void {
@@ -63,7 +63,7 @@ function replayPager(h: Harness, number: number): void {
   h.f.fire(`[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: ${number}) -- `, 'mail');
 }
 
-async function search(h: Harness, entries: Row[]): Promise<void> {
+async function search(h: Harness, entries: Row[], prompt = true): Promise<void> {
   if (!h.content.querySelector('.arkmail-deletion-search')) click(h, '[data-tab="usuwanie"]');
   const before = h.f.sent.filter((command) => command === 'listy odebrane').length;
   click(h, '.arkmail-deletion-search');
@@ -71,11 +71,10 @@ async function search(h: Harness, entries: Row[]): Promise<void> {
     () => h.f.sent.filter((command) => command === 'listy odebrane').length === before + 1,
     'reczne wyszukiwanie',
   );
-  replayListing(h, entries);
-  await h.waitFor(
-    () => h.content.querySelectorAll('.arkmail-deletion-entry').length === entries.length,
-    'wyniki wyszukiwania',
-  );
+  replayListing(h, entries, prompt);
+  const completed = () => h.content.querySelectorAll('.arkmail-deletion-entry').length === entries.length;
+  if (prompt) await h.waitFor(completed, 'wyniki wyszukiwania');
+  else await waitRt(completed, 'wyniki wyszukiwania bez promptu');
 }
 
 function check(h: Harness, number: number): void {
@@ -159,6 +158,50 @@ test('usuwanie: swiezy listing zmienia numery, a potwierdzenia aktualizuja dane'
     clickText(h, '.arkmail-subpill', 'Osoby z listow');
     await h.waitFor(() => h.content.querySelectorAll('.arkmail-contact').length === 1, 'jeden kontakt');
     assert.equal(textOf(h, '.arkmail-contact-name'), 'Corge');
+  } finally {
+    await stopHarness();
+  }
+});
+
+test('usuwanie: odswiezenie bez promptu pokazuje wynik i nie usuwa nieobjetych rekordow', async () => {
+  const h = await startHarness({
+    archive: [archive(rows.a), archive(rows.b), archive(rows.c)],
+    autoRefreshEnabled: false,
+  });
+  const { f } = h;
+  try {
+    await search(h, [rows.a, rows.b, rows.c]);
+    check(h, 1);
+    click(h, '.arkmail-deletion-delete');
+    click(h, '.arkmail-deletion-delete');
+    await h.waitFor(
+      () => f.sent.filter((command) => command === 'listy odebrane').length === 2,
+      'kontrola przed usunieciem',
+    );
+    replayListing(h, [rows.a, rows.b, rows.c]);
+    await h.waitFor(() => f.sent.includes('przeczytaj list 1'), 'odczyt przed usunieciem');
+    replayPager(h, 1);
+    await h.waitFor(() => f.sent.includes('d 1'), 'zaznaczenie listu');
+    f.fire('Zaznaczono do skasowania: 1.', 'mail');
+    f.fire('[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ', 'mail');
+    await h.waitFor(() => f.sent.includes('q'), 'zamkniecie pagera');
+    f.fire('Kasuje listy...', 'mail');
+    f.fire('Kasuje: 1.', 'mail');
+    f.fire('> ', 'prompt');
+    await waitRt(
+      () => textOf(h, '.arkmail-deletion-message') === 'Usunieto: 1 list.',
+      'potwierdzenie usuniecia',
+    );
+
+    await search(h, [rows.b], false);
+    assert.equal(h.content.querySelectorAll('.arkmail-deletion-entry').length, 1);
+    let subjects: string[] = [];
+    for (let i = 0; i < 240; i++) {
+      subjects = (await storedArchive()).map((letter) => letter.subject).sort();
+      if (subjects.join('|') === 'Temat B|Temat C') break;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    assert.deepEqual(subjects, ['Temat B', 'Temat C']);
   } finally {
     await stopHarness();
   }

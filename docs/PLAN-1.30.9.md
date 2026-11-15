@@ -22,7 +22,7 @@ Nie wolno zmieniac UI, motywow, responsywnosci, funkcji â€žOdpowiedz wszystkimâ€
 
 Prompt pozostaje podstawowym potwierdzeniem konca odpowiedzi. Brak promptu nie moze powodowac bezterminowej blokady kolejnych operacji. Wynik bez promptu musi miec odrebny status potwierdzenia; odpowiedz czesciowa albo niejednoznaczna nie moze kasowac archiwum ani oznaczac indeksacji jako kompletnej. Nie wolno przywracac bezwarunkowej reguly, w ktorej krotka cisza dowodzi kompletnosci i pozwala usuwac rekordy.
 
-Opozniony prompt przed pelnym limitem pozostaje akceptowany. Odpowiedz innej skrzynki nie zmienia danych zadanej skrzynki. Reconnect i `dispose()` nie wysylaja `q` ani `~q`.
+Opozniony prompt przed limitem ciszy pozostaje akceptowany. Po zwroceniu niepotwierdzonego wyniku pozny prompt nie zmienia go wstecznie. Odpowiedz innej skrzynki nie zmienia danych zadanej skrzynki. Reconnect i `dispose()` nie wysylaja `q` ani `~q`.
 
 ## Kontrole
 

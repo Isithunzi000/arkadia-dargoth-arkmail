@@ -5,8 +5,9 @@
  *
  * Przenosnosc: zywy PluginApi daje triggerom SAM tekst linii (bez klas
  * gmcp_msgs), wiec koniec listingu wykrywamy tez po samej tresci:
- * echo komendy ("→ ...") oraz prompt ("> "). Cisza nie rozstrzyga
- * operacji; brak zakonczenia odrzuca dopiero pelny limit czasu.
+ * echo komendy ("→ ...") oraz prompt ("> "). Po ciszy zwracamy listing
+ * jako niepotwierdzony: mozna go wyswietlic i scalic, ale nie wolno
+ * traktowac go jako pelnej prawdy o skrzynce.
  */
 
 import {
@@ -33,12 +34,12 @@ const MAIL_ERROR_RE = /^Data zostala podana w zlym formacie\./;
 
 /** Retry po komunikacie "Listy sa w tej chwili ladowane." (ms). */
 export const LISTS_LOADING_RETRY_MS = 2000;
-/** Domyslny limit ciszy przed odrzuceniem operacji (ms). */
+/** Domyslny limit ciszy przed zwroceniem niepotwierdzonego listingu (ms). */
 export const DEFAULT_IDLE_FLUSH_MS = 600;
 
 export interface SessionOptions {
   timeoutMs: number;
-  /** Limit ciszy; po nim operacja jest odrzucana, nie zatwierdzana. */
+  /** Limit ciszy; po nim listing wraca jako niepotwierdzony. */
   idleMs?: number;
   /** Rejestracja natychmiastowego anulowania przy zmianie polaczenia. */
   onCancel?: (cb: () => void) => () => void;
@@ -83,7 +84,13 @@ export const entryKey = (entry: MailboxEntry): string =>
   [entry.party, entry.subject, entry.forwarded ? 'f' : '', entry.date?.raw ?? ''].join('|');
 
 export type MailboxResult =
-  | { kind: 'lista'; header: ListingHeader; entries: MailboxEntry[] }
+  | {
+      kind: 'lista';
+      header: ListingHeader;
+      entries: MailboxEntry[];
+      /** Prompt/echo potwierdza koniec; cisza daje tylko wynik do scalenia. */
+      confirmed?: boolean;
+    }
   | { kind: 'pusta'; box: MailBox; reason: 'puste' | 'filtr' };
 
 export class MailboxSession {
@@ -108,11 +115,14 @@ export class MailboxSession {
        *  ladowane." (serwer nie zdazyl zbudowac listingu). */
       let loadRetried = false;
       let loadRetryTimer: ReturnType<typeof setTimeout> | null = null;
+      const idleMs = this.opts.idleMs ?? DEFAULT_IDLE_FLUSH_MS;
+      let idleTimer: ReturnType<typeof setTimeout> | null = null;
       let cancelUnsub: () => void = () => {};
 
       const cleanup = () => {
         done = true;
         clearTimeout(timer);
+        if (idleTimer) clearTimeout(idleTimer);
         if (loadRetryTimer) clearTimeout(loadRetryTimer);
         cancelUnsub();
         session.close();
@@ -143,6 +153,13 @@ export class MailboxSession {
         // sieroty nie ma - zdejmij podejrzenie straznika.
         clearPagerOrphan();
         resolve(r);
+      };
+      const armIdle = () => {
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          if (done || !header) return;
+          finish({ kind: 'lista', header, entries, confirmed: false });
+        }, idleMs);
       };
 
       const timer = setTimeout(() => {
@@ -231,6 +248,7 @@ export class MailboxSession {
               loadRetryTimer = null;
             }
             header = h;
+            armIdle();
           }
           return;
         }
@@ -244,9 +262,10 @@ export class MailboxSession {
           isPromptLine(line.text) ||
           isEchoLine(line.text)
         ) {
-          finish({ kind: 'lista', header, entries });
+          finish({ kind: 'lista', header, entries, confirmed: true });
           return;
         }
+        armIdle();
         const entry = parseListingEntry(line.text);
         if (entry) {
           entries.push({ ...entry, party: '', partyKind: null, date: null });

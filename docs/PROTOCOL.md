@@ -431,11 +431,19 @@ zapisu. Dawne klucze localStorage sa usuwane bez migracji danych.
 
 ## Konczenie operacji i spojnosc archiwum
 
-- Listing, odczyt pagera i import wymagaja jednoznacznego zakonczenia
-  zwyklym promptem. Cisza nie konczy operacji ani nie uniewaznia jej.
-  Prompt opozniony ponad 400 ms jest nadal przyjmowany przed pelnym limitem.
-  Brak jednoznacznego zakonczenia do pelnego limitu odrzuca cala odpowiedz
-  bez zapisu i uruchamia ograniczone odzyskiwanie kanalu.
+- Odczyt pagera i import wymagaja jednoznacznego zakonczenia zwyklym
+  promptem. Cisza nie konczy tych operacji ani nie uniewaznia ich.
+- Listing konczy sie jako potwierdzony na zwyklym promptcie albo echcie
+  kolejnej komendy, takze gdy prompt jest opozniony, ale dociera przed
+  limitem ciszy. Domyslnie po 600 ms ciszy poprawny listing wraca jako
+  `confirmed: false` i zwalnia sesje bez odzyskiwania. Pozniejszy prompt
+  nie zmienia wstecznie juz zwroconego statusu.
+- Wynik niepotwierdzony mozna pokazac i scalic z archiwum. Nie wolno nim
+  zastepowac archiwum, usuwac rekordow, zawezac zakresow ani oznaczac
+  indeksacji jako kompletnej. Skan zapisuje pobrane wpisy, raportuje
+  skrzynke jako niekompletna i przechodzi do nastepnej.
+- Brak poprawnej odpowiedzi do pelnego limitu nadal odrzuca operacje
+  i uruchamia ograniczone odzyskiwanie kanalu.
 - Lokalny identyfikator sesji lub generacji porzadkuje jedynie zdarzenia
   wtyczki; nie dowodzi pochodzenia odpowiedzi serwera. Do potwierdzenia
   kanalu nie wolno prowadzic rownoleglych odczytow tego samego zasobu.

@@ -190,7 +190,7 @@ test('adapter: prompt przed limitem anuluje oczekujacy komunikat', (context) => 
   t.dispose();
 });
 
-test('mailbox: cisza bez promptu nie jest pomyslnym zakonczeniem', async () => {
+test('mailbox: cisza po listingu zwraca wynik niepotwierdzony i zwalnia sesje', async () => {
   const t = new MockTransport();
   const mailbox = new MailboxSession(t, { timeoutMs: 200, idleMs: 20 });
   const operation = mailbox.fetch('odebrane');
@@ -199,17 +199,16 @@ test('mailbox: cisza bez promptu nie jest pomyslnym zakonczeniem', async () => {
     { cls: 'mail', text: ' 1. *R* Temat: syntetyczny' },
     { cls: 'mail', text: 'Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12' },
   ]);
-  await assert.rejects(operation, /timeout/);
-  await assert.rejects(mailbox.fetch('odebrane'), /operacja anulowana/);
+  const result = await operation;
+  assert.equal(result.kind, 'lista');
+  assert.equal(result.kind === 'lista' && result.confirmed, false);
 
-  await t.replay([{ cls: 'prompt', text: '> ' }]);
   const next = mailbox.fetch('odebrane');
   await t.replay([
     { cls: 'mail', text: 'Nie masz zadnych odebranych listow.' },
     { cls: 'prompt', text: '> ' },
   ]);
-  const result = await next;
-  assert.equal(result.kind, 'pusta');
+  assert.equal((await next).kind, 'pusta');
 });
 
 test('pager: cisza po q nie jest pomyslnym zakonczeniem odczytu', async () => {

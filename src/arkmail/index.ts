@@ -677,7 +677,7 @@ export async function init(api: PluginApi) {
       let resolvedIds: string[] | undefined;
       if (res.kind === "lista") {
         const listingRecords = recordsOfListing(box, res.entries);
-        if (!res.header.truncated) {
+        if (!res.header.truncated && res.confirmed !== false) {
           const replaced = replaceBoxLetters(ui.state.archive, box, listingRecords);
           ui.setArchive(replaced.letters);
           resolvedIds = replaced.resolvedIds;
@@ -698,7 +698,7 @@ export async function init(api: PluginApi) {
           const merged = mergeListingPage(ui.state.archive, box, listingRecords);
           ui.setArchive(merged.letters);
           resolvedIds = merged.resolvedIds;
-          if (boundaryDay !== undefined) {
+          if (res.confirmed !== false && boundaryDay !== undefined) {
             markGoneFromServerNewerThan(box, merged.freshIds, boundaryDay);
           }
         }
@@ -717,7 +717,7 @@ export async function init(api: PluginApi) {
       // Fala 14f: pusty listing TEZ nadpisuje biezacy kontekst serwera.
       if (res.kind === "lista") stampEntries(box, res.entries, resolvedIds);
       else bumpCtx(box);
-      if (res.kind === "lista" && mode === "sync") {
+      if (res.kind === "lista" && mode === "sync" && res.confirmed !== false) {
         // null = brak widoku / widok pusty -> pelne zastosowanie.
         const synced = ui.syncMailboxPage(box, res.entries, res.header.truncated, boundaryDay);
         if (!synced) ui.applyMailbox(box, res);

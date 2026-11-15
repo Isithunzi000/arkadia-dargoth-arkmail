@@ -123,20 +123,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok('E5b humanize', humanizeMailError(err?.message ?? '') === 'Serwer nie odpowiedzial na czas - sprobuj ponownie.');
 }
 
-// --- E6: wpisy bez promptu -> timeout i odzyskiwanie do promptu --------------
+// --- E6: wpisy bez promptu -> wynik niepotwierdzony, sesja wolna ------------
 {
   const t = new MockTransport();
   const mb = new MailboxSession(t, { timeoutMs: 3000, idleMs: 300 });
   const p = mb.fetch('odebrane');
   await t.replay(load('listing-odebrane-male.json').slice(3, 10)); // same wpisy, bez promptu
-  let err = null;
-  try { await p; } catch (e) { err = e; }
-  ok('E6 cisza nie konczy sukcesem', err !== null && /^timeout: mailbox fetch odebrane$/.test(err.message), err?.message);
-  let blocked = false;
-  try { await mb.fetch('odebrane'); } catch (e) { blocked = /operacja anulowana/.test(e.message); }
-  ok('E6b nowa operacja czeka na prompt', blocked);
-  t.emit({ cls: 'prompt', text: '> ' });
+  const result = await p;
+  ok('E6 cisza zwraca niepotwierdzony listing', result.kind === 'lista' && result.confirmed === false);
   const next = mb.fetch('odebrane');
+  ok('E6b nowa operacja nie czeka na prompt', t.sent.filter((command) => command === 'listy odebrane').length === 2);
   await t.replay([
     { cls: 'mail', text: 'Nie masz zadnych odebranych listow.' },
     { cls: 'prompt', text: '> ' },

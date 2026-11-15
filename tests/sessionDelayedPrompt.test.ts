@@ -21,7 +21,7 @@ const flushPromises = async (): Promise<void> => {
   await new Promise<void>((resolve) => { setImmediate(resolve); });
 };
 
-test('mailbox: prompt po limicie ciszy konczy kompletny listing sukcesem', async (context) => {
+test('mailbox: opozniony prompt przed limitem ciszy potwierdza listing', async (context) => {
   context.mock.timers.enable({ apis: ['setTimeout'] });
   const transport = new MockTransport();
   const mailbox = new MailboxSession(transport, { timeoutMs: 8000, idleMs: 400 });
@@ -37,13 +37,14 @@ test('mailbox: prompt po limicie ciszy konczy kompletny listing sukcesem', async
     { cls: 'mail', text: ' 1. *R* Temat: syntetyczny' },
     { cls: 'mail', text: 'Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12' },
   ]);
-  context.mock.timers.tick(400);
+  context.mock.timers.tick(399);
   await flushPromises();
-  assert.equal(settlement, 'pending', 'cisza nie rozstrzyga operacji');
+  assert.equal(settlement, 'pending', 'przed limitem ciszy operacja nadal czeka');
 
   await transport.replay([{ cls: 'prompt', text: '> ' }]);
   const result = await operation;
   assert.equal(result.kind, 'lista');
+  assert.equal(result.kind === 'lista' && result.confirmed, true);
   assert.equal(result.kind === 'lista' ? result.entries.length : 0, 1);
 });
 
@@ -70,7 +71,7 @@ test('pager: opozniony prompt po q konczy odczyt sukcesem', async (context) => {
   assert.deepEqual(result.letter.body, ['', 'Syntetyczna tresc.']);
 });
 
-test('mailbox: brak promptu odrzuca listing dopiero po pelnym limicie', async (context) => {
+test('mailbox: brak promptu zwraca niepotwierdzony listing po limicie ciszy', async (context) => {
   context.mock.timers.enable({ apis: ['setTimeout'] });
   const transport = new MockTransport();
   const mailbox = new MailboxSession(transport, { timeoutMs: 8000, idleMs: 400 });
@@ -86,14 +87,12 @@ test('mailbox: brak promptu odrzuca listing dopiero po pelnym limicie', async (c
     { cls: 'mail', text: ' 1. *R* Temat: syntetyczny' },
     { cls: 'mail', text: 'Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12' },
   ]);
-  context.mock.timers.tick(7999);
+  context.mock.timers.tick(400);
   await flushPromises();
-  assert.equal(settlement, 'pending', 'przed pelnym limitem nie ma rozstrzygniecia');
-
-  const rejection = assert.rejects(operation, /timeout: mailbox fetch odebrane/);
-  context.mock.timers.tick(1);
-  await rejection;
-  assert.equal(settlement, 'rejected');
+  assert.equal(settlement, 'resolved', 'cisza zwraca uzyteczny wynik');
+  const result = await operation;
+  assert.equal(result.kind, 'lista');
+  assert.equal(result.kind === 'lista' && result.confirmed, false);
 });
 
 test('pager: brak promptu po q odrzuca odczyt dopiero po pelnym limicie', async (context) => {
