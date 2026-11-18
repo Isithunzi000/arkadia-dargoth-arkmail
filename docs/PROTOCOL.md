@@ -438,10 +438,16 @@ zapisu. Dawne klucze localStorage sa usuwane bez migracji danych.
   limitem ciszy. Domyslnie po 600 ms ciszy poprawny listing wraca jako
   `confirmed: false` i zwalnia sesje bez odzyskiwania. Pozniejszy prompt
   nie zmienia wstecznie juz zwroconego statusu.
-- Wynik niepotwierdzony mozna pokazac i scalic z archiwum. Nie wolno nim
-  zastepowac archiwum, usuwac rekordow, zawezac zakresow ani oznaczac
-  indeksacji jako kompletnej. Skan zapisuje pobrane wpisy, raportuje
-  skrzynke jako niekompletna i przechodzi do nastepnej.
+- Wynik niepotwierdzony mozna pokazac i scalic z archiwum. Nie przerywa on
+  wielostronicowego skanu: kolejne kotwice sa wyznaczane i wysylane tak samo
+  jak po stronie potwierdzonej az do strukturalnego konca, luki albo bledu.
+  Skan raportuje osobno wynik strukturalny i liczbe niepotwierdzonych stron,
+  lacznie z listingiem bazowym podczas ponawiania kotwicy. Jesli liczba jest
+  wieksza od zera, nie wolno zastepowac archiwum, usuwac rekordow, zawezac
+  zakresow, czyscic luk ani oznaczac indeksacji jako kompletnej. Pobrane wpisy
+  pozostaja zapisane, a indeksacja przechodzi do nastepnej skrzynki z raportem
+  niekompletnym. Dopiero skan bez niepotwierdzonych stron moze wykonac operacje
+  pelnej prawdy.
 - Brak poprawnej odpowiedzi do pelnego limitu nadal odrzuca operacje
   i uruchamia ograniczone odzyskiwanie kanalu.
 - Lokalny identyfikator sesji lub generacji porzadkuje jedynie zdarzenia

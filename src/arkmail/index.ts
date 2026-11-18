@@ -1287,7 +1287,7 @@ export async function init(api: PluginApi) {
           },
         });
         if (scan.end === "cancelled") return;
-        if (scan.end === "complete" && scan.pages === 0) {
+        if (scan.end === "complete" && scan.pages === 0 && scan.unconfirmedPages === 0) {
           ui.appendMailboxPage(box, [], false);
           // Fala 25 (blad 1, decyzja D2): pusta odpowiedz na paginacje
           // wstecz = doszlismy do dna skrzynki - cala zawartosc jest
@@ -1304,10 +1304,13 @@ export async function init(api: PluginApi) {
             { title: "Wczytano dostepne listy", level: "warning" },
           );
         } else {
+          const confirmationNote = scan.unconfirmedPages > 0
+            ? ` Nie potwierdzono zamkniecia odpowiedzi: ${scan.unconfirmedPages}. Archiwum zachowano bez usuwania wpisow.`
+            : "";
           notify(
             api,
-            `W widoku: ${ui.state.boxes[box]?.entries.length ?? 0} (dodano: ${scan.addedToView}).`,
-            { title: "Wczytano starsze listy", level: "success" },
+            `W widoku: ${ui.state.boxes[box]?.entries.length ?? 0} (dodano: ${scan.addedToView}).${confirmationNote}`,
+            { title: "Wczytano starsze listy", level: scan.unconfirmedPages > 0 ? "warning" : "success" },
           );
         }
       })
@@ -1387,22 +1390,30 @@ export async function init(api: PluginApi) {
           }
           if (scan.end === "complete") {
             ui.appendMailboxPage(box, [], false);
-            clearArchiveGaps(box);
-            const done = ui.state.boxes[box];
-            if (done && !done.truncated) {
-              // Fala 41: widok = glowa + doklejone strony = pelny zrzut
-              // skrzynki; zastepuje archiwum tej skrzynki wynikiem.
-              const replaced = replaceBoxLetters(ui.state.archive, box, snapshotRecords(box));
-              ui.setArchive(replaced.letters);
-              if (replaced.removedIds.size > 0) pruneGoneFromView(box, replaced.removedIds);
-              ui.setIndexMeta({ ...ui.state.indexMeta, [box]: new Date().toISOString() });
-              persistIndexMeta();
+            if (scan.unconfirmedPages === 0) {
+              clearArchiveGaps(box);
+              const done = ui.state.boxes[box];
+              if (done && !done.truncated) {
+                // Fala 41: widok = glowa + doklejone strony = pelny zrzut
+                // skrzynki; zastepuje archiwum tej skrzynki wynikiem.
+                const replaced = replaceBoxLetters(ui.state.archive, box, snapshotRecords(box));
+                ui.setArchive(replaced.letters);
+                if (replaced.removedIds.size > 0) pruneGoneFromView(box, replaced.removedIds);
+                ui.setIndexMeta({ ...ui.state.indexMeta, [box]: new Date().toISOString() });
+                persistIndexMeta();
+              }
+              notify(
+                api,
+                `W widoku: ${ui.state.boxes[box]?.entries.length ?? 0} (dodano: ${scan.addedToView}).`,
+                { title: "Wczytano wszystkie", level: "success" },
+              );
+            } else {
+              notify(
+                api,
+                `W widoku: ${ui.state.boxes[box]?.entries.length ?? 0} (dodano: ${scan.addedToView}). Nie potwierdzono zamkniecia odpowiedzi: ${scan.unconfirmedPages}. Archiwum zachowano bez usuwania wpisow.`,
+                { title: "Wczytano wszystkie strony", level: "warning" },
+              );
             }
-            notify(
-              api,
-              `W widoku: ${ui.state.boxes[box]?.entries.length ?? 0} (dodano: ${scan.addedToView}).`,
-              { title: "Wczytano wszystkie", level: "success" },
-            );
           } else {
             notify(
               api,
@@ -1531,7 +1542,7 @@ export async function init(api: PluginApi) {
                 };
               },
             });
-            if ((scan.end === "complete" || scan.end === "clamped") && !flag.cancelled) {
+            if ((scan.end === "complete" || scan.end === "clamped") && scan.unconfirmedPages === 0 && !flag.cancelled) {
               if (scan.end === "complete" && collectedFreshIds.size > 0) {
                 ui.appendMailboxPage(box, [], false);
               }
@@ -1558,7 +1569,10 @@ export async function init(api: PluginApi) {
             } else if (scan.end === "cancelled" || flag.cancelled) {
               break;
             } else {
-              skipped.push(`${box} (${scan.skipWhy ?? "niekompletne"})`);
+              const why = scan.skipWhy ?? (scan.unconfirmedPages > 0
+                ? `nie potwierdzono zamkniecia odpowiedzi: ${scan.unconfirmedPages}`
+                : "niekompletne");
+              skipped.push(`${box} (${why})`);
             }
           }
           if (flag.cancelled) {

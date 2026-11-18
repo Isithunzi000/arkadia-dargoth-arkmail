@@ -35,6 +35,12 @@
 5. Dodać kontrolę pojedynczego „Wczytaj starsze” bez promptu oraz jednostkową kontrolę licznika `unconfirmedPages`, w tym wyniku strukturalnie kompletnego.
 6. Testy i implementacja trafią w jednym commicie. Dowód niepowodzenia pozostaje wyłącznie lokalny; CI zobaczy dopiero zielony zestaw.
 
+## Uzyskane dowody przed pełnym zestawem
+
+- Finalny zestaw `mailboxNoPrompt` uruchomiony na osobnej kopii z oryginalnymi `pagination.ts` i `index.ts` z 1.30.9: 8 testów, 3 zaliczone, 5 błędów, kod 1. „Wczytaj wszystkie” zatrzymało się na jednej komendzie zamiast dwóch, indeksacja nie wysłała drugiej kotwicy, a skan zwrócił `incomplete` zamiast strukturalnego `complete`.
+- Te same 8 testów po poprawce: 8 zaliczonych, 0 błędów, 0 pominiętych, kod 0. Obejmują także zachowanie rekordu i luki, brak stempla oraz niebezpieczną ścieżkę `clamped` w indeksacji przyrostowej.
+- Dwie pośrednie kontrole testu „Wczytaj wszystkie” odrzucono jako błędy samego testu: najpierw bezpośrednie wywołanie `.map()` na `NodeList`, potem rekord kontrolny nowszy niż granica wcześniejszego, potwierdzonego listingu. Ostateczny test używa `Array.from` i rekordu starszego niż granica; dopiero ten wynik jest dowodem zachowania produktu.
+
 ## Implementacja i kontrole
 
 1. Zmienić `src/arkmail/core/pagination.ts`, `src/arkmail/index.ts`, właściwe testy oraz `docs/PROTOCOL.md` w jednym commicie naprawczym.

@@ -189,6 +189,7 @@ export async function startHarness(
     notifyEnabled?: boolean;
     autoRefreshEnabled?: boolean;
     indexMeta?: Partial<Record<MailBox, string>>;
+    archiveGaps?: Partial<Record<MailBox, string[]>>;
     // Fala 27: true = pominac domyslne uzbrojenie bramy po init
     // (symulacja install/enable pluginu W GRZE - sygnaly obecnosci
     // przeminely, zanim plugin zdazyl sie zaladowac).
@@ -212,7 +213,7 @@ export async function startHarness(
       disconnect(): void {}
     };
   }
-  if (options.archive || options.notifyEnabled !== undefined || options.autoRefreshEnabled !== undefined || options.indexMeta) {
+  if (options.archive || options.notifyEnabled !== undefined || options.autoRefreshEnabled !== undefined || options.indexMeta || options.archiveGaps) {
     const seed = new IndexedDbStorageDriver(globalThis.indexedDB);
     if (options.archive) {
       await seed.putLetters(
@@ -228,6 +229,9 @@ export async function startHarness(
     }
     if (options.indexMeta) {
       await seed.put('arkmail.foo.indeks', JSON.stringify(options.indexMeta));
+    }
+    if (options.archiveGaps) {
+      await seed.put('arkmail.foo.luki-archiwum', JSON.stringify(options.archiveGaps));
     }
     await seed.close();
   }
