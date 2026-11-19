@@ -1014,7 +1014,9 @@ export async function init(api: PluginApi) {
   const awaitPlayerMailPrompt = (): void => {
     if (!playerMailMode) return;
     awaitingPlayerMailPrompt = true;
-    clearPlayerMailModeTimer();
+    // Zwykly prompt jest potwierdzeniem zamkniecia, ale jego brak nie
+    // moze zostawic trybu gracza bez ograniczonego czasowo wyjscia.
+    armPlayerMailModeIdle();
   };
   const beginPagerModal = (): void => {
     transport!.beginModal({

@@ -146,6 +146,42 @@ test('komenda gracza przerywa aktywna serie listingow i zachowuje prace do wznow
   }
 });
 
+test('wyjscie q bez zwyklego promptu konczy tryb po limicie awaryjnym', async (context) => {
+  answered.clear();
+  const h = await startHarness();
+  const { f } = h;
+  let mocked = false;
+  const flush = async (): Promise<void> => {
+    for (let i = 0; i < 12; i++) await new Promise((resolve) => setImmediate(resolve));
+  };
+  try {
+    context.mock.timers.enable({ apis: ['setTimeout'] });
+    mocked = true;
+    f.fire('→ listy');
+    f.fire('→ q');
+    context.mock.timers.tick(PLAYER_MAIL_MODE_IDLE_MS - 1);
+    await flush();
+    assert.deepEqual(f.sent, [], 'przed limitem tryb nadal blokuje komendy pluginu');
+
+    context.mock.timers.tick(1);
+    await flush();
+    assert.deepEqual(f.sent, ['listy odebrane'], 'limit konczy oczekiwanie i uruchamia odzyskiwanie');
+    context.mock.timers.reset();
+    mocked = false;
+    await answerEmpty(h, 'odebrane');
+    await answerEmpty(h, 'nieprzeczytane');
+    await waitIdle(h);
+    const sent = [...f.sent];
+    f.fire('> ', 'prompt');
+    await sleep(50);
+    assert.deepEqual(f.sent, sent, 'pozny prompt nie uruchamia drugiego odzyskiwania');
+  } finally {
+    if (mocked) context.mock.timers.reset();
+    f.fire('> ', 'prompt');
+    await stopHarness();
+  }
+});
+
 test('kasowanie w trybie poczty gracza parkuje, po wyjsciu drenaz 4 skrzynek (Fala 24f3)', async () => {
   answered.clear();
   const h = await startHarness();

@@ -44,4 +44,12 @@
 - Pelny zestaw po poprawce: 1224 testy, 1224 zaliczone, 0 bledow; typowanie i build zakonczone sukcesem.
 - Zakres kodu: Tylko DW uzywa niezaleznej deduplikacji pierwotnego naglowka DW. DO+DW i Tylko DO pozostaly bez zmian.
 
+### Pager, q/x i odzyskiwanie
+
+- RED na niezmienionym kodzie: 9 nowych przypadkow wykrylo podwojne zamkniecie, odrzucenie recznego q/x oraz blokade bez zwyklego promptu; pozostale 17 z 26 ukierunkowanych testow przechodzilo.
+- GREEN po poprawce: 26 z 26 ukierunkowanych testow.
+- Pelny zestaw po poprawce: 1233 testy, 1233 zaliczone, 0 bledow, 0 przerwanych; rzeczywiste typowanie i build zakonczone sukcesem.
+- Reczne q/x przed rozpoznaniem pagera oraz po automatycznym zamknieciu jest koalescencja jednego zamkniecia. Modal konczy sie natychmiast, a ograniczony hook do zwyklego promptu usuwa wylacznie powtorzenia q/x; wszystkie inne komendy przechodza normalnie.
+- Tryb gracza bez zwyklego promptu ma awaryjne wyjscie po 180 sekundach. Blokada transportu `recovering` nie jest zdejmowana przez sam uplyw czasu, aby pozne dane starej sesji nie trafily do nowej.
+
 Pozostale wyniki beda dopisywane wraz z kolejnymi commitami. Po zakonczeniu calego zakresu ten dokument zostanie usuniety jako zrealizowany.
