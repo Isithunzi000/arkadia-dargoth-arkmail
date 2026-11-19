@@ -963,6 +963,7 @@ const filterClearClass = (viewClass?: string): string =>
     if (entries.length > 0) {
       const list = doc.createElement('div');
       list.className = 'arkmail-deletion-results';
+      list.setAttribute('data-pane-key', 'usuwanie:wyniki');
       // Najnowsze na gorze - identycznie jak w zakladce Listy
       // (zgloszenie 2026-10-30).
       for (const entry of [...entries].reverse()) {

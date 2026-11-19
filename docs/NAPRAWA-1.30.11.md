@@ -52,4 +52,11 @@
 - Pierwszy pełny przebieg tego etapu odrzucono: 1202 testy, 1198 zaliczone, 4 błędy. Trzy strażniki higieny nie miały lokalnego indeksu `git`, a czwarty błąd pochodził z historycznego zakazu selektora filtra, który w tej poprawce stał się aktywny. Po odtworzeniu indeksu i usunięciu wyłącznie przestarzałego zakazu kontrole strażników: 7/7.
 - Ostateczny pełny zestaw z docelowym komunikatem commita: 1202 testy, 1202 zaliczone, 0 błędów, 0 pominiętych. Typowanie i build zakończyły się kodem 0.
 
+## 3. Usuwanie — wynik
+
+- Przed poprawką dwa nowe testy padały na starym kodzie: 2 testy, 0 zaliczonych, 2 błędy. Brakowało klucza `usuwanie:wyniki` oraz kolumnowego kontraktu CSS.
+- Po poprawce kontrole ukierunkowane: 43/43, w tym zaznaczanie, potwierdzanie, kolejność wyników, wysyłane komendy, fokus oraz odtworzenie `scrollTop` panelu i wyników.
+- Pierwszy pełny przebieg odrzucono: 1204 testy, 1203 zaliczone, 1 błąd. Stary test dividerów trafiał w nowy selektor `:not(.arkmail-deletion-results)`. Bez zmiany tego testu uporządkowano reguły tak, aby definicja wyników była pierwszym właściwym dopasowaniem; trzy powiązane kontrole przeszły 3/3.
+- Ostateczny pełny zestaw z docelowym komunikatem commita: 1204 testy, 1204 zaliczone, 0 błędów, 0 pominiętych. Typowanie i build zakończyły się kodem 0.
+
 Pozostałe wyniki zostaną dopisane do tego dokumentu w commitach zawierających odpowiadające im testy i poprawki.

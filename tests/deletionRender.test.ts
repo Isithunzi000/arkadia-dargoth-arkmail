@@ -220,3 +220,40 @@ test('usuwanie: ESC w oknie potwierdzania anuluje uzbrojenie', () => {
   assert.deepEqual(calls, [{ name: 'deletion-delete', args: [] }], 'drugi klik po ponownym uzbrojeniu kasuje');
   off();
 });
+
+
+test('usuwanie: kontrolki stoja poza wynikami, a oba scrollTop wracaja po rerenderze', () => {
+  const store = deletionStore();
+  const { container, off } = mount(store);
+  const pane = container.querySelector('[data-pane-key="usuwanie"]');
+  const results = container.querySelector('.arkmail-deletion-results');
+  assert.ok(pane, 'panel zachowuje klucz usuwanie');
+  assert.ok(results, 'wyniki istnieja');
+  assert.equal(results.getAttribute('data-pane-key'), 'usuwanie:wyniki');
+
+  for (const selector of [
+    '.arkmail-deletion-intro',
+    '.arkmail-deletion-controls',
+    '.arkmail-deletion-filters',
+    '.arkmail-deletion-summary',
+    '.arkmail-deletion-selection-ops',
+  ]) {
+    const element = container.querySelector(selector);
+    assert.ok(element, `kontrolka ${selector} istnieje`);
+    assert.ok(!results.contains(element), `${selector} NIE w przewijanych wynikach`);
+  }
+  const row = container.querySelector('.arkmail-deletion-entry');
+  assert.ok(row && results.contains(row), 'wiersze listow SA w przewijanych wynikach');
+
+  (pane as unknown as { scrollTop: number }).scrollTop = 17;
+  (results as unknown as { scrollTop: number }).scrollTop = 42;
+  store.toggleDeletionEntry(1);
+  const paneAfter = container.querySelector('[data-pane-key="usuwanie"]');
+  const resultsAfter = container.querySelector('[data-pane-key="usuwanie:wyniki"]');
+  assert.ok(paneAfter && resultsAfter, 'oba klucze istnieja po rerenderze');
+  assert.equal((paneAfter as unknown as { scrollTop: number }).scrollTop, 17, 'scroll panelu zachowany');
+  assert.equal((resultsAfter as unknown as { scrollTop: number }).scrollTop, 42, 'scroll wynikow zachowany');
+  const selected = container.querySelector('.arkmail-deletion-selected');
+  assert.ok(selected && !resultsAfter.contains(selected), 'licznik zaznaczenia NIE w wynikach');
+  off();
+});

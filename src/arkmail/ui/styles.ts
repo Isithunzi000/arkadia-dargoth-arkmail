@@ -569,6 +569,11 @@ export const STYLES = `
 }
 
 /* --- usuwanie listow --- */
+.arkmail-deletion {
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
 .arkmail-deletion-intro, .arkmail-deletion-message, .arkmail-deletion-summary,
 .arkmail-deletion-limit, .arkmail-deletion-selected { margin: 0 0 calc(8px * var(--window-font-scale, 1)); }
 .arkmail-deletion-intro, .arkmail-deletion-limit { color: ${FG_DIM}; }
@@ -588,7 +593,13 @@ export const STYLES = `
 .arkmail-deletion-filter { min-width: 0; color: ${FG_DIM}; font-size: calc(12px * var(--window-font-scale, 1)); }
 .arkmail-deletion-filter span { display: block; margin-bottom: calc(2px * var(--window-font-scale, 1)); }
 .arkmail-root .arkmail-deletion-filter input { width: 100%; min-width: 0; }
-.arkmail-deletion-results { border-top: calc(1px * var(--window-font-scale, 1)) solid ${BG}; }
+.arkmail-deletion-results {
+  flex: 1 0 calc(96px * var(--window-font-scale, 1));
+  min-height: calc(96px * var(--window-font-scale, 1));
+  overflow: auto;
+  border-top: calc(1px * var(--window-font-scale, 1)) solid ${BG};
+}
+.arkmail-deletion > :not(.arkmail-deletion-results) { flex: none; }
 .arkmail-deletion-entry {
   display: flex;
   align-items: flex-start;

@@ -91,3 +91,16 @@ test('skala: pasek wynikow jest nieruchomy i zawija dlugi opis', () => {
   assert.match(banner, /flex-wrap:\s*wrap/, 'opis i przycisk moga zajac osobne wiersze');
   assert.match(banner, /overflow-wrap:\s*anywhere/, 'dlugi opis nie wypycha przycisku');
 });
+
+test('skala: Usuwanie ma nieruchome kontrolki i awaryjne przewijanie panelu', () => {
+  const pane = body(/^\.arkmail-deletion(?![\w-])/);
+  assert.match(pane, /display:\s*flex/);
+  assert.match(pane, /flex-direction:\s*column/);
+  assert.match(pane, /overflow:\s*auto/, 'brak miejsca moze przewinac caly panel');
+  const fixed = body(/\.arkmail-deletion\s*>\s*:not\(\.arkmail-deletion-results\)/);
+  assert.match(fixed, /flex:\s*none/, 'wszystkie kontrolki naglowka sa nieruchome');
+  const results = body(/^\.arkmail-deletion-results(?![\w-])/);
+  assert.match(results, /flex:\s*1\s+0\s+calc\(96px \* var\(--window-font-scale, 1\)\)/);
+  assert.match(results, /min-height:\s*calc\(96px \* var\(--window-font-scale, 1\)\)/);
+  assert.match(results, /overflow:\s*auto/, 'wyniki maja wlasne przewijanie');
+});
