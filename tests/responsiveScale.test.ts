@@ -104,3 +104,14 @@ test('skala: Usuwanie ma nieruchome kontrolki i awaryjne przewijanie panelu', ()
   assert.match(results, /min-height:\s*calc\(96px \* var\(--window-font-scale, 1\)\)/);
   assert.match(results, /overflow:\s*auto/, 'wyniki maja wlasne przewijanie');
 });
+
+test('skala: Archiwum listow ma nieruchome karty, filtry i licznik', () => {
+  for (const cls of ['arkmail-archive-steps', 'arkmail-arch-controls', 'arkmail-arch-counts', 'arkmail-dates-error', 'arkmail-tresc-note']) {
+    const fixed = body(new RegExp(`\\.arkmail-listy\\s*>\\s*\\.arkmail-subpanel\\s*>\\s*\\.${cls}\\b`));
+    assert.match(fixed, /flex:\s*none/, `${cls} jest nieruchomy`);
+  }
+  const list = body(/^\.arkmail-arch-list(?![\w-])/);
+  assert.match(list, /flex:\s*1\s+0\s+calc\(96px \* var\(--window-font-scale, 1\)\)/);
+  assert.match(list, /min-height:\s*calc\(96px \* var\(--window-font-scale, 1\)\)/);
+  assert.match(list, /overflow:\s*auto/, 'lista Archiwum ma wlasne przewijanie');
+});

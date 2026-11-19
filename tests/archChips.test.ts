@@ -116,3 +116,56 @@ test('archiwum: skok z osoby wraca na chips listy z filtrem osoby', () => {
   assert.equal(osoba.value, 'Waldo', 'filtr osoby postawiony');
   assert.match(text(q(container, '.arkmail-arch-list')), /Spotkanie/, 'wynik filtra na liscie');
 });
+
+
+test('archiwum: kontrolki Listow sa stale, oba scrollTop wracaja, a Osoby zachowuja podwidok', () => {
+  const s = new MailUiStore({ tab: 'archiwum' });
+  s.setArchive([
+    {
+      id: 'a1',
+      box: 'odebrane',
+      number: 1,
+      party: 'Waldo',
+      subject: 'Spotkanie',
+      dateRaw: '2026-10-01 10:00:00',
+      sortKey: '2026-10-01 10:00:00',
+      read: true,
+      body: [],
+    },
+  ]);
+  const container = mount(s);
+  type ScrollElement = {
+    className?: string;
+    scrollTop: number;
+    getAttribute(name: string): string | null;
+    contains(node: unknown): boolean;
+  };
+  const pane = q(container, '[data-pane-key="archiwum"]') as ScrollElement;
+  const list = q(container, '.arkmail-arch-list') as ScrollElement;
+  assert.ok(pane, 'panel Archiwum istnieje');
+  assert.match(pane.className ?? '', /arkmail-listy/, 'Archiwum listow uzywa kolumny List');
+  assert.ok(list, 'lista Archiwum istnieje');
+  assert.equal(list.getAttribute('data-pane-key'), 'archiwum:listy');
+  for (const selector of ['.arkmail-archive-steps', '.arkmail-arch-controls', '.arkmail-arch-counts']) {
+    const element = q(container, selector);
+    assert.ok(element, `${selector} istnieje`);
+    assert.ok(!list.contains(element), `${selector} NIE w przewijanej liscie`);
+  }
+  const row = q(container, '.arkmail-arch-entry');
+  assert.ok(row && list.contains(row), 'rekordy SA w przewijanej liscie');
+
+  pane.scrollTop = 11;
+  list.scrollTop = 37;
+  click(chip(container, 'Archiwum listow'));
+  const paneAfter = q(container, '[data-pane-key="archiwum"]') as ScrollElement;
+  const listAfter = q(container, '[data-pane-key="archiwum:listy"]') as ScrollElement;
+  assert.ok(paneAfter && listAfter, 'oba klucze istnieja po odswiezeniu');
+  assert.equal(paneAfter.scrollTop, 11, 'scroll panelu zachowany');
+  assert.equal(listAfter.scrollTop, 37, 'scroll listy zachowany');
+
+  click(chip(container, 'Osoby z listow'));
+  assert.ok(q(container, '[data-arch-people]'), 'podwidok Osób nadal istnieje');
+  assert.equal(q(container, '.arkmail-arch-list'), null, 'lista Listow nie jest malowana w Osobach');
+  click(chip(container, 'Archiwum listow'));
+  assert.ok(q(container, '[data-pane-key="archiwum:listy"]'), 'powrot przywraca przewijana liste');
+});

@@ -746,6 +746,11 @@ export const STYLES = `
   margin-bottom: calc(8px * var(--window-font-scale, 1));
 }
 .arkmail-root .arkmail-arch-people-panel .arkmail-contact-controls { flex: none; }
+.arkmail-arch-list {
+  flex: 1 0 calc(96px * var(--window-font-scale, 1));
+  min-height: calc(96px * var(--window-font-scale, 1));
+  overflow: auto;
+}
 .arkmail-archive-steps {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(calc(220px * var(--window-font-scale, 1)), 1fr));
@@ -791,6 +796,11 @@ export const STYLES = `
   width: auto;
   max-width: 100%;
 }
+.arkmail-listy > .arkmail-subpanel > .arkmail-archive-steps,
+.arkmail-listy > .arkmail-subpanel > .arkmail-arch-controls,
+.arkmail-listy > .arkmail-subpanel > .arkmail-arch-counts,
+.arkmail-listy > .arkmail-subpanel > .arkmail-dates-error,
+.arkmail-listy > .arkmail-subpanel > .arkmail-tresc-note { flex: none; }
 .arkmail-contact-controls > .arkmail-ghost-wrap {
   flex: 1 1 calc(140px * var(--window-font-scale, 1));
   min-width: 0;

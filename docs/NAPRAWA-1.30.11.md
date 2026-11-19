@@ -59,4 +59,11 @@
 - Pierwszy pełny przebieg odrzucono: 1204 testy, 1203 zaliczone, 1 błąd. Stary test dividerów trafiał w nowy selektor `:not(.arkmail-deletion-results)`. Bez zmiany tego testu uporządkowano reguły tak, aby definicja wyników była pierwszym właściwym dopasowaniem; trzy powiązane kontrole przeszły 3/3.
 - Ostateczny pełny zestaw z docelowym komunikatem commita: 1204 testy, 1204 zaliczone, 0 błędów, 0 pominiętych. Typowanie i build zakończyły się kodem 0.
 
+## 4. Archiwum listów — wynik
+
+- Przed poprawką dwa nowe testy padały na starym kodzie: 2 testy, 0 zaliczonych, 2 błędy. Panel Listów nie używał kolumny `arkmail-listy`, nie było też reguł nieruchomych kart i filtrów.
+- Po poprawce kontrole ukierunkowane: 34/34, w tym klucz `archiwum:listy`, oba `scrollTop`, karty, filtry, skoki z Osób, klawiatura i powrót między podwidokami.
+- Pierwszy pełny przebieg odrzucono: 1206 testów, 1205 zaliczonych, 1 błąd. Stary test siatki kart trafiał w nową regułę `flex:none`. Bez zmiany testu przeniesiono reguły nieruchomych elementów za podstawowe definicje Archiwum; kontrole stylów, skali i Archiwum: 49/49.
+- Ostateczny pełny zestaw z docelowym komunikatem commita: 1206 testów, 1206 zaliczonych, 0 błędów, 0 pominiętych. Typowanie i build zakończyły się kodem 0.
+
 Pozostałe wyniki zostaną dopisane do tego dokumentu w commitach zawierających odpowiadające im testy i poprawki.

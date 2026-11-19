@@ -2991,7 +2991,7 @@ const filterClearClass = (viewClass?: string): string =>
 
   const renderArchiwum = (state: MailUiState): HTMLElement => {
     const pane = doc.createElement('div');
-    pane.className = archView.sub === 'osoby' ? 'arkmail-pane arkmail-listy' : 'arkmail-pane';
+    pane.className = 'arkmail-pane arkmail-listy';
     pane.setAttribute('data-pane-key', 'archiwum');
     // Wydanie 1.30.1 (zgloszenie 6): chipsy jak w Kontaktach - lista
     // listow i osoby jako osobne widoki, nie jedno nad drugim.
@@ -3246,6 +3246,7 @@ const filterClearClass = (viewClass?: string): string =>
     // Zgloszenie 2026-11-05 (A2): klasa = punkt przewijania po skoku
     // z osoby (jumpTo w renderArchPeople).
     list.className = 'arkmail-arch-list';
+    list.setAttribute('data-pane-key', 'archiwum:listy');
     subPanel.appendChild(list);
     const repaint = () => {
       // Fala 30a: sprzeczny zakres dat (Od pozniej niz Do) = komunikat
