@@ -100,6 +100,28 @@ test('txt: nazwa pliku - sortKey + slugi ASCII, bezpieczna dla systemu plikow', 
   assert.equal(slugAscii('  ..::  '), 'list', 'pusty slug ma fallback');
 });
 
+test('eksport archiwum: nazwa TXT zawiera pelne strony listu z naglowkow', () => {
+  const letter: ArchiveLetter = {
+    ...fromMailboxEntry('odebrane', {
+      number: 1,
+      isRead: true,
+      subject: 'najnowszy',
+      forwarded: false,
+      party: 'Corge',
+      partyKind: 'nadawca',
+      date: { raw: DATE_RAW, weekday: 'Wt', day: 24, month: 8, year: 1999, time: '00:11:12' },
+    }),
+    body: ['Tresc.'],
+    headers: { from: 'Corge', to: 'Waldo', cc: 'Bar' },
+  };
+  const { entries } = archiveExportEntries([letter]);
+  assert.equal(
+    entries[0]?.name,
+    'odebrane/1999-08-24_00-11-12_corge-waldo-bar_najnowszy.txt',
+  );
+  assert.match(entries[0]?.txt ?? '', /Od: Corge \| Do: Waldo \| DW: Bar/);
+});
+
 test('zip: CRC32 zgodny z referencja, STORED, deterministyczny', () => {
   assert.equal(crc32(new TextEncoder().encode('123456789')), 0xcbf43926, 'CRC32 referencyjny');
   const files = [
@@ -202,11 +224,19 @@ function replayListing3(h: Harness): void {
   f.fire('> ', 'prompt');
 }
 
-function replayLetter(h: Harness, numer: number, subject: string, body: string): void {
+function replayLetter(
+  h: Harness,
+  numer: number,
+  subject: string,
+  body: string,
+  headers: { to?: string; cc?: string } = {},
+): void {
   const { f } = h;
   f.fire(`List : ${numer}`, 'mail');
   f.fire('Od   : Corge', 'mail');
   f.fire(`Temat: ${subject}`, 'mail');
+  if (headers.to !== undefined) f.fire(`Do   : ${headers.to}`, 'mail');
+  if (headers.cc !== undefined) f.fire(`DW   : ${headers.cc}`, 'mail');
   f.fire('Data : Wt, 24 VIII 1999, 00:11:12', 'mail');
   f.fire('', 'mail');
   f.fire(body, 'mail');
@@ -236,16 +266,18 @@ test('widok listu: Zapisz list TXT pobiera plik o tresci jak na ekranie', async 
     f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(() => f.sent.includes('przeczytaj list 1'), 'odczyt');
-    replayLetter(h, 1, 'najnowszy', 'Tresc pierwszego.');
+    replayLetter(h, 1, 'najnowszy', 'Tresc pierwszego.', { to: 'Waldo', cc: 'Bar' });
     await waitRt(() => !!h.content.querySelector('.arkmail-export-letter'), 'przycisk eksportu');
 
     const base = f.sent.length;
     click(h, '.arkmail-export-letter');
     await waitRt(() => captured.length === 1, 'pobieranie TXT');
-    assert.match(captured[0].name, /^1999-08-24_00-11-12_corge_najnowszy\.txt$/, 'nazwa pliku');
+    assert.match(captured[0].name, /^1999-08-24_00-11-12_corge-waldo-bar_najnowszy\.txt$/, 'nazwa pliku');
     const txt = await captured[0].data.text();
     assert.ok(txt.includes('najnowszy'), 'temat w TXT');
     assert.ok(txt.includes('Od: Corge'), 'meta Od w TXT');
+    assert.ok(txt.includes('Do: Waldo'), 'meta Do w TXT');
+    assert.ok(txt.includes('DW: Bar'), 'meta DW w TXT');
     assert.ok(txt.includes('skrzynka: odebrane'), 'skrzynka w TXT');
     assert.ok(txt.includes('Tresc pierwszego.'), 'tresc w TXT');
     assert.equal(f.sent.length, base, 'eksport bez komend do serwera');

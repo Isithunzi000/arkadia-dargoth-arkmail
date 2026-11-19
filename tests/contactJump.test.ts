@@ -233,6 +233,22 @@ test('kontakty: list wieloodbiorczy trafia w skok po osobie (Fala 26b)', () => {
   assert.deepEqual(archRows(container), ['do Foo, Corge i Bar | wyslane']);
 });
 
+test('kontakty: skok po osobie tylko z DW pokazuje pelny list w Archiwum', () => {
+  const s = new MailUiStore({ tab: 'archiwum', indexMeta: INDEXED });
+  s.setContacts([contact({ lettersReceived: 0, lettersSent: 1 })]);
+  s.setArchive([{
+    ...letter('wyslane', 'Foo', 'odbiorca ukryty w DW', '2026-10-06 10:00:00'),
+    headers: { from: 'Tester', to: 'Foo', cc: 'Corge' },
+  }]);
+  const { container } = mount(s);
+  expandPeople(container);
+
+  clickEl(container.querySelector('[data-dir="wyslane"]'));
+
+  assert.deepEqual(filterInputs(container), { osoba: 'Corge', skrzynka: 'wyslane' });
+  assert.deepEqual(archRows(container), ['do Foo | wyslane']);
+});
+
 test('kontakty: przycisk kierunku wylaczony, gdy licznik wynosi 0', () => {
   const s = new MailUiStore({ tab: 'archiwum', indexMeta: INDEXED });
   s.setContacts([contact({ lettersReceived: 0, lettersSent: 5 })]);

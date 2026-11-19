@@ -75,9 +75,68 @@ test('contactsFromArchive: rekord bez daty i bez flagged forwarded (stare storag
   assert.equal(el.lastContactKey, undefined);
 });
 
+test('contactsFromArchive: pelne naglowki, DW, biezaca postac i repliki bez podwojnego liczenia', () => {
+  const received = archLetter({
+    box: 'odebrane',
+    party: 'Nadawca',
+    headers: {
+      from: 'Nadawca',
+      to: 'Tester, Odbiorca',
+      cc: 'TylkoDW, nadawca',
+    },
+  });
+  const replica = archLetter({
+    ...received,
+    id: 'replika',
+    box: 'nieprzeczytane',
+  });
+  const sent = archLetter({
+    id: 'wyslany',
+    box: 'wyslane',
+    party: '',
+    subject: 'odpowiedz',
+    headers: { from: 'Tester', to: '', cc: 'PozaDW' },
+  });
+  const build = contactsFromArchive as (
+    letters: readonly ArchiveLetter[],
+    currentCharacter?: string | null,
+  ) => ReturnType<typeof contactsFromArchive>;
+  const out = build([received, replica, sent], 'Tester');
+
+  assert.deepEqual(out.map((contact) => contact.name), ['Nadawca', 'Odbiorca', 'PozaDW', 'TylkoDW']);
+  for (const name of ['Nadawca', 'Odbiorca', 'TylkoDW']) {
+    assert.equal(out.find((contact) => contact.name === name)?.lettersReceived, 1, name);
+  }
+  assert.equal(out.find((contact) => contact.name === 'PozaDW')?.lettersSent, 1);
+  assert.ok(!out.some((contact) => contact.name.toLowerCase() === 'tester'));
+});
+
+test('init: kontakty z pelnych naglowkow pomijaja biezaca postac i pokazuja osobe tylko z DW', async () => {
+  const h: Harness = await startHarness({
+    archive: [archLetter({
+      id: 'pelne-naglowki',
+      party: 'Testalpha',
+      headers: { from: 'Testalpha', to: 'Foo', cc: 'Testgamma' },
+    })],
+  });
+  try {
+    click(h, '[data-tab="archiwum"]');
+    click(h, '[data-archive-tab="osoby"]');
+    await h.waitFor(
+      () => h.content.querySelectorAll('.arkmail-contact').length === 2,
+      'dwa kontakty z pelnych naglowkow',
+    );
+    const names = Array.from(h.content.querySelectorAll('.arkmail-contact-name'))
+      .map((element) => String((element as { textContent?: string }).textContent ?? ''));
+    assert.deepEqual(names, ['Testalpha', 'Testgamma']);
+  } finally {
+    await stopHarness();
+  }
+});
+
 test('init: kontakty odbudowuja sie z zapisanego archiwum przed pierwszym renderem', async () => {
   const h: Harness = await startHarness({
-    archive: [archLetter({ id: 'zapisany-1', party: 'Foo' })],
+    archive: [archLetter({ id: 'zapisany-1', party: 'Bar' })],
   });
   const { content, waitFor } = h;
   try {
@@ -88,7 +147,7 @@ test('init: kontakty odbudowuja sie z zapisanego archiwum przed pierwszym render
       'kontakt odbudowany z archiwum po starcie pluginu',
     );
     const name = content.querySelector('.arkmail-contact-name') as { textContent?: string | null } | null;
-    assert.equal(name?.textContent, 'Foo');
+    assert.equal(name?.textContent, 'Bar');
     const received = content.querySelector('[data-dir="odebrane"]') as { disabled?: boolean } | null;
     assert.equal(received?.disabled, false);
   } finally {

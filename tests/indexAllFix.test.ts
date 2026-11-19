@@ -49,9 +49,9 @@ test('pusta skrzynka wariantem "Nie znaleziono..." tez dostaje flage (4/4)', asy
     );
     f.fire('Listy odebrane:', 'mail');
     f.fire(' 2. *R* Temat: najstarszy', 'mail');
-    f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
+    f.fire('Nadawca: Bar                        Nd, 22 VIII 1999, 01:15:04', 'mail');
     f.fire(' 1. *R* Temat: srodkowy', 'mail');
-    f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
+    f.fire('Nadawca: Bar                        Pn, 23 VIII 1999, 02:20:05', 'mail');
     f.fire('> ', 'prompt');
     // nieprzeczytane (2. wystapienie): puste wariantem bazowym
     await waitRt(

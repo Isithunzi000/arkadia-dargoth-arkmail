@@ -29,9 +29,9 @@ function replayCompleteListing2(h: Harness): void {
   // listu (Corge) juz nie ma na serwerze.
   f.fire('Listy odebrane:', 'mail');
   f.fire(' 2. *R* Temat: srodkowy', 'mail');
-  f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
+  f.fire('Nadawca: Bar                        Pn, 23 VIII 1999, 02:20:05', 'mail');
   f.fire(' 1. *R* Temat: najstarszy', 'mail');
-  f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
+  f.fire('Nadawca: Bar                        Nd, 22 VIII 1999, 01:15:04', 'mail');
   f.fire('> ', 'prompt');
 }
 
@@ -95,7 +95,7 @@ test('kompletny listing: znikniety list znika z widoku archiwum i kontaktow', as
       }>,
     ).map((r) => String(r.textContent ?? ''));
     assert.ok(!names.includes('Corge'), 'kontakt bez zywych listow znika');
-    assert.ok(names.includes('Foo'), 'zywy kontakt zostaje');
+    assert.ok(names.includes('Bar'), 'zywy kontakt zostaje');
   } finally {
     await stopHarness();
   }

@@ -227,7 +227,7 @@ test('Indeksuj wszystkie: paginacja kotwicowa, flagi, gone-marking, odblokowanie
     assert.ok(texts.every((t) => !t.includes('najnowszy')), 'znikniety list ukryty');
     assert.ok(texts.some((t) => t.includes('prastary')), 'dopisany list z paginacji');
 
-    // Kontakty odblokowane: Foo i Fred licza sie, Corge nie.
+    // Kontakty odblokowane: Fred liczy sie, biezaca postac i Corge nie.
     // Fala UI-2 krok 4: wiersze kontaktow stoja w panelu Archiwum.
     // Zgloszenie 2026-11-05 (A1): panel domyslnie zwiniety - toggle
     // przed odczytem wierszy.
@@ -239,7 +239,7 @@ test('Indeksuj wszystkie: paginacja kotwicowa, flagi, gone-marking, odblokowanie
         textContent?: string;
       }>,
     ).map((r) => String(r.textContent ?? ''));
-    assert.ok(names.includes('Foo'), 'kontakt z zywych listow');
+    assert.ok(!names.includes('Foo'), 'biezaca postac nie jest wlasnym kontaktem');
     assert.ok(names.includes('Fred'), 'kontakt z dopisanej strony');
     assert.ok(!names.includes('Corge'), 'kontakt zniknietego listu odpada');
     // Wydanie 1.30.1 (zgloszenie 6): krok 1 i pasek licznikow stoja

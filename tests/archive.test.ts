@@ -113,6 +113,22 @@ test('archiwum: filtr tresc przeszukuje body, filtr od po stronie listu', () => 
   assert.equal(filterLetters([wyslany], { od: 'fo' }).length, 0);
 });
 
+test('archiwum: filtry od/do/osoba czytaja pelne naglowki, takze samo DW', () => {
+  const odebrany: ArchiveLetter = {
+    ...fromMailboxEntry('odebrane', entry({ party: 'Stary opis' })),
+    headers: { from: 'NadawcaPelny', to: 'Tester', cc: 'DwOdebrany' },
+  };
+  const wyslany: ArchiveLetter = {
+    ...fromMailboxEntry('wyslane', entry({ party: '' })),
+    headers: { from: 'Tester', to: 'OdbiorcaPelny', cc: 'DwWyslany' },
+  };
+  assert.deepEqual(filterLetters([odebrany], { od: 'nadawcapelny' }), [odebrany]);
+  assert.deepEqual(filterLetters([wyslany], { do: 'odbiorcapelny' }), [wyslany]);
+  assert.deepEqual(filterLetters([wyslany], { do: 'dwwyslany' }), [wyslany]);
+  assert.deepEqual(filterLetters([odebrany], { osoba: 'dwodebrany' }), [odebrany]);
+  assert.deepEqual(filterLetters([wyslany], { osoba: 'tester' }), [wyslany]);
+});
+
 test('archiwum: zakres dat wlacznie (odDaty/doDaty)', () => {
   const a = fromMailboxEntry('odebrane', entry());
   const { letters } = upsertLetters([], [a]);

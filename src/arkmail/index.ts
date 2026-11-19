@@ -83,6 +83,7 @@ import { humanizeMailError, isOperationCancelled } from "./core/errors";
 import {
   archiveExportEntries,
   archiveExportHeaderGaps,
+  letterFileParties,
   letterTxt,
   txtFileName,
 } from "./core/exportTxt";
@@ -504,7 +505,11 @@ export async function init(api: PluginApi) {
     // Fala UI-2: czlonkowie zaimportowanych aliasow dolaczaja do bazy
     // ze zrodlem 'alias' (mergeContacts); aliasow nie edytujemy.
     ui.setContacts(
-      contactsFromArchiveWithAliases(ui.state.archive, ui.state.importedAliases),
+      contactsFromArchiveWithAliases(
+        ui.state.archive,
+        ui.state.importedAliases,
+        ui.state.characterName,
+      ),
     );
   };
 
@@ -2604,8 +2609,7 @@ export async function init(api: PluginApi) {
     onExportLetter: () => {
       const l = ui.state.letter;
       if (!l) return;
-      const sender = l.box === "odebrane" || l.box === "nieprzeczytane";
-      const party = sender ? l.from : l.to || l.cc || "";
+      const party = letterFileParties(l);
       const txt = letterTxt({
         subject: l.subject,
         from: l.from,

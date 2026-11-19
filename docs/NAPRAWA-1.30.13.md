@@ -59,4 +59,13 @@
 - Pelny zestaw po poprawce: 1234 testy, 1234 zaliczone, 0 bledow, 0 przerwanych; rzeczywiste typowanie i build zakonczone sukcesem.
 - Niepotwierdzona strona oraz niepotwierdzony listing bazowy sa najpierw scalane, a nastepnie koncza skan wynikiem czesciowym. Nie otwieraja kolejnej sesji, nie stempluja kompletu, nie zastepuja Archiwum i nie kasuja nieobecnych rekordow.
 
+### Kontakty, filtry i nazwy eksportow
+
+- RED na niezmienionym kodzie: 7 przypadkow wykrylo pomijanie pelnych naglowkow i DW w kontaktach, obu filtrach, skoku z kontaktu oraz nazwach TXT i ZIP; pozostale 38 z 45 ukierunkowanych testow przechodzilo.
+- GREEN po poprawce: 45 z 45 ukierunkowanych testow.
+- Pelny zestaw po poprawce: 1240 testow, 1240 zaliczonych, 0 bledow, 0 przerwanych; rzeczywiste typowanie i build zakonczone sukcesem.
+- Kontakty i liczniki korzystaja z nadawcy, DO i DW, pomijaja biezaca postac oraz deduplikuja nazwy bez rozrozniania wielkosci liter. Repliki zachowuja sumowanie w obrebie skrzynki i MAX miedzy skrzynkami.
+- Oba filtry oraz skok z kontaktu czytaja pelne naglowki. Nazwy pojedynczych TXT i plikow ZIP zawieraja wszystkie znane strony listu; tresc eksportu pozostala bez zmian.
+- Istniejace kontrolki, ktore traktowaly biezaca postac testowa jako wlasny kontakt, zaktualizowano do nowego kontraktu bez zmiany sprawdzanych mechanik indeksacji, kasowania i paginacji.
+
 Pozostale wyniki beda dopisywane wraz z kolejnymi commitami. Po zakonczeniu calego zakresu ten dokument zostanie usuniety jako zrealizowany.

@@ -15,7 +15,7 @@
 
 import type { MailBox } from './protocol/types.js';
 import type { MailboxEntry } from './session/mailbox.js';
-import type { ArchiveLetter } from './archive.js';
+import { archiveLetterContent, type ArchiveLetter } from './archive.js';
 
 export type ContactSource = 'people' | 'korespondencja' | 'alias';
 
@@ -154,12 +154,22 @@ function entryToLetterLike(box: MailBox, e: MailboxEntry): LetterLike {
 }
 
 /** Rekord archiwum -> znormalizowany LetterLike (dateKey z sortKey). */
-function archiveToLetterLike(l: ArchiveLetter): LetterLike {
+function archiveToLetterLike(l: ArchiveLetter, currentCharacter: string | null): LetterLike {
   // sortKey 'YYYY-MM-DD HH:MM:SS' -> yyyymmddHHMMSS; same zera = brak daty.
   const digits = Number(l.sortKey.replace(/\D/g, ''));
+  const content = archiveLetterContent(l);
+  const current = currentCharacter?.trim().toLowerCase() || null;
+  const seen = new Set<string>();
+  const parties: string[] = [];
+  for (const name of [content.from, content.to, content.cc ?? ''].flatMap(splitParty)) {
+    const key = name.toLowerCase();
+    if (key === current || seen.has(key)) continue;
+    seen.add(key);
+    parties.push(name);
+  }
   return {
     direction: directionOf(l.box),
-    party: l.party,
+    party: parties.join(', '),
     subject: l.subject,
     forwarded: l.forwarded === true,
     dateRaw: l.dateRaw,
@@ -199,8 +209,11 @@ export function contactsFromBoxes(
  * Fala 28: listow nieobecnych na serwerze w bazie nie ma wcale
  * (fizyczny purge), wiec zywosc nie jest sprawdzana.
  */
-export function contactsFromArchive(letters: readonly ArchiveLetter[]): Contact[] {
-  return contactsFromArchiveWithAliases(letters, []);
+export function contactsFromArchive(
+  letters: readonly ArchiveLetter[],
+  currentCharacter: string | null = null,
+): Contact[] {
+  return contactsFromArchiveWithAliases(letters, [], currentCharacter);
 }
 
 /**
@@ -212,6 +225,7 @@ export function contactsFromArchive(letters: readonly ArchiveLetter[]): Contact[
 export function contactsFromArchiveWithAliases(
   letters: readonly ArchiveLetter[],
   aliases: readonly { name: string; targets: string[] }[],
+  currentCharacter: string | null = null,
 ): Contact[] {
   return mergeContacts({
     people: [],
@@ -222,7 +236,7 @@ export function contactsFromArchiveWithAliases(
         // Fala 41: kazdy rekord to osobny list (dedup ponizej sumuje).
         // Zapisy legacy z polem occurrences (Fala 35) czytaja je jako
         // domyslna 1 - runtime nie polega juz na tym polu.
-        .map((l) => ({ ...archiveToLetterLike(l), count: l.occurrences ?? 1 })),
+        .map((l) => ({ ...archiveToLetterLike(l, currentCharacter), count: l.occurrences ?? 1 })),
     ),
     aliasy: aliases.map((a) => ({ name: a.name, targets: [...a.targets] })),
   });

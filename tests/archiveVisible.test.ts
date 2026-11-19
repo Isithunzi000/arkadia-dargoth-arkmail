@@ -97,6 +97,20 @@ test('filtr tresci dziala per rekord (tylko rekord z trescia przechodzi)', () =>
   assert.equal(filterVisibleArchive([bezTresci, zTrescia], { tresc: 'nie-ma' }).length, 0);
 });
 
+test('widoczne archiwum: filtry czytaja pelne naglowki i samo DW', () => {
+  const odebrany: ArchiveLetter = {
+    ...entry('odebrane', { party: 'Stary opis' }),
+    headers: { from: 'NadawcaPelny', to: 'Tester', cc: 'DwOdebrany' },
+  };
+  const wyslany: ArchiveLetter = {
+    ...entry('wyslane', { party: '' }),
+    headers: { from: 'Tester', to: 'OdbiorcaPelny', cc: 'DwWyslany' },
+  };
+  assert.deepEqual(filterVisibleArchive([odebrany], { od: 'nadawcapelny' }), [odebrany]);
+  assert.deepEqual(filterVisibleArchive([wyslany], { do: 'dwwyslany' }), [wyslany]);
+  assert.deepEqual(filterVisibleArchive([odebrany, wyslany], { osoba: 'dwodebrany' }), [odebrany]);
+});
+
 test('kontakty i eksport pomijaja rekordy znikniete z serwera (po purge Fala 28)', () => {
   const flagged = {
     ...entry('odebrane', { party: 'Corge', subject: 'Stary' }),

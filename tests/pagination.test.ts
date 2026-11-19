@@ -279,7 +279,7 @@ test('kontakty: wczytaj starsze odbudowuje kontakty z dopisanej strony (Fala 24b
         textContent?: string;
       }>,
     ).map((r) => String(r.textContent ?? ''));
-    assert.ok(names.includes('Foo'), 'kontakt z prologu');
+    assert.ok(names.includes('Corge'), 'kontakt z prologu');
     assert.ok(names.includes('Baz'), 'kontakt z dopisanej strony starszych');
   } finally {
     await stopHarness();

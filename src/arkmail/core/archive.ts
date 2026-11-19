@@ -595,15 +595,20 @@ export function filterVisibleArchive(
       !norm(l.body.join('\n')).includes(norm(filter.tresc!))
     )
       continue;
+    const content = archiveLetterContent(l);
     if (filter.od !== undefined) {
       if (!SENDER_BOXES.has(l.box)) continue;
-      if (!norm(l.party).includes(norm(filter.od))) continue;
+      if (!norm(content.from).includes(norm(filter.od))) continue;
     }
     if (filter.do !== undefined) {
       if (!RECIPIENT_BOXES.has(l.box)) continue;
-      if (!norm(l.party).includes(norm(filter.do))) continue;
+      if (!norm(`${content.to}, ${content.cc ?? ''}`).includes(norm(filter.do))) continue;
     }
-    if (filter.osoba !== undefined && !norm(l.party).includes(norm(filter.osoba))) continue;
+    if (
+      filter.osoba !== undefined &&
+      !norm(`${content.from}, ${content.to}, ${content.cc ?? ''}`).includes(norm(filter.osoba))
+    )
+      continue;
     if (filter.temat !== undefined && !norm(l.subject).includes(norm(filter.temat))) continue;
     if (odDaty !== undefined && l.sortKey.slice(0, 10) < odDaty) continue;
     if (doDaty !== undefined && l.sortKey.slice(0, 10) > doDaty) continue;
@@ -622,15 +627,20 @@ export function filterLetters(
   const odDaty = validArchiveDate(filter.odDaty);
   const doDaty = validArchiveDate(filter.doDaty);
   return letters.filter((l) => {
+    const content = archiveLetterContent(l);
     if (filter.od !== undefined) {
       if (!SENDER_BOXES.has(l.box)) return false;
-      if (!norm(l.party).includes(norm(filter.od))) return false;
+      if (!norm(content.from).includes(norm(filter.od))) return false;
     }
     if (filter.do !== undefined) {
       if (!RECIPIENT_BOXES.has(l.box)) return false;
-      if (!norm(l.party).includes(norm(filter.do))) return false;
+      if (!norm(`${content.to}, ${content.cc ?? ''}`).includes(norm(filter.do))) return false;
     }
-    if (filter.osoba !== undefined && !norm(l.party).includes(norm(filter.osoba))) return false;
+    if (
+      filter.osoba !== undefined &&
+      !norm(`${content.from}, ${content.to}, ${content.cc ?? ''}`).includes(norm(filter.osoba))
+    )
+      return false;
     if (filter.skrzynka !== undefined && l.box !== filter.skrzynka) return false;
     if (filter.temat !== undefined && !norm(l.subject).includes(norm(filter.temat))) return false;
     if (filter.tresc !== undefined && !norm(l.body.join('\n')).includes(norm(filter.tresc))) return false;

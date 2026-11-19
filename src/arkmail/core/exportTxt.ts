@@ -47,6 +47,15 @@ export function archiveLetterTxt(l: ArchiveLetter): string {
   return letterTxt({ ...archiveLetterContent(l), box: l.box });
 }
 
+/** Wszystkie znane strony listu do nazwy pliku; puste pola pomijane. */
+export function letterFileParties(
+  l: Pick<LetterTxtInput, 'from' | 'to' | 'cc'>,
+): string {
+  return [l.from ?? '', l.to ?? '', l.cc ?? '']
+    .filter((party) => party.trim() !== '')
+    .join(', ');
+}
+
 /** Slug ASCII do nazwy pliku (fallback 'list' dla pustego). */
 export function slugAscii(s: string, max = 40): string {
   const slug = s
@@ -120,7 +129,8 @@ export function archiveExportEntries(letters: readonly ArchiveLetter[]): {
   });
   const used = new Map<string, number>();
   const entries: ExportEntry[] = sorted.map((letter) => {
-    const base = `${letter.box}/${txtFileName(letter.party, letter.subject, letter.dateRaw)}`;
+    const content = archiveLetterContent(letter);
+    const base = `${letter.box}/${txtFileName(letterFileParties(content), letter.subject, letter.dateRaw)}`;
     const n = (used.get(base) ?? 0) + 1;
     used.set(base, n);
     const name = n === 1 ? base : base.replace(/\.txt$/, `-${n}.txt`);
