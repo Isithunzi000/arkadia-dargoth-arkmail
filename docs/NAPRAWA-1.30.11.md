@@ -76,4 +76,15 @@
 - Testy czekają teraz na wymagane rekordy i znaczniki, bez zmiany kodu produktu. Dziesięć kolejnych przebiegów obu plików: 120/120 zaliczonych, 0 błędów.
 - Ostateczny pełny zestaw z docelowym komunikatem commita: 1208 testów, 1208 zaliczonych, 0 błędów, 0 pominiętych. Typowanie i build zakończyły się kodem 0.
 
+## 6. Kontrole przeglądarkowe — wynik
+
+- Commit testów `a766c705af43c21fc450b5c8b5c916cabb41f3c1` uruchomił macierz `44459207895` przeciwko produktowi `5026c39bacf665809c08a483aea0a8496a477595` i Dargothowi `616ea27c949097f13b835d4195af26f4b32f6b14`.
+- Pierwszy przebieg odrzucono: 44 scenariusze, 41 zaliczonych, 3 błędy, 0 pominiętych, 0 niestabilnych powtórzeń. Wynik pochodzi z artefaktu `results.json`.
+- Dwie kontrole List błędnie oczekiwały przycisku `.arkmail-older` po pełnym wyszukiwaniu. Dwie kontrole Usuwania oczekiwały 60 wierszy, podczas gdy właściwy limit wyniku wynosi 50. Błędy dotyczyły założeń nowych scenariuszy, nie kodu produktu.
+- Testy pluginow Dargoth `44459207999` oraz ogólny E2E klienta `44459207958` zakończyły się sukcesem dla tego samego commita testów.
+- Commit testów `8e9f5719f3f10762e8a4a83e292c7a967a7db758` uruchomił macierz `44464806847` przeciwko temu samemu produktowi i Dargothowi. Drugi przebieg odrzucono: 46 scenariuszy, 45 zaliczonych, 1 błąd, 0 pominiętych, 0 niestabilnych powtórzeń. Wynik pochodzi z artefaktu `results.json`.
+- Jedyny błąd dotyczył Archiwum przy szerokości 390 px, wysokości 520 px i skali 1,8. Przyciski `.arkmail-index-all`, `.arkmail-arch-download` i `.arkmail-arch-export` miały prostokąty od współrzędnej 67 do 421 i wychodziły poza prawą krawędź roota. Kontroli overflow nie złagodzono ani nie usunięto.
+- Przyczyną był minimalny tor siatki `220 px * skala` bez ograniczenia do szerokości kontenera. Przed poprawką nowa lokalna kontrola CSS zakończyła się wynikiem 12 testów, 11 zaliczonych, 1 błąd. Poprawka ogranicza minimalny tor do `100%` szerokości kontenera, zachowując dotychczasowy próg i automatyczne dopasowanie liczby kolumn.
+- Po poprawce kontrole stylów, skali i Archiwum przeszły 62/62. Pełny lokalny zestaw z docelowym komunikatem commita: 1209 testów, 1209 zaliczonych, 0 błędów, 0 pominiętych. Typowanie i build zakończyły się kodem 0.
+
 Pozostałe wyniki zostaną dopisane do tego dokumentu w commitach zawierających odpowiadające im testy i poprawki.

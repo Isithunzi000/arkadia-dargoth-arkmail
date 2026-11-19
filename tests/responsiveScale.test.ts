@@ -132,3 +132,12 @@ test('skala: statusy Archiwum dziela informacje na zawijane wiersze', () => {
   assert.match(value, /min-width:\s*0/);
   assert.match(value, /overflow-wrap:\s*anywhere/);
 });
+
+test('skala: karty Archiwum nie wykraczaja poza waski panel', () => {
+  const steps = body(/^\.arkmail-archive-steps(?![\w-])/);
+  assert.match(
+    steps,
+    /grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(calc\(220px \* var\(--window-font-scale, 1\)\),\s*100%\),\s*1fr\)\)/,
+    'skalowany minimalny tor nie moze przekroczyc szerokosci kontenera',
+  );
+});

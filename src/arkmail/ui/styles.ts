@@ -753,7 +753,7 @@ export const STYLES = `
 }
 .arkmail-archive-steps {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(calc(220px * var(--window-font-scale, 1)), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(calc(220px * var(--window-font-scale, 1)), 100%), 1fr));
   gap: calc(10px * var(--window-font-scale, 1));
   margin: calc(10px * var(--window-font-scale, 1)) 0 calc(12px * var(--window-font-scale, 1));
 }
