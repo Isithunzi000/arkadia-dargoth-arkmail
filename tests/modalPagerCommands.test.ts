@@ -46,7 +46,7 @@ const PAGER_COMMANDS = [
 ] as const;
 
 interface PagerHooks {
-  onUserCommand: () => void;
+  onUserCommand: (command: string) => void;
   onCommandDropped: () => void;
 }
 
@@ -74,10 +74,11 @@ test('modal pagera: kazda komenda czytania trafia raz do otwartego pagera jako k
     const seen: ProtoLine[] = [];
     transport.subscribe((line) => seen.push(line));
     let takeovers = 0;
+    const takenCommands: string[] = [];
     let dropped = 0;
     try {
       beginPagerModal(transport, {
-        onUserCommand: () => { takeovers++; },
+        onUserCommand: (command) => { takeovers++; takenCommands.push(command); },
         onCommandDropped: () => { dropped++; },
       });
       f.fire(PAGER_PROMPT, 'mail');
@@ -89,6 +90,7 @@ test('modal pagera: kazda komenda czytania trafia raz do otwartego pagera jako k
         `otwarty pager: ${JSON.stringify(command)}`,
       );
       assert.equal(takeovers, 1, `jedno przejecie: ${JSON.stringify(command)}`);
+      assert.deepEqual(takenCommands, [command], `tresc przejetej komendy: ${JSON.stringify(command)}`);
       assert.equal(dropped, 0, `brak odrzucenia: ${JSON.stringify(command)}`);
       const echo = command === '' ? '→ ' : `→ ${command}`;
       seen.length = 0;
@@ -246,6 +248,103 @@ for (const closeCommand of ['q', 'x'] as const) {
     }
   });
 }
+
+for (const closeCommand of ['q', 'x'] as const) {
+    test(`automatyczny odczyt: kolejkowane ${closeCommand} bez echa konczy sie dopiero zwyklym promptem`, async () => {
+      const h = await startHarness();
+      const { f } = h;
+      try {
+        await startRead(h);
+        const listingsBefore = f.sent.filter((command) => command === 'listy odebrane').length;
+        await f.api.command.send(closeCommand, true);
+        f.fire(PAGER_PROMPT, 'mail');
+        await waitRt(() => f.sent.includes(closeCommand), `${closeCommand} gracza bez echa`);
+        await waitRt(() => f.hookCb === null, 'koniec modalu bez echa');
+        assert.equal(f.sent.filter((command) => command === closeCommand).length, 1, 'jedno zamkniecie');
+        f.fire(PAGER_PROMPT, 'mail');
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        assert.equal(
+          f.sent.filter((command) => command === 'listy odebrane').length,
+          listingsBefore,
+          'prompt pagera nie zastepuje zwyklego promptu',
+        );
+
+        const checkDownload = closeCommand === 'q';
+        if (checkDownload) {
+          click(h, '[data-tab="archiwum"]');
+          const commandsBefore = f.sent.length;
+          click(h, '.arkmail-arch-download');
+          click(h, '.arkmail-arch-download');
+          assert.ok(notifyText(f, 'Przed pobieraniem tresci zamknij poczte otwarta w grze'), 'pobieranie czeka na prompt');
+          assert.equal(f.sent.length, commandsBefore, 'blokada pobierania nie wysyla komendy');
+        }
+
+        // Swiadomie bez linii "→ q/x": komenda z hooka jest jedynym sygnalem zamkniecia.
+        f.fire('> ', 'prompt');
+        await waitRt(
+          () => f.sent.filter((command) => command === 'listy odebrane').length > listingsBefore,
+          'wznowienie bez echa po zwyklym prompcie',
+        );
+        if (checkDownload) {
+          f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
+          f.fire(' 3. *R* Temat: najstarszy', 'mail');
+          f.fire('Nadawca: Foo                        Nd, 22 VIII 1999, 01:15:04', 'mail');
+          f.fire(' 2. *R* Temat: srodkowy', 'mail');
+          f.fire('Nadawca: Foo                        Pn, 23 VIII 1999, 02:20:05', 'mail');
+          f.fire(' 1. *R* Temat: najnowszy', 'mail');
+          f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
+          f.fire('> ', 'prompt');
+        } else {
+          f.fire('Nie masz zadnych odebranych listow.', 'mail');
+        }
+        await waitRt(() => f.sent.includes('listy nieprzeczytane'), 'druga skrzynka bez echa');
+        f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
+        if (checkDownload) {
+          await waitRt(
+            () => ((h.content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '',
+            'koniec odswiezenia przed pobieraniem',
+          );
+          click(h, '[data-tab="archiwum"]');
+          click(h, '.arkmail-arch-download');
+          click(h, '.arkmail-arch-download');
+          await waitRt(
+            () => f.sent.some((command) => command.startsWith('listy odebrane przed')),
+            'istniejace pobieranie tresci po zamknieciu',
+          );
+        }
+      } finally {
+        f.fire('> ', 'prompt');
+        await stopHarness();
+      }
+    });
+}
+
+test('automatyczny odczyt: prompt przed echem q konczy tryb, a pozne i powtorzone echo jest bezsilne', async () => {
+  const h = await startHarness();
+  const { f } = h;
+  try {
+    await startRead(h);
+    const listingsBefore = f.sent.filter((command) => command === 'listy odebrane').length;
+    await f.api.command.send('q', true);
+    f.fire(PAGER_PROMPT, 'mail');
+    await waitRt(() => f.sent.includes('q'), 'q gracza');
+    await waitRt(() => f.hookCb === null, 'koniec modalu');
+    f.fire('> ', 'prompt');
+    await waitRt(
+      () => f.sent.filter((command) => command === 'listy odebrane').length > listingsBefore,
+      'prompt przed echem zdejmuje blokade',
+    );
+    f.fire('→ q', 'info');
+    f.fire('→ q', 'info');
+    f.fire('Nie masz zadnych odebranych listow.', 'mail');
+    await waitRt(() => f.sent.includes('listy nieprzeczytane'), 'pozne echo nie blokuje drugiej skrzynki');
+    f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
+    assert.equal(f.sent.filter((command) => command === 'q').length, 1, 'pozne echo nie wysyla drugiego q');
+  } finally {
+    f.fire('> ', 'prompt');
+    await stopHarness();
+  }
+});
 
 // Kontrola typu na wypadek przypadkowej zmiany podpisow API w tescie.
 const _apiTypeCheck: PluginApi = new FakeApi().api;

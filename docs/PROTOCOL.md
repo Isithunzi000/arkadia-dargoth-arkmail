@@ -466,6 +466,9 @@ zapisu. Dawne klucze localStorage sa usuwane bez migracji danych.
 - Nieznanego pagera nie wolno zamykac automatycznym `q`. Reczna operacja
   pokazuje wyjasnienie, a kolejna komenda czeka na zwykly prompt. Reconnect
   i `dispose()` wykonuja cichy lokalny cleanup bez `q` ani `~q`.
+- Przechwycona komenda gracza `q`/`x` ustawia oczekiwanie na zwykly prompt
+  takze bez echa. Echo jest sygnalem dodatkowym, a pozne lub powtorzone echo
+  po zwyklym prompcie nie przywraca trybu poczty gracza.
 - Odzyskiwanie ma ograniczony czas, a zwykly prompt konczy je jednokrotnie.
   Nie wolno pozostawiac bezterminowej blokady ani zdejmowac jej automatycznie
   bez synchronizacji kanalu.

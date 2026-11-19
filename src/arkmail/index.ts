@@ -923,8 +923,9 @@ export async function init(api: PluginApi) {
    * Fala 24f2: reczny tryb czytania poczty gracza (zgloszenie
    * 2026-10-21: "ArkMail blokowal wpisywanie komend jak sie wyswietla
    * list recznie"). Wejscie: echo komendy pocztowej gracza poza
-   * blokada; wyjscie: echo q/x albo bezczynnosc
-   * (PLAYER_MAIL_MODE_IDLE_MS). W trakcie trybu scheduleRefresh
+   * blokada; wyjscie: przechwycone q/x albo jego echo ustawia
+   * oczekiwanie, a zwykly prompt konczy tryb. Bezczynnosc
+   * (PLAYER_MAIL_MODE_IDLE_MS) pozostaje awaryjnym wyjsciem. W trakcie trybu scheduleRefresh
    * PARKUJE - pager gracza zjadlby komende listujaca, a straznik
    * desynchronizacji moglby odpowiedziec "q" i zabic jego sesje
    * (mechanika Fali 17a/24g).
@@ -1010,10 +1011,18 @@ export async function init(api: PluginApi) {
     ui.setIndexRun(null);
     ui.setArchiveDownload(null);
   };
+  const awaitPlayerMailPrompt = (): void => {
+    if (!playerMailMode) return;
+    awaitingPlayerMailPrompt = true;
+    clearPlayerMailModeTimer();
+  };
   const beginPagerModal = (): void => {
     transport!.beginModal({
       pager: {
-        onUserCommand: enterPlayerMailMode,
+        onUserCommand: (command) => {
+          enterPlayerMailMode();
+          if (/^(?:q|x)$/i.test(command.trim())) awaitPlayerMailPrompt();
+        },
         onCommandDropped: () => notify(
           api,
           "Nie wykonano komendy pocztowej, poniewaz tryb czytania poczty zostal juz zamkniety. Otworz poczte recznie i powtorz komende.",
@@ -2903,8 +2912,7 @@ export async function init(api: PluginApi) {
       } else if (playerMailMode && !line.own && /^(?:q|x)$/i.test(cmd.trim())) {
         // Samo echo q/x nie dowodzi, ze serwer zamknal pager. Wznowienie
         // czeka na zwykly prompt gry; kolejny prompt pagera go nie zastepuje.
-        awaitingPlayerMailPrompt = true;
-        clearPlayerMailModeTimer();
+        awaitPlayerMailPrompt();
       }
       return;
     }

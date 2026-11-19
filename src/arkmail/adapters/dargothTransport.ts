@@ -22,7 +22,7 @@ import { notify } from './notify.js';
 
 export interface PagerModalHooks {
   /** Gracz przejmuje wlasny pager; sesja pluginu konczy sie bez q. */
-  onUserCommand: () => void;
+  onUserCommand: (command: string) => void;
   /** Komende czytania odrzucono, bo pager jest juz zamkniety. */
   onCommandDropped: () => void;
 }
@@ -239,7 +239,7 @@ export class DargothTransport implements Transport {
         if (/^(?:q|x)$/i.test(command.trim())) this.pagerOpen = false;
         // Przejecie najpierw anuluje sesje, wiec PagerSession nie wysle
         // wlasnego q. Komenda gracza idzie raz, z zachowanym zrodlem.
-        hooks.onUserCommand();
+        hooks.onUserCommand(command);
         void this.enqueue(command, true, 'user').catch(() => {});
       } else {
         this.queue.push(command);
@@ -257,7 +257,7 @@ export class DargothTransport implements Transport {
     const command = this.queue.splice(index, 1)[0]!;
     const hooks = this.pagerModal;
     if (/^(?:q|x)$/i.test(command.trim())) this.pagerOpen = false;
-    hooks.onUserCommand();
+    hooks.onUserCommand(command);
     void this.enqueue(command, true, 'user').catch(() => {});
   }
 
