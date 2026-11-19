@@ -167,9 +167,10 @@ export async function scanMailboxPages(options: PageScanOptions): Promise<PageSc
     addedToView += visit.addedToView ?? 0;
     archiveAdded += visit.archiveAdded ?? 0;
     if (options.cancelled()) return finish('cancelled');
-    // Cisza zwraca uzyteczna strone do scalenia i nie przerywa skanu.
-    // Licznik niepotwierdzonych stron blokuje natomiast wszystkie operacje
-    // pelnej prawdy po stronie wywolujacej (kasowanie, komplet indeksu).
+    // Cisza zwraca uzyteczna strone do scalenia, ale nie potwierdza jej
+    // konca. Nie wolno po niej otwierac kolejnej sesji: pozne wpisy, echo
+    // lub prompt starej odpowiedzi moglyby zostac przypisane nowej stronie.
+    if (result.confirmed === false) return finish('partial');
 
     if (!result.header.truncated) {
       if (gapDays.length > 0) return incompleteWithGaps();
@@ -198,6 +199,10 @@ export async function scanMailboxPages(options: PageScanOptions): Promise<PageSc
         observeConfirmation(base);
         options.onBaseRefresh?.(base);
         if (options.cancelled()) return finish('cancelled');
+        // Odswiezona baza bez potwierdzenia takze konczy skan. Jej dane
+        // zostaly scalone przez onBaseRefresh, lecz kolejna kotwica moglab
+        // zebrac pozny koniec tej samej odpowiedzi.
+        if (base.kind === 'lista' && base.confirmed === false) return finish('partial');
         result = await options.fetchPage(olderListingCommand(box, nextDay(oldestDuplicate.date)));
         continue;
       }

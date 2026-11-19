@@ -52,4 +52,11 @@
 - Reczne q/x przed rozpoznaniem pagera oraz po automatycznym zamknieciu jest koalescencja jednego zamkniecia. Modal konczy sie natychmiast, a ograniczony hook do zwyklego promptu usuwa wylacznie powtorzenia q/x; wszystkie inne komendy przechodza normalnie.
 - Tryb gracza bez zwyklego promptu ma awaryjne wyjscie po 180 sekundach. Blokada transportu `recovering` nie jest zdejmowana przez sam uplyw czasu, aby pozne dane starej sesji nie trafily do nowej.
 
+### Paginacja i pozne odpowiedzi
+
+- RED na niezmienionym kodzie: 4 przypadki wykryly kolejna strone po niepotwierdzonej odpowiedzi, kolejna kotwice po niepotwierdzonym listingu bazowym oraz niebezpieczna kontynuacje w petli i indeksacji; pozostale 5 z 9 ukierunkowanych testow przechodzilo.
+- GREEN po poprawce: 9 z 9 ukierunkowanych testow.
+- Pelny zestaw po poprawce: 1234 testy, 1234 zaliczone, 0 bledow, 0 przerwanych; rzeczywiste typowanie i build zakonczone sukcesem.
+- Niepotwierdzona strona oraz niepotwierdzony listing bazowy sa najpierw scalane, a nastepnie koncza skan wynikiem czesciowym. Nie otwieraja kolejnej sesji, nie stempluja kompletu, nie zastepuja Archiwum i nie kasuja nieobecnych rekordow.
+
 Pozostale wyniki beda dopisywane wraz z kolejnymi commitami. Po zakonczeniu calego zakresu ten dokument zostanie usuniety jako zrealizowany.

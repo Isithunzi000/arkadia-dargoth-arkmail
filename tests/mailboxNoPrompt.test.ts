@@ -196,56 +196,85 @@ const fireOlderPage = (
   h.f.fire(`Nadawca: Waldo                          ${dateRaw}`, 'mail');
 };
 
-test('skan: liczy niepotwierdzone strony i listing bazowy bez zmiany strukturalnego konca', async () => {
-  const entry = (subject: string, day: number, time: string): MailboxEntry => ({
-    number: 1,
-    isRead: true,
-    subject,
-    forwarded: false,
-    party: 'Waldo',
-    partyKind: 'nadawca',
-    date: {
-      raw: `Wt, ${day} VIII 1999, ${time}`,
-      weekday: 'Wt', day, month: 8, year: 1999, time,
-    },
-  });
-  const first = entry('Pierwsza', 24, '10:00:00');
-  const base = entry('Bazowa', 25, '10:00:00');
-  const last = entry('Ostatnia', 23, '10:00:00');
-  const page = (
-    entries: MailboxEntry[],
-    truncated: boolean,
-    confirmed: boolean,
-  ): MailboxResult => ({
-    kind: 'lista',
-    header: { box: 'odebrane', truncated },
-    entries,
-    confirmed,
-  });
+const scanEntry = (subject: string, day: number, time: string): MailboxEntry => ({
+  number: 1,
+  isRead: true,
+  subject,
+  forwarded: false,
+  party: 'Waldo',
+  partyKind: 'nadawca',
+  date: {
+    raw: `Wt, ${day} VIII 1999, ${time}`,
+    weekday: 'Wt', day, month: 8, year: 1999, time,
+  },
+});
+const scanPage = (
+  entries: MailboxEntry[],
+  truncated: boolean,
+  confirmed: boolean,
+): MailboxResult => ({
+  kind: 'lista',
+  header: { box: 'odebrane', truncated },
+  entries,
+  confirmed,
+});
+
+test('skan: niepotwierdzona strona zostaje scalona i konczy pobieranie przed kolejna kotwica', async () => {
+  const first = scanEntry('Pierwsza', 24, '10:00:00');
   const anchor = 'listy odebrane przed 25 VIII 1999';
   const commands: Array<string | undefined> = [];
-  let baseRefreshes = 0;
+  const visited: string[] = [];
   const result = await scanMailboxPages({
     box: 'odebrane',
     initialCommand: anchor,
     cancelled: () => false,
     fetchPage: async (command) => {
       commands.push(command);
-      if (commands.length === 1) return page([first], true, false);
-      if (commands.length === 2) return page([first], true, true);
-      if (commands.length === 3) return page([base], true, false);
-      return page([last], false, true);
+      return scanPage([first], true, false);
     },
     wait: async () => {},
-    onBaseRefresh: () => { baseRefreshes += 1; },
+    onPage: (value) => {
+      visited.push(...value.entries.map((entry) => entry.subject));
+      return {};
+    },
+  });
+
+  assert.equal(result.end, 'partial');
+  assert.equal(result.pages, 1);
+  assert.equal(result.unconfirmedPages, 1);
+  assert.deepEqual(result.all, [first]);
+  assert.deepEqual(visited, ['Pierwsza']);
+  assert.deepEqual(commands, [anchor]);
+});
+
+test('skan: niepotwierdzony listing bazowy zostaje scalony i blokuje kolejna kotwice', async () => {
+  const first = scanEntry('Pierwsza', 24, '10:00:00');
+  const base = scanEntry('Bazowa', 25, '10:00:00');
+  const anchor = 'listy odebrane przed 25 VIII 1999';
+  const commands: Array<string | undefined> = [];
+  const refreshed: string[] = [];
+  const result = await scanMailboxPages({
+    box: 'odebrane',
+    initialCommand: anchor,
+    cancelled: () => false,
+    fetchPage: async (command) => {
+      commands.push(command);
+      if (commands.length <= 2) return scanPage([first], true, true);
+      if (commands.length === 3) return scanPage([base], true, false);
+      return scanPage([scanEntry('Zabroniona', 23, '10:00:00')], false, true);
+    },
+    wait: async () => {},
+    onBaseRefresh: (value) => {
+      if (value.kind === 'lista') refreshed.push(...value.entries.map((entry) => entry.subject));
+    },
     onPage: () => ({}),
   });
 
-  assert.equal(result.end, 'complete');
-  assert.equal(result.pages, 3);
-  assert.equal(Reflect.get(result, 'unconfirmedPages'), 2);
-  assert.equal(baseRefreshes, 1);
-  assert.deepEqual(commands, [anchor, anchor, undefined, anchor]);
+  assert.equal(result.end, 'partial');
+  assert.equal(result.pages, 2);
+  assert.equal(result.unconfirmedPages, 1);
+  assert.deepEqual(refreshed, ['Bazowa']);
+  assert.deepEqual(commands, [anchor, anchor, undefined]);
 });
 
 test('wczytaj starsze: strona bez promptu zostaje w widoku i archiwum bez dawnego bledu', async () => {
@@ -271,7 +300,7 @@ test('wczytaj starsze: strona bez promptu zostaje w widoku i archiwum bez dawneg
   }
 });
 
-test('wczytaj wszystkie: wiele stron bez promptu dociera do konca i zachowuje archiwum', async () => {
+test('wczytaj wszystkie: strona bez promptu konczy petle i zachowuje czesciowe archiwum', async () => {
   const completeMarker = '1999-08-01T12:00:00.000Z';
   const h = await startHarness({
     archive: [oldArchive('Stary wpis', 'Pn, 9 VIII 1999, 02:20:05')],
@@ -287,44 +316,30 @@ test('wczytaj wszystkie: wiele stron bez promptu dociera do konca i zachowuje ar
     assert.equal(f.sent.find((command) => command.startsWith('listy odebrane przed')), 'listy odebrane przed 23 VIII 1999');
 
     fireOlderPage(h, 'Strona pierwsza', 'Nd, 15 VIII 1999, 10:00:00', true);
-    await waitRt(
-      () => anchors() === 2 || notifyText(f, 'nie potwierdzono pelnej odpowiedzi - sprobuj ponownie'),
-      'druga komenda po stronie bez promptu',
-    );
-    assert.equal(anchors(), 2, 'pierwsza strona bez promptu nie moze zatrzymac petli');
-    assert.equal(
-      f.sent.filter((command) => command.startsWith('listy odebrane przed'))[1],
-      'listy odebrane przed 16 VIII 1999',
-    );
-
-    fireOlderPage(h, 'Strona druga', 'Pn, 9 VIII 1999, 09:00:00', false);
-    await waitRt(() => notifyText(f, 'Wczytano wszystkie strony'), 'koniec calej petli bez promptow');
-    assert.equal(anchors(), 2, 'naturalny koniec nie wysyla dodatkowej komendy');
-    assert.ok(!notifyText(f, 'nie potwierdzono pelnej odpowiedzi - sprobuj ponownie'));
-    assert.ok(notifyText(f, 'Nie potwierdzono zamkniecia odpowiedzi: 2'));
-    assert.ok(notifyText(f, '5 (dodano: 2)'));
+    await waitRt(() => notifyText(f, 'Wczytano dostepne listy'), 'koniec petli po stronie bez promptu');
+    assert.equal(anchors(), 1, 'niepotwierdzona strona nie moze otworzyc kolejnej');
+    assert.ok(!notifyText(f, 'Wczytano wszystkie'), 'czesciowy skan nie jest kompletem');
+    assert.ok(notifyText(f, '4 (dodano: 1)'));
 
     const subjects = Array.from(h.content.querySelectorAll('.arkmail-entry-subject'))
       .map((element) => String((element as { textContent?: string }).textContent ?? ''));
-    assert.equal(subjects.length, 5);
-    assert.equal(new Set(subjects).size, 5, 'widok nie zawiera duplikatow');
+    assert.equal(subjects.length, 4);
+    assert.equal(new Set(subjects).size, 4, 'widok nie zawiera duplikatow');
     assert.ok(subjects.includes('Strona pierwsza'));
-    assert.ok(subjects.includes('Strona druga'));
-    await waitRt(() => !h.content.querySelector('.arkmail-older'), 'koniec paginacji w widoku');
+    assert.ok(h.content.querySelector('.arkmail-older'), 'dalej uciety listing zachowuje paginacje');
 
-    const snapshot = await waitStoredLetters(6);
-    assert.equal(new Set(snapshot.letters.map((letter) => letter.id)).size, 6, 'archiwum nie zawiera duplikatow');
+    const snapshot = await waitStoredLetters(5);
+    assert.equal(new Set(snapshot.letters.map((letter) => letter.id)).size, 5, 'archiwum nie zawiera duplikatow');
     assert.ok(snapshot.letters.some((letter) => letter.subject === 'Stary wpis'), 'stary rekord nie zostal usuniety');
     assert.ok(snapshot.letters.some((letter) => letter.subject === 'Strona pierwsza'));
-    assert.ok(snapshot.letters.some((letter) => letter.subject === 'Strona druga'));
-    assert.equal(snapshot.indexMeta.odebrane, completeMarker, 'niepotwierdzony skan nie zmienia stempla');
-    assert.deepEqual(snapshot.archiveGaps.odebrane, ['1999-08-01'], 'niepotwierdzony skan nie czysci luk');
+    assert.equal(snapshot.indexMeta.odebrane, completeMarker, 'czesciowy skan nie zmienia stempla');
+    assert.deepEqual(snapshot.archiveGaps.odebrane, ['1999-08-01'], 'czesciowy skan nie czysci luk');
   } finally {
     await stopHarness();
   }
 });
 
-test('indeksacja: kolejne strony bez promptu sa zapisywane, ale skrzynka pozostaje niekompletna', async () => {
+test('indeksacja: strona bez promptu konczy biezaca skrzynke i nie zastepuje archiwum', async () => {
   const h = await startHarness({ archive: [oldArchive('Stary wpis')], autoRefreshEnabled: false });
   const { f } = h;
   const anchors = () => f.sent.filter((command) => command.startsWith('listy odebrane przed')).length;
@@ -337,15 +352,8 @@ test('indeksacja: kolejne strony bez promptu sa zapisywane, ale skrzynka pozosta
     f.fire(' 1. *R* Temat: Indeks pierwszy', 'mail');
     f.fire('Nadawca: Waldo                          Wt, 24 VIII 1999, 00:11:12', 'mail');
 
-    await waitRt(
-      () => anchors() === 1 || f.sent.includes('listy nieprzeczytane'),
-      'druga strona indeksu bez promptu',
-    );
-    assert.equal(anchors(), 1, 'niepotwierdzona pierwsza strona nie moze przerwac indeksu');
-    assert.equal(f.sent.find((command) => command.startsWith('listy odebrane przed')), 'listy odebrane przed 25 VIII 1999');
-    fireOlderPage(h, 'Indeks drugi', 'Pn, 23 VIII 1999, 02:20:05', false);
-
-    await waitRt(() => f.sent.includes('listy nieprzeczytane'), 'nastepna skrzynka po dwoch stronach');
+    await waitRt(() => f.sent.includes('listy nieprzeczytane'), 'nastepna skrzynka bez drugiej strony');
+    assert.equal(anchors(), 0, 'niepotwierdzona strona konczy paginacje biezacej skrzynki');
     f.fire('Nie masz zadnych nieprzeczytanych listow.', 'mail');
     await waitRt(() => f.sent.includes('listy wyslane'), 'indeksacja wyslanych');
     f.fire('Nie masz zadnych wyslanych listow.', 'mail');
@@ -353,10 +361,10 @@ test('indeksacja: kolejne strony bez promptu sa zapisywane, ale skrzynka pozosta
     f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
 
     await waitRt(() => notifyText(f, 'Indeksowanie niekompletne'), 'raport niekompletny');
-    assert.ok(notifyText(f, 'Pominiete: odebrane (nie potwierdzono zamkniecia odpowiedzi: 2)'));
+    assert.ok(notifyText(f, 'Pominiete: odebrane (nie potwierdzono zamkniecia odpowiedzi: 1)'));
     assert.ok(!notifyText(f, 'Zindeksowano skrzynki'));
-    const snapshot = await waitStoredLetters(3, (current) => Boolean(current.indexMeta.nieprzeczytane));
-    assert.deepEqual(snapshot.letters.map((letter) => letter.subject).sort(), ['Indeks drugi', 'Indeks pierwszy', 'Stary wpis']);
+    const snapshot = await waitStoredLetters(2, (current) => Boolean(current.indexMeta.nieprzeczytane));
+    assert.deepEqual(snapshot.letters.map((letter) => letter.subject).sort(), ['Indeks pierwszy', 'Stary wpis']);
     assert.equal(snapshot.indexMeta.odebrane, undefined, 'brak stempla kompletu dla odebranych');
     assert.ok(snapshot.indexMeta.nieprzeczytane, 'kolejna skrzynka zostala zatwierdzona');
   } finally {
