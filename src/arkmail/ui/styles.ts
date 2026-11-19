@@ -126,6 +126,7 @@ export const STYLES = `
  * klienta (popup-input popup-input--control) - tlo, obwodka, fokus
  * i placeholder pilnuje motyw klienta. Zostaja tylko checkboxy. */
 .arkmail-root input[type='checkbox'] { accent-color: ${ACCENT}; }
+.arkmail-root input[type='radio'] { accent-color: ${ACCENT}; }
 .arkmail-root .popup-input::placeholder {
   color: var(--arkmail-placeholder);
   opacity: 1;
@@ -510,6 +511,48 @@ export const STYLES = `
 }
 .arkmail-letter-ops { display: flex; flex-wrap: wrap; gap: calc(6px * var(--window-font-scale, 1)); margin-top: calc(8px * var(--window-font-scale, 1)); align-items: center; }
 .arkmail-letter-ops input { flex: 1; }
+.arkmail-reply-all-panel {
+  display: grid;
+  min-width: 0;
+  max-width: 100%;
+  margin-top: calc(8px * var(--window-font-scale, 1));
+  padding: calc(10px * var(--window-font-scale, 1));
+  gap: calc(10px * var(--window-font-scale, 1));
+  background: ${BG_RAISED};
+  color: ${FG};
+  border: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
+  border-radius: calc(8px * var(--window-font-scale, 1));
+}
+.arkmail-reply-all-scopes {
+  display: grid;
+  min-inline-size: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  gap: calc(6px * var(--window-font-scale, 1));
+}
+.arkmail-reply-all-scopes legend {
+  margin-bottom: calc(4px * var(--window-font-scale, 1));
+  padding: 0;
+  color: ${FG_DIM};
+  font-size: calc(12px * var(--window-font-scale, 1));
+}
+.arkmail-reply-all-choice {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  max-width: 100%;
+  gap: calc(7px * var(--window-font-scale, 1));
+  cursor: pointer;
+}
+.arkmail-reply-all-choice input { flex: 0 0 auto; margin: 0; }
+.arkmail-reply-all-choice span { min-width: 0; overflow-wrap: anywhere; }
+.arkmail-reply-all-quote-row {
+  padding-top: calc(8px * var(--window-font-scale, 1));
+  border-top: calc(1px * var(--window-font-scale, 1)) solid ${BORDER};
+}
+.arkmail-reply-all-actions { display: flex; flex-wrap: wrap; max-width: 100%; gap: calc(6px * var(--window-font-scale, 1)); }
+.arkmail-reply-all-actions > button { flex: 0 0 auto; width: auto; max-width: 100%; white-space: normal; }
 /* Zgloszenie 2026-11-05 (A3): kolory klawisza kasowania listu daje
  * klasa natywna popup-btn--danger. */
 .arkmail-fwd { flex: none; }

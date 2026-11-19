@@ -2349,12 +2349,13 @@ export async function init(api: PluginApi) {
       openArchiveFromServer(letter);
     },
     onDownloadArchiveBodies: () => runArchiveDownload(),
-    onReplyAllArchive: (archiveId, apply) => {
+    onReplyAllArchive: (archiveId, scope, apply) => {
       const applyRecord = (record: ArchiveLetter): void => {
         const prefill = buildReplyAllPrefill(
           { ...archiveLetterContent(record), box: record.box },
           ui.state.characterName,
           knownRecipientNames(ui.state),
+          scope,
         );
         if (!prefill) {
           notify(

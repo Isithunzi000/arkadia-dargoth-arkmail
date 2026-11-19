@@ -123,8 +123,25 @@ async function openCached(h: Harness, rowIndex = 0): Promise<void> {
   await waitRt(() => !!h.content.querySelector('.arkmail-letter-meta'), 'podglad z cache');
 }
 
-async function beginRecovery(h: Harness): Promise<void> {
+function replyAll(h: Harness, scope: 'all' | 'to' | 'cc' = 'all', quote = false): void {
   click(h, '.arkmail-reply-all');
+  const scopeInput = h.content.querySelector(`[data-reply-scope="${scope}"]`) as
+    | { checked: boolean; dispatchEvent(event: unknown): void }
+    | null;
+  assert.ok(scopeInput, `zakres ${scope} w panelu Archiwum`);
+  scopeInput.checked = true;
+  scopeInput.dispatchEvent(new h.window.Event('change'));
+  const quoteInput = h.content.querySelector('.arkmail-reply-all-quote') as
+    | { checked: boolean; dispatchEvent(event: unknown): void }
+    | null;
+  assert.ok(quoteInput, 'checkbox cytowania w panelu Archiwum');
+  quoteInput.checked = quote;
+  quoteInput.dispatchEvent(new h.window.Event('change'));
+  click(h, '.arkmail-reply-all-continue');
+}
+
+async function beginRecovery(h: Harness): Promise<void> {
+  replyAll(h);
   await waitRt(
     () => h.f.sent.some((command) => command.startsWith('listy odebrane przed')),
     'jedyna re-kotwica reply-all',
@@ -181,7 +198,7 @@ test('reply-all: rekord z kompletem pozostaje lokalny i nie uruchamia odzyskiwan
   });
   try {
     await openCached(h);
-    click(h, '.arkmail-reply-all');
+    replyAll(h);
     assert.equal(field(h, 'adresat').value, 'Nadawca, Pierwszy');
     assert.equal(field(h, 'dw').value, 'Trzeci');
     assert.deepEqual(h.f.sent, [], 'pelny rekord nie wymaga komend');
@@ -219,7 +236,7 @@ test('reply-all: jeden odczyt zapisuje komplet przed prefillem, a kolejne otwarc
 
     await openCached(h);
     const commands = h.f.sent.length;
-    click(h, '.arkmail-reply-all');
+    replyAll(h);
     assert.equal(field(h, 'adresat').value, 'Nadawca, Pierwszy');
     assert.equal(field(h, 'dw').value, 'Trzeci');
     assert.equal(h.f.sent.length, commands, 'kolejne otwarcie i klik nie wymagaja komend');
@@ -254,7 +271,7 @@ test('reply-all: brak poprawnej daty oznacza zero komend i compose bez zmian', a
   try {
     seedDraft(h);
     await openCached(h);
-    click(h, '.arkmail-reply-all');
+    replyAll(h);
     assert.ok(notifyText(h.f, 'bez poprawnej daty listu'));
     assert.deepEqual(h.f.sent, [], 'brak daty nie powoduje slepej kotwicy');
     assertDraftUnchanged(h);
@@ -378,6 +395,54 @@ test('reply-all: blad trwalego zapisu nie daje prefillu ani trwalego kompletu', 
     assert.equal(h.f.sent.filter((command) => command === 'przeczytaj list 3').length, 1);
   } finally {
     IndexedDbStorageDriver.prototype.putLetters = original;
+    await stopHarness();
+  }
+});
+
+test('reply-all: odzyskane naglowki respektuja Tylko DW, a cytat pochodzi z tego samego otwartego rekordu', async () => {
+  const h = await startHarness({ archive: [record()] });
+  try {
+    await openCached(h);
+    replyAll(h, 'cc', true);
+    await waitRt(
+      () => h.f.sent.some((command) => command.startsWith('listy odebrane przed')),
+      'odzyskiwanie po wyborze Tylko DW',
+    );
+    replayListing(h);
+    await waitRt(() => h.f.sent.includes('przeczytaj list 3'), 'odczyt dla Tylko DW');
+    replayLetter(h);
+    await waitRt(() => {
+      const element = h.content.querySelector('[data-field="adresat"]') as Field | null;
+      return element?.value === 'Trzeci';
+    }, 'oryginalne DW jako Adresat');
+    assert.equal(field(h, 'dw').value, '');
+    assert.equal(field(h, 'temat').value, 'Odp: Syntetyczny temat');
+    assert.equal(field(h, 'tresc').value, `\n\n---\n${BODY}\n---`);
+    assert.equal(h.f.sent.filter((command) => command === 'przeczytaj list 3').length, 1);
+    assert.ok(!h.f.sent.some((command) => command === 'napisz list'), 'prefill nie wysyla listu');
+  } finally {
+    await stopHarness();
+  }
+});
+
+test('reply-all: zamkniecie listu odrzuca pozny wynik i chroni reczny draft', async () => {
+  const h = await startHarness({ archive: [record()] });
+  try {
+    seedDraft(h);
+    await openCached(h);
+    await beginRecovery(h);
+    replayListing(h);
+    await waitRt(() => h.f.sent.includes('przeczytaj list 3'), 'odczyt przed zamknieciem listu');
+    const close = h.content.querySelector('.arkmail-letter-close, button.arkmail-older') as
+      | { dispatchEvent(event: unknown): void }
+      | null;
+    assert.ok(close, 'Zamknij list jest dostepne');
+    close.dispatchEvent(new h.window.Event('click'));
+    replayLetter(h);
+    await ticks();
+    assert.equal(h.content.querySelector('[data-field="adresat"]'), null, 'pozny wynik nie otwiera compose');
+    assertDraftUnchanged(h);
+  } finally {
     await stopHarness();
   }
 });

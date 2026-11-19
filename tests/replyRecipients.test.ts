@@ -86,3 +86,38 @@ test('reply-all core: znane nazwy obejmuja kontakty, aliasy, osoby i grupy', () 
     ['bar', 'baz', 'dlugi alias', 'foo', 'foo alias', 'foo bar'],
   );
 });
+
+test('reply-all core: jawny zakres DO + DW zachowuje domyslny wynik', () => {
+  const value = letter('odebrane', { from: 'Foo', to: 'Gracz, Bar', cc: 'Baz' });
+  assert.deepEqual(buildReplyAllPrefill(value, 'Gracz', new Set(), 'all'), { adresat: 'Foo, Bar', dw: 'Baz' });
+});
+
+test('reply-all core: Tylko DO nie promuje DW, a Tylko DW przenosi oryginalne DW do Adresat', () => {
+  const value = letter('odebrane', { from: 'Foo', to: 'Gracz, Bar', cc: 'Baz i Qux' });
+  assert.deepEqual(buildReplyAllPrefill(value, 'Gracz', new Set(), 'to'), { adresat: 'Foo, Bar', dw: '' });
+  assert.deepEqual(buildReplyAllPrefill(value, 'Gracz', new Set(), 'cc'), { adresat: 'Baz, Qux', dw: '' });
+});
+
+test('reply-all core: Tylko DW nie wraca do duplikatu usunietego na rzecz DO', () => {
+  const value = letter('odebrane', { from: 'Foo', to: 'Gracz', cc: 'foo i Bar' });
+  assert.deepEqual(buildReplyAllPrefill(value, 'Gracz', new Set(), 'cc'), { adresat: 'Bar', dw: '' });
+});
+
+test('reply-all core: pusty wybrany zakres nie ma fallbacku do innego zbioru', () => {
+  const onlyCarbon = letter('wyslane', { from: 'Gracz', to: 'gracz', cc: 'Bar' });
+  assert.deepEqual(buildReplyAllPrefill(onlyCarbon, 'Gracz', new Set(), 'all'), { adresat: 'Bar', dw: '' });
+  assert.equal(buildReplyAllPrefill(onlyCarbon, 'Gracz', new Set(), 'to'), null);
+  const onlyPrimary = letter('odebrane', { from: 'Foo', to: 'Gracz', cc: null });
+  assert.equal(buildReplyAllPrefill(onlyPrimary, 'Gracz', new Set(), 'cc'), null);
+});
+
+test('reply-all core: zakresy zachowuja znane nazwy wielowyrazowe i aliasy', () => {
+  const known = new Set(['foo bar', 'dlugi alias']);
+  const value = letter('odebrane', {
+    from: 'Zork',
+    to: 'Foo Bar i Gracz',
+    cc: 'Dlugi Alias i Baz',
+  });
+  assert.deepEqual(buildReplyAllPrefill(value, 'Gracz', known, 'to'), { adresat: 'Zork, Foo Bar', dw: '' });
+  assert.deepEqual(buildReplyAllPrefill(value, 'Gracz', known, 'cc'), { adresat: 'Dlugi Alias, Baz', dw: '' });
+});

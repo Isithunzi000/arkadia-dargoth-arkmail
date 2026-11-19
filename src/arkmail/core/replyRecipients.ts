@@ -13,6 +13,8 @@ export interface ReplyAllPrefill {
   dw: string;
 }
 
+export type ReplyAllScope = 'all' | 'to' | 'cc';
+
 /** Zrodla znanych nazw wspolne dla reply-all i advisory wysylki. */
 export const knownRecipientNames = (state: {
   contacts: { name: string; mailAlias?: string }[];
@@ -51,6 +53,7 @@ export function buildReplyAllPrefill(
   letter: ReplyAllLetter,
   currentCharacter: string | null,
   known: ReadonlySet<string>,
+  scope: ReplyAllScope = 'all',
 ): ReplyAllPrefill | null {
   const current = currentCharacter?.trim().toLowerCase() || null;
   const primary: string[] = [];
@@ -71,6 +74,14 @@ export function buildReplyAllPrefill(
   add(letter.to, primary);
   add(letter.cc, carbon);
 
+  if (scope === 'cc') {
+    if (carbon.length === 0) return null;
+    return { adresat: carbon.join(', '), dw: '' };
+  }
+  if (scope === 'to') {
+    if (primary.length === 0) return null;
+    return { adresat: primary.join(', '), dw: '' };
+  }
   if (primary.length === 0 && carbon.length > 0) {
     primary.push(...carbon);
     carbon.length = 0;

@@ -44,6 +44,7 @@ import {
   buildReplyAllPrefill,
   knownRecipientNames,
   type ReplyAllPrefill,
+  type ReplyAllScope,
 } from '../core/replyRecipients.js';
 import type { MailUiState, MailUiStore, UiTab } from './store.js';
 import { allBoxesIndexed, formatBadgeSuffix, INDEX_BOXES } from './store.js';
@@ -80,6 +81,7 @@ export interface MailUiHandlers {
    */
   onReplyAllArchive?(
     archiveId: string,
+    scope: ReplyAllScope,
     apply: (prefill: ReplyAllPrefill) => boolean,
   ): void;
   /**
@@ -1367,57 +1369,141 @@ const filterClearClass = (viewClass?: string): string =>
     // Zwykla odpowiedz zachowuje stary, jednoadresowy kontrakt.
     // Pelny rekord daje lokalny prefill; stary rekord Archiwum przechodzi
     // przez integracje, ktora moze najpierw odzyskac pelne naglowki.
-    const replyTo = (all: boolean): void => {
+    const applyReplyPrefill = (prefill: ReplyAllPrefill, quote: boolean): void => {
+      composeDraft.adresat = prefill.adresat;
+      composeDraft.dw = prefill.dw;
+      composeDraft.temat = quote ? `Odp: ${l.subject}` : '';
+      composeDraft.tresc = quote ? `\n\n---\n${l.body.join('\n')}\n---` : '';
+      store.setTab('napisz');
+    };
+    const replyTo = (): void => {
       const received = l.box === 'odebrane' || l.box === 'nieprzeczytane';
-      if (all) {
-        if (l.archiveId && handlers.onReplyAllArchive) {
-          const before = { ...composeDraft };
-          handlers.onReplyAllArchive(l.archiveId, (prefill) => {
-            if (
-              composeDraft.adresat !== before.adresat ||
-              composeDraft.temat !== before.temat ||
-              composeDraft.dw !== before.dw ||
-              composeDraft.tresc !== before.tresc
-            ) {
-              return false;
-            }
-            composeDraft.adresat = prefill.adresat;
-            composeDraft.dw = prefill.dw;
-            composeDraft.temat = '';
-            composeDraft.tresc = '';
-            store.setTab('napisz');
-            return true;
-          });
-          return;
-        }
-        const prefill = buildReplyAllPrefill(
-          l,
-          store.state.characterName,
-          knownRecipientNames(store.state),
-        );
-        if (!prefill) {
-          handlers.onReplyAllEmpty?.();
-          return;
-        }
-        composeDraft.adresat = prefill.adresat;
-        composeDraft.dw = prefill.dw;
-      } else {
-        composeDraft.adresat = received ? l.from : l.to || l.cc || '';
-        composeDraft.dw = '';
-      }
+      composeDraft.adresat = received ? l.from : l.to || l.cc || '';
+      composeDraft.dw = '';
       composeDraft.temat = '';
       composeDraft.tresc = '';
       store.setTab('napisz');
     };
+    const replyAllTo = (scope: ReplyAllScope, quote: boolean): void => {
+      if (l.archiveId && handlers.onReplyAllArchive) {
+        const before = { ...composeDraft };
+        handlers.onReplyAllArchive(l.archiveId, scope, (prefill) => {
+          if (store.state.letter !== l) return false;
+          if (
+            composeDraft.adresat !== before.adresat ||
+            composeDraft.temat !== before.temat ||
+            composeDraft.dw !== before.dw ||
+            composeDraft.tresc !== before.tresc
+          ) {
+            return false;
+          }
+          applyReplyPrefill(prefill, quote);
+          return true;
+        });
+        return;
+      }
+      const prefill = buildReplyAllPrefill(
+        l,
+        store.state.characterName,
+        knownRecipientNames(store.state),
+        scope,
+      );
+      if (!prefill) {
+        handlers.onReplyAllEmpty?.();
+        return;
+      }
+      applyReplyPrefill(prefill, quote);
+    };
     const reply = doc.createElement('button');
     reply.className = 'arkmail-reply popup-btn popup-btn--control';
     reply.textContent = 'Odpowiedz';
-    reply.addEventListener('click', () => replyTo(false));
+    reply.addEventListener('click', () => replyTo());
     replies.appendChild(reply);
     const replyAll = doc.createElement('button');
     replyAll.className = 'arkmail-reply-all popup-btn popup-btn--control';
     replyAll.textContent = 'Odpowiedz wszystkim';
-    replyAll.addEventListener('click', () => replyTo(true));
+    let replyAllPanel: HTMLElement | null = null;
+    replyAll.addEventListener('click', () => {
+      if (replyAllPanel) return;
+      const panel = doc.createElement('div');
+      replyAllPanel = panel;
+      panel.className = 'arkmail-reply-all-panel';
+      panel.setAttribute('role', 'group');
+      panel.setAttribute('aria-label', 'Odpowiedz wszystkim');
+
+      const choices = doc.createElement('fieldset');
+      choices.className = 'arkmail-reply-all-scopes';
+      const legend = doc.createElement('legend');
+      legend.textContent = 'Odbiorcy odpowiedzi';
+      choices.appendChild(legend);
+      const scopeInputs = new Map<ReplyAllScope, HTMLInputElement>();
+      for (const [scope, label] of [
+        ['all', 'DO + DW'],
+        ['to', 'Tylko DO'],
+        ['cc', 'Tylko DW'],
+      ] as const) {
+        const row = doc.createElement('label');
+        row.className = 'arkmail-reply-all-choice';
+        const input = doc.createElement('input');
+        input.type = 'radio';
+        input.name = 'arkmail-reply-all-scope';
+        input.value = scope;
+        input.checked = scope === 'all';
+        input.setAttribute('data-reply-scope', scope);
+        scopeInputs.set(scope, input);
+        row.appendChild(input);
+        const text = doc.createElement('span');
+        text.textContent = label;
+        row.appendChild(text);
+        choices.appendChild(row);
+      }
+      panel.appendChild(choices);
+
+      const quoteRow = doc.createElement('label');
+      quoteRow.className = 'arkmail-reply-all-choice arkmail-reply-all-quote-row';
+      const quoteInput = doc.createElement('input');
+      quoteInput.type = 'checkbox';
+      quoteInput.className = 'arkmail-reply-all-quote';
+      quoteInput.checked = false;
+      quoteRow.appendChild(quoteInput);
+      const quoteText = doc.createElement('span');
+      quoteText.textContent = 'Z cytowaniem';
+      quoteRow.appendChild(quoteText);
+      panel.appendChild(quoteRow);
+
+      const close = (): void => {
+        panel.remove();
+        if (replyAllPanel === panel) replyAllPanel = null;
+        replyAll.focus();
+      };
+      panel.addEventListener('keydown', (event: KeyboardEvent) => {
+        if (event.key !== 'Escape') return;
+        event.preventDefault();
+        event.stopPropagation();
+        close();
+      });
+      const actions = doc.createElement('div');
+      actions.className = 'arkmail-reply-all-actions';
+      const proceed = doc.createElement('button');
+      proceed.className = 'arkmail-reply-all-continue popup-btn popup-btn--control popup-btn--solid';
+      proceed.textContent = 'Kontynuuj';
+      proceed.addEventListener('click', () => {
+        const scope = [...scopeInputs].find(([, input]) => input.checked)?.[0] ?? 'all';
+        const quote = quoteInput.checked;
+        panel.remove();
+        if (replyAllPanel === panel) replyAllPanel = null;
+        replyAllTo(scope, quote);
+      });
+      actions.appendChild(proceed);
+      const cancel = doc.createElement('button');
+      cancel.className = 'arkmail-reply-all-cancel popup-btn popup-btn--control';
+      cancel.textContent = 'Anuluj';
+      cancel.addEventListener('click', close);
+      actions.appendChild(cancel);
+      panel.appendChild(actions);
+      ops.parentElement?.insertBefore(panel, ops.nextSibling);
+      scopeInputs.get('all')?.focus();
+    });
     replies.appendChild(replyAll);
     // Fala 28c (decyzja 2026-10-22): Odpowiedz z cytowaniem. Adresat jak
     // przy zwyklym Odpowiedz (bez DW), temat = "Odp: <oryginalny temat>"
