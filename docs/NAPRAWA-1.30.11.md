@@ -86,5 +86,13 @@
 - Jedyny błąd dotyczył Archiwum przy szerokości 390 px, wysokości 520 px i skali 1,8. Przyciski `.arkmail-index-all`, `.arkmail-arch-download` i `.arkmail-arch-export` miały prostokąty od współrzędnej 67 do 421 i wychodziły poza prawą krawędź roota. Kontroli overflow nie złagodzono ani nie usunięto.
 - Przyczyną był minimalny tor siatki `220 px * skala` bez ograniczenia do szerokości kontenera. Przed poprawką nowa lokalna kontrola CSS zakończyła się wynikiem 12 testów, 11 zaliczonych, 1 błąd. Poprawka ogranicza minimalny tor do `100%` szerokości kontenera, zachowując dotychczasowy próg i automatyczne dopasowanie liczby kolumn.
 - Po poprawce kontrole stylów, skali i Archiwum przeszły 62/62. Pełny lokalny zestaw z docelowym komunikatem commita: 1209 testów, 1209 zaliczonych, 0 błędów, 0 pominiętych. Typowanie i build zakończyły się kodem 0.
+- Poprawka produktu została zapisana jako `99d9f42b382b5d3d075fed6117ec7ffbcc433654`. Zdalny build `44470945868` zakończył się sukcesem wraz z wdrożeniem.
+- Ponowiona macierz `44464806847`, próba 2, użyła produktu `99d9f42b382b5d3d075fed6117ec7ffbcc433654` i Dargotha `616ea27c949097f13b835d4195af26f4b32f6b14`. Wynik z `results.json`: 47 scenariuszy, 47 zaliczonych, 0 błędów, 0 pominiętych, 0 niestabilnych powtórzeń. Artefakt zawiera `ALL-GATES-OK`.
+- Ogólny E2E `44466630298` zakończył się sukcesem: macierz oraz zadania Chromium, Firefox, WebKit A i WebKit B są zielone.
 
-Pozostałe wyniki zostaną dopisane do tego dokumentu w commitach zawierających odpowiadające im testy i poprawki.
+## 7. Wydanie 1.30.11
+
+- Przed zmianą numeru zaktualizowana kontrola wersji zakończyła się wynikiem 10 testów, 9 zaliczonych, 1 błąd: źródło nadal wskazywało 1.30.10.
+- Po zmianie numeru standardowy skrypt wydania zsynchronizował `meta.ts`, oba pola wersji w `plugin.json`, bundle i paczkę. Kontrola wersji przeszła 10/10.
+- Paczka `arkmail_1_30_11.zip` zawiera dokładnie `index.ts` i `plugin.json`. Ponowne wygenerowanie dało identyczny SHA-256: `e841ea9eb83488645f61838ee64e38c8b67cfa2f186c85ea4176ef4c7fdf529e`.
+- Pełny lokalny zestaw z docelowym komunikatem commita wydania: 1209 testów, 1209 zaliczonych, 0 błędów, 0 pominiętych. Typowanie i build z paczki 1.30.11 zakończyły się kodem 0.
