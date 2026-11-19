@@ -12,6 +12,7 @@ import { Window } from 'happy-dom';
 import { mountMailUi } from '../src/arkmail/ui/render';
 import { MailUiStore } from '../src/arkmail/ui/store';
 import type { MailboxEntry } from '../src/arkmail/core/session/mailbox';
+import type { MailBox } from '../src/arkmail/core/protocol/types';
 
 const window = new Window();
 const document = window.document;
@@ -28,15 +29,16 @@ function entry(n: number): MailboxEntry {
   };
 }
 
-function mount() {
+function mount(box: MailBox = 'odebrane', search = false) {
   const container = document.createElement('div');
   const store = new MailUiStore();
-  store.setActiveBox('odebrane');
-  store.applyMailbox('odebrane', {
+  store.setActiveBox(box);
+  store.applyMailbox(box, {
     kind: 'lista',
-    header: { box: 'odebrane', truncated: false },
+    header: { box, truncated: false },
     entries: [entry(1), entry(2), entry(3)],
   });
+  if (search) store.setSearch({ box, label: 'temat: "Raport"' });
   mountMailUi(container as unknown as HTMLElement, store, {
     onOpenLetter: () => {},
     onSendCompose: () => {},
@@ -84,6 +86,25 @@ test('scroll: przełacznik skrzynek i operacje POZA kontenerem scrolla', () => {
   assert.ok(searchRow && !isInside(scroll, searchRow), 'szukajka NIE wewnatrz scrolla');
   const rows = q('.arkmail-entry');
   assert.ok(rows && isInside(scroll, rows), 'wiersze listow WEWNATRZ scrolla');
+});
+
+test('scroll: pasek wynikow i jego przycisk zostaja poza lista we wszystkich skrzynkach', () => {
+  for (const box of ['nieprzeczytane', 'odebrane', 'wyslane', 'niewyslane'] as const) {
+    const { container: c } = mount(box, true);
+    const q = (s: string) =>
+      (c as { querySelector(s: string): unknown }).querySelector(s) as unknown as El | null;
+    const scroll = q(`[data-pane-key="listy:${box}"]`);
+    const banner = q('.arkmail-search-banner');
+    const clear = q('.arkmail-search-clear');
+    assert.ok(scroll, `${box}: kontener listy istnieje`);
+    assert.ok(banner, `${box}: pasek wynikow istnieje`);
+    assert.ok(!isInside(scroll as unknown as El, banner as unknown as El), `${box}: pasek NIE wewnatrz scrolla`);
+    assert.ok(clear && !isInside(scroll as unknown as El, clear as unknown as El), `${box}: przycisk NIE wewnatrz scrolla`);
+    const searchRow = q('.arkmail-search-row');
+    assert.ok(searchRow && !isInside(scroll as unknown as El, searchRow), `${box}: szukajka NIE wewnatrz scrolla`);
+    const row = q('.arkmail-entry');
+    assert.ok(row && isInside(scroll as unknown as El, row), `${box}: wiersze WEWNATRZ scrolla`);
+  }
 });
 
 test('scroll: pozycja scrolla zachowana przy rerenderze (migawka na kontenerze)', () => {

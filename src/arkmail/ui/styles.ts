@@ -247,6 +247,7 @@ export const STYLES = `
 .arkmail-listy > button,
 .arkmail-listy > .arkmail-boxes,
 .arkmail-listy > .arkmail-search-row,
+.arkmail-listy > .arkmail-search-banner,
 .arkmail-listy > .arkmail-group-add,
 .arkmail-listy > .arkmail-group-filter { flex: none; }
 .arkmail-pane::-webkit-scrollbar,
@@ -380,6 +381,7 @@ export const STYLES = `
 .arkmail-dates-error { color: ${DANGER_TEXT}; font-size: calc(12px * var(--window-font-scale, 1)); margin-bottom: calc(6px * var(--window-font-scale, 1)); }
 .arkmail-search-banner {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: calc(8px * var(--window-font-scale, 1));
@@ -390,6 +392,7 @@ export const STYLES = `
   margin-bottom: calc(8px * var(--window-font-scale, 1));
   color: ${FG};
   font-size: calc(12px * var(--window-font-scale, 1));
+  overflow-wrap: anywhere;
 }
 .arkmail-root button.arkmail-search-clear { flex: none; padding: calc(2px * var(--window-font-scale, 1)) calc(10px * var(--window-font-scale, 1)); }
 .arkmail-root .arkmail-older-all { flex: 1; }

@@ -1208,7 +1208,6 @@ const filterClearClass = (viewClass?: string): string =>
     const scroll = doc.createElement('div');
     scroll.className = 'arkmail-list-scroll';
     scroll.setAttribute('data-pane-key', `listy:${state.activeBox}`);
-    pane.appendChild(scroll);
 
     // Tryb wynikow: banner z opisem zapytania + Wyczysc (restore pelnego
     // widoku z pamieci, bez strzalu do serwera).
@@ -1232,8 +1231,9 @@ const filterClearClass = (viewClass?: string): string =>
         handlers.onClearSearch(state.activeBox);
       });
       banner.appendChild(clear);
-      scroll.appendChild(banner);
+      pane.appendChild(banner);
     }
+    pane.appendChild(scroll);
 
     const view = state.boxes[state.activeBox];
     if (!view) {

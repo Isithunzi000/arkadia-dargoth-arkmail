@@ -83,3 +83,11 @@ test('skala: brak wysokosci przewija caly panel zamiast scisnac liste do zera', 
   assert.match(list, /flex:\s*1\s+0\s+calc\(96px \* var\(--window-font-scale, 1\)\)/);
   assert.match(list, /min-height:\s*calc\(96px \* var\(--window-font-scale, 1\)\)/);
 });
+
+test('skala: pasek wynikow jest nieruchomy i zawija dlugi opis', () => {
+  const fixed = body(/\.arkmail-listy\s*>\s*\.arkmail-search-banner(?![\w-])/);
+  assert.match(fixed, /flex:\s*none/, 'pasek jest nieruchomym dzieckiem kolumny');
+  const banner = body(/^\.arkmail-search-banner(?![\w-])/);
+  assert.match(banner, /flex-wrap:\s*wrap/, 'opis i przycisk moga zajac osobne wiersze');
+  assert.match(banner, /overflow-wrap:\s*anywhere/, 'dlugi opis nie wypycha przycisku');
+});
