@@ -45,4 +45,11 @@
 - Po przeniesieniu paska i dodaniu zawijania kontrole ukierunkowane: 19/19, w tym wszystkie cztery skrzynki, czyszczenie wyników oraz pól filtrów.
 - Pełny zestaw z docelowym komunikatem commita: 1202 testy, 1202 zaliczone, 0 błędów, 0 pominiętych. Typowanie i build zakończyły się kodem 0.
 
+## 2. Książka adresowa — wynik
+
+- Przed poprawką nowe kontrole wykazały filtr wewnątrz przewijanej listy, brak nieruchomej reguły nagłówka oraz zastępowanie elementu licznika podczas przeliczania.
+- Po poprawce kontrole ukierunkowane: 48/48, w tym pełny plik `bookView`, fokus i karetka wszystkich pól Kontaktów, zaznaczanie, usuwanie i czyszczenie filtra.
+- Pierwszy pełny przebieg tego etapu odrzucono: 1202 testy, 1198 zaliczone, 4 błędy. Trzy strażniki higieny nie miały lokalnego indeksu `git`, a czwarty błąd pochodził z historycznego zakazu selektora filtra, który w tej poprawce stał się aktywny. Po odtworzeniu indeksu i usunięciu wyłącznie przestarzałego zakazu kontrole strażników: 7/7.
+- Ostateczny pełny zestaw z docelowym komunikatem commita: 1202 testy, 1202 zaliczone, 0 błędów, 0 pominiętych. Typowanie i build zakończyły się kodem 0.
+
 Pozostałe wyniki zostaną dopisane do tego dokumentu w commitach zawierających odpowiadające im testy i poprawki.

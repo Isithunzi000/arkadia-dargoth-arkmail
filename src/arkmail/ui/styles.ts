@@ -248,6 +248,8 @@ export const STYLES = `
 .arkmail-listy > .arkmail-boxes,
 .arkmail-listy > .arkmail-search-row,
 .arkmail-listy > .arkmail-search-banner,
+.arkmail-listy > .arkmail-book-filter,
+.arkmail-listy > .arkmail-book-count,
 .arkmail-listy > .arkmail-group-add,
 .arkmail-listy > .arkmail-group-filter { flex: none; }
 .arkmail-pane::-webkit-scrollbar,

@@ -119,10 +119,10 @@ test('scroll: pozycja scrolla zachowana przy rerenderze (migawka na kontenerze)'
   assert.equal(po.scrollTop, 42, 'scrollTop nie skacze po rerenderze');
 });
 test('scroll: Ksiazka adresowa - naglowek staly, lista w kontenerze scrolla', () => {
-  // Zgloszenie 2026-11-05 (D9): wzorzec z zakladki Listy - sub-pigulki
-  // i klawisze zbiorcze stoja na stale, scrolluje sie tylko filtr
-  // i lista imion. K7: import z gry i dodawanie przeniesione do
-  // pigulki Import i eksport (jedno miejsce budowy ksiazki).
+  // Sub-pigulki, dodawanie, klawisze zbiorcze, filtr i licznik stoja
+  // na stale. Przewija sie wylacznie lista imion.
+  // K7: import z gry i dodawanie przeniesione do pigulki Import i eksport
+  // (jedno miejsce budowy ksiazki).
   const container = document.createElement('div');
   const store = new MailUiStore({ tab: 'kontakty', people: ['Fred', 'Grault'] });
   mountMailUi(container as unknown as HTMLElement, store, {
@@ -156,7 +156,9 @@ test('scroll: Ksiazka adresowa - naglowek staly, lista w kontenerze scrolla', ()
   const row = cq('[data-book-row]');
   assert.ok(row && isInside(scroll as unknown as El, row as unknown as El), 'wiersze imion WEWNATRZ scrolla');
   const filter = cq('[data-book-filter]');
-  assert.ok(filter && isInside(scroll as unknown as El, filter as unknown as El), 'filtr WEWNATRZ scrolla');
+  assert.ok(filter && !isInside(scroll as unknown as El, filter as unknown as El), 'filtr NIE w scrollu');
+  const count = cq('[data-book-count]');
+  assert.ok(count && !isInside(scroll as unknown as El, count as unknown as El), 'licznik NIE w scrollu');
   // Ostatnia kliknieta pigulka to Import i eksport: czysty import/eksport
   // bez pol recznego dodawania (zgloszenia 4/5).
   for (const pill of Array.from(

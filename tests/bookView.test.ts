@@ -369,15 +369,24 @@ test('ksiazka: filtr bez trafien pokazuje komunikat pustej listy', () => {
 test('ksiazka: licznik total i widocznych przy aktywnym filtrze', () => {
   const s = new MailUiStore({ tab: 'kontakty', people: ['Fred', 'Grault', 'Corge'] });
   const { container } = mount(s);
+  const initialCount = q(container, '[data-book-count]');
   const count = () => text(q(container, '[data-book-count]'));
   assert.equal(count(), 'Ksiazka: 3 imiona', 'total przy pelnej liscie');
   const filter = q(container, '[data-book-filter]') as unknown as {
     value: string;
+    selectionStart: number;
+    selectionEnd: number;
     dispatchEvent(e: unknown): void;
   };
   filter.value = 'grau';
+  filter.selectionStart = 2;
+  filter.selectionEnd = 2;
   filter.dispatchEvent(new window.Event('input') as unknown as Event);
   assert.equal(count(), 'Ksiazka: 3 imiona (widoczne: 1)', 'filtr pokazuje liczbe widocznych');
+  assert.ok(q(container, '[data-book-count]') === initialCount, 'przeliczenie nie zastepuje elementu licznika');
+  assert.ok(q(container, '[data-book-filter]') === filter, 'przeliczenie nie zastepuje pola filtra');
+  assert.equal(filter.selectionStart, 2, 'karetka zostaje na swojej pozycji');
+  assert.equal(filter.selectionEnd, 2, 'zaznaczenie karetki zostaje bez zmian');
 });
 
 // Zgloszenie 2026-11-05 (K8): filtr listy imion z ghost-podpowiedziami

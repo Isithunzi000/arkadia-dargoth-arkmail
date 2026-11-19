@@ -2303,8 +2303,8 @@ const filterClearClass = (viewClass?: string): string =>
     pane.appendChild(bookAddRow);
 
     // --- filtr listy imion z przyciskiem czyszczenia
-    // Zgloszenie 2026-11-05. Filtr jest czescia .arkmail-list-scroll:
-    // repaint listy nie odbiera mu fokusu ani wpisanej wartosci.
+    // Filtr stoi poza lista. Repaint wierszy nie odbiera mu fokusu,
+    // wpisanej wartosci ani zaznaczenia karetki.
     const filterRow = doc.createElement('div');
     filterRow.className = 'arkmail-book-filter arkmail-field-action';
     const filterInput = doc.createElement('input');
@@ -2337,22 +2337,23 @@ const filterClearClass = (viewClass?: string): string =>
     // i aliasow (jak pole Osoba w Archiwum).
     attachGhost(doc, filterInput, personSource);
 
-    // Kontener scrollujacy (D9): filtr i lista imion; naglowek (sub-
-    // pigulki, klawisze zbiorcze) zostaje na stale. Klucz migawki
-    // scrolla jak w zakladce Listy - pozycja przetrwa rerender.
+    // Kontener scrollujacy obejmuje wylacznie liste imion. Filtr,
+    // licznik i pozostale kontrolki naglowka zostaja na stale.
+    // Klucz migawki scrolla pozostaje na liscie.
     const scroll = doc.createElement('div');
     scroll.className = 'arkmail-list-scroll';
     scroll.setAttribute('data-pane-key', 'kontakty:ksiazka');
-    scroll.appendChild(filterRow);
+    pane.appendChild(filterRow);
+    const count = doc.createElement('div');
+    count.className = 'arkmail-dim arkmail-book-count';
+    count.setAttribute('data-book-count', '');
+    pane.appendChild(count);
     const listWrap = doc.createElement('div');
     const paintList = (): void => {
       const shown = currentVisible();
       listWrap.replaceChildren();
       // Zgloszenie 2026-11-05 (K3): total ksiazki nad lista; przy
       // aktywnym filtrze dopisuje liczbe widocznych pozycji.
-      const count = doc.createElement('div');
-      count.className = 'arkmail-dim';
-      count.setAttribute('data-book-count', '');
       const lastTwo = sorted.length % 100;
       const last = sorted.length % 10;
       const noun =
@@ -2364,7 +2365,6 @@ const filterClearClass = (viewClass?: string): string =>
       count.textContent =
         `Ksiazka: ${sorted.length} ${noun}` +
         (bookFilter.trim() ? ` (widoczne: ${shown.length})` : '');
-      listWrap.appendChild(count);
       if (sorted.length === 0) {
         listWrap.appendChild(
           dim('Ksiazka adresowa jest pusta - zaimportuj osoby z gry albo dodaj recznie.'),

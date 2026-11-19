@@ -1,10 +1,10 @@
 /**
  * Wydanie 1.30.2 (Etap 4): martwy CSS i aliasy kolorow.
  * Regresja B: po audycie usunieto selektory bez uzycia w DOM
- * (.arkmail-arch-expand, .arkmail-arch-occ, .arkmail-listy >
- * .arkmail-book-filter) oraz aliasy kolorow (ACCENT_SOFT, ACCENT_DEEP,
- * ACCENT_BRIGHT, HOVER_RESET - wszystkie prowadzily do tej samej
- * zmiennej, cztery nazwy na jedna wartosc mylily w utrzymaniu).
+ * (.arkmail-arch-expand, .arkmail-arch-occ) oraz aliasy kolorow
+ * (ACCENT_SOFT, ACCENT_DEEP, ACCENT_BRIGHT, HOVER_RESET - wszystkie
+ * prowadzily do tej samej zmiennej, cztery nazwy na jedna wartosc
+ * mylily w utrzymaniu).
  * Kontrakt twardy: ani STYLES, ani zrodlo styles.ts nie zawieraja
  * wymienionych ciagow (dowolny powrot = czerwony).
  */
@@ -21,17 +21,12 @@ const SRC = readFileSync(
 );
 
 const DEAD_SELECTORS = ['.arkmail-arch-expand', '.arkmail-arch-occ'];
-const DEAD_SNIPPETS = ['.arkmail-listy > .arkmail-book-filter'];
 const DEAD_ALIASES = ['ACCENT_SOFT', 'ACCENT_DEEP', 'ACCENT_BRIGHT', 'HOVER_RESET'];
 
 test('styles: martwe selektory archiwum usuniete', () => {
   for (const sel of DEAD_SELECTORS) {
     assert.ok(!STYLES.includes(sel), `STYLES zawiera martwy selektor: ${sel}`);
     assert.ok(!SRC.includes(sel), `styles.ts zawiera martwy selektor: ${sel}`);
-  }
-  for (const snip of DEAD_SNIPPETS) {
-    assert.ok(!STYLES.includes(snip), `STYLES zawiera martwy fragment: ${snip}`);
-    assert.ok(!SRC.includes(snip), `styles.ts zawiera martwy fragment: ${snip}`);
   }
 });
 
