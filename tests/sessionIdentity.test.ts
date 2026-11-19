@@ -294,7 +294,7 @@ test('archiwum: niezgodny numer daje niejednoznaczna_odpowiedz i brak zapisu', a
     const events = diagnostics.readArchiveDownloadDiagnostics();
     assert.equal(events[0]?.result, 'niejednoznaczna_odpowiedz');
     assert.equal(events[0]?.stage, 'odczyt');
-    assert.ok(archiveStepText(h).includes('liczba listow z trescia 0'), 'cudza tresc nie trafila do Archiwum');
+    assert.ok(archiveStepText(h).includes('Liczba listow z trescia: 0.'), 'cudza tresc nie trafila do Archiwum');
     assert.ok(!f.sent.includes('przeczytaj list 2'), 'przerwanie blokuje kolejny odczyt');
   } finally {
     await stopHarness();

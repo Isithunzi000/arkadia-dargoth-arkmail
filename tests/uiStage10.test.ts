@@ -192,8 +192,8 @@ test('etap 10 S28-S31: statusy rozdzielaja kandydatow, pominietych i date indeks
   const { container, off } = mountArchive(store);
   try {
     assert.deepEqual(stepStatuses(container), [
-      'Wszystkie skrzynki zapisane. Najstarszy zapis: 2000-01-01.',
-      'Czesciowo: liczba listow z trescia 1. Do pobrania: 1. Bez tresci i bez prawidlowej daty: 2.',
+      'Stan: Wszystkie skrzynki zapisane. Najstarszy zapis: 2000-01-01.',
+      'Stan: Czesciowo. Liczba listow z trescia: 1. Do pobrania: 1. Bez tresci i bez prawidlowej daty: 2.',
       'Do zapisu: 1. Pominiete bez tresci: 3.',
     ]);
   } finally {
@@ -211,7 +211,7 @@ test('etap 10 S28-S31: brak kandydatow, biezaca indeksacja i pojedynczy list', (
   const { container, off } = mountArchive(store);
   try {
     assert.deepEqual(stepStatuses(container), [
-      'W toku: skrzynka odebrane. Liczba stron: 1.',
+      'Stan: W toku. Skrzynka: odebrane. Liczba stron: 1.',
       'Liczba listow z trescia: 1. Do pobrania nie nadaja sie: 1 (brak prawidlowej daty).',
       'Do zapisu: 1. Pominiete bez tresci: 1.',
     ]);

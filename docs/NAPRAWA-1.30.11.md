@@ -66,4 +66,14 @@
 - Pierwszy pełny przebieg odrzucono: 1206 testów, 1205 zaliczonych, 1 błąd. Stary test siatki kart trafiał w nową regułę `flex:none`. Bez zmiany testu przeniesiono reguły nieruchomych elementów za podstawowe definicje Archiwum; kontrole stylów, skali i Archiwum: 49/49.
 - Ostateczny pełny zestaw z docelowym komunikatem commita: 1206 testów, 1206 zaliczonych, 0 błędów, 0 pominiętych. Typowanie i build zakończyły się kodem 0.
 
+## 5. Statusy kart Archiwum — wynik
+
+- Przed poprawką dwa nowe testy padały na starym kodzie: 2 testy, 0 zaliczonych, 2 błędy. Karty nie zawierały wierszy statusów, a kontener statusu nie był kolumną flex.
+- Po rozdzieleniu etykiet i wartości nowe testy DOM i CSS przeszły. Warunki stanów oraz wszystkie źródła liczników pozostały bez zmian.
+- Kontrole powiązanych stanów, indeksacji, paginacji, pobierania i sesji: 77/77. Dodatkowy plik wyników pobierania: 6/6.
+- Pierwszy pełny przebieg odrzucono: 1208 testów, 1206 zaliczonych, 2 błędy. Dwie stare asercje oczekiwały poprzedniego zapisu licznika listów z treścią. Zaktualizowano wyłącznie ich tekst do nowych wierszy; osobne kontrole przeszły 10/10 i 6/6.
+- Drugi pełny przebieg odrzucono: 1208 testów, 1206 zaliczonych, 2 błędy. Dwa testy odczytywały IndexedDB bezpośrednio po komunikacie zakończenia, przed trwałym zapisem rekordów albo znaczników. Błąd magazynu odtworzono również w powtarzanym przebiegu ukierunkowanym.
+- Testy czekają teraz na wymagane rekordy i znaczniki, bez zmiany kodu produktu. Dziesięć kolejnych przebiegów obu plików: 120/120 zaliczonych, 0 błędów.
+- Ostateczny pełny zestaw z docelowym komunikatem commita: 1208 testów, 1208 zaliczonych, 0 błędów, 0 pominiętych. Typowanie i build zakończyły się kodem 0.
+
 Pozostałe wyniki zostaną dopisane do tego dokumentu w commitach zawierających odpowiadające im testy i poprawki.

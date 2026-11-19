@@ -3108,7 +3108,8 @@ const filterClearClass = (viewClass?: string): string =>
     const steps = doc.createElement('div');
     steps.className = 'arkmail-archive-steps';
     steps.setAttribute('aria-label', 'Kolejne kroki pracy z archiwum');
-    const makeStep = (title: string, status: string, tone: string): HTMLElement => {
+    type ArchiveStatusRow = readonly [label: string, value: string];
+    const makeStep = (title: string, status: readonly ArchiveStatusRow[], tone: string): HTMLElement => {
       const step = doc.createElement('section');
       step.className = `arkmail-archive-step arkmail-step-${tone}`;
       const heading = doc.createElement('div');
@@ -3116,7 +3117,20 @@ const filterClearClass = (viewClass?: string): string =>
       heading.textContent = title;
       const description = doc.createElement('div');
       description.className = 'arkmail-archive-step-status';
-      description.textContent = status;
+      status.forEach(([label, value], index) => {
+        if (index > 0) description.appendChild(doc.createTextNode(' '));
+        const row = doc.createElement('div');
+        row.className = 'arkmail-archive-step-status-row';
+        const labelElement = doc.createElement('span');
+        labelElement.className = 'arkmail-archive-step-status-label';
+        labelElement.textContent = `${label} `;
+        const valueElement = doc.createElement('span');
+        valueElement.className = 'arkmail-archive-step-status-value';
+        valueElement.textContent = value;
+        row.appendChild(labelElement);
+        row.appendChild(valueElement);
+        description.appendChild(row);
+      });
       step.appendChild(heading);
       step.appendChild(description);
       steps.appendChild(step);
@@ -3137,15 +3151,28 @@ const filterClearClass = (viewClass?: string): string =>
     // Liczebnik dni: 1 dnia / 2 dni / 5 dni.
     const gapPhrase = (days: number): string =>
       days === 1 ? 'brakuje danych z 1 dnia' : `brakuje danych z ${days} dni`;
-    const indexStatus = state.indexRun
-      ? `W toku: skrzynka ${state.indexRun.box}. Liczba stron: ${state.indexRun.pages}.`
-      : allBoxesIndexed(state.indexMeta)
-        ? gapCount > 0
-          ? `Gotowe, ale ${gapPhrase(gapCount)}.`
-          : `Wszystkie skrzynki zapisane. Najstarszy zapis: ${earliestIndexDate}.`
-        : indexedCount > 0 || gapCount > 0
-          ? `Czesciowo: ${indexedCount} z ${INDEX_BOXES.length} skrzynek${gapCount > 0 ? ` (${gapPhrase(gapCount)})` : ''}.`
-          : 'Jeszcze nie zaczeto.';
+    const indexStatus: ArchiveStatusRow[] = [];
+    if (state.indexRun) {
+      indexStatus.push(
+        ['Stan:', 'W toku.'],
+        ['Skrzynka:', `${state.indexRun.box}.`],
+        ['Liczba stron:', `${state.indexRun.pages}.`],
+      );
+    } else if (allBoxesIndexed(state.indexMeta)) {
+      if (gapCount > 0) {
+        indexStatus.push(['Stan:', 'Gotowe.'], ['Braki:', `${gapPhrase(gapCount)}.`]);
+      } else {
+        indexStatus.push(
+          ['Stan:', 'Wszystkie skrzynki zapisane.'],
+          ['Najstarszy zapis:', `${earliestIndexDate}.`],
+        );
+      }
+    } else if (indexedCount > 0 || gapCount > 0) {
+      indexStatus.push(['Stan:', `Czesciowo: ${indexedCount} z ${INDEX_BOXES.length} skrzynek.`]);
+      if (gapCount > 0) indexStatus.push(['Braki:', `${gapPhrase(gapCount)}.`]);
+    } else {
+      indexStatus.push(['Stan:', 'Jeszcze nie zaczeto.']);
+    }
     // Fala 28: grupy przez core/archiveStats - jedna miara "total"
     // dla paska, stopki indeksacji i komunikatow. Rekordow nieobecnych
     // na serwerze w bazie nie ma wcale (fizyczny purge), wiec zywosc
@@ -3168,20 +3195,34 @@ const filterClearClass = (viewClass?: string): string =>
       if (dateRaw !== null && parseMailDate(dateRaw) !== null) pendingBody += 1;
       else undatedBody += 1;
     }
-    const downloadStatus = state.archiveDownload
-      ? `Pobieram tresci: ${state.archiveDownload.done} z ${state.archiveDownload.total}.`
-      : state.archive.length === 0
-        ? 'Jeszcze nie pobrano.'
-        : pendingBody > 0
-          ? `Czesciowo: liczba listow z trescia ${withBody}. Do pobrania: ${pendingBody}. Bez tresci i bez prawidlowej daty: ${undatedBody}.`
-          : `Liczba listow z trescia: ${withBody}. Do pobrania nie nadaja sie: ${undatedBody} (brak prawidlowej daty).`;
+    const downloadStatus: ArchiveStatusRow[] = [];
+    if (state.archiveDownload) {
+      downloadStatus.push(['Pobieram tresci:', `${state.archiveDownload.done} z ${state.archiveDownload.total}.`]);
+    } else if (state.archive.length === 0) {
+      downloadStatus.push(['Stan:', 'Jeszcze nie pobrano.']);
+    } else if (pendingBody > 0) {
+      downloadStatus.push(
+        ['Stan:', 'Czesciowo.'],
+        ['Liczba listow z trescia:', `${withBody}.`],
+        ['Do pobrania:', `${pendingBody}.`],
+        ['Bez tresci i bez prawidlowej daty:', `${undatedBody}.`],
+      );
+    } else {
+      downloadStatus.push(
+        ['Liczba listow z trescia:', `${withBody}.`],
+        ['Do pobrania nie nadaja sie:', `${undatedBody} (brak prawidlowej daty).`],
+      );
+    }
     // Podglad potrzebuje tylko licznikow. Pelne nazwy i tresci TXT
     // powstaja dopiero po poleceniu eksportu w runExportArchive().
     const exportable = archiveExportStats(state.archive);
-    const exportStatus =
+    const exportStatus: readonly ArchiveStatusRow[] =
       exportable.count === 0
-        ? 'Brak listow z trescia - nie ma czego zapisywac.'
-        : `Do zapisu: ${exportable.count}. Pominiete bez tresci: ${exportable.skipped}.`;
+        ? [['Stan:', 'Brak listow z trescia - nie ma czego zapisywac.']]
+        : [
+            ['Do zapisu:', `${exportable.count}.`],
+            ['Pominiete bez tresci:', `${exportable.skipped}.`],
+          ];
     // Fala 31d/28: agregat nad lista - globalny (nie zalezy od filtra),
     // Agregat = totalLive (suma MAX na klucz tresci w kazdej skrzynce),
     // a nie liczba grup kluczy: dwa rekordy tej samej skrzynki o

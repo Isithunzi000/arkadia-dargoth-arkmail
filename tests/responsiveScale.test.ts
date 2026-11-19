@@ -115,3 +115,20 @@ test('skala: Archiwum listow ma nieruchome karty, filtry i licznik', () => {
   assert.match(list, /min-height:\s*calc\(96px \* var\(--window-font-scale, 1\)\)/);
   assert.match(list, /overflow:\s*auto/, 'lista Archiwum ma wlasne przewijanie');
 });
+
+test('skala: statusy Archiwum dziela informacje na zawijane wiersze', () => {
+  const status = body(/^\.arkmail-archive-step-status(?![\w-])/);
+  assert.match(status, /display:\s*flex/);
+  assert.match(status, /flex-direction:\s*column/);
+  assert.match(status, /gap:\s*calc\(/);
+  const row = body(/^\.arkmail-archive-step-status-row(?![\w-])/);
+  assert.match(row, /display:\s*flex/);
+  assert.match(row, /flex-wrap:\s*wrap/);
+  assert.match(row, /min-width:\s*0/);
+  const label = body(/^\.arkmail-archive-step-status-label(?![\w-])/);
+  assert.match(label, /flex:\s*none/);
+  assert.match(label, /font-weight:\s*600/);
+  const value = body(/^\.arkmail-archive-step-status-value(?![\w-])/);
+  assert.match(value, /min-width:\s*0/);
+  assert.match(value, /overflow-wrap:\s*anywhere/);
+});

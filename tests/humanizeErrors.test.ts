@@ -180,7 +180,7 @@ test('stringi klasa B: poprawione, naturalne polskie (ASCII)', () => {
   assert.ok(render.includes('Wybierz list, aby go przeczytac.'), 'bez "list z listy"');
   // Fala UI-2 krok 4: data kompletu indeksacji mieszka w kroku 1
   // Archiwum (stopka sub-pigulki Osoby zniknela).
-  assert.ok(render.includes('Najstarszy zapis: '), 'jasny opis kompletnej indeksacji z data');
+  assert.ok(render.includes('Najstarszy zapis:'), 'jasny opis kompletnej indeksacji z data');
   assert.ok(render.includes('Wszystkie skrzynki zapisane'), 'komplet po ludzku');
   assert.ok(render.includes('Jeszcze nie zaczeto.'), 'jasny opis niezaczetej indeksacji');
   assert.ok(render.includes('Indeksuj wszystkie skrzynki'), 'jedna wersja przycisku indeksacji');

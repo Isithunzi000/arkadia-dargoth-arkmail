@@ -157,7 +157,7 @@ test('statusy: liczniki pobierania i ZIP uwzgledniaja rekordy oraz niedostepne d
     // rekord bez tresci liczy sie osobno (blizniak nie pozycza tresci).
     // Liczniki kroku 2 ida per rekord: blizniak bez tresci w drugiej
     // skrzynce to realny kandydat do pobrania, nie "grupa z trescia".
-    assert.match(steps[1], /Czesciowo: liczba listow z trescia 1\. Do pobrania: 1\. Bez tresci i bez prawidlowej daty: 1\./);
+    assert.match(steps[1], /Stan: Czesciowo\. Liczba listow z trescia: 1\. Do pobrania: 1\. Bez tresci i bez prawidlowej daty: 1\./);
     assert.match(steps[2], /Do zapisu: 1\. Pominiete bez tresci: 2\./);
   } finally {
     await stopHarness();

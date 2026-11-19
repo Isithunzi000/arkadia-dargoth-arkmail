@@ -140,7 +140,13 @@ test('indeksacja: niepotwierdzony listing nie konczy skrzynki jako kompletnej i 
     await waitRt(() => notifyText(h.f, 'Indeksowanie niekompletne'), 'raport niekompletny');
     assert.ok(notifyText(h.f, 'Pominiete: odebrane'));
     assert.ok(!notifyText(h.f, 'Zindeksowano skrzynki'));
-    assert.deepEqual(await storedSubjects(), ['Niepotwierdzony wpis']);
+    let subjects: string[] = [];
+    for (let i = 0; i < 240; i++) {
+      subjects = await storedSubjects();
+      if (subjects.join('|') === 'Niepotwierdzony wpis') break;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    assert.deepEqual(subjects, ['Niepotwierdzony wpis']);
   } finally {
     await stopHarness();
   }
@@ -165,12 +171,15 @@ async function storedSnapshot(): Promise<StoredSnapshot> {
   };
 }
 
-async function waitStoredLetters(count: number): Promise<StoredSnapshot> {
+async function waitStoredLetters(
+  count: number,
+  ready: (snapshot: StoredSnapshot) => boolean = () => true,
+): Promise<StoredSnapshot> {
   let last: StoredSnapshot | null = null;
   for (let attempt = 0; attempt < 240; attempt += 1) {
     const snapshot = await storedSnapshot();
     last = snapshot;
-    if (snapshot.letters.length === count) return snapshot;
+    if (snapshot.letters.length === count && ready(snapshot)) return snapshot;
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
   assert.fail(`timeout: oczekiwano ${count} trwalych rekordow, stan: ${JSON.stringify(last)}`);
@@ -346,7 +355,7 @@ test('indeksacja: kolejne strony bez promptu sa zapisywane, ale skrzynka pozosta
     await waitRt(() => notifyText(f, 'Indeksowanie niekompletne'), 'raport niekompletny');
     assert.ok(notifyText(f, 'Pominiete: odebrane (nie potwierdzono zamkniecia odpowiedzi: 2)'));
     assert.ok(!notifyText(f, 'Zindeksowano skrzynki'));
-    const snapshot = await waitStoredLetters(3);
+    const snapshot = await waitStoredLetters(3, (current) => Boolean(current.indexMeta.nieprzeczytane));
     assert.deepEqual(snapshot.letters.map((letter) => letter.subject).sort(), ['Indeks drugi', 'Indeks pierwszy', 'Stary wpis']);
     assert.equal(snapshot.indexMeta.odebrane, undefined, 'brak stempla kompletu dla odebranych');
     assert.ok(snapshot.indexMeta.nieprzeczytane, 'kolejna skrzynka zostala zatwierdzona');

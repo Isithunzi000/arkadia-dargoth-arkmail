@@ -58,7 +58,7 @@ test('archiwum: kompletny indeks z lukami - status kroku 1 mowi o brakach, liczn
     try {
       store.setTab('archiwum');
       const statuses = stepStatuses(container);
-      assert.match(statuses[0] ?? '', /Gotowe, ale brakuje danych z 1 dnia/, 'status kroku 1 z lukami');
+      assert.match(statuses[0] ?? '', /Stan: Gotowe\. Braki: brakuje danych z 1 dnia/, 'status kroku 1 z lukami');
       assert.match(container.textContent ?? '', /Liczba listow w bazie: 1\./, 'licznik bazy archiwum');
       const pane = container.querySelector('#arkmail-archive-panel-listy[role="tabpanel"]')!;
       assert.ok(pane, 'aktywny semantyczny podpanel Archiwum istnieje');

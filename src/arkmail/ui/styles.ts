@@ -770,12 +770,23 @@ export const STYLES = `
 }
 .arkmail-archive-step-title { font-weight: 700; margin-bottom: calc(5px * var(--window-font-scale, 1)); }
 .arkmail-archive-step-status {
+  display: flex;
+  flex-direction: column;
+  gap: calc(3px * var(--window-font-scale, 1));
   min-height: calc(34px * var(--window-font-scale, 1));
   margin-bottom: calc(9px * var(--window-font-scale, 1));
   color: ${FG_DIM};
   font-size: calc(12px * var(--window-font-scale, 1));
   line-height: 1.4;
 }
+.arkmail-archive-step-status-row {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: calc(4px * var(--window-font-scale, 1));
+  min-width: 0;
+}
+.arkmail-archive-step-status-label { flex: none; font-weight: 600; }
+.arkmail-archive-step-status-value { min-width: 0; overflow-wrap: anywhere; }
 .arkmail-archive-step button { width: 100%; margin: 0; margin-top: auto; }
 .arkmail-step-active { border-left-color: ${ACCENT}; }
 .arkmail-step-done { border-left-color: var(--popup-success); }

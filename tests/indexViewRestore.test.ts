@@ -132,6 +132,17 @@ test('po relogu przeczes inkrementalny odtwarza starsze wiersze z archiwum bez d
     assert.equal(entryRows(h).length, 5, 'pelna indeksacja pokazuje glowe i starsza strone');
 
     snapshot = await storageSnapshot();
+    for (
+      let i = 0;
+      i < 240 && (
+        snapshot.archive.filter((letter) => letter.box === 'odebrane').length !== 5
+        || !snapshot.indexMeta.odebrane
+      );
+      i++
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      snapshot = await storageSnapshot();
+    }
     assert.equal(snapshot.archive.filter((letter) => letter.box === 'odebrane').length, 5);
     assert.ok(snapshot.indexMeta.odebrane, 'kompletna skrzynka ma znacznik indeksacji');
   } finally {

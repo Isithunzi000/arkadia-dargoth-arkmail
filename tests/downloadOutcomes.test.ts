@@ -186,7 +186,7 @@ test('pobieranie: body = [] jest pusta_tresc, nieudanym rekordem i nadal kandyda
     await waitRt(() => notifyText(f, 'Pobrano: 2 z 3. Nieudane: 1.'), 'podsumowanie');
     assert.ok(!notifyText(f, 'Pobrano tresci do archiwum (3 listy).'), 'pusta tresc nie jest sukcesem');
     await waitRt(() => archiveStepText(h).includes('Do pobrania: 1.'), 'rekord pozostal kandydatem');
-    assert.ok(archiveStepText(h).includes('liczba listow z trescia 2'), 'licznik pobranych wynika z Archiwum');
+    assert.ok(archiveStepText(h).includes('Liczba listow z trescia: 2.'), 'licznik pobranych wynika z Archiwum');
 
     const events = await diagnostics();
     assert.equal(events.length, 3, 'jeden wynik koncowy na rekord');

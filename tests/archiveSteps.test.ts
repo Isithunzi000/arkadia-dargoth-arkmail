@@ -117,3 +117,43 @@ test('archiwum: zapis ZIP jest lokalny i nie uruchamia indeksacji', async () => 
     await stopHarness();
   }
 });
+
+
+test('archiwum: wieloczesciowe statusy kart 1-3 maja osobne wiersze etykiet i wartosci', async () => {
+  const h = await startHarness({
+    archive: [archived(['Tresc.'], 1), archived([], 2)],
+    indexMeta: { odebrane: '2026-10-29' },
+    archiveGaps: { wyslane: ['1999-08-21'] },
+  });
+  try {
+    await openArchive(h);
+    const steps = Array.from(h.content.querySelectorAll('.arkmail-archive-step'));
+    assert.equal(steps.length, 3);
+    const actual = steps.map((step) =>
+      Array.from((step as { querySelectorAll(s: string): Iterable<unknown> }).querySelectorAll('.arkmail-archive-step-status-row')).map((row) => {
+        const element = row as { querySelector(s: string): unknown };
+        const label = element.querySelector('.arkmail-archive-step-status-label') as { textContent?: string } | null;
+        const value = element.querySelector('.arkmail-archive-step-status-value') as { textContent?: string } | null;
+        return [(label?.textContent ?? '').trim(), (value?.textContent ?? '').trim()];
+      }),
+    );
+    assert.deepEqual(actual, [
+      [
+        ['Stan:', 'Czesciowo: 1 z 4 skrzynek.'],
+        ['Braki:', 'brakuje danych z 1 dnia.'],
+      ],
+      [
+        ['Stan:', 'Czesciowo.'],
+        ['Liczba listow z trescia:', '1.'],
+        ['Do pobrania:', '1.'],
+        ['Bez tresci i bez prawidlowej daty:', '0.'],
+      ],
+      [
+        ['Do zapisu:', '1.'],
+        ['Pominiete bez tresci:', '1.'],
+      ],
+    ]);
+  } finally {
+    await stopHarness();
+  }
+});
