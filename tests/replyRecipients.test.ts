@@ -98,9 +98,29 @@ test('reply-all core: Tylko DO nie promuje DW, a Tylko DW przenosi oryginalne DW
   assert.deepEqual(buildReplyAllPrefill(value, 'Gracz', new Set(), 'cc'), { adresat: 'Baz, Qux', dw: '' });
 });
 
-test('reply-all core: Tylko DW nie wraca do duplikatu usunietego na rzecz DO', () => {
-  const value = letter('odebrane', { from: 'Foo', to: 'Gracz', cc: 'foo i Bar' });
-  assert.deepEqual(buildReplyAllPrefill(value, 'Gracz', new Set(), 'cc'), { adresat: 'Bar', dw: '' });
+test('reply-all core: Tylko DW zachowuje osoby powtorzone z nadawca i DO', () => {
+  for (const box of ['odebrane', 'nieprzeczytane', 'wyslane', 'niewyslane'] as const) {
+    const value = letter(box, { from: 'Foo', to: 'Gracz, Bar', cc: 'foo, BAR i Baz' });
+    assert.deepEqual(
+      buildReplyAllPrefill(value, 'Gracz', new Set(), 'cc'),
+      { adresat: 'foo, BAR, Baz', dw: '' },
+      box,
+    );
+  }
+});
+
+test('reply-all core: Tylko DW deduplikuje tylko wewnatrz DW i nie usuwa wyslania przez duplikaty', () => {
+  const duplicates = letter('odebrane', {
+    from: 'Foo',
+    to: 'Gracz, Bar',
+    cc: 'foo, BAR, FOO i bar',
+  });
+  assert.deepEqual(
+    buildReplyAllPrefill(duplicates, 'Gracz', new Set(), 'cc'),
+    { adresat: 'foo, BAR', dw: '' },
+  );
+  const onlyCurrent = letter('odebrane', { from: 'Foo', to: 'Gracz', cc: 'gracz i GRACZ' });
+  assert.equal(buildReplyAllPrefill(onlyCurrent, 'Gracz', new Set(), 'cc'), null);
 });
 
 test('reply-all core: pusty wybrany zakres nie ma fallbacku do innego zbioru', () => {

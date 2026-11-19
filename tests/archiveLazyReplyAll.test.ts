@@ -425,6 +425,29 @@ test('reply-all: odzyskane naglowki respektuja Tylko DW, a cytat pochodzi z tego
   }
 });
 
+test('reply-all: pelne naglowki Archiwum zachowuja w Tylko DW takze nadawce i odbiorcow DO', async () => {
+  const h = await startHarness({
+    archive: [record({
+      headers: {
+        from: 'Nadawca',
+        to: 'Foo, Pierwszy',
+        cc: 'Nadawca, Pierwszy, Trzeci',
+      },
+    })],
+  });
+  try {
+    await openCached(h);
+    replyAll(h, 'cc', false);
+    await waitRt(() => !!h.content.querySelector('[data-field="adresat"]'), 'prefill z Archiwum');
+    assert.equal(field(h, 'adresat').value, 'Nadawca, Pierwszy, Trzeci');
+    assert.equal(field(h, 'dw').value, '');
+    assert.equal(field(h, 'tresc').value, '');
+    assert.ok(!h.f.sent.some((command) => command === 'napisz list'), 'prefill nie wysyla listu');
+  } finally {
+    await stopHarness();
+  }
+});
+
 test('reply-all: zamkniecie listu odrzuca pozny wynik i chroni reczny draft', async () => {
   const h = await startHarness({ archive: [record()] });
   try {

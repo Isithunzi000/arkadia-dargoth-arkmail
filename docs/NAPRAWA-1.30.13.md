@@ -36,4 +36,12 @@
 
 ## Wyniki
 
-Wyniki poszczegolnych etapow beda dopisywane wraz z ich commitami. Po zakonczeniu calego zakresu ten dokument zostanie usuniety jako zrealizowany.
+### Tylko DW
+
+- Baza przed zmiana: 1221 testow, 1221 zaliczonych, 0 bledow; typowanie i build zakonczone sukcesem.
+- RED na niezmienionym kodzie: 4 nowe przypadki wykryly utrate osob z DW oraz bledny pusty zakres; pozostale 41 z 45 ukierunkowanych testow przechodzilo.
+- GREEN po poprawce: 45 z 45 ukierunkowanych testow.
+- Pelny zestaw po poprawce: 1224 testy, 1224 zaliczone, 0 bledow; typowanie i build zakonczone sukcesem.
+- Zakres kodu: Tylko DW uzywa niezaleznej deduplikacji pierwotnego naglowka DW. DO+DW i Tylko DO pozostaly bez zmian.
+
+Pozostale wyniki beda dopisywane wraz z kolejnymi commitami. Po zakonczeniu calego zakresu ten dokument zostanie usuniety jako zrealizowany.

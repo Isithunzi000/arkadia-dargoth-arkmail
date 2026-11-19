@@ -143,6 +143,22 @@ test('ui: Odpowiedz z odebranych wypelnia nadawce i przelacza na Napisz', () => 
   off();
 });
 
+test('ui: Tylko DW zachowuje wszystkie oryginalne DW w kazdej skrzynce, z cytatem i bez', () => {
+  for (const box of ['odebrane', 'nieprzeczytane', 'wyslane', 'niewyslane'] as const) {
+    for (const quote of [false, true]) {
+      const s = new MailUiStore();
+      const { container, calls, off } = mount(s);
+      openLetter(s, box, { from: 'Foo', to: 'Gracz', cc: 'Foo i Baz' });
+      replyAll(container, 'cc', quote);
+      assert.equal(field(container, 'adresat'), 'Foo, Baz', `${box}, cytat=${quote}`);
+      assert.equal(field(container, 'dw'), '');
+      assert.equal(field(container, 'tresc'), quote ? '\n\n---\nczesc\n---' : '');
+      assert.equal(sends(calls).length, 0, 'Kontynuuj nie wysyla listu');
+      off();
+    }
+  }
+});
+
 test('ui: Odpowiedz wszystkim doklada pozostalych odbiorcow i oryginalne DW', () => {
   const s = new MailUiStore();
   const { container, off } = mount(s);

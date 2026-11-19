@@ -56,6 +56,19 @@ export function buildReplyAllPrefill(
   scope: ReplyAllScope = 'all',
 ): ReplyAllPrefill | null {
   const current = currentCharacter?.trim().toLowerCase() || null;
+  if (scope === 'cc') {
+    const carbon: string[] = [];
+    const seen = new Set<string>();
+    for (const name of parseReplyHeader(letter.cc ?? '', known)) {
+      const key = name.trim().toLowerCase();
+      if (!key || key === current || seen.has(key)) continue;
+      seen.add(key);
+      carbon.push(name);
+    }
+    if (carbon.length === 0) return null;
+    return { adresat: carbon.join(', '), dw: '' };
+  }
+
   const primary: string[] = [];
   const carbon: string[] = [];
   const seen = new Set<string>();
@@ -74,10 +87,6 @@ export function buildReplyAllPrefill(
   add(letter.to, primary);
   add(letter.cc, carbon);
 
-  if (scope === 'cc') {
-    if (carbon.length === 0) return null;
-    return { adresat: carbon.join(', '), dw: '' };
-  }
   if (scope === 'to') {
     if (primary.length === 0) return null;
     return { adresat: primary.join(', '), dw: '' };
