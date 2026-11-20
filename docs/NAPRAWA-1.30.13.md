@@ -71,4 +71,17 @@
 - Oba filtry oraz skok z kontaktu czytaja pelne naglowki. Nazwy pojedynczych TXT i plikow ZIP zawieraja wszystkie znane strony listu; tresc eksportu pozostala bez zmian.
 - Istniejace kontrolki, ktore traktowaly biezaca postac testowa jako wlasny kontakt, zaktualizowano do nowego kontraktu bez zmiany sprawdzanych mechanik indeksacji, kasowania i paginacji.
 
-Pozostale wyniki beda dopisywane wraz z kolejnymi commitami. Po zakonczeniu calego zakresu ten dokument zostanie usuniety jako zrealizowany.
+### Kontrole przed wydaniem
+
+- Izolowany ArkMail E2E na produkcie `2761fed970bc0481ef400fd8d03fef024c4ec9a2` i scenariuszach `7283043b0f439c35a807b2be759ae939519463b6`: 47 scenariuszow zaliczonych, 0 bledow. Kontrola obejmuje odczyt po wspolnym zamknieciu pagera oraz domkniecie odswiezenia przed reczna zmiana skrzynki.
+- Testy pluginow Dargoth: 99 plikow zaliczonych, 1 pominiety; 669 testow zaliczonych, 3 pominiete, 0 bledow.
+- E2E Dargoth na Chromium po ostatniej korekcie scenariusza: 142 testy zaliczone, 0 bledow.
+- Pelna macierz Dargoth przed ostatnia korekta scenariusza: Chromium 142 zaliczone, Firefox 142 zaliczone, WebKit A 53 zaliczone i 2 pominiete, WebKit B 76 zaliczonych i 11 pominietych; wszystkie cztery nogi zielone. Macierz WWW: wszystkie nogi silnikowe i wspolpracy zielone.
+- Kontrole sa wynikami testow syntetycznych i przegladarkowych, nie kontrola w realnej grze.
+
+### Wersja
+
+- RED straznika wersji na niezmienionym `meta.ts`: 10 testow, 9 zaliczonych, 1 blad; oczekiwano 1.30.13, odczytano 1.30.12.
+- GREEN po podbiciu wersji i zbudowaniu paczki: 10 z 10 testow. `meta.ts`, oba pola `plugin.json`, nazwa ZIP i metadane w ZIP wskazuja 1.30.13.
+
+Po zakonczeniu calego zakresu ten dokument zostanie usuniety jako zrealizowany.
