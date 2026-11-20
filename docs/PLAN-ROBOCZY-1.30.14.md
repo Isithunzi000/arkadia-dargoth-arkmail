@@ -1,6 +1,7 @@
 # Plan roboczy poprawek ArkMail 1.30.14
 
 Data utworzenia: 2026-11-21.
+Ostatnia aktualizacja: 2026-11-21, analiza flushLines i timestampow.
 
 ## Status i przeznaczenie
 
@@ -180,12 +181,47 @@ sygnalu poczatku ani konca.
 
 Dowod: services/session-proxy/session.go 332-367 i 521-544.
 
+### Odrzucone obejscie przez flushLines i timestampy
+
+Sprawdzono takze mozliwosc opoznienia przetwarzania ArkMaila do flushLines
+albo przejscia na flushLines jako zrodlo linii. Zdarzenie ma timestamp i jest
+emitowane przed triggerami z grupami tekstu, wiec poczatkowo wyglada na
+pluginowy sposob oznaczania replayu. Nie daje jednak pelnego dowodu:
+
+1. MudClient.processIncomingData zapisuje currentEventTime tylko dla biezacej
+   ramki. pendingLineTail i pendingMsgTails moga przechowywac tekst z ramki
+   wczesniejszej. flushMessageBuffer skleja held + group.text, a calej
+   wynikowej linii przypisuje timestamp ostatniej ramki. Stary fragment moze
+   wiec zostac polaczony z aktualnym i uznany za aktualny.
+2. scheduleTailFlush wywoluje flushMessageBuffer poza runWithEventTime. Taka
+   linia trafia do flushLines bez timestampu, niezaleznie od tego, czy byla
+   stara czy aktualna. Brak timestampu nie mowi o pochodzeniu.
+3. Ramka z samym GMCP i bez tekstu nie musi wyemitowac flushLines. Zdarzenia
+   gmcp oraz gmcp.* sa wykonywane wczesniej i nie przekazuja timestampu do
+   PluginApi. Nie mozna wiarygodnie opoznic ich do batcha, ktory moze w ogole
+   nie istniec.
+4. proxy.clockOffset jest estymatorem diagnostycznym raportowanym co najmniej
+   co 50 ms roznicy, a nie dokladnym timestampem ramki kontrolnej. Nie dostaje
+   sie przez niego publicznego DecodedFrame.at ani offsetu kazdej porcji.
+5. socket.incoming nie ma timestampu. Nie uzupelnia wiec brakow dla ramek bez
+   flushLines ani nie rozstrzyga sklejonych linii.
+
+Dowody: src/web/MudClient.ts 140-158, 185-201, 462-526, 893-957, 997-1112;
+src/web/proxyClockOffset.ts 12-25 i 76-105; src/shared/socket/gmcp.ts 61-91.
+
+Wniosek: timestamp z flushLines moze byc pomocnicza diagnostyka, ale nie moze
+byc podstawa gwarantowanej ochrony operacji. Odrzucenie kazdej niejednoznacznej
+linii byloby bezpieczne, lecz mogloby odrzucac rowniez poprawne aktualne
+odpowiedzi i nie zapewnialoby sprawnego dzialania pluginu. Nie jest to pelne
+rozwiazanie i nie wolno przedstawiac go jako 100%.
+
 ### Wniosek wiazacy
 
 Nie istnieje pluginowa, deterministyczna metoda rozroznienia wszystkich
 starych i aktualnych linii bez modyfikowania klienta. Nie wolno uzywac pauzy,
-pierwszego promptu, pierwszego GMCP, samego replayedBytes, identycznej
-odpowiedzi ani lokalnej generacji linii jako substytutu.
+pierwszego promptu, pierwszego GMCP, samego replayedBytes, timestampow z
+flushLines, identycznej odpowiedzi ani lokalnej generacji linii jako
+substytutu.
 
 Bez zmiany klienta wolno natomiast:
 
