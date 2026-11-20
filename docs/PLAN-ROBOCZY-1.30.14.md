@@ -14,9 +14,12 @@ Plan obejmuje wszystkie dotychczas znalezione problemy z komunikatami
 reply-all, reconnectem, przeładowaniem, replayem proxy, pagerem, edytorem,
 reczna poczta gracza, archiwum, importem, timerami i zwierzeciem.
 
-Plan nie jest jeszcze zatwierdzeniem implementacji. Nie wolno uznac go za
-w pelni gotowy, dopoki analiza replayu nie wskaze wiarygodnego mechanizmu
-odroznienia starych i aktualnych linii.
+Plan nie jest zatwierdzeniem implementacji. Etap 0 zostal zakonczony:
+publiczne API nie daje wiarygodnej granicy replayu ani pochodzenia linii
+we wszystkich scenariuszach. Plan wskazuje bezpieczne blokady mozliwe juz
+teraz, ale pelna automatyczna naprawa replayu wymaga odrebnej decyzji o
+rozszerzeniu kontraktu klienta. Nie wolno deklarowac naprawy 100% bez tego
+warunku.
 
 ## Zasady wiazace
 
@@ -114,33 +117,94 @@ i wysylania zwierzecia.
 - Czesc stanu wysylki zwierzecia przezywa reconnect; stare Slucham? albo pozne
   resolve moze zmienic nowy stan.
 
-## Etap 0 - zamkniecie projektu ochrony przed replayem
+## Etap 0 - zakonczona analiza replayu i wniosek o API
 
-Przed implementacja ochrony sesji wykonac pelna analize read-only aktualnego
-kodu proxy, klienta, PluginApi oraz zainstalowanych typow.
+Analize read-only wykonano na publicznym drzewie
+Delwing/arkadia-web-client-extension, commit
+616ea27c949097f13b835d4195af26f4b32f6b14, oraz na lokalnych typach
+ArkMaila types/plugin-api.d.ts. Kazdy pobrany plik zrodlowy zostal
+zweryfikowany przez rozmiar i Git blob SHA. Nie analizowano niekompletnego
+archiwum jako pelnego drzewa.
 
-Ustalic i zapisac w tym dokumencie:
+### Kolejnosc i znaczenie sygnalow
 
-1. Kolejnosc client.connect, proxy.session, replayu bufora, GMCP i nowego
-   ruchu z gry.
-2. Znaczenie resumed, upstreamClosed, replayedBytes, droppedBytes oraz
-   dostepnych offsetow i potwierdzen odbioru.
-3. Czy publiczne API udostepnia poczatek lub koniec replayu, pochodzenie
-   linii, offset albo inna jednoznaczna granice.
-4. Czy replay moze przeplatac sie z nowym ruchem.
-5. Jak plugin moze zablokowac nowe sesje do konca replayu bez modyfikowania
-   klienta i bez wysylania komend probnych do gry.
+1. MudClient.connect otwiera WebSocket. client.connect jest emitowane w
+   onopen, przed jakakolwiek ramka proxy.session.
+2. Session.attach w proxy wybiera brakujace dane od offsetu klienta, liczy
+   replayedBytes, zdejmuje blokade sesji, a nastepnie wysyla ramke attached.
+3. MudClient odbiera attached, przy resumed uruchamia ponowna negocjacje GMCP,
+   emituje proxy.session i dopiero pozniej przetwarza kolejne ramki danych.
+   Proxy wysyla replay po ramce kontrolnej. proxy.session jest poczatkiem
+   attachu, nie koncem replayu.
+4. resumed oznacza powrot do istniejacej sesji. upstreamClosed oznacza, ze
+   gra zakonczyla polaczenie; replay moze wtedy zawierac wylacznie ostatnie
+   dane martwej sesji i nie wolno uzbrajac transportu.
+5. replayedBytes jest suma bajtow wybranych do replayu. droppedBytes opisuje
+   dane utracone przez ograniczenie bufora albo luke wzgledem offsetu.
+6. processedBytes i offsety ack sa wewnetrzne dla MudClienta i proxy. Klient
+   przekazuje offset w subprotokole, a potwierdzenia ack wysyla jako osobne
+   komunikaty. Plugin nie otrzymuje biezacego offsetu ani potwierdzenia
+   zakonczenia replayu.
 
-Nie wolno zastepowac granicy replayu pauza, pierwszym promptem, pierwszym
-GMCP ani zalozeniem, ze identyczna odpowiedz jest nowa.
+Dowody: src/web/MudClient.ts 415-530 i 562-566,
+services/session-proxy/session.go 369-482, src/web/proxySession.ts 178-225,
+src/shared/socket/transport.ts 16-49.
 
-Jesli API daje wiarygodna granice, projekt ma wskazac konkretne zdarzenie
-zamykajace kwarantanne i konkretna sciezke testowa.
+### Dostepne API i niedostepna granica
 
-Jesli publiczne API nie daje wystarczajacej informacji, nalezy jawnie zapisac
-ograniczenie i nie deklarowac pelnej naprawy replayu. Nie dostarczamy
-pozornej poprawki. Ewentualna zmiana kontraktu klienta wymaga odrebnej
-decyzji i nie jest wykonywana w repozytorium klienta w ramach tego planu.
+Publiczne PluginApi udostepnia proxy.session z SessionControl,
+socket.incoming z samym tekstem, flushLines z opcjonalnym timestampem oraz
+proxy.clockOffset. TriggerCallback otrzymuje linie, dopasowania i typ; nie
+otrzymuje znacznika replayu ani offsetu. PluginApi nie udostepnia zegara
+client.now ani DecodedFrame.at. W ClientEvents nie ma zdarzenia konca
+replayu. Lokalne typy ArkMaila potwierdzaja ten sam zakres; nie ma w nich
+publicznego pola pochodzenia linii.
+
+replayedBytes nie moze byc samodzielnym licznikiem konca replayu. Attach
+zwalnia s.mu przed wyslaniem ramki kontrolnej i petli replayu. Rownolegly
+Session.pump wywoluje Session.deliver, ktore po uzyskaniu s.mu wysyla nowe
+dane bezposrednio do tego samego klienta. Nowa ramka moze wiec wejsc miedzy
+porcje replayu. Zliczenie replayedBytes bajtow z socket.incoming moze wtedy
+policzyc nowy ruch i zwolnic blokade przed ostatnia stara porcja.
+
+Dowody: services/session-proxy/session.go 157-171, 214-229 i 442-481;
+services/session-proxy/main.go 185-203; src/client/PluginApi/events.ts,
+src/client/PluginApi/triggers.ts, src/client/PluginApi/PluginApi.ts,
+src/shared/events/clientEvents.ts 679-690.
+
+Dodatkowo reconnect nie jest jedynym zrodlem starych danych. Gdy karta
+obudzi sie na tym samym sockecie, Session.write moze wywolac
+flushPendingLocked. Ta sciezka wysyla zalegly bufor bez nowej ramki
+proxy.session i bez replayedBytes. Publiczne API nie daje wowczas zadnego
+sygnalu poczatku ani konca.
+
+Dowod: services/session-proxy/session.go 332-367 i 521-544.
+
+### Wniosek wiazacy
+
+Nie istnieje pluginowa, deterministyczna metoda rozroznienia wszystkich
+starych i aktualnych linii bez modyfikowania klienta. Nie wolno uzywac pauzy,
+pierwszego promptu, pierwszego GMCP, samego replayedBytes, identycznej
+odpowiedzi ani lokalnej generacji linii jako substytutu.
+
+Bez zmiany klienta wolno natomiast:
+
+- przy kazdym connect/disconnect uniewazniac operacje i blokowac transport;
+- dla zywego attachu z jawnym replayedBytes === 0 uznac, ze nie ma replayu
+  attachu; nadal trzeba uwzglednic pozniejsze flushPendingLocked;
+- przy resumed z replayedBytes > 0 albo nieznanym replayedBytes nie uruchamiac
+  automatycznego odswiezenia ani nowych sesji na podstawie replayowanych
+  danych;
+- pokazac jeden jasny komunikat o braku bezpiecznej synchronizacji, bez q i
+  bez obiecywania, ze kolejny reconnect rozwiaze problem;
+- nie nazywac takiego zachowania pelna naprawa replayu.
+
+Pelne rozwiazanie wymaga nowego, publicznego kontraktu klienta: co najmniej
+zdarzenia zakonczenia kazdego replayu/bufora, takze flushPendingLocked, albo
+wiarygodnego pochodzenia przekazywanego przed triggerami do kazdej porcji i
+linii. Kontrakt musi miec okreslone zachowanie przy przeplataniu nowego
+ruchu. Zmiana klienta nie jest wykonywana w tym planie i wymaga odrebnej
+decyzji.
 
 ## Etap 1 - komunikaty dla wszystkich zakresow reply-all
 
@@ -220,28 +284,57 @@ i powrotu do logowania. Ma ona:
 - byc idempotentna przy powtorzonych zdarzeniach, bez duplikatow komend,
   timerow i odswiezen.
 
-setOnline(true) nie zdejmuje synchronizacji. Gotowosc wyznacza wylacznie
-mechanizm zamkniety projektowo w etapie 0.
+setOnline(true) nie zdejmuje synchronizacji. Przy kazdym nowym connect
+transport pozostaje rozbrojony do sygnalu dozwolonego przez etap 0. Sam
+client.connect, dowolne GMCP ani proxy.session nie sa dowodem aktualnosci.
 
-Automatyczne odswiezenie po wznowieniu nie startuje przed gotowoscia, wykonuje
-sie dokladnie raz po gotowosci, nie znika przez recovering i nie duplikuje sie
-przez kolejne GMCP.
+Automatyczne odswiezenie po wznowieniu z replayedBytes === 0 wykonuje sie
+dokladnie raz i nie duplikuje sie przez kolejne GMCP. Przy niepustym albo
+nieznanym replayu zadanie nie startuje; nie wolno zastepowac go odswiezeniem
+po pierwszym promptcie. Pelne ponowienie po replayu zalezy od publicznego
+sygnalu konca opisanego w etapie 0.
 
 Testy: reconnect z/bez disconnect, powtorne connect/proxy.session, reconnect
 podczas recznej poczty, stare opoznione odswiezenie, stare Slucham?, pozne
-resolve zwierzecia, brak komend na logowaniu i jedno odswiezenie przy wielu
-sygnalach obecnosci.
+resolve zwierzecia, brak komend na logowaniu, brak odswiezenia przy niepustym
+replayu i jedno odswiezenie przy pustym replayu oraz wielu sygnalach
+obecnosci.
 
 ## Etap 3 - centralna ochrona przed replayem i poznymi odpowiedziami
 
-Implementacja zalezy od wyniku etapu 0. Centralny punkt wejscia linii ma:
+Etap jest zablokowany dla pelnego automatycznego wznowienia przez brak API
+udowodniony w etapie 0. Nie implementujemy licznika replayedBytes jako
+pozornej granicy.
 
-- przypisywac linie do wlasciwego okresu polaczenia;
-- blokowac replay przed wszystkimi aktywnymi maszynami sesji;
-- blokowac stare prompty przed recovering i playerMailMode;
-- blokowac stare echo przed wejsciem w playerMailMode;
-- blokowac stare zdarzenia przed odswiezeniami, archiwum i zwierzeciem;
-- po zakonczeniu replayu przepuszczac aktualny ruch bez komend uzytkownika.
+### Czesc wykonalna bez zmiany klienta
+
+Centralny punkt wejscia ma odrzucac caly ruch ArkMaila przez czas aktywnej
+blokady synchronizacji, przed:
+
+- wszystkimi aktywnymi maszynami sesji;
+- recovering i playerMailMode;
+- wejsciem przez stare echo w playerMailMode;
+- odswiezeniami, archiwum i zwierzeciem.
+
+Przy niepustym/nieznanym replayu blokada pozostaje fail-closed: zero komend
+pluginu, zero automatycznego odswiezenia i jedno zrozumiale powiadomienie.
+Nie wolno jej zdejmowac po uplywie czasu ani zwyklym promptem. To ogranicza
+szkody, ale nie zapewnia automatycznego powrotu do pracy i nie zamyka etapu
+jako pelnej naprawy.
+
+Testy tej czesci: replayowany prompt nie zdejmuje blokady; replayowane echo
+nie wlacza recznej poczty; stary listing/list/potwierdzenie nie zmienia
+archiwum i nie uruchamia komend; pusty replay attachu dopuszcza jedna nowa
+operacje; nowy ruch wplatany przed osiagnieciem replayedBytes nie zdejmuje
+blokady; flushPendingLocked bez proxy.session nie jest traktowany jako
+aktualny dowod synchronizacji.
+
+### Czesc wymagajaca odrebnego kontraktu klienta
+
+Po dostarczeniu wiarygodnego sygnalu konca kazdego replayu/bufora centralny
+punkt wejscia ma przypisywac linie do wlasciwego okresu polaczenia, a po
+koncu przepuszczac aktualny ruch i wykonac jedno odswiezenie bez komend
+probnych.
 
 Kazdy ponizszy test najpierw musi past na starym kodzie:
 
@@ -256,9 +349,13 @@ Kazdy ponizszy test najpierw musi past na starym kodzie:
 8. Replayowany zwykly prompt nie zdejmuje synchronizacji.
 9. Replayowane echo list/listy nie wlacza recznej poczty.
 10. Po zakonczeniu replayu identyczne aktualne odpowiedzi dzialaja.
+11. Nowy ruch wplatany w replay nie jest bledna granica, a po sygnale konca
+    zadna stara porcja nie zostaje juz przyjeta.
+12. Bufor wypelniony na tym samym sockecie ma rowniez jednoznaczny koniec.
 
 Testy wykonuja rzeczywista sciezke adaptera i integracji, nie wylacznie
-sztucznie oznaczone obiekty ProtoLine.
+sztucznie oznaczone obiekty ProtoLine. Do czasu nowego kontraktu testy 10-12
+nie moga byc uczciwie zaliczone przez sam ArkMail.
 
 ## Etap 4 - pelna blokada komend pluginu podczas recznej poczty
 
@@ -382,6 +479,11 @@ testow, wynik typowania/buildu i liste zmienionych plikow. Nie deklarujemy
 sprawdzenia w grze, jesli go nie wykonano.
 
 ## Kontrole koncowe i wydanie
+
+Wydanie jako zamkniecie calego planu wymaga pelnego etapu 3. Jesli kontrakt
+klienta pozostaje niezmieniony, wolno co najwyzej przygotowac osobno
+zdecydowany zakres czesciowy; nie wolno opisac go jako naprawy wszystkich
+znalezisk ani pelnej obslugi replayu.
 
 1. Pelne lokalne testy, typowanie i build.
 2. Jedna pelna macierz scenariuszowa ArkMaila i zgodnosci z klientem na
