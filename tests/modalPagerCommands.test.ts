@@ -12,6 +12,7 @@ import {
   click,
   waitRt,
   notifyText,
+  textOf,
   type Harness,
 } from './harness';
 
@@ -361,6 +362,10 @@ for (const closeCommand of ['q', 'x'] as const) {
         if (withEcho) f.fire(`→ ${closeCommand}`, 'info');
         f.fire('> ', 'prompt');
         await waitRt(() => f.hookCb === null, 'koniec modalu po wspolnym zamknieciu');
+        await waitRt(
+          () => textOf(h, '.arkmail-letter-body').includes('Tresc pierwszego.'),
+          'pierwotny odczyt konczy sie po wspolnym zamknieciu',
+        );
         await drain();
 
         assert.equal(f.sent.filter((command) => command === 'q' || command === 'x').length, 1, 'jedno wspolne zamkniecie');
@@ -394,6 +399,10 @@ for (const closeCommand of ['q', 'x'] as const) {
 
       f.fire('> ', 'prompt');
       await waitRt(() => f.hookCb === null, 'koniec modalu po poznym prompcie');
+      await waitRt(
+        () => textOf(h, '.arkmail-letter-body').includes('Tresc pierwszego.'),
+        'pierwotny odczyt konczy sie po poznym prompcie',
+      );
       await drain();
       assert.ok(!notifyText(f, CLOSED_MESSAGE), 'powtorzone zamkniecie nie jest odrzucane');
     } finally {

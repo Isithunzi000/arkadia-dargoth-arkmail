@@ -51,6 +51,9 @@
 - Pelny zestaw po poprawce: 1233 testy, 1233 zaliczone, 0 bledow, 0 przerwanych; rzeczywiste typowanie i build zakonczone sukcesem.
 - Reczne q/x przed rozpoznaniem pagera oraz po automatycznym zamknieciu jest koalescencja jednego zamkniecia. Modal konczy sie natychmiast, a ograniczony hook do zwyklego promptu usuwa wylacznie powtorzenia q/x; wszystkie inne komendy przechodza normalnie.
 - Tryb gracza bez zwyklego promptu ma awaryjne wyjscie po 180 sekundach. Blokada transportu `recovering` nie jest zdejmowana przez sam uplyw czasu, aby pozne dane starej sesji nie trafily do nowej.
+- Dodatkowy RED po kontroli przegladarkowej: 6 kontroli wykrylo anulowanie pierwotnego odczytu po recznym q/x wyslanym podczas automatycznego zamykania; pozostale 13 z 19 ukierunkowanych testow przechodzilo.
+- GREEN po poprawce koalescencji: 19 z 19 ukierunkowanych testow. Powtorzone q/x nie uruchamia trybu poczty gracza i pozwala zakonczyc pierwotny odczyt na zwyklym prompcie.
+- Pelny zestaw po tej poprawce: 1240 testow, 1239 zaliczonych, 0 bledow, 0 przerwanych, 1 zamierzone pominiecie; rzeczywiste typowanie i build zakonczone sukcesem.
 
 ### Paginacja i pozne odpowiedzi
 

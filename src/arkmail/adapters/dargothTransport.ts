@@ -276,13 +276,9 @@ export class DargothTransport implements Transport {
           }
           void result.catch(() => {});
         } else if (this.pagerCloseSent) {
-          // Automatyczne albo wczesniejsze reczne zamkniecie jest juz w
-          // toku. Nowa komenda gracza uruchamia obsluge odzyskiwania,
-          // lecz nie moze wyslac duplikatu ani zostac odrzucona.
-          if (!this.pagerUserClose) {
-            this.pagerUserClose = true;
-            hooks.onUserCommand(command);
-          }
+          // Zamkniecie jest juz w toku. Powtorzone q/x nalezy do tej
+          // samej operacji: nie wysyla duplikatu, nie odrzuca komendy
+          // i nie anuluje odczytu, ktory konczy sie na zwyklym prompcie.
         } else if (!this.queue.some(isPagerCloseCommand)) {
           // Przed promptem pagera q/x czeka na potwierdzenie jego
           // otwarcia. Powtorzenie tej samej intencji jest koalescencja.
