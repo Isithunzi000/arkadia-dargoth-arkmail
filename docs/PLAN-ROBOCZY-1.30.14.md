@@ -1,7 +1,7 @@
 # Plan roboczy poprawek ArkMail 1.30.14
 
 Data utworzenia: 2026-11-21.
-Ostatnia aktualizacja: 2026-11-21, analiza flushLines i timestampow.
+Ostatnia aktualizacja: 2026-11-21, przyjecie resetu i recznego ponowienia.
 
 ## Status i przeznaczenie
 
@@ -15,12 +15,17 @@ Plan obejmuje wszystkie dotychczas znalezione problemy z komunikatami
 reply-all, reconnectem, przeładowaniem, replayem proxy, pagerem, edytorem,
 reczna poczta gracza, archiwum, importem, timerami i zwierzeciem.
 
-Plan nie jest zatwierdzeniem implementacji. Etap 0 zostal zakonczony:
-publiczne API nie daje wiarygodnej granicy replayu ani pochodzenia linii
-we wszystkich scenariuszach. Plan wskazuje bezpieczne blokady mozliwe juz
-teraz, ale pelna automatyczna naprawa replayu wymaga odrebnej decyzji o
-rozszerzeniu kontraktu klienta. Nie wolno deklarowac naprawy 100% bez tego
-warunku.
+Plan nie jest zatwierdzeniem implementacji. Etap 0 zostal zakonczony.
+Publiczne API nie daje wiarygodnej granicy replayu ani pochodzenia linii
+we wszystkich scenariuszach, dlatego plugin nie probuje odtwarzac nieznanego
+stanu gry. Przyjetym i kompletnym modelem obslugi jest: przerwij stara operacje,
+wyczysc kolejki i timery, poinformuj uzytkownika, jesli cos przerwano, oraz
+pozwol mu swiadomie powtorzyc czynnosc od czystego stanu.
+
+Zakres 100% dotyczy tego modelu bezpiecznego przerwania i recznego ponowienia.
+Nie obejmuje automatycznego wznawiania starej operacji ani zgadywania, ktora
+linia pochodzi z replayu. Nie sa one warunkiem wydania. Rozwiazanie wykonujemy
+wylacznie w ArkMailu, bez zmiany klienta Dargoth.
 
 ## Zasady wiazace
 
@@ -118,7 +123,7 @@ i wysylania zwierzecia.
 - Czesc stanu wysylki zwierzecia przezywa reconnect; stare Slucham? albo pozne
   resolve moze zmienic nowy stan.
 
-## Etap 0 - zakonczona analiza replayu i wniosek o API
+## Etap 0 - zakonczona analiza replayu i decyzja produktowa
 
 Analize read-only wykonano na publicznym drzewie
 Delwing/arkadia-web-client-extension, commit
@@ -215,32 +220,40 @@ linii byloby bezpieczne, lecz mogloby odrzucac rowniez poprawne aktualne
 odpowiedzi i nie zapewnialoby sprawnego dzialania pluginu. Nie jest to pelne
 rozwiazanie i nie wolno przedstawiac go jako 100%.
 
-### Wniosek wiazacy
+### Wniosek wiazacy i przyjety model obslugi
 
 Nie istnieje pluginowa, deterministyczna metoda rozroznienia wszystkich
 starych i aktualnych linii bez modyfikowania klienta. Nie wolno uzywac pauzy,
 pierwszego promptu, pierwszego GMCP, samego replayedBytes, timestampow z
 flushLines, identycznej odpowiedzi ani lokalnej generacji linii jako
-substytutu.
+substytutu. Nie jest to jednak blokada prac, poniewaz celem nie jest
+automatyczne kontynuowanie starej operacji.
 
-Bez zmiany klienta wolno natomiast:
+Po connect, disconnect, zamknieciu upstreamu, powrocie do logowania oraz przy
+niepustym albo nieznanym replayu ArkMail wykonuje wspolny reset:
 
-- przy kazdym connect/disconnect uniewazniac operacje i blokowac transport;
-- dla zywego attachu z jawnym replayedBytes === 0 uznac, ze nie ma replayu
-  attachu; nadal trzeba uwzglednic pozniejsze flushPendingLocked;
-- przy resumed z replayedBytes > 0 albo nieznanym replayedBytes nie uruchamiac
-  automatycznego odswiezenia ani nowych sesji na podstawie replayowanych
-  danych;
-- pokazac jeden jasny komunikat o braku bezpiecznej synchronizacji, bez q i
-  bez obiecywania, ze kolejny reconnect rozwiaze problem;
-- nie nazywac takiego zachowania pelna naprawa replayu.
+1. Anuluje aktywne operacje i uniewaznia ich pozne wyniki.
+2. Zatrzymuje timery, kolejki, automatyczne komendy i automatyczne odswiezenia.
+3. Czysci stan pagerow, edytora, importu, recznej poczty, archiwum w toku i
+   wysylki zwierzecia, pozostawiajac dane trwale oraz tresc formularza.
+4. Nie wysyla q, ~q, znakow sterujacych ani komend probnych.
+5. Przy przerwanej operacji uzytkownika pokazuje jeden zrozumialy komunikat
+   z poleceniem powtorzenia. Reset podczas bezczynnosci jest cichy.
+6. Umozliwia nowa operacje wylacznie po jawnym dzialaniu uzytkownika. Nowa
+   operacja dostaje nowa generacje i zaczyna sie od czystego stanu.
+7. Powtorzone sygnaly resetu sa idempotentne: nie duplikuja komunikatow,
+   timerow, komend ani odswiezen.
 
-Pelne rozwiazanie wymaga nowego, publicznego kontraktu klienta: co najmniej
-zdarzenia zakonczenia kazdego replayu/bufora, takze flushPendingLocked, albo
-wiarygodnego pochodzenia przekazywanego przed triggerami do kazdej porcji i
-linii. Kontrakt musi miec okreslone zachowanie przy przeplataniu nowego
-ruchu. Zmiana klienta nie jest wykonywana w tym planie i wymaga odrebnej
-decyzji.
+Dane przychodzace w stanie bezczynnosci po resecie nie moga same otwierac sesji,
+zmieniac archiwum, zdejmowac blokady ani uruchamiac komend. Dotyczy to takze
+zaleglego bufora dostarczonego bez proxy.session. Swiadome ponowienie przez
+uzytkownika jest decyzja o rozpoczeciu nowej operacji, a nie dowodem
+rozroznienia kazdej pozniejszej linii; plan nie obiecuje takiej klasyfikacji.
+
+Przy zywym attachu z replayedBytes === 0 wolno wykonac dokladnie jedno
+automatyczne odswiezenie. Przy replayu niepustym albo nieznanym automatyczne
+odswiezenie nie startuje. Uzytkownik moze recznie ponowic potrzebna czynnosc.
+Zadne dodatkowe API klienta ani zmiana Dargotha nie sa wymagane do tego modelu.
 
 ## Etap 1 - komunikaty dla wszystkich zakresow reply-all
 
@@ -320,78 +333,92 @@ i powrotu do logowania. Ma ona:
 - byc idempotentna przy powtorzonych zdarzeniach, bez duplikatow komend,
   timerow i odswiezen.
 
-setOnline(true) nie zdejmuje synchronizacji. Przy kazdym nowym connect
-transport pozostaje rozbrojony do sygnalu dozwolonego przez etap 0. Sam
-client.connect, dowolne GMCP ani proxy.session nie sa dowodem aktualnosci.
+setOnline(true) nie odtwarza zadnej przerwanej sesji. Po resecie transport
+pozostaje rozbrojony dla automatyzmu, a przychodzace linie i GMCP nie moga
+utworzyc nowej operacji bez dzialania uzytkownika. Sam client.connect, dowolne
+GMCP, prompt ani proxy.session nie sa dowodem aktualnosci i nie zdejmuja
+blokady automatycznych dzialan.
 
+Reczne polecenie uzytkownika po komunikacie o przerwaniu otwiera jedna nowa
+generacje operacji. Nie poprzedza sie jej q ani innymi komendami probnymi.
 Automatyczne odswiezenie po wznowieniu z replayedBytes === 0 wykonuje sie
 dokladnie raz i nie duplikuje sie przez kolejne GMCP. Przy niepustym albo
-nieznanym replayu zadanie nie startuje; nie wolno zastepowac go odswiezeniem
-po pierwszym promptcie. Pelne ponowienie po replayu zalezy od publicznego
-sygnalu konca opisanego w etapie 0.
+nieznanym replayu zadanie nie startuje i nie jest zastepowane odswiezeniem po
+pierwszym promptcie.
 
 Testy: reconnect z/bez disconnect, powtorne connect/proxy.session, reconnect
 podczas recznej poczty, stare opoznione odswiezenie, stare Slucham?, pozne
-resolve zwierzecia, brak komend na logowaniu, brak odswiezenia przy niepustym
-replayu i jedno odswiezenie przy pustym replayu oraz wielu sygnalach
-obecnosci.
+resolve zwierzecia, brak komend na logowaniu, zachowanie formularza i danych
+trwalych, jedno ponowienie przez uzytkownika, brak odswiezenia przy niepustym
+replayu i jedno odswiezenie przy pustym replayu oraz wielu sygnalach obecnosci.
 
-## Etap 3 - centralna ochrona przed replayem i poznymi odpowiedziami
+## Etap 3 - centralne przerwanie, ochrona archiwum i reczne ponowienie
 
-Etap jest zablokowany dla pelnego automatycznego wznowienia przez brak API
-udowodniony w etapie 0. Nie implementujemy licznika replayedBytes jako
-pozornej granicy.
+Etap jest w pelni wykonalny w ArkMailu. Nie implementujemy licznika
+replayedBytes jako pozornej granicy ani automatycznego wznawiania operacji.
 
-### Czesc wykonalna bez zmiany klienta
+### Centralna bramka stanu
 
-Centralny punkt wejscia ma odrzucac caly ruch ArkMaila przez czas aktywnej
-blokady synchronizacji, przed:
+Jeden punkt wejscia obsluguje caly ruch ArkMaila przed maszynami sesji,
+recovering, playerMailMode, odswiezeniami, archiwum i zwierzeciem. Po resecie
+oraz w stanie bezczynnosci:
 
-- wszystkimi aktywnymi maszynami sesji;
-- recovering i playerMailMode;
-- wejsciem przez stare echo w playerMailMode;
-- odswiezeniami, archiwum i zwierzeciem.
+- zadna przychodzaca linia ani GMCP nie otwiera sesji i nie uruchamia komendy;
+- stary listing, pusta odpowiedz, list, prompt lub potwierdzenie nie zmienia
+  archiwum i nie konczy zadnej nowej operacji;
+- replayowane echo nie wlacza recznej poczty;
+- replayowany zwykly prompt nie zdejmuje recovering i nie synchronizuje stanu;
+- automatyczne odswiezenie jest dopuszczone tylko wedlug etapu 2;
+- brak q, ~q, kasowania, przekazania i innych komend na podstawie starych danych.
 
-Przy niepustym/nieznanym replayu blokada pozostaje fail-closed: zero komend
-pluginu, zero automatycznego odswiezenia i jedno zrozumiale powiadomienie.
-Nie wolno jej zdejmowac po uplywie czasu ani zwyklym promptem. To ogranicza
-szkody, ale nie zapewnia automatycznego powrotu do pracy i nie zamyka etapu
-jako pelnej naprawy.
+Aktywna operacja uzytkownika jest anulowana przez zdarzenia resetujace z etapu
+0 i etapu 2. Jej pozne odpowiedzi maja stara generacje i sa ignorowane. Nowa
+operacja moze powstac tylko z nowego polecenia uzytkownika. Powtorzenie jest
+jednorazowe, nie uruchamia zadnych zaparkowanych komend z poprzedniej sesji.
 
-Testy tej czesci: replayowany prompt nie zdejmuje blokady; replayowane echo
-nie wlacza recznej poczty; stary listing/list/potwierdzenie nie zmienia
-archiwum i nie uruchamia komend; pusty replay attachu dopuszcza jedna nowa
-operacje; nowy ruch wplatany przed osiagnieciem replayedBytes nie zdejmuje
-blokady; flushPendingLocked bez proxy.session nie jest traktowany jako
-aktualny dowod synchronizacji.
+### Komunikat i powrot do pracy
 
-### Czesc wymagajaca odrebnego kontraktu klienta
+Jesli reset przerwal reczna operacje, pokaz jeden komunikat:
 
-Po dostarczeniu wiarygodnego sygnalu konca kazdego replayu/bufora centralny
-punkt wejscia ma przypisywac linie do wlasciwego okresu polaczenia, a po
-koncu przepuszczac aktualny ruch i wykonac jedno odswiezenie bez komend
-probnych.
+"Polaczenie zostalo wznowione. Poprzednia operacja pocztowa zostala przerwana. Wykonaj ja ponownie."
 
-Kazdy ponizszy test najpierw musi past na starym kodzie:
+Jesli bezposrednia przyczyna jest replay, wolno uzyc:
 
-1. Stary listing tej samej skrzynki nie konczy nowej operacji i nie zmienia
+"Klient odtworzyl dane poprzedniej sesji. ArkMail przerwal poprzednia operacje, aby nie wykonywac komend na podstawie starych danych. Wykonaj operacje ponownie."
+
+Komunikat nie sugeruje otwartego pagera, koniecznosci q ani kolejnego reloadu.
+Po swiadomym ponowieniu plugin wykonuje normalna sciezke nowej operacji.
+Automatyczne operacje w tle nie generuja powiadomien i nie sa wznawiane.
+
+### Testy
+
+Kazdy przypadek najpierw musi pasc na starym kodzie:
+
+1. Reconnect i replay podczas bezczynnosci nie wysylaja komend i nie pokazuja
+   zbednego komunikatu.
+2. Reset podczas aktywnej operacji anuluje ja, kasuje timery i pokazuje jeden
+   wlasciwy komunikat.
+3. Powtorzone connect, disconnect i proxy.session nie duplikuja efektow.
+4. Replayowany prompt nie zdejmuje blokady, a stare echo nie wlacza recznej
+   poczty.
+5. Stary listing, pusta odpowiedz i stary list o tym samym numerze nie zmienia
    archiwum.
-2. Stara odpowiedz pusta nie czysci aktualnej skrzynki.
-3. Stary list o tym samym numerze nie zostaje zapisany jako aktualny.
-4. Stary prompt o zgodnym numerze nie uruchamia d ani f.
-5. Stare potwierdzenie kasowania/przekazania nie konczy nowej operacji.
-6. Stary prompt nie konczy nowego importu.
-7. Stary wynik compose nie daje sukcesu i nie czysci formularza.
-8. Replayowany zwykly prompt nie zdejmuje synchronizacji.
-9. Replayowane echo list/listy nie wlacza recznej poczty.
-10. Po zakonczeniu replayu identyczne aktualne odpowiedzi dzialaja.
-11. Nowy ruch wplatany w replay nie jest bledna granica, a po sygnale konca
-    zadna stara porcja nie zostaje juz przyjeta.
-12. Bufor wypelniony na tym samym sockecie ma rowniez jednoznaczny koniec.
+6. Stary prompt lub stare potwierdzenie nie uruchamia kasowania, przekazania,
+   compose, importu ani q.
+7. Stare linie nie daja sukcesu compose/importu i nie czyscza formularza.
+8. Jawne ponowienie otwiera dokladnie jedna nowa operacje bez q, komend
+   probnych i drenazu starej kolejki.
+9. Pozne wyniki starej generacji nie zmieniaja nowej operacji.
+10. Zalegly bufor bez proxy.session w stanie bezczynnosci pozostaje bez wplywu
+    na sesje, archiwum i komendy.
+11. Pusty replay dopuszcza jedno automatyczne odswiezenie, a niepusty lub
+    nieznany replay go nie uruchamia.
+12. Zwykla nowa operacja bez replayu dziala bez zmian.
 
 Testy wykonuja rzeczywista sciezke adaptera i integracji, nie wylacznie
-sztucznie oznaczone obiekty ProtoLine. Do czasu nowego kontraktu testy 10-12
-nie moga byc uczciwie zaliczone przez sam ArkMail.
+sztucznie oznaczone obiekty ProtoLine. Kryterium zakonczenia etapu jest opisane
+powyzej bezpieczne przerwanie i reczne ponowienie, nie automatyczna klasyfikacja
+kazdej linii.
 
 ## Etap 4 - pelna blokada komend pluginu podczas recznej poczty
 
@@ -411,7 +438,7 @@ zbiorcze odswiezenie.
 
 Test parametryczny przechodzi przez wszystkie publiczne operacje UI i dowodzi:
 zero komend pluginu, brak zmian archiwum, komunikat dla uzytkownika, brak
-powiadomien automatycznych, jeden pozniejszy drenaz i nietkniete komendy
+powiadomien automatycznych, jedno pozniejsze zbiorcze odswiezenie i nietkniete komendy
 gracza.
 
 ## Etap 5 - pager i timeouty
@@ -470,14 +497,24 @@ niekompletny listing, stary list o tym samym numerze i reconnect przed zapisem.
 
 ## Etap 8 - komunikaty o anulowaniu i synchronizacji
 
-Rozroznic anulowanie przez reconnect, reczna poczte, brak synchronizacji,
-timeout i zamierzone anulowanie automatyczne.
+Rozroznic anulowanie przez reconnect, replay, reczna poczte, timeout i
+zamierzone anulowanie automatyczne. Dla reconnectu i replayu obowiazuja tresci
+z etapu 3. Pozostale komunikaty maja nazywac rzeczywisty powod i sposob powrotu
+do pracy.
 
-- Reczna operacja uzytkownika zawsze ma zrozumialy komunikat.
-- Automatyczne anulowanie nie generuje zbednych powiadomien.
+- Reczna operacja uzytkownika zawsze ma zrozumialy komunikat o przerwaniu.
+- Automatyczne anulowanie oraz reset podczas bezczynnosci nie generuja
+  zbednych powiadomien.
 - Komunikat nie sugeruje otwartego pagera ani koniecznosci q bez dowodu.
 - Po limicie czasu nie moze zostac niewidoczna trwala blokada i milczace
   klikniecia.
+- Komunikat wystepuje raz dla jednego przerwania, takze przy wielu sygnalach
+  resetu.
+- Po komunikacie uzytkownik moze powtorzyc operacje bez reloadu i bez recznego
+  czyszczenia stanu gry.
+
+Testy obejmuja kazda przyczyne, duplikaty zdarzen, bezczynnosc, ponowienie oraz
+brak komend naprawczych.
 
 ## Mapa pokrycia wszystkich znalezisk
 
@@ -498,6 +535,10 @@ timeout i zamierzone anulowanie automatyczne.
 | Stare timery odswiezen przezywaja reconnect | 2 |
 | Stan zwierzecia reaguje na stare zdarzenia | 2 i 3 |
 | Ogolne lub niewidoczne operacja anulowana | 4 i 8 |
+| Zalegly bufor po obudzeniu karty bez ramki kontrolnej | 2 i 3 |
+| Pozne wyniki i stare callbacki zmieniaja nowa operacje | 2 i 3 |
+| Reset musi zachowac dane trwale i tresc formularza | 2, 3 i 6 |
+| Reczne ponowienie bez reloadu, q i komend probnych | 3 i 8 |
 
 ## Procedura wykonania kazdego przypadku
 
@@ -516,10 +557,10 @@ sprawdzenia w grze, jesli go nie wykonano.
 
 ## Kontrole koncowe i wydanie
 
-Wydanie jako zamkniecie calego planu wymaga pelnego etapu 3. Jesli kontrakt
-klienta pozostaje niezmieniony, wolno co najwyzej przygotowac osobno
-zdecydowany zakres czesciowy; nie wolno opisac go jako naprawy wszystkich
-znalezisk ani pelnej obslugi replayu.
+Wydanie zamyka caly plan po wykonaniu wszystkich etapow w przyjetym modelu
+bezpiecznego przerwania i recznego ponowienia. Zmiana klienta Dargoth ani
+automatyczne wznawianie starej operacji nie sa warunkiem wydania. Opis wydania
+nie moze obiecywac automatycznego kontynuowania przerwanej operacji.
 
 1. Pelne lokalne testy, typowanie i build.
 2. Jedna pelna macierz scenariuszowa ArkMaila i zgodnosci z klientem na
