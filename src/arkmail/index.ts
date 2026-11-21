@@ -823,6 +823,9 @@ export async function init(api: PluginApi) {
     drainScheduled = false;
     for (const timer of delayedInboxTimers) clearTimeout(timer);
     delayedInboxTimers = [];
+    if (unsentFlashTimer !== null) clearTimeout(unsentFlashTimer);
+    unsentFlashTimer = null;
+    ui.setUnsentFlash(false);
     playerMailMode = false;
     awaitingPlayerMailPrompt = false;
     clearPlayerMailModeTimer();

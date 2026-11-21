@@ -180,6 +180,53 @@ test('compose gotowy -> flash niewyslanych zapala sie i gasnie po ~3 s', async (
   }
 });
 
+test('reconnect gasi wskaznik niewyslanych bez komend naprawczych', async () => {
+  const h: Harness = await startHarness();
+  const { f, waitFor, content } = h;
+  const flashing = (selector: string): boolean =>
+    String(
+      (content.querySelector(selector) as { className?: string } | null)?.className ?? '',
+    ).includes('arkmail-flash');
+  try {
+    hClick(h, '[data-tab="napisz"]');
+    const setVal = (field: string, v: string) => {
+      const el = content.querySelector(`[data-field="${field}"]`) as {
+        value: string;
+        dispatchEvent(e: unknown): void;
+      };
+      el.value = v;
+      el.dispatchEvent(new h.window.Event('input'));
+    };
+    setVal('adresat', 'Gracz');
+    setVal('temat', 'Test reconnectu');
+    setVal('tresc', 'czesc');
+    hClick(h, '.arkmail-send');
+    await waitFor(() => f.sent.includes('napisz list'), 'compose start');
+    f.fire('Adresat: Temat: DW: ', 'mail');
+    f.fire('Wpisz ~?, zeby uzyskac pomoc, lub **, by zakonczyc edycje.', 'mail');
+    await waitFor(() => f.sent.includes('**'), 'tresc wyslana');
+    f.fire('List jest gotowy do wyslania.', 'mail');
+    await waitFor(() => f.sent.includes('listy niewyslane'), 'refresh niewyslanych');
+    f.fire('Nie masz zadnych niewyslanych listow.', 'mail');
+    f.fire('> ', 'prompt');
+    await waitFor(() => flashing('[data-tab="listy"]'), 'flash przed reconnectem');
+
+    const sentBeforeReset = [...f.sent];
+    f.fireEvent('client.disconnect', undefined);
+    f.fireEvent('client.connect', undefined);
+    assert.ok(!flashing('[data-tab="listy"]'), 'zakladka Listy nie pulsuje po reconnectcie');
+    assert.ok(
+      !flashing('[data-box="niewyslane"]'),
+      'skrzynka Niewyslane nie pulsuje po reconnectcie',
+    );
+    assert.deepEqual(f.sent, sentBeforeReset, 'reset nie wysyla zadnej komendy');
+    assert.ok(!f.sent.includes('q'));
+    assert.ok(!f.sent.includes('~q'));
+  } finally {
+    await stopHarness();
+  }
+});
+
 test('compose: store.clearCompose czysci pola i draft (przez rerender)', () => {
   const s = new MailUiStore({ tab: 'napisz' });
   const { container, off } = mount(s);
