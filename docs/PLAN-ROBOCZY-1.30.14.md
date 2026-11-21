@@ -1,7 +1,7 @@
 # Plan roboczy poprawek ArkMail 1.30.14
 
 Data utworzenia: 2026-11-21.
-Ostatnia aktualizacja: 2026-11-21, etap 5 zakonczony.
+Ostatnia aktualizacja: 2026-11-21, etap 6 zakonczony.
 
 ## Status i zakres
 
@@ -358,26 +358,29 @@ pagerWatchdog.test.ts pozostaja regresja dla recznego pagera i braku duplikatu q
   tests/pagerTimeout.test.ts, tests/pagerRobust.test.ts,
   tests/orphanPager.test.ts oraz ten plan.
 
-## Etap 6 - timeout compose i edytor serwera
+## Etap 6 - zakonczony: timeout compose i edytor serwera
 
-Obsluzyc timeout zaleznie od istniejacego stanu editorReady, bodyStarted i stage:
+Timeout wykorzystuje istniejace editorReady, bodyStarted i stage. Przed
+potwierdzeniem edytora konczy operacje bez ~q i uruchamia synchronizacje. Po
+potwierdzeniu wysyla najwyzej jedno ~q, natychmiast zatrzymuje kolejne linie
+tresci i czeka najwyzej 400 ms na "Zaniechane.", a nastepnie zwykly prompt.
+Oba potwierdzenia w tej kolejnosci daja wynik zaniechany. Brak ktoregokolwiek
+konczy sie timeoutem, synchronizacja i blokada komend pluginu do zwyklego
+promptu. Disconnect i wspolny reset nie wysylaja ~q. Formularz pozostaje
+nietkniety po bledzie, timeoutcie i przerwaniu.
 
-1. Przed potwierdzeniem edytora: bez ~q, wynik niepotwierdzony, brak kolejnych
-   komend do synchronizacji.
-2. Po potwierdzeniu edytora: jedno ~q, oczekiwanie na przerwanie i zwykly prompt
-   przez ograniczony czas.
-3. Brak potwierdzenia zamkniecia: synchronizacja i blokada komend pluginu, bez
-   sukcesu.
-4. Disconnect: bez wysylania ~q do zamknietego polaczenia; wspolny reset.
-
-Formularz po bledzie zostaje nietkniety. Po timeoutcie lub anulowaniu nie wolno
-wyslac kolejnej linii tresci.
-
-Testy dla timeoutu na adresacie, temacie, DW, przed edytorem, w tresci i po **:
-najwyzej jedno ~q, zero ~q bez potwierdzonego edytora, brak falszywego sukcesu,
-brak czyszczenia formularza, brak poznych wysylek i poprawny powrot po
-synchronizacji. Zachowanie formularza jest testem regresji, jezeli dany przypadek
-juz dziala na starym kodzie.
+Wynik kontroli:
+- RED: 29 kontrolek ukierunkowanych na starym kodzie, 23 zaliczone i 6 bledow.
+  Bledy wykazaly brak ~q po potwierdzeniu edytora oraz zbyt wczesne rozstrzyganie
+  zamkniecia. Przypadki przed potwierdzeniem, reset i formularz przeszly jako
+  regresja istniejacego poprawnego zachowania.
+- GREEN: 29/29 kontrolek ukierunkowanych i 156/156 powiazanych regresji compose,
+  transportu, reconnectu oraz interfejsu.
+- Pelny zestaw: 1248 testow TypeScript i 49 kontrolek MJS, razem 1297
+  zaliczonych, 0 bledow, 0 anulowan, 0 pominiec. Typowanie i build zielone.
+- Zmienione pliki: src/arkmail/core/session/editor.ts,
+  tests/editorTimeout.test.ts, tests/composeTransport.test.ts,
+  tests/uiStage11.test.ts oraz ten plan.
 
 ## Etap 7 - import i ochrona archiwum
 
@@ -432,9 +435,9 @@ brak komend naprawczych.
 | Stary listing albo pusta odpowiedz zmienia archiwum | 3 i 7 |
 | Stary list o tym samym numerze zostaje zapisany | 3 i 7 |
 | Stare prompty uruchamiaja kasowanie/przekazywanie | 3 i 7 |
-| Stare linie koncza compose lub import | 3, 6 i 7 |
+| Stare linie koncza compose lub import | 3 i 6 zakonczone dla compose; 7 dla importu |
 | Timeout pagera wysyla q bez dowodu pagera | 5, zakonczone |
-| Timeout compose nie obsluguje otwartego edytora | 6 |
+| Timeout compose nie obsluguje otwartego edytora | 6, zakonczone |
 | Stare timery odswiezen przezywaja reconnect | 2, zakonczone |
 | Wskaznik niewyslanych i jego timer przezywaja reconnect | 2, zakonczone |
 | Stan zwierzecia reaguje na stare zdarzenia | Reset i komunikat przerwania zakonczone w 2 i 3; przypadek bez sygnalu pozostaje ograniczeniem z 0 |

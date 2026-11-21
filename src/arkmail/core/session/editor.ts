@@ -17,7 +17,7 @@ import {
   parseMailError,
 } from '../protocol/parser.js';
 import type { MailError } from '../protocol/types.js';
-import { isEchoLine } from './lines.js';
+import { isEchoLine, isPromptLine } from './lines.js';
 import type { ProtoLine, Transport } from './transport.js';
 import type { SessionOptions } from './mailbox.js';
 
@@ -34,6 +34,9 @@ export type ComposeOutcome =
 
 type Stage = 'adresat' | 'temat' | 'dw' | 'tresc' | 'tresc-wyslana';
 
+/** Krotkie oczekiwanie na "Zaniechane." i zwykly prompt po naszym ~q. */
+const EDITOR_CLOSE_GRACE_MS = 400;
+
 export class EditorSession {
   constructor(
     private readonly transport: Transport,
@@ -47,6 +50,9 @@ export class EditorSession {
       let done = false;
       let editorReady = false;
       let bodyStarted = false;
+      let closingEditor = false;
+      let editorAbandoned = false;
+      let closeTimer: ReturnType<typeof setTimeout> | null = null;
       const dw = input.dw ?? '';
       let cancelUnsub: () => void = () => {};
       let transition: Promise<void> = Promise.resolve();
@@ -54,6 +60,8 @@ export class EditorSession {
       const cleanup = () => {
         done = true;
         clearTimeout(timer);
+        if (closeTimer) clearTimeout(closeTimer);
+        closeTimer = null;
         cancelUnsub();
         unsub();
         session.close();
@@ -72,20 +80,45 @@ export class EditorSession {
         transition.catch(fail);
       };
       const sendLine = async (line: string): Promise<void> => {
-        if (!done) await this.transport.send(line, true);
+        if (!done && !closingEditor) await this.transport.send(line, true);
+      };
+      const finishTimeout = () => {
+        if (done) return;
+        this.transport.beginRecovery();
+        finish({ result: 'blad', error: { kind: 'timeout' } });
+      };
+      const closeConfirmedEditor = async (): Promise<void> => {
+        try {
+          await this.transport.send('~q', true);
+        } catch {
+          finishTimeout();
+          return;
+        }
+        if (done) return;
+        closeTimer = setTimeout(finishTimeout, EDITOR_CLOSE_GRACE_MS);
+        (closeTimer as unknown as { unref?: () => void }).unref?.();
       };
 
       const timer = setTimeout(() => {
-        this.transport.beginRecovery();
-        cleanup();
-        resolve({ result: 'blad', error: { kind: 'timeout' } });
+        if (done) return;
+        // Bez odpowiedzi serwera nie wiadomo, czy nasz edytor istnieje.
+        // Wyslanie ~q mogloby trafic do zwyklego trybu gry albo cudzej sesji.
+        const confirmedEditor = editorReady || bodyStarted || stage === 'tresc-wyslana';
+        if (!confirmedEditor) {
+          finishTimeout();
+          return;
+        }
+        // Potwierdzony edytor dostaje jedno ~q. Od tej chwili zadna linia
+        // tresci nie moze juz wyjsc, nawet gdy wczesniejsza wysylka sie konczy.
+        closingEditor = true;
+        void closeConfirmedEditor();
       }, this.opts.timeoutMs);
 
       /** Wysyla odpowiedzi na wszystkie potwierdzone prompty. */
       const flush = async (confirmed: Stage[]): Promise<void> => {
         const order: Stage[] = ['adresat', 'temat', 'dw'];
         for (const c of confirmed) {
-          if (done) return;
+          if (done || closingEditor) return;
           const idx = order.indexOf(c);
           const cur = order.indexOf(stage);
           if (idx < cur) continue;
@@ -96,20 +129,34 @@ export class EditorSession {
       };
 
       const sendBody = async (): Promise<void> => {
-        if (done || bodyStarted || stage !== 'tresc' || !editorReady) return;
+        if (done || closingEditor || bodyStarted || stage !== 'tresc' || !editorReady) return;
         bodyStarted = true;
         stage = 'tresc-wyslana';
         for (const linia of input.linie) {
-          if (done) return;
+          if (done || closingEditor) return;
           await sendLine(linia);
         }
-        if (!done) await sendLine('**');
+        if (!done && !closingEditor) await sendLine('**');
       };
 
       const unsub = session.subscribe((line: ProtoLine) => {
         // Echo wlasnych komend: po klasie albo po samej tresci
         // (przenosnosc: zywy PluginApi nie daje klas gmcp_msgs).
         if (done || line.cls === 'command' || isEchoLine(line.text)) return;
+
+        if (closingEditor) {
+          // Po timeoutcie sukces wysylki ani sam prompt nie rozstrzygaja
+          // zamkniecia. Potwierdzeniem jest dopiero zwykly prompt otrzymany
+          // po "Zaniechane."; wczesniejszy prompt nie zostaje zapamietany.
+          if (line.text === 'Zaniechane.') {
+            editorAbandoned = true;
+            return;
+          }
+          if (editorAbandoned && (line.cls === 'prompt' || isPromptLine(line.text))) {
+            finish({ result: 'zaniechany' });
+          }
+          return;
+        }
 
         // Fala UI-2 krok 5: gracz przerywa compose w grze klawiszem ~q -
         // serwer odpowiada "Zaniechane.". Konczymy od razu, bez czekania

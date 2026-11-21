@@ -160,7 +160,7 @@ test('compose: anulowanie nie zwalnia pozostalych linii', async () => {
   assert.ok(!client.wire.includes('**'));
 });
 
-test('compose: timeout nie zwalnia pozostalych linii', async () => {
+test('compose: timeout w tresci wysyla jedno ~q i nie zwalnia pozostalych linii', async () => {
   const client = new ComposeClient();
   client.delay = (command) => command === TOP ? 40 : command === '**' ? 80 : 0;
   const { transport, operation } = start(client, 15);
@@ -169,7 +169,8 @@ test('compose: timeout nie zwalnia pozostalych linii', async () => {
   await client.drain();
 
   assert.deepEqual(outcome, { result: 'blad', error: { kind: 'timeout' } });
-  assert.deepEqual(client.wire, [...PREFIX, TOP]);
+  assert.deepEqual(client.wire, [...PREFIX, TOP, '~q']);
+  assert.equal(client.wire.filter((command) => command === '~q').length, 1);
   assert.ok(!client.wire.includes('**'));
 });
 

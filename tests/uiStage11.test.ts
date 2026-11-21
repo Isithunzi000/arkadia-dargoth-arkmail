@@ -296,7 +296,8 @@ test('etap 11 S18: wysylka rozroznia adresata, timeout, znany blad i fallback', 
   EditorSession.prototype.send = () => failure
     ? Promise.reject(failure)
     : Promise.resolve(outcome);
-  const { h, handlers, restore } = await startCaptured();
+  const { h, handlers, store, restore } = await startCaptured();
+  const composeClearSeq = store.state.composeClearSeq;
   try {
     const cases: Array<[ComposeOutcome, string]> = [
       [
@@ -320,6 +321,7 @@ test('etap 11 S18: wysylka rozroznia adresata, timeout, znany blad i fallback', 
       outcome = nextOutcome;
       handlers.onSendCompose(SEND_INPUT);
       await h.waitFor(() => exactNotice(h.f, text)?.level === 'error', `wysylka: ${text}`);
+      assert.equal(store.state.composeClearSeq, composeClearSeq, `blad nie czysci formularza: ${text}`);
     }
     failure = new Error('transport offline');
     handlers.onSendCompose(SEND_INPUT);
