@@ -110,13 +110,29 @@ test('adapter: odzyskiwanie zatrzymuje komende pluginu oczekujaca w kolejce', as
   t.dispose();
 });
 
-test('adapter: reconnect z aktywna sesja wymaga promptu przed nowa operacja', () => {
+test('adapter: reconnect otwiera nowa operacje bez starego promptu', async () => {
   const f = new FakeApi();
   const t = armedTransport(f);
   const first = t.openSession();
   t.setOnline(false);
   t.setOnline(true);
   assert.equal(first.active, false);
+
+  const second = t.openSession();
+  assert.ok(second.id > first.id);
+  second.close();
+  await t.send('listy odebrane');
+  assert.deepEqual(f.sent, ['listy odebrane']);
+  t.dispose();
+});
+
+test('adapter: powtorne sygnaly obecnosci nie koncza odzyskiwania bez reconnectu', () => {
+  const f = new FakeApi();
+  const t = armedTransport(f);
+  const first = t.openSession();
+  first.close();
+  t.beginRecovery();
+  t.setOnline(true);
 
   assert.equal(f.fire('Spozniona odpowiedz.', 'mail'), null);
   assert.deepEqual(f.fire('Dialog uzytkownika.', 'other'), { text: 'Dialog uzytkownika.' });
@@ -158,7 +174,7 @@ test('adapter: limit odzyskiwania zglasza blad bez zdejmowania blokady', async (
   t.dispose();
 });
 
-test('adapter: reconnect odnawia limit, a dispose anuluje oczekujacy timer', (context) => {
+test('adapter: reconnect czysci stary limit, a dispose anuluje kolejny timer', (context) => {
   context.mock.timers.enable({ apis: ['setTimeout'] });
   const f = new FakeApi();
   const t = armedTransport(f);
@@ -167,16 +183,15 @@ test('adapter: reconnect odnawia limit, a dispose anuluje oczekujacy timer', (co
 
   t.setOnline(false);
   t.setOnline(true);
-  context.mock.timers.tick(4_000);
+  context.mock.timers.tick(20_000);
   assert.equal(f.shown.length, 0, 'stary timer nie zglasza bledu po reconnectcie');
-  context.mock.timers.tick(6_000);
-  assert.equal(f.shown.length, 1, 'nowe polaczenie ma wlasny pelny limit');
+  const session = t.openSession();
+  session.close();
 
-  f.fire('> ', 'prompt');
   t.beginRecovery();
   t.dispose();
   context.mock.timers.tick(20_000);
-  assert.equal(f.shown.length, 1, 'dispose anuluje kolejny limit');
+  assert.equal(f.shown.length, 0, 'dispose anuluje kolejny limit');
 });
 
 test('adapter: prompt przed limitem anuluje oczekujacy komunikat', (context) => {

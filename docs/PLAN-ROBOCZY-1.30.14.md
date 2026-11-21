@@ -1,7 +1,7 @@
 # Plan roboczy poprawek ArkMail 1.30.14
 
 Data utworzenia: 2026-11-21.
-Ostatnia aktualizacja: 2026-11-21, reset stanu zwierzecia zakonczony.
+Ostatnia aktualizacja: 2026-11-21, reset recovering przy reconnectcie zakonczony.
 
 ## Status i zakres
 
@@ -249,8 +249,6 @@ sesja gracza nie dostaje q; zwykla nowa operacja bez replayu dziala bez zmian.
 
 Istniejace testy do swiadomej aktualizacji kontraktu:
 
-- sessionRecovery.test.ts: reconnect i odzyskiwanie nie moga byc zdejmowane
-  dowolnym promptem; przypadki zalezne od starego kontraktu dostaja nowy dowod.
 - gateHotLoad.test.ts: swieze logowanie i hot-load pozostaja regresja; przypadek
   resumed bez replayedBytes zmienia sie z automatycznego odswiezenia na replay
   nieznany bez odswiezenia.
@@ -366,7 +364,7 @@ brak komend naprawczych.
 | Znalezisko | Etap i zakres |
 |---|---|
 | Niejasne komunikaty pustego reply-all we wszystkich zakresach | 1, zakonczone |
-| recovering przezywa reconnect | 2 i 3 |
+| recovering przezywa reconnect | 2, zakonczone; blokada niepustego replayu pozostaje w 3 |
 | Replayowany prompt zdejmuje blokade | 2 i 3, bez zdejmowania blokady przez prompt |
 | playerMailMode przezywa reconnect albo powstaje ze starego echa | Reset przy reconnectcie zakonczony w 2; replay i przypadek bez sygnalu pozostaja zgodnie z 0 i 3 |
 | Komendy pluginu wychodza podczas recznej poczty | 4 |

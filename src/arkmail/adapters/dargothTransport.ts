@@ -363,8 +363,15 @@ export class DargothTransport implements Transport {
 
   /** Odcina stare wysylki i porzuca kolejke bez drenowania. */
   setOnline(online: boolean): void {
+    const wasOnline = this.online;
     this.online = online;
-    if (online) return;
+    if (online) {
+      // Tylko rzeczywiste przejscie offline -> online konczy odzyskiwanie
+      // starego polaczenia. Powtorny sygnal obecnosci podczas timeoutu
+      // nadal nie zdejmuje blokady przed zwyklym promptem.
+      if (!wasOnline) this.finishRecovery();
+      return;
+    }
     this.connectionGeneration++;
     const needsRecovery = this.recovering || this.sessions.hasActive;
     this.recovering = false;
