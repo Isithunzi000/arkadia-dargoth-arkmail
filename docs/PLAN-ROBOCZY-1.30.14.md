@@ -1,7 +1,7 @@
 # Plan roboczy poprawek ArkMail 1.30.14
 
 Data utworzenia: 2026-11-21.
-Ostatnia aktualizacja: 2026-11-21, reset opoznionych odswiezen zakonczony.
+Ostatnia aktualizacja: 2026-11-21, reset recznej poczty przy reconnectcie zakonczony.
 
 ## Status i zakres
 
@@ -176,7 +176,6 @@ Reset ma:
 - zamykac aktywne sesje, czyszczac kolejke komend i oczekujace echa;
 - kasowac lastMailState, listingCtx, pendingRefresh, drainScheduled i
   archiveDownloadEta zgodnie z dotychczasowa odpowiedzialnoscia procedury;
-- czyszczyc playerMailMode, awaitingPlayerMailPrompt i playerMailModeTimer;
 - czyszczyc animalSendPending i sluchamArmed, zwiekszac animalSendSerial oraz
   kasowac animalTimer, sluchamTimer i unsentFlashTimer;
 - kasowac flagi i wskazniki operacji w toku oraz pozostawiac spojny interfejs;
@@ -187,9 +186,9 @@ Nie budujemy centralnej bramki calego ruchu. Zmiana dotyczy resetu, decyzji w
 onProxySession i blokad automatycznych dzialan. Aktualne komendy gracza oraz ich
 istniejace wykrywanie pozostaja poza blokada ArkMaila.
 
-Testy: reconnect z/bez disconnect, powtorne connect/proxy.session, reconnect
-podczas recznej poczty, stare Slucham?, pozne resolve zwierzecia, brak komend
-na logowaniu, zachowanie formularza i danych trwalych oraz idempotentnosc. Swieze logowanie i hot-load sa testami regresji,
+Testy: reconnect z/bez disconnect, powtorne connect/proxy.session, stare
+Slucham?, pozne resolve zwierzecia, brak komend na logowaniu, zachowanie
+formularza i danych trwalych oraz idempotentnosc. Swieze logowanie i hot-load sa testami regresji,
 nie maja stracic obecnego automatycznego dzialania.
 
 ## Etap 3 - reconnect, replay i reczne ponowienie
@@ -370,7 +369,7 @@ brak komend naprawczych.
 | Niejasne komunikaty pustego reply-all we wszystkich zakresach | 1, zakonczone |
 | recovering przezywa reconnect | 2 i 3 |
 | Replayowany prompt zdejmuje blokade | 2 i 3, bez zdejmowania blokady przez prompt |
-| playerMailMode przezywa reconnect albo powstaje ze starego echa | 2 i 3 przy wykrytym reconnect/replayu; przypadek bez sygnalu jest ograniczeniem API |
+| playerMailMode przezywa reconnect albo powstaje ze starego echa | Reset przy reconnectcie zakonczony w 2; replay i przypadek bez sygnalu pozostaja zgodnie z 0 i 3 |
 | Komendy pluginu wychodza podczas recznej poczty | 4 |
 | Pomijane automatyczne odswiezenie po wznowieniu | 2 i 3, jedno odswiezenie przy pustym replayu |
 | Stary listing albo pusta odpowiedz zmienia archiwum | 3 i 7 |

@@ -182,6 +182,27 @@ test('wyjscie q bez zwyklego promptu konczy tryb po limicie awaryjnym', async (c
   }
 });
 
+test('connect podczas recznej poczty czysci stary tryb przed nowymi zdarzeniami', async () => {
+  answered.clear();
+  const h = await startHarness();
+  const { f } = h;
+  try {
+    f.fire('→ listy');
+    f.fireEvent('client.connect', undefined);
+    f.fireEvent('gmcp.char.info', { name: 'Tester' });
+    f.fire(' [ POCZTA ] Masz nowa poczte od Foo.', 'mail');
+
+    await h.waitFor(() => f.sent.includes('listy odebrane'), 'odswiezenie po nowym polaczeniu');
+    await answerEmpty(h, 'odebrane');
+    await answerEmpty(h, 'nieprzeczytane');
+    await waitIdle(h);
+    assert.ok(!f.sent.includes('q'));
+    assert.ok(!f.sent.includes('~q'));
+  } finally {
+    await stopHarness();
+  }
+});
+
 test('kasowanie w trybie poczty gracza parkuje, po wyjsciu drenaz 4 skrzynek (Fala 24f3)', async () => {
   answered.clear();
   const h = await startHarness();

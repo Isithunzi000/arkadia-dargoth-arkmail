@@ -823,6 +823,9 @@ export async function init(api: PluginApi) {
     drainScheduled = false;
     for (const timer of delayedInboxTimers) clearTimeout(timer);
     delayedInboxTimers = [];
+    playerMailMode = false;
+    awaitingPlayerMailPrompt = false;
+    clearPlayerMailModeTimer();
     ui.setBusy(null);
     ui.setLoadAll(null);
     ui.setIndexRun(null);
@@ -903,9 +906,6 @@ export async function init(api: PluginApi) {
   };
   const onClientDisconnect = (): void => {
     cancelConnectionOperations();
-    playerMailMode = false;
-    awaitingPlayerMailPrompt = false;
-    clearPlayerMailModeTimer();
   };
   const onSystemLogin = (): void => {
     onClientDisconnect();
