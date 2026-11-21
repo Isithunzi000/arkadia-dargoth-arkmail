@@ -122,6 +122,28 @@ test('natychmiastowe "Slucham?" z wnetrza API nie gubi zdarzenia ani nie zostawi
   }
 });
 
+test('reconnect konczy stary lot i odcina detektor Slucham?', async () => {
+  answered.clear();
+  const h = await startHarness();
+  try {
+    click(h, '.arkmail-animal-send');
+    await h.waitFor(() => h.f.sent.includes('wyslij zwierze'), 'komenda przed reconnectem');
+    await h.waitFor(() => animalDisabled(h) === true, 'lot przed reconnectem');
+
+    h.f.fireEvent('client.disconnect', undefined);
+    h.f.fireEvent('client.connect', undefined);
+    h.f.fireEvent('gmcp.char.info', { name: 'Tester' });
+    await h.waitFor(() => animalDisabled(h) === false, 'przycisk odblokowany po reconnectcie');
+
+    h.f.fire('Slucham?');
+    await sleep(80);
+    assert.ok(!sluchamToast(h), 'stare Slucham? nie wywoluje komunikatu ani nowej operacji');
+    assert.deepEqual(h.f.sent, ['wyslij zwierze'], 'reset nie wysyla zadnych komend naprawczych');
+  } finally {
+    await stopHarness();
+  }
+});
+
 test('"Slucham?" po zamknieciu okna nie konczy lotu', async () => {
   answered.clear();
   ANIMAL_TIMING.sluchamWindowMs = 40;

@@ -826,6 +826,10 @@ export async function init(api: PluginApi) {
     playerMailMode = false;
     awaitingPlayerMailPrompt = false;
     clearPlayerMailModeTimer();
+    animalSendSerial++;
+    animalSendPending = false;
+    disarmSlucham();
+    endAnimalFlight();
     ui.setBusy(null);
     ui.setLoadAll(null);
     ui.setIndexRun(null);

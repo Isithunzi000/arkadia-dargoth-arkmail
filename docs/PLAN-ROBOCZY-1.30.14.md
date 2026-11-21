@@ -1,7 +1,7 @@
 # Plan roboczy poprawek ArkMail 1.30.14
 
 Data utworzenia: 2026-11-21.
-Ostatnia aktualizacja: 2026-11-21, reset recznej poczty przy reconnectcie zakonczony.
+Ostatnia aktualizacja: 2026-11-21, reset stanu zwierzecia zakonczony.
 
 ## Status i zakres
 
@@ -176,8 +176,7 @@ Reset ma:
 - zamykac aktywne sesje, czyszczac kolejke komend i oczekujace echa;
 - kasowac lastMailState, listingCtx, pendingRefresh, drainScheduled i
   archiveDownloadEta zgodnie z dotychczasowa odpowiedzialnoscia procedury;
-- czyszczyc animalSendPending i sluchamArmed, zwiekszac animalSendSerial oraz
-  kasowac animalTimer, sluchamTimer i unsentFlashTimer;
+- kasowac unsentFlashTimer i czyscic wskaznik niewyslanych;
 - kasowac flagi i wskazniki operacji w toku oraz pozostawiac spojny interfejs;
 - zachowywac dane trwale, archiwum, ustawienia i tresc formularza;
 - byc idempotentny, bez duplikatow komunikatow, komend, timerow i odswiezen.
@@ -186,9 +185,9 @@ Nie budujemy centralnej bramki calego ruchu. Zmiana dotyczy resetu, decyzji w
 onProxySession i blokad automatycznych dzialan. Aktualne komendy gracza oraz ich
 istniejace wykrywanie pozostaja poza blokada ArkMaila.
 
-Testy: reconnect z/bez disconnect, powtorne connect/proxy.session, stare
-Slucham?, pozne resolve zwierzecia, brak komend na logowaniu, zachowanie
-formularza i danych trwalych oraz idempotentnosc. Swieze logowanie i hot-load sa testami regresji,
+Testy: reconnect z/bez disconnect, powtorne connect/proxy.session, brak
+komend na logowaniu, zachowanie formularza i danych trwalych oraz
+idempotentnosc. Swieze logowanie i hot-load sa testami regresji,
 nie maja stracic obecnego automatycznego dzialania.
 
 ## Etap 3 - reconnect, replay i reczne ponowienie
@@ -379,7 +378,7 @@ brak komend naprawczych.
 | Timeout pagera wysyla q bez dowodu pagera | 5 |
 | Timeout compose nie obsluguje otwartego edytora | 6 |
 | Stare timery odswiezen przezywaja reconnect | 2, zakonczone |
-| Stan zwierzecia reaguje na stare zdarzenia | 2 i 3 |
+| Stan zwierzecia reaguje na stare zdarzenia | Reset zakonczony w 2; granice wykrywania replayu pozostaja zgodne z 0 i 3 |
 | Ogolne lub niewidoczne operacja anulowana | 4 i 8 |
 | Zalegly bufor po obudzeniu karty bez ramki kontrolnej | Ograniczenie API opisane w etapie 0; bez falszywej gwarancji wykrycia |
 | Pozne wyniki i stare callbacki zmieniaja nowa operacje | 2 i 3 |
