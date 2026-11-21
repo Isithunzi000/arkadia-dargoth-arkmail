@@ -45,37 +45,72 @@ export function parseReplyHeader(value: string, known: ReadonlySet<string>): str
   return splitRecipients(value.replace(/\s+i\s+/gi, ','), known);
 }
 
-/**
- * Zwraca kanoniczne pola albo null, gdy po regulach nie ma odbiorcy.
- * Nie zmienia zwyklej odpowiedzi, cytowania ani recznego wpisu.
- */
-export function buildReplyAllPrefill(
+export type ReplyAllEmptyReason = 'no-recipients' | 'only-current-character';
+
+export type ReplyAllResult =
+  | { kind: 'prefill'; scope: ReplyAllScope; prefill: ReplyAllPrefill }
+  | { kind: 'empty'; scope: ReplyAllScope; reason: ReplyAllEmptyReason };
+
+/** Jedna tresc komunikatu dla zwyklego listu i Archiwum. */
+export function replyAllEmptyMessage(scope: ReplyAllScope, reason: ReplyAllEmptyReason): string {
+  if (scope === 'cc') {
+    return reason === 'only-current-character'
+      ? 'Nie mozna przygotowac odpowiedzi tylko do DW, poniewaz Twoja postac jest jedynym odbiorca DW i zostaje pominieta.'
+      : 'List nie ma odbiorcow DW, wiec nie mozna przygotowac odpowiedzi tylko do DW.';
+  }
+  if (scope === 'to') {
+    return reason === 'only-current-character'
+      ? 'Nie mozna przygotowac odpowiedzi w zakresie Tylko DO, poniewaz Twoja postac jest jedyna osoba w tym zakresie i zostaje pominieta.'
+      : 'Nie mozna przygotowac odpowiedzi w zakresie Tylko DO, poniewaz ten zakres nie zawiera adresatow.';
+  }
+  return reason === 'only-current-character'
+    ? 'Nie mozna przygotowac odpowiedzi wszystkim, poniewaz Twoja postac jest jedynym adresem odpowiedzi i zostaje pominieta.'
+    : 'Nie mozna przygotowac odpowiedzi wszystkim, poniewaz list nie zawiera adresatow odpowiedzi.';
+}
+
+/** Rozroznia brak adresatow od odrzucenia wylacznie aktualnej postaci. */
+export function buildReplyAllResult(
   letter: ReplyAllLetter,
   currentCharacter: string | null,
   known: ReadonlySet<string>,
   scope: ReplyAllScope = 'all',
-): ReplyAllPrefill | null {
+): ReplyAllResult {
   const current = currentCharacter?.trim().toLowerCase() || null;
+  const empty = (onlyCurrent: boolean): ReplyAllResult => ({
+    kind: 'empty',
+    scope,
+    reason: onlyCurrent ? 'only-current-character' : 'no-recipients',
+  });
   if (scope === 'cc') {
     const carbon: string[] = [];
     const seen = new Set<string>();
+    let onlyCurrent = false;
     for (const name of parseReplyHeader(letter.cc ?? '', known)) {
       const key = name.trim().toLowerCase();
-      if (!key || key === current || seen.has(key)) continue;
+      if (!key) continue;
+      if (key === current) onlyCurrent = true;
+      if (key === current || seen.has(key)) continue;
       seen.add(key);
       carbon.push(name);
     }
-    if (carbon.length === 0) return null;
-    return { adresat: carbon.join(', '), dw: '' };
+    if (carbon.length === 0) return empty(onlyCurrent);
+    return { kind: 'prefill', scope, prefill: { adresat: carbon.join(', '), dw: '' } };
   }
 
   const primary: string[] = [];
   const carbon: string[] = [];
   const seen = new Set<string>();
+  let currentPrimary = false;
+  let currentCarbon = false;
   const add = (header: string | null, destination: string[]): void => {
     for (const name of parseReplyHeader(header ?? '', known)) {
       const key = name.trim().toLowerCase();
-      if (!key || seen.has(key)) continue;
+      if (!key) continue;
+      if (key === current) {
+        if (destination === primary) currentPrimary = true;
+        else currentCarbon = true;
+      }
+      if (seen.has(key)) continue;
       seen.add(key);
       if (key === current) continue;
       destination.push(name);
@@ -88,13 +123,24 @@ export function buildReplyAllPrefill(
   add(letter.cc, carbon);
 
   if (scope === 'to') {
-    if (primary.length === 0) return null;
-    return { adresat: primary.join(', '), dw: '' };
+    if (primary.length === 0) return empty(currentPrimary);
+    return { kind: 'prefill', scope, prefill: { adresat: primary.join(', '), dw: '' } };
   }
   if (primary.length === 0 && carbon.length > 0) {
     primary.push(...carbon);
     carbon.length = 0;
   }
-  if (primary.length === 0) return null;
-  return { adresat: primary.join(', '), dw: carbon.join(', ') };
+  if (primary.length === 0) return empty(currentPrimary || currentCarbon);
+  return { kind: 'prefill', scope, prefill: { adresat: primary.join(', '), dw: carbon.join(', ') } };
+}
+
+/** Poprzedni interfejs dla wywolan, ktore potrzebuja tylko gotowych pol. */
+export function buildReplyAllPrefill(
+  letter: ReplyAllLetter,
+  currentCharacter: string | null,
+  known: ReadonlySet<string>,
+  scope: ReplyAllScope = 'all',
+): ReplyAllPrefill | null {
+  const result = buildReplyAllResult(letter, currentCharacter, known, scope);
+  return result.kind === 'prefill' ? result.prefill : null;
 }

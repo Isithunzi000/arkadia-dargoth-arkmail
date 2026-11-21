@@ -41,8 +41,9 @@ import {
 } from '../core/letterRender.js';
 import { validateCompose, type ComposeSendInput } from '../core/composeValidation.js';
 import {
-  buildReplyAllPrefill,
+  buildReplyAllResult,
   knownRecipientNames,
+  type ReplyAllEmptyReason,
   type ReplyAllPrefill,
   type ReplyAllScope,
 } from '../core/replyRecipients.js';
@@ -73,8 +74,8 @@ export interface MailUiHandlers {
   onClearSearch(box: MailBox): void;
   onDeleteLetter(box: MailBox, entry: MailboxEntry): void;
   onForwardLetter(box: MailBox, entry: MailboxEntry, adresat: string): void;
-  /** Pusty wynik reply-all wymaga komunikatu z warstwy integracyjnej. */
-  onReplyAllEmpty?(): void;
+  /** Pusty wynik reply-all przekazuje zakres i przyczyne do komunikatu. */
+  onReplyAllEmpty?(scope: ReplyAllScope, reason: ReplyAllEmptyReason): void;
   /**
    * Reply-all z Archiwum uzywa aktualnego rekordu. Brak kompletu moze
    * wymagac jednego odczytu; apply odrzuca nadpisanie zmienionego draftu.
@@ -1402,17 +1403,17 @@ const filterClearClass = (viewClass?: string): string =>
         });
         return;
       }
-      const prefill = buildReplyAllPrefill(
+      const result = buildReplyAllResult(
         l,
         store.state.characterName,
         knownRecipientNames(store.state),
         scope,
       );
-      if (!prefill) {
-        handlers.onReplyAllEmpty?.();
+      if (result.kind === 'empty') {
+        handlers.onReplyAllEmpty?.(result.scope, result.reason);
         return;
       }
-      applyReplyPrefill(prefill, quote);
+      applyReplyPrefill(result.prefill, quote);
     };
     const reply = doc.createElement('button');
     reply.className = 'arkmail-reply popup-btn popup-btn--control';

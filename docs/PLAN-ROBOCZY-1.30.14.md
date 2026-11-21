@@ -1,7 +1,7 @@
 # Plan roboczy poprawek ArkMail 1.30.14
 
 Data utworzenia: 2026-11-21.
-Ostatnia aktualizacja: 2026-11-21, uproszczenie po audycie kodu.
+Ostatnia aktualizacja: 2026-11-21, komunikaty reply-all zakonczone.
 
 ## Status i zakres
 
@@ -163,67 +163,6 @@ gwarantujemy tez, ze kazde replayowane echo zostanie odroznione od aktualnej
 komendy gracza. Nie usuwamy wykrywania aktualnych komend gracza i nie blokujemy
 globalnie ręcznej poczty, poniewaz to psuloby poprawna funkcje. Te ograniczenia
 sa jawne; zadny test ani raport nie moze przedstawiac ich jako rozwiazanych.
-
-## Etap 1 - komunikaty dla wszystkich zakresow reply-all
-
-### Zmiana
-
-Wewnetrzny wynik budowania odpowiedzi ma rozrozniac:
-
-- poprawny prefill;
-- no-recipients: wybrany zakres nie zawiera adresatow;
-- only-current-character: wszystkie znalezione adresy naleza do aktualnej
-  postaci, takze przy powtorzeniach i roznej wielkosci liter.
-
-Wynik ma zawierac zakres all/to/cc. Jedna wspolna klasyfikacja obsluguje zwykly
-list i Archiwum. Interfejs nie zgaduje przyczyny samodzielnie.
-
-### Komunikaty
-
-DO + DW, brak adresatow:
-
-"Nie mozna przygotowac odpowiedzi wszystkim, poniewaz list nie zawiera adresatow odpowiedzi."
-
-DO + DW, wylacznie aktualna postac:
-
-"Nie mozna przygotowac odpowiedzi wszystkim, poniewaz Twoja postac jest jedynym adresem odpowiedzi i zostaje pominieta."
-
-Tylko DO, brak adresatow:
-
-"Nie mozna przygotowac odpowiedzi w zakresie Tylko DO, poniewaz ten zakres nie zawiera adresatow."
-
-Tylko DO, wylacznie aktualna postac:
-
-"Nie mozna przygotowac odpowiedzi w zakresie Tylko DO, poniewaz Twoja postac jest jedyna osoba w tym zakresie i zostaje pominieta."
-
-Tylko DW, brak adresatow:
-
-"List nie ma odbiorcow DW, wiec nie mozna przygotowac odpowiedzi tylko do DW."
-
-Tylko DW, wylacznie aktualna postac:
-
-"Nie mozna przygotowac odpowiedzi tylko do DW, poniewaz Twoja postac jest jedynym odbiorca DW i zostaje pominieta."
-
-Sformulowanie zakres Tylko DO jest celowe, poniewaz dla listow odebranych obejmuje
-on takze nadawce.
-
-### Testy
-
-Dla kazdego zakresu sprawdzic brak adresatow, wylacznie aktualna postac,
-powtorzenia i wielkosc liter, aktualna postac z inna osoba oraz brak aktualnej
-postaci. Obejmuja one zwykly list, Archiwum i cytowanie.
-
-Dodatkowo:
-
-- Odebrane/Nieprzeczytane: zewnetrzny nadawca zapobiega pustemu Tylko DO i DO +
-  DW, nawet gdy DO i DW zawieraja tylko aktualna postac.
-- Wyslane/Niewyslane: nadawca nie ratuje wyniku; puste DO z innymi osobami w DW
-  daje puste Tylko DO, ale poprawne DO + DW.
-- Wszystkie skrzynki: samotna aktualna postac w DW daje konkretny komunikat.
-
-Nie zmieniamy pomijania wlasnej postaci, deduplikacji, skladu odbiorcow, braku
-fallbacku, przenoszenia DW do Adresata, istniejacego formularza ani braku komend
-przy pustym wyniku.
 
 ## Etap 2 - jeden reset na istniejacej infrastrukturze
 
@@ -431,7 +370,7 @@ brak komend naprawczych.
 
 | Znalezisko | Etap i zakres |
 |---|---|
-| Niejasne komunikaty pustego reply-all we wszystkich zakresach | 1 |
+| Niejasne komunikaty pustego reply-all we wszystkich zakresach | 1, zakonczone |
 | recovering przezywa reconnect | 2 i 3 |
 | Replayowany prompt zdejmuje blokade | 2 i 3, bez zdejmowania blokady przez prompt |
 | playerMailMode przezywa reconnect albo powstaje ze starego echa | 2 i 3 przy wykrytym reconnect/replayu; przypadek bez sygnalu jest ograniczeniem API |

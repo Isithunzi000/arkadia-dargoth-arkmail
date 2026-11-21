@@ -76,7 +76,11 @@ import {
 } from "./core/archiveDownload";
 import { totalLive } from "./core/archiveStats";
 import { cancelFlag, DownloadEta, waitOrCancel } from "./core/timing";
-import { buildReplyAllPrefill, knownRecipientNames } from "./core/replyRecipients";
+import {
+  buildReplyAllResult,
+  knownRecipientNames,
+  replyAllEmptyMessage,
+} from "./core/replyRecipients";
 import { MailboxSession, type ListingCtx, type MailboxEntry, type MailboxResult } from "./core/session/mailbox";
 import { AmbiguousResponseError } from "./core/session/errors";
 import { humanizeMailError, isOperationCancelled } from "./core/errors";
@@ -2358,21 +2362,17 @@ export async function init(api: PluginApi) {
     onDownloadArchiveBodies: () => runArchiveDownload(),
     onReplyAllArchive: (archiveId, scope, apply) => {
       const applyRecord = (record: ArchiveLetter): void => {
-        const prefill = buildReplyAllPrefill(
+        const result = buildReplyAllResult(
           { ...archiveLetterContent(record), box: record.box },
           ui.state.characterName,
           knownRecipientNames(ui.state),
           scope,
         );
-        if (!prefill) {
-          notify(
-            api,
-            "Nie mozna przygotowac odpowiedzi wszystkim, poniewaz lista odbiorcow jest pusta.",
-            { level: "warning" },
-          );
+        if (result.kind === "empty") {
+          notify(api, replyAllEmptyMessage(result.scope, result.reason), { level: "warning" });
           return;
         }
-        if (!apply(prefill)) {
+        if (!apply(result.prefill)) {
           notify(
             api,
             "Nie ustawiono odpowiedzi, poniewaz formularz zostal zmieniony w trakcie odczytu.",
@@ -2458,9 +2458,9 @@ export async function init(api: PluginApi) {
           if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
         });
     },
-    onReplyAllEmpty: () => notify(
+    onReplyAllEmpty: (scope, reason) => notify(
       api,
-      "Nie mozna przygotowac odpowiedzi wszystkim, poniewaz lista odbiorcow jest pusta.",
+      replyAllEmptyMessage(scope, reason),
       { level: "warning" },
     ),
     // Indeksacja wszystkich skrzynek jako osobna operacja.

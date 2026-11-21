@@ -494,3 +494,31 @@ test('ui: szesc kombinacji zakresu i cytowania tworzy lokalny prefill bez wysylk
     }
   }
 });
+
+test('ui: pusty reply-all przekazuje zakres i rzeczywista przyczyne', () => {
+  const cases: Array<{
+    scope: ReplyScope;
+    reason: string;
+    box: MailBox;
+    letter: { from: string; to: string; cc: string | null };
+  }> = [
+    { scope: 'all', reason: 'only-current-character', box: 'odebrane', letter: { from: 'Gracz', to: 'gracz', cc: 'GRACZ' } },
+    { scope: 'all', reason: 'no-recipients', box: 'odebrane', letter: { from: '', to: '', cc: null } },
+    { scope: 'to', reason: 'only-current-character', box: 'wyslane', letter: { from: 'Gracz', to: 'gracz', cc: 'Baz' } },
+    { scope: 'to', reason: 'no-recipients', box: 'wyslane', letter: { from: 'Gracz', to: '', cc: 'Baz' } },
+    { scope: 'cc', reason: 'only-current-character', box: 'odebrane', letter: { from: 'Foo', to: 'Bar', cc: 'gracz i GRACZ' } },
+    { scope: 'cc', reason: 'no-recipients', box: 'odebrane', letter: { from: 'Foo', to: 'Bar', cc: null } },
+  ];
+  for (const value of cases) {
+    const s = new MailUiStore({ characterName: 'Gracz' } as Partial<import('../src/arkmail/ui/store').MailUiState>);
+    const { container, calls, off } = mount(s);
+    openLetter(s, value.box, value.letter);
+    replyAll(container, value.scope);
+    const empty = calls.filter((call) => call.name === 'reply-all-empty');
+    assert.equal(empty.length, 1, `${value.scope}, ${value.reason}`);
+    assert.deepEqual(empty[0]?.args, [value.scope, value.reason]);
+    assert.equal(s.state.tab, 'list', 'pusty wynik nie otwiera formularza');
+    assert.equal(sends(calls).length, 0);
+    off();
+  }
+});

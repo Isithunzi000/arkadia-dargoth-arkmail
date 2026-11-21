@@ -469,3 +469,53 @@ test('reply-all: zamkniecie listu odrzuca pozny wynik i chroni reczny draft', as
     await stopHarness();
   }
 });
+
+test('reply-all: Archiwum pokazuje konkretny komunikat dla kazdego zakresu i przyczyny', async () => {
+  const cases: Array<{
+    scope: 'all' | 'to' | 'cc';
+    headers: { from: string; to: string; cc: string | null };
+    message: string;
+  }> = [
+    {
+      scope: 'all',
+      headers: { from: 'Foo', to: 'foo', cc: 'FOO' },
+      message: 'Nie mozna przygotowac odpowiedzi wszystkim, poniewaz Twoja postac jest jedynym adresem odpowiedzi i zostaje pominieta.',
+    },
+    {
+      scope: 'all',
+      headers: { from: '', to: '', cc: null },
+      message: 'Nie mozna przygotowac odpowiedzi wszystkim, poniewaz list nie zawiera adresatow odpowiedzi.',
+    },
+    {
+      scope: 'to',
+      headers: { from: 'Foo', to: 'foo', cc: 'Bar' },
+      message: 'Nie mozna przygotowac odpowiedzi w zakresie Tylko DO, poniewaz Twoja postac jest jedyna osoba w tym zakresie i zostaje pominieta.',
+    },
+    {
+      scope: 'to',
+      headers: { from: '', to: '', cc: 'Bar' },
+      message: 'Nie mozna przygotowac odpowiedzi w zakresie Tylko DO, poniewaz ten zakres nie zawiera adresatow.',
+    },
+    {
+      scope: 'cc',
+      headers: { from: 'Nadawca', to: 'Bar', cc: 'foo i FOO' },
+      message: 'Nie mozna przygotowac odpowiedzi tylko do DW, poniewaz Twoja postac jest jedynym odbiorca DW i zostaje pominieta.',
+    },
+    {
+      scope: 'cc',
+      headers: { from: 'Nadawca', to: 'Bar', cc: null },
+      message: 'List nie ma odbiorcow DW, wiec nie mozna przygotowac odpowiedzi tylko do DW.',
+    },
+  ];
+  for (const value of cases) {
+    const h = await startHarness({ archive: [record({ headers: value.headers })] });
+    try {
+      await openCached(h);
+      replyAll(h, value.scope);
+      await waitRt(() => notifyText(h.f, value.message), `${value.scope}: konkretny komunikat`);
+      assert.deepEqual(h.f.sent, [], 'pusty wynik nie wysyla komend');
+    } finally {
+      await stopHarness();
+    }
+  }
+});
