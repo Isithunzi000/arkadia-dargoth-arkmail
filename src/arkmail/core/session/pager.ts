@@ -399,13 +399,18 @@ export class PagerSession {
       };
 
       /**
-       * Fala 12a: timeout najpierw UBIA ewentualny pager ("q" + krotka
-       * grace na jego domkniecie), dopiero potem reject. Sierocy pager
-       * konsumowalby kolejne komendy gracza ("Nie ma takiej komendy").
-       * Prompt gry w grace = serwer jednak odpowiedzial -> finish().
+       * Timeout zamyka "q" tylko pager potwierdzony odpowiedzia na nasza
+       * komende. Przy ciszy przed naglowkami nie wolno zgadywac stanu gry
+       * ani wysylac q do legalnej sesji gracza.
        */
       const timer = setTimeout(() => {
         actions?.onTimeout?.();
+        const confirmedPager = state === 'pager' || pagerFired || idleOpened || headersDone;
+        if (state !== 'closing' && !confirmedPager) {
+          cleanup();
+          reject(new Error(`timeout: pager session list ${numer}`));
+          return;
+        }
         // Fala 24g: timeout z pagerem (byc moze) otwartym na serwerze -
         // "q" wyslane, ale bez potwierdzenia. Straznik dostaje
         // podejrzenie: przy najblizszym promptcie pagera poza sesja

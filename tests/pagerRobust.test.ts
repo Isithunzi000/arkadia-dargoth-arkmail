@@ -158,7 +158,7 @@ test('sklejona linia prompt+odrzucenie: wykrycie, q i ponowienie odczytu', async
   if (out.ok) assert.equal(out.value.letter.from, 'Bar');
 });
 
-test('timeout sesji wysyla q przed porzuceniem (zero sierocych pagerow)', async () => {
+test('timeout sesji bez potwierdzonego pagera konczy sie bez q', async () => {
   const t = new MockTransport();
   const s = new PagerSession(t, OPTS);
   const out = await settle(s.readLetter(7));
@@ -166,8 +166,8 @@ test('timeout sesji wysyla q przed porzuceniem (zero sierocych pagerow)', async 
   if (!out.ok) assert.ok(/timeout/.test(String(out.error)), 'powod: timeout');
   assert.deepEqual(
     t.sent,
-    ['przeczytaj list 7', 'q'],
-    'q poszlo do gry mimo timeoutu - pager nie zostaje sierota',
+    ['przeczytaj list 7'],
+    'bez naglowkow i promptu nie wolno zgadywac, ze pager jest otwarty',
   );
 });
 

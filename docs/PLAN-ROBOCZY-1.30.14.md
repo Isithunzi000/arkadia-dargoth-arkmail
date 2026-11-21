@@ -1,7 +1,7 @@
 # Plan roboczy poprawek ArkMail 1.30.14
 
 Data utworzenia: 2026-11-21.
-Ostatnia aktualizacja: 2026-11-21, etap 4 zakonczony.
+Ostatnia aktualizacja: 2026-11-21, etap 5 zakonczony.
 
 ## Status i zakres
 
@@ -322,7 +322,7 @@ komendy gracza. Istniejace testy playerMailMode.test.ts pozostaja regresja.
   tests/playerMailUiGuard.test.ts, tests/adapters.test.ts,
   tests/archiveDownload.test.ts, tests/modalPagerCommands.test.ts oraz ten plan.
 
-## Etap 5 - pager i timeouty
+## Etap 5 - zakonczony: pager i timeouty
 
 Timeout przed dowodem otwarcia pagera nie wysyla q.
 
@@ -339,6 +339,24 @@ Testy: cisza przed naglowkiem bez q; timeout po potwierdzonym pagerze z
 kontrolowanym zamknieciem; timeout podczas zamykania z synchronizacja i
 wlasciwym komunikatem; stary prompt bez akcji. Istniejace testy
 pagerWatchdog.test.ts pozostaja regresja dla recznego pagera i braku duplikatu q.
+
+### Wynik wykonania
+
+- RED: dwa nowe przypadki calkowitej ciszy przed naglowkami wysylaly q.
+  Dwa pozostale przypadki, timeout po potwierdzonym pagerze i timeout podczas
+  zamykania, juz dzialaly poprawnie i pozostaly kontrola regresji.
+- Timeout bez zgodnych naglowkow, promptu pagera i wczesniejszego potwierdzenia
+  konczy tylko lokalna operacje: bez q, bez podejrzenia sieroty i bez blokady
+  swiadomego ponowienia. Pozne prompty i linie listu nie wywoluja komend.
+- Potwierdzony pager nadal dostaje najwyzej jedno q. Brak zwyklego promptu po q
+  uruchamia synchronizacje i podejrzenie sieroty; nie ma drugiego q.
+- GREEN: 62/62 kontrole ukierunkowane, w tym nowe timeouty, pagerRobust,
+  pagerRecovery, sessionDelayedPrompt, session, pagerWatchdog i orphanPager.
+- Pelny zestaw: 1238 testow TypeScript i 49 kontrolek MJS, razem 1287
+  zaliczonych, 0 bledow, 0 anulowan, 0 pominiec. Typowanie i build zielone.
+- Zmienione pliki: src/arkmail/core/session/pager.ts,
+  tests/pagerTimeout.test.ts, tests/pagerRobust.test.ts,
+  tests/orphanPager.test.ts oraz ten plan.
 
 ## Etap 6 - timeout compose i edytor serwera
 
@@ -415,7 +433,7 @@ brak komend naprawczych.
 | Stary list o tym samym numerze zostaje zapisany | 3 i 7 |
 | Stare prompty uruchamiaja kasowanie/przekazywanie | 3 i 7 |
 | Stare linie koncza compose lub import | 3, 6 i 7 |
-| Timeout pagera wysyla q bez dowodu pagera | 5 |
+| Timeout pagera wysyla q bez dowodu pagera | 5, zakonczone |
 | Timeout compose nie obsluguje otwartego edytora | 6 |
 | Stare timery odswiezen przezywaja reconnect | 2, zakonczone |
 | Wskaznik niewyslanych i jego timer przezywaja reconnect | 2, zakonczone |

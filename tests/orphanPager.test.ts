@@ -3,8 +3,8 @@
  *
  * Kontrakt:
  * - flaga startuje czysta; suspect/clear dzialaja jak przełacznik;
- * - awaryjny timeout sesji pagerowej STAWIA podejrzenie (pager mogl
- *   zostac na serwerze - "q" poszlo bez potwierdzenia);
+ * - awaryjny timeout PO POTWIERDZENIU wlasnego pagera STAWIA podejrzenie
+ *   ("q" poszlo bez potwierdzenia); cisza przed naglowkami go nie stawia;
  * - sierocy pager przetrwaly "q" w fetchu STAWIA podejrzenie;
  * - kazdy UDANY fetch/odczyt ZDEJMUJE podejrzenie (komendy dochodza);
  * - straznik w index.ts: podejrzenie + prompt pagera poza blokada ->
@@ -32,16 +32,30 @@ test('flaga: start czysta, suspect stawia, clear zdejmuje', () => {
   assert.equal(isPagerOrphanSuspected(), false, 'clear zdejmuje flage');
 });
 
-test('timeout sesji pagerowej stawia podejrzenie sieroty', async () => {
+test('timeout przed potwierdzeniem pagera nie stawia podejrzenia sieroty', async () => {
   clearPagerOrphan();
   const t = new MockTransport();
   const pager = new PagerSession(t, { timeoutMs: 50, idleMs: 20 });
   const p = pager.readLetter(1);
-  // Serwer milknie calkowicie - sesja timeoutuje; "q" leci bez
-  // potwierdzenia, pager moze zostac na serwerze.
   await assert.rejects(p, /timeout/, 'sesja konczy sie timeoutem');
-  assert.ok(t.sent.includes('q'), 'sesja probowala domknac pager przed porzuceniem');
-  assert.equal(isPagerOrphanSuspected(), true, 'timeout stawia podejrzenie');
+  assert.ok(!t.sent.includes('q'), 'bez dowodu pagera nie ma q');
+  assert.equal(isPagerOrphanSuspected(), false, 'bez dowodu nie przypisujemy sobie cudzego pagera');
+});
+
+test('timeout po potwierdzeniu wlasnego pagera stawia podejrzenie sieroty', async () => {
+  clearPagerOrphan();
+  const t = new MockTransport();
+  const pager = new PagerSession(t, { timeoutMs: 50, idleMs: 20 });
+  const p = pager.readLetter(1);
+  const rejection = assert.rejects(p, /timeout/, 'sesja konczy sie timeoutem');
+  await t.replay([
+    { cls: 'mail', text: 'List : 1' },
+    { cls: 'mail', text: 'Data : Wt, 24 VIII 1999, 00:11:12' },
+    { cls: 'mail', text: '[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ' },
+  ]);
+  assert.ok(t.sent.includes('q'), 'potwierdzony pager dostal q przed porzuceniem');
+  await rejection;
+  assert.equal(isPagerOrphanSuspected(), true, 'q bez zwyklego promptu stawia podejrzenie');
   clearPagerOrphan();
 });
 
