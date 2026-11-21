@@ -108,7 +108,7 @@ test('re-login: wznowienie sesji uniewaznia kontekst i odswieza skrzynki', async
     // kontekst i tak jest uniewazniany przy connect, ale odswiezenie
     // rusza dopiero po faktycznym wznowieniu sesji w grze.
     f.fireEvent('client.connect', undefined);
-    f.fireEvent('proxy.session', { resumed: true, upstreamClosed: false });
+    f.fireEvent('proxy.session', { resumed: true, upstreamClosed: false, replayedBytes: 0 });
     await waitFor(
       () => f.sent.slice(base).includes('listy odebrane'),
       'auto-refresh odebranych po connect',

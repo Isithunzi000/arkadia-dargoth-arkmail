@@ -437,8 +437,33 @@ export async function init(api: PluginApi) {
       tasks.add(tracked);
       return tracked;
     };
-    const runExclusive = <T,>(operation: () => Promise<T>): Promise<T> =>
-      trackTask(lock.runExclusive(operation));
+    type OperationSource = "manual" | "auto";
+    let replayReviewRequired = false;
+    let manualOperations = 0;
+    const releaseReplayForManual = (): void => {
+      if (!replayReviewRequired) return;
+      replayReviewRequired = false;
+      transport!.setOnline(true);
+    };
+    const manualOperationBlocked = (): boolean => {
+      if (replayReviewRequired) {
+        releaseReplayForManual();
+        return false;
+      }
+      return lock.locked;
+    };
+    const runExclusive = <T,>(
+      operation: () => Promise<T>,
+      source: OperationSource = "manual",
+    ): Promise<T> => {
+      if (source === "manual") {
+        manualOperations++;
+        releaseReplayForManual();
+      }
+      return trackTask(lock.runExclusive(operation)).finally(() => {
+        if (source === "manual") manualOperations--;
+      });
+    };
   let connectionGeneration = 0;
   let archiveDownloadEta: DownloadEta | null = null;
   const cancelListeners = new Set<() => void>();
@@ -530,7 +555,7 @@ export async function init(api: PluginApi) {
    * import NIE tworzy grup.
    */
   const importPeople = (kind: PeopleImportKind): void => {
-    if (lock.locked) {
+    if (manualOperationBlocked()) {
       notify(api, SESSION_BUSY_MSG, { level: "warning" });
       return;
     }
@@ -563,7 +588,7 @@ export async function init(api: PluginApi) {
    * dolaczaja do ksiazki adresowej (dedup).
    */
   const importAliases = (): void => {
-    if (lock.locked) {
+    if (manualOperationBlocked()) {
       notify(api, SESSION_BUSY_MSG, { level: "warning" });
       return;
     }
@@ -774,6 +799,7 @@ export async function init(api: PluginApi) {
     source: "auto" | "manual" = "auto",
     automatic = false,
   ): void => {
+    if (replayReviewRequired && source === "auto") return;
     if (automatic && !ui.state.autoRefreshEnabled) return;
     if (ui.state.tab === "usuwanie") ui.resetDeletion();
     ui.clearSearchBoxes(boxes);
@@ -781,7 +807,7 @@ export async function init(api: PluginApi) {
     let cancelled = false;
     void runExclusive(async () => {
       await fetchBoxes(boxes, mode, source, automatic);
-    })
+    }, source)
       .catch((err: unknown) => {
         cancelled = isOperationCancelled(err);
         if (source === "manual" && !cancelled) {
@@ -875,7 +901,7 @@ export async function init(api: PluginApi) {
     transport!.setOnline(true);
   };
   const onGamePresence = (): void => {
-    if (lastUpstreamClosed) return;
+    if (lastUpstreamClosed || replayReviewRequired) return;
     armGameTransport();
   };
   // Fala 27 (blad A): pluginy Dargoth laduja sie hot-load - install/
@@ -886,7 +912,7 @@ export async function init(api: PluginApi) {
   // kazdym ticku, wiec uzbrojenie nastepuje w ciagu sekund. Straz
   // anti-replay obowiazuje identycznie jak dla sygnalow gate.
   const onAnyGmcp = (): void => {
-    if (lastUpstreamClosed) return;
+    if (lastUpstreamClosed || replayReviewRequired) return;
     armGameTransport();
   };
   const onProxySession = (session: unknown): void => {
@@ -902,10 +928,24 @@ export async function init(api: PluginApi) {
     // sam uzywa poprawnego !upstreamClosed (PlayerIdentity.ts).
     if (s?.resumed === true && !s?.upstreamClosed) {
       lastUpstreamClosed = false;
-      if (s.replayedBytes === 0) {
-        if (emptyReplayHandled) return;
-        emptyReplayHandled = true;
+      if (s.replayedBytes !== 0) {
+        if (replayReviewRequired) return;
+        const interruptedManual =
+          manualOperations > 0 || playerMailMode || animalSendPending || animalFlight;
+        replayReviewRequired = true;
+        cancelConnectionOperations();
+        if (interruptedManual) {
+          notify(
+            api,
+            "Wznowienie polaczenia przerwalo poprzednia operacje. Ponow ja, gdy bedziesz gotowy.",
+            { level: "warning" },
+          );
+        }
+        return;
       }
+      replayReviewRequired = false;
+      if (emptyReplayHandled) return;
+      emptyReplayHandled = true;
       armGameTransport();
       refreshBoxes(["odebrane", "nieprzeczytane", "wyslane", "niewyslane"], "sync", "auto", true);
     } else if (s?.upstreamClosed === true) {
@@ -914,15 +954,18 @@ export async function init(api: PluginApi) {
       // przychodza PRZED ekranem logowania / gmcp_msg.system.login).
       // Rozbrajamy natychmiast, zamiast czekac na system.login.
       lastUpstreamClosed = true;
+      replayReviewRequired = false;
       onClientDisconnect();
     } else {
       // Swiezy attach (brak resumed i upstreamClosed) - czysta sesja
       // na ekranie logowania; zdejmujemy straz anti-replay.
       lastUpstreamClosed = false;
       emptyReplayHandled = false;
+      replayReviewRequired = false;
     }
   };
   const onClientDisconnect = (): void => {
+    replayReviewRequired = false;
     cancelConnectionOperations();
   };
   const onSystemLogin = (): void => {
@@ -962,6 +1005,7 @@ export async function init(api: PluginApi) {
   let playerMailMode = false;
   let awaitingPlayerMailPrompt = false;
   const scheduleRefresh = (boxes: MailBox[]): void => {
+    if (replayReviewRequired) return;
     // Wylaczenie nie parkuje nowych zadan na pozniej: zdarzenia w tle
     // zostaja bez komend az do recznej operacji lub ponownego wlaczenia.
     if (!ui.state.autoRefreshEnabled) return;
@@ -982,7 +1026,7 @@ export async function init(api: PluginApi) {
         pendingRefresh.clear();
         ui.clearSearchBoxes(batch);
         await fetchBoxes(batch, "sync", "auto", true);
-      })
+      }, "auto")
       .catch(() => {})
       .finally(() => {
         if (generation !== connectionGeneration) return;
@@ -1068,7 +1112,7 @@ export async function init(api: PluginApi) {
   const scheduleDelayedInboxRefresh = (): void => {
     for (const t of delayedInboxTimers) clearTimeout(t);
     delayedInboxTimers = [];
-    if (!ui.state.autoRefreshEnabled) return;
+    if (replayReviewRequired || !ui.state.autoRefreshEnabled) return;
     const generation = connectionGeneration;
     delayedInboxTimers = DELAYED_INBOX_RETRY_MS.map((ms) =>
       setTimeout(() => {
@@ -1390,7 +1434,7 @@ export async function init(api: PluginApi) {
       cancelFlag(loadAllFlag);
       return;
     }
-    if (lock.locked) {
+    if (manualOperationBlocked()) {
       notify(api, SESSION_BUSY_MSG, { level: "warning" });
       return;
     }
@@ -1495,7 +1539,7 @@ export async function init(api: PluginApi) {
       cancelFlag(indexFlag);
       return;
     }
-    if (lock.locked) {
+    if (manualOperationBlocked()) {
       notify(api, SESSION_BUSY_MSG, { level: "warning" });
       return;
     }
@@ -1925,7 +1969,7 @@ export async function init(api: PluginApi) {
       cancelFlag(archiveDownloadFlag);
       return;
     }
-    if (lock.locked) {
+    if (manualOperationBlocked()) {
       notify(api, SESSION_BUSY_MSG, { level: "warning" });
       return;
     }
@@ -2151,7 +2195,7 @@ export async function init(api: PluginApi) {
     [...numbers].sort((a, b) => a - b).join(",");
 
   const searchForDeletion = (box: MailBox, command: string): void => {
-    if (lock.locked) {
+    if (manualOperationBlocked()) {
       notify(api, SESSION_BUSY_MSG, { level: "warning" });
       return;
     }
@@ -2186,7 +2230,7 @@ export async function init(api: PluginApi) {
   };
 
   const deleteSelectedLetters = (): void => {
-    if (lock.locked) {
+    if (manualOperationBlocked()) {
       notify(api, SESSION_BUSY_MSG, { level: "warning" });
       return;
     }
@@ -2288,7 +2332,7 @@ export async function init(api: PluginApi) {
    * odczytu co klik w liste skrzynki.
    */
   const openArchiveFromServer = (letter: ArchiveLetter): void => {
-    if (lock.locked) {
+    if (manualOperationBlocked()) {
       notify(api, SESSION_BUSY_MSG, { level: "warning" });
       return;
     }
@@ -2316,7 +2360,7 @@ export async function init(api: PluginApi) {
     onDeletionDelete: () => deleteSelectedLetters(),
     onSendAnimal: () => {
       // Jak przy innych operacjach (Fala 12a): zero cichego kolejkowania.
-      if (lock.locked) {
+      if (manualOperationBlocked()) {
         notify(api, SESSION_BUSY_MSG, { level: "warning" });
         return;
       }
@@ -2358,7 +2402,7 @@ export async function init(api: PluginApi) {
       // Fala 12a: sesje modalne NIE kolejkuja klikow - w trakcie wiszacej
       // operacji kolejna komenda odczytu wpadalaby w sierocy pager
       // ("Nie ma takiej komendy", log 2026-10-18). Komunikat zamiast kolejki.
-      if (lock.locked) {
+      if (manualOperationBlocked()) {
         notify(api, SESSION_BUSY_MSG, { level: "warning" });
         return;
       }
@@ -2415,7 +2459,7 @@ export async function init(api: PluginApi) {
         applyRecord(letter);
         return;
       }
-      if (lock.locked) {
+      if (manualOperationBlocked()) {
         notify(api, SESSION_BUSY_MSG, { level: "warning" });
         return;
       }
@@ -2664,7 +2708,7 @@ export async function init(api: PluginApi) {
         return;
       }
       // Fala 12a: jak przy odczycie - zero cichego kolejkowania sesji.
-      if (lock.locked) {
+      if (manualOperationBlocked()) {
         notify(api, SESSION_BUSY_MSG, { level: "warning" });
         return;
       }
@@ -2743,14 +2787,14 @@ export async function init(api: PluginApi) {
     // sesji). Klik gracza przy zajetej blokadzie: odmowa z toastem,
     // zero cichego kolejkowania komend (audyt race 2026-10-21).
     onRefreshBox: (box) => {
-      if (lock.locked) {
+      if (manualOperationBlocked()) {
         notify(api, SESSION_BUSY_MSG, { level: "warning" });
         return;
       }
       refreshBoxes([box], "sync", "manual");
     },
     onLoadOlder: (box) => {
-      if (lock.locked) {
+      if (manualOperationBlocked()) {
         notify(api, SESSION_BUSY_MSG, { level: "warning" });
         return;
       }
@@ -2763,7 +2807,7 @@ export async function init(api: PluginApi) {
         notify(api, validationError, { level: "error" });
         return;
       }
-      if (lock.locked) {
+      if (manualOperationBlocked()) {
         notify(api, SESSION_BUSY_MSG, { level: "warning" });
         return;
       }
@@ -2810,7 +2854,7 @@ export async function init(api: PluginApi) {
     // ZACHOWUJE ustawienia (powiadomienia, szablon compose) - one nie
     // sa cache, tylko preferencje.
     onClearCache: () => {
-      if (lock.locked) {
+      if (manualOperationBlocked()) {
         notify(api, SESSION_BUSY_MSG, { level: "warning" });
         return;
       }
@@ -2833,7 +2877,7 @@ export async function init(api: PluginApi) {
     },
     onDeleteLetter: (box, entry) => {
       // Fala 12a: zero cichego kolejkowania sesji modalnych.
-      if (lock.locked) {
+      if (manualOperationBlocked()) {
         notify(api, SESSION_BUSY_MSG, { level: "warning" });
         return;
       }
@@ -2870,7 +2914,7 @@ export async function init(api: PluginApi) {
     },
     onForwardLetter: (box, entry, adresat) => {
       // Fala 12a: zero cichego kolejkowania sesji modalnych.
-      if (lock.locked) {
+      if (manualOperationBlocked()) {
         notify(api, SESSION_BUSY_MSG, { level: "warning" });
         return;
       }

@@ -69,7 +69,7 @@ test('brama gry: proxy.session (wznowienie sesji) uzbraja i odswieza skrzynki', 
     f.fireEvent('client.disconnect', undefined);
     f.fireEvent('client.connect', undefined);
     f.fireEvent('gmcp.char.info', { name: 'Foo' });
-    f.fireEvent('proxy.session', { resumed: true, upstreamClosed: false });
+    f.fireEvent('proxy.session', { resumed: true, upstreamClosed: false, replayedBytes: 0 });
     // Skrzynki leca sekwencyjnie (kazda czeka na odpowiedz poprzedniej),
     // wiec pierwsza komenda wystarczy jako dowod, ze brama jest otwarta
     // i auto-refresh wystartowal.
@@ -90,7 +90,7 @@ test('brama gry: proxy.session po zamknieciu upstreamu (kick) nie uzbraja; wznow
     await new Promise((r) => setTimeout(r, 30));
     assert.equal(f.sent.length, 0, 'kick = upstream zamkniety, brak autoryzacji do wysylki');
     f.fireEvent('gmcp.char.info', { name: 'Foo' });
-    f.fireEvent('proxy.session', { resumed: true, upstreamClosed: false });
+    f.fireEvent('proxy.session', { resumed: true, upstreamClosed: false, replayedBytes: 0 });
     await waitFor(() => f.sent.includes('listy odebrane'), 'odswiezenie po faktycznym zalogowaniu');
   } finally {
     await stopHarness();

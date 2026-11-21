@@ -84,19 +84,24 @@ test('C: replay GMCP z martwej sesji proxy NIE uzbraia bramy (ochrona buga 3)', 
   }
 });
 
-test('B: proxy.session resumed BEZ klucza upstreamClosed (ksztalt produkcyjny Go) uzbraia', async () => {
+test('B: resumed bez upstreamClosed i bez replayedBytes czeka na reczna operacje', async () => {
   const h = await startHarness();
   try {
     const { f, waitFor } = h;
     f.sent.length = 0;
     f.fireEvent('client.disconnect', undefined);
     f.fireEvent('client.connect', undefined);
-    // Dokladnie to wysyla Go przy zywej sesji: resumed, upstreamClosed
-    // pominiety przez omitempty. Zadnego jawnego false.
+    // upstreamClosed jest pominiety przez omitempty, ale rozmiar replayu
+    // jest nieznany. Automatyczne odswiezenie nie wolno zgadywac stanu gry.
     f.fireEvent('proxy.session', { type: 'attached', resumed: true });
+    f.fireEvent('gmcp.char.info', { name: 'Foo' });
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.equal(f.sent.length, 0, 'nieznany replay nie uzbraia automatyzmu');
+
+    click(h, '[data-box="odebrane"]');
     await waitFor(
-      () => f.sent.includes('listy odebrane'),
-      'uzbrojenie na wznowieniu sesji bez klucza upstreamClosed',
+      () => f.sent.filter((command) => command === 'listy odebrane').length === 1,
+      'swiadoma operacja odblokowuje transport',
     );
   } finally {
     await stopHarness();

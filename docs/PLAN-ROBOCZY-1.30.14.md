@@ -1,7 +1,7 @@
 # Plan roboczy poprawek ArkMail 1.30.14
 
 Data utworzenia: 2026-11-21.
-Ostatnia aktualizacja: 2026-11-21, pojedyncze odswiezenie pustego replayu zakonczone.
+Ostatnia aktualizacja: 2026-11-21, etap 3 zakonczony.
 
 ## Status i zakres
 
@@ -194,7 +194,7 @@ komend na logowaniu, zachowanie formularza i danych trwalych oraz
 idempotentnosc. Swieze logowanie i hot-load sa testami regresji,
 nie maja stracic obecnego automatycznego dzialania.
 
-## Etap 3 - reconnect, replay i reczne ponowienie
+## Etap 3 - zakonczony: reconnect, replay i reczne ponowienie
 
 ### Minimalna zmiana przeplywu
 
@@ -261,6 +261,21 @@ Istniejace testy do swiadomej aktualizacji kontraktu:
 
 Nie dodajemy testu udajacego pewne wykrycie bufora bez zdarzenia ani testu
 gwarantujacego rozroznienie kazdego replayowanego echa.
+
+### Wynik wykonania
+
+- RED: replay niepusty i nieznany wysylal po jednej komendzie bez dzialania
+  uzytkownika; po implementacji oba przypadki przechodza bez komend.
+- RED: aktywna reczna operacja nie dostawala komunikatu przerwania; osobne
+  kontrole dla poczty gracza i wysylki zwierzecia rowniez padaly przed zmiana.
+- GREEN: reconnectCancel 11/11, w tym jeden komunikat, brak q/~q, reczne
+  ponowienie oraz odrzucenie poznego listingu z widoku i archiwum.
+- Regresje pustego replayu, swiezego logowania, hot-loadu, bramy gry,
+  automatycznych odswiezen, indeksacji i kontekstu listow sa zielone.
+- Zmienione pliki: src/arkmail/index.ts, tests/reconnectCancel.test.ts,
+  tests/gateHotLoad.test.ts, tests/gameGate.test.ts,
+  tests/autoRefreshSettings.test.ts, tests/indexStamp.test.ts,
+  tests/reloginCtx.test.ts oraz ten plan.
 
 ## Etap 4 - pelna blokada komend pluginu podczas recznej poczty
 
@@ -368,11 +383,11 @@ brak komend naprawczych.
 | Znalezisko | Etap i zakres |
 |---|---|
 | Niejasne komunikaty pustego reply-all we wszystkich zakresach | 1, zakonczone |
-| recovering przezywa reconnect | 2, zakonczone; blokada niepustego replayu pozostaje w 3 |
-| Replayowany prompt zdejmuje blokade | 2 i 3, bez zdejmowania blokady przez prompt |
-| playerMailMode przezywa reconnect albo powstaje ze starego echa | Reset przy reconnectcie zakonczony w 2; replay i przypadek bez sygnalu pozostaja zgodnie z 0 i 3 |
+| recovering przezywa reconnect | 2 i 3, zakonczone |
+| Replayowany prompt zdejmuje blokade | 2 i 3, zakonczone; prompt nie zdejmuje blokady |
+| playerMailMode przezywa reconnect albo powstaje ze starego echa | Reset i blokada replayu zakonczone w 2 i 3; przypadek bez sygnalu pozostaje ograniczeniem z 0 |
 | Komendy pluginu wychodza podczas recznej poczty | 4 |
-| Pomijane automatyczne odswiezenie po wznowieniu | Pusty replay zakonczony w 3: dokladnie jedno odswiezenie; pozostale replaye pozostaja w 3 |
+| Pomijane automatyczne odswiezenie po wznowieniu | 3, zakonczone: pusty replay odswieza raz, niepusty i nieznany czekaja na reczna operacje |
 | Stary listing albo pusta odpowiedz zmienia archiwum | 3 i 7 |
 | Stary list o tym samym numerze zostaje zapisany | 3 i 7 |
 | Stare prompty uruchamiaja kasowanie/przekazywanie | 3 i 7 |
@@ -381,12 +396,12 @@ brak komend naprawczych.
 | Timeout compose nie obsluguje otwartego edytora | 6 |
 | Stare timery odswiezen przezywaja reconnect | 2, zakonczone |
 | Wskaznik niewyslanych i jego timer przezywaja reconnect | 2, zakonczone |
-| Stan zwierzecia reaguje na stare zdarzenia | Reset zakonczony w 2; granice wykrywania replayu pozostaja zgodne z 0 i 3 |
+| Stan zwierzecia reaguje na stare zdarzenia | Reset i komunikat przerwania zakonczone w 2 i 3; przypadek bez sygnalu pozostaje ograniczeniem z 0 |
 | Ogolne lub niewidoczne operacja anulowana | 4 i 8 |
 | Zalegly bufor po obudzeniu karty bez ramki kontrolnej | Ograniczenie API opisane w etapie 0; bez falszywej gwarancji wykrycia |
-| Pozne wyniki i stare callbacki zmieniaja nowa operacje | 2 i 3 |
+| Pozne wyniki i stare callbacki zmieniaja nowa operacje | 2 i 3, zakonczone dla wynikow po resecie |
 | Reset musi zachowac dane trwale i tresc formularza | Kontrola resetu zakonczona w 2; 3 i 6 pozostaja regresja |
-| Reczne ponowienie bez reloadu, q i komend probnych | 3 i 8 |
+| Reczne ponowienie bez reloadu, q i komend probnych | 3, zakonczone; pozostale komunikaty w 8 |
 
 Wszystkie zgloszone usterki maja etap naprawczy. Dwie pozycje dotyczace
 nierozroznialnych danych bez sygnalu maja natomiast jawnie opisane ograniczenie;

@@ -96,7 +96,7 @@ test('wylaczone odswiezanie: zdarzenia w tle nie wysylaja komend, powiadomienia 
   try {
     f.fire(' [ POCZTA ] Masz nowa poczte od Corge.');
     f.fireEvent('gmcp.mail.state', { unread: true, unreceived: false, unsent: true });
-    f.fireEvent('proxy.session', { resumed: true, upstreamClosed: false });
+    f.fireEvent('proxy.session', { resumed: true, upstreamClosed: false, replayedBytes: 0 });
     f.fire('Wsrod trzepotu skrzydel Sroka laduje na twoim prawym ramieniu.');
     await sleep(150);
     assert.deepEqual(f.sent, []);

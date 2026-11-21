@@ -35,7 +35,7 @@ const EMPTY_LINE: Record<string, string> = {
  */
 async function fullRefresh4Boxes(h: Harness): Promise<void> {
   const { f, waitFor, content } = h;
-  f.fireEvent('proxy.session', { resumed: true, upstreamClosed: false });
+  f.fireEvent('proxy.session', { resumed: true, upstreamClosed: false, replayedBytes: 0 });
   await waitFor(() => f.sent.includes('listy odebrane'), 'listing odebrane');
   f.fire('Listy odebrane:', 'mail');
   f.fire(' 1. *R* Temat: jedyny', 'mail');
@@ -77,7 +77,7 @@ test('blad 1 (D1): same puste skrzynki w refreshu tez stempluja indeksacje', asy
   const h = await startHarness();
   try {
     const { f, waitFor, content } = h;
-    f.fireEvent('proxy.session', { resumed: true, upstreamClosed: false });
+    f.fireEvent('proxy.session', { resumed: true, upstreamClosed: false, replayedBytes: 0 });
     for (const box of ['odebrane', 'nieprzeczytane', 'wyslane', 'niewyslane']) {
       await waitFor(() => f.sent.includes(`listy ${box}`), `listing ${box}`);
       f.fire(EMPTY_LINE[box], 'mail');
@@ -101,7 +101,7 @@ test('blad 1 (D2): loadOlder do dna stempluje skrzynke i czysci luki', async () 
     const { f, waitFor, content } = h;
     // Refresh, w ktorym odebrane wraca uciete (brak stempla), pozostale
     // trzy puste (stempel przez sciezke "puste").
-    f.fireEvent('proxy.session', { resumed: true, upstreamClosed: false });
+    f.fireEvent('proxy.session', { resumed: true, upstreamClosed: false, replayedBytes: 0 });
     await waitFor(() => f.sent.includes('listy odebrane'), 'listing odebrane');
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 1. *R* Temat: najnowszy', 'mail');
