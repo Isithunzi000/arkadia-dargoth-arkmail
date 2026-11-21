@@ -61,14 +61,38 @@ test('automatyczne odswiezenie: blad bez toastu i bez agresywnego ponawiania', a
   }
 });
 
-test('reczne odswiezenie: anulowanie reconnectem nie jest zglaszane jako awaria', async () => {
-  const h = await startHarness();
+test('reczne odswiezenie: reconnect ma jedno ostrzezenie i pozwala ponowic', async () => {
+  const message =
+    'Polaczenie zostalo przerwane. Poprzednia operacja pocztowa zostala anulowana. Wykonaj ja ponownie po ponownym polaczeniu.';
+  const h = await startHarness({ autoRefreshEnabled: false });
   try {
     click(h, '.arkmail-search-go');
     await h.waitFor(() => h.f.sent.includes('listy odebrane'), 'reczna komenda przed reconnectem');
     h.f.fireEvent('client.disconnect', undefined);
+    h.f.fireEvent('client.disconnect', undefined);
+    h.f.fireEvent('client.connect', undefined);
+    h.f.fireEvent('gmcp.char.info', { name: 'Tester' });
+    h.f.fireEvent('client.disconnect', undefined);
     await waitRefreshIdle(h);
-    assert.ok(!notifyText(h.f, 'Blad odswiezania'), 'anulowanie pozostaje ciche');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    assert.ok(!notifyText(h.f, 'Blad odswiezania'), 'anulowanie nie jest awaria');
+    assert.equal(
+      h.f.shown.filter((entry) => String((entry as { text?: string }).text ?? '') === message).length,
+      1,
+      'wiele sygnalow resetu daje jedno ostrzezenie',
+    );
+    assert.ok(!h.f.sent.includes('q'));
+    assert.ok(!h.f.sent.includes('~q'));
+
+    h.f.fireEvent('client.connect', undefined);
+    h.f.fireEvent('gmcp.char.info', { name: 'Tester' });
+    click(h, '.arkmail-search-go');
+    await h.waitFor(
+      () => h.f.sent.filter((command) => command === 'listy odebrane').length === 2,
+      'reczne ponowienie po nowym polaczeniu',
+    );
+    h.f.fire('Nie masz zadnych odebranych listow.', 'mail');
+    await waitRefreshIdle(h);
   } finally {
     await stopHarness();
   }

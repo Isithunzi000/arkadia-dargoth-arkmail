@@ -1,7 +1,7 @@
 # Plan roboczy poprawek ArkMail 1.30.14
 
 Data utworzenia: 2026-11-21.
-Ostatnia aktualizacja: 2026-11-21, etap 7 zakonczony.
+Ostatnia aktualizacja: 2026-11-21, etap 8 zakonczony.
 
 ## Status i zakres
 
@@ -425,25 +425,37 @@ niekompletny listing, stary list o tym samym numerze i reconnect przed zapisem.
   tests/archiveGeneration.test.ts, tests/deletionFlow.test.ts,
   tests/groupAliasConflicts.test.ts, tests/sessionRecovery.test.ts oraz ten plan.
 
-## Etap 8 - komunikaty o anulowaniu i synchronizacji
+## Etap 8 - zakonczony: komunikaty o anulowaniu i synchronizacji
 
-Rozroznic anulowanie przez reconnect, replay, reczna poczte, timeout i zamierzone
-anulowanie automatyczne. Dla reconnectu i replayu obowiazuja tresci z etapu 3.
-Pozostale komunikaty maja nazywac rzeczywisty powod i sposob powrotu do pracy.
+Reczna operacja przerwana przez rozlaczenie, replay albo poczte gracza ma jedno
+konkretne ostrzezenie. Operacje automatyczne i reset podczas bezczynnosci
+pozostaja ciche. Wiele sygnalow resetu nie duplikuje komunikatu. Ponowienie jest
+reczne i nie wysyla q, ~q ani komend probnych.
 
-- Reczna operacja uzytkownika zawsze ma zrozumialy komunikat o przerwaniu.
-- Automatyczne anulowanie oraz reset podczas bezczynnosci nie generuja zbednych
-  powiadomien.
-- Komunikat nie sugeruje otwartego pagera ani koniecznosci q bez dowodu.
-- Po limicie czasu nie moze zostac niewidoczna trwala blokada i milczace
-  klikniecia.
-- Komunikat wystepuje raz dla jednego przerwania, takze przy wielu sygnalach
-  resetu.
-- Po komunikacie uzytkownik moze powtorzyc operacje bez reloadu i bez recznego
-  czyszczenia stanu gry.
+Po limicie czasu kolejna proba przed zwyklym promptem nie otwiera sesji.
+Uzytkownik dostaje informacje o synchronizacji, a po promptcie moze swiadomie
+ponowic. Import osob, import aliasow, usuwanie i odczyt archiwum rozrozniaja
+limit czasu od ogolnego bledu.
 
-Testy obejmuja kazda przyczyne, duplikaty zdarzen, bezczynnosc, ponowienie oraz
-brak komend naprawczych.
+### Wynik wykonania
+
+- RED: 7 rzeczywistych bledow we wspolnym przebiegu 11 kontrolek, 4 zaliczone,
+  0 anulowan. Rozlaczenie i poczta gracza byly ciche, ponowienie podczas
+  synchronizacji nie mialo komunikatu, a cztery operacje uzywaly ogolnego bledu
+  zamiast limitu czasu. Poprawiony scenariusz usuwania zostal dodatkowo
+  uruchomiony na starym catchu i potwierdzil stary komunikat.
+- Wspolny komunikat przerwania ma deduplikacje dla jednej recznej operacji.
+  Dotychczasowa tresc replayu pozostala niezmieniona.
+- Transport udostepnia tylko odczyt stanu synchronizacji. Nie zmieniono resetow,
+  parserow, protokolu ani mechaniki automatycznego odswiezania.
+- GREEN: 11/11 kontrolek ukierunkowanych i 104/104 powiazane regresje poczty
+  gracza, reconnectu, replayu, pagerow, edytora, importu, archiwum i UI.
+- Pelny zestaw: 1279 testow TypeScript i 49 kontrolek MJS, razem 1328
+  zaliczonych, 0 bledow, 0 anulowan, 0 pominiec. Typowanie i build zielone.
+- Zmienione pliki: src/arkmail/index.ts,
+  src/arkmail/adapters/dargothTransport.ts,
+  tests/cancellationMessages.test.ts, tests/refreshErrors.test.ts,
+  tests/playerMailMode.test.ts oraz ten plan.
 
 ## Mapa pokrycia wszystkich znalezisk
 
@@ -464,11 +476,11 @@ brak komend naprawczych.
 | Stare timery odswiezen przezywaja reconnect | 2, zakonczone |
 | Wskaznik niewyslanych i jego timer przezywaja reconnect | 2, zakonczone |
 | Stan zwierzecia reaguje na stare zdarzenia | Reset i komunikat przerwania zakonczone w 2 i 3; przypadek bez sygnalu pozostaje ograniczeniem z 0 |
-| Ogolne lub niewidoczne operacja anulowana | Reczna poczta zakonczona w 4; pozostale przyczyny w 8 |
+| Ogolne lub niewidoczne operacja anulowana | 4 i 8, zakonczone |
 | Zalegly bufor po obudzeniu karty bez ramki kontrolnej | Ograniczenie API opisane w etapie 0; bez falszywej gwarancji wykrycia |
 | Pozne wyniki i stare callbacki zmieniaja nowa operacje | 2 i 3, zakonczone dla wynikow po resecie |
 | Reset musi zachowac dane trwale i tresc formularza | Kontrola resetu zakonczona w 2; 3 i 6 pozostaja regresja |
-| Reczne ponowienie bez reloadu, q i komend probnych | 3, zakonczone; pozostale komunikaty w 8 |
+| Reczne ponowienie bez reloadu, q i komend probnych | 3 i 8, zakonczone |
 
 Wszystkie zgloszone usterki maja etap naprawczy. Dwie pozycje dotyczace
 nierozroznialnych danych bez sygnalu maja natomiast jawnie opisane ograniczenie;

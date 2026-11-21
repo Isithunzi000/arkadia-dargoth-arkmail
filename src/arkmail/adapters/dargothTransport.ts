@@ -105,6 +105,11 @@ export class DargothTransport implements Transport {
     this.gagWhen = pred;
   }
 
+  /** UI moze wyjasnic blokade bez otwierania nowej sesji podczas synchronizacji. */
+  isRecovering(): boolean {
+    return this.recovering;
+  }
+
   /** Usuwa powtorzenia recznego zamkniecia, ale zachowuje jego zdarzenie. */
   private takeQueuedPagerClose(): string | null {
     let first: string | null = null;

@@ -198,6 +198,12 @@ const SESSION_BUSY_MSG = "Poczekaj, az skoncze biezaca operacje.";
 const PLAYER_MAIL_MODE_BUSY_MSG =
   "Najpierw zakoncz reczna sesje poczty w grze, a potem powtorz operacje w ArkMailu.";
 const OPERATION_TIMEOUT_MSG = "Serwer nie odpowiedzial na czas. Sprobuj ponownie.";
+const CONNECTION_INTERRUPTED_MSG =
+  "Polaczenie zostalo przerwane. Poprzednia operacja pocztowa zostala anulowana. Wykonaj ja ponownie po ponownym polaczeniu.";
+const PLAYER_MAIL_INTERRUPTED_MSG =
+  "Reczna poczta w grze przerwala poprzednia operacje ArkMaila. Zakoncz reczna poczte i wykonaj operacje ponownie.";
+const RECOVERY_BUSY_MSG =
+  "ArkMail czeka na potwierdzenie zakonczenia poprzedniej odpowiedzi. Po powrocie zwyklego widoku gry ponow operacje.";
 const SEND_FAILURE_MSG = "Nie udalo sie wyslac listu. Sprobuj ponownie.";
 const FORWARD_FAILURE_MSG = "Nie udalo sie przekazac listu. Sprobuj ponownie.";
 
@@ -210,6 +216,9 @@ const mailErrorText = (error: MailError): string => {
 
 const isPagerTimeout = (error: unknown): boolean =>
   error instanceof Error && /^timeout: pager session list \d+$/.test(error.message);
+
+const isImportTimeout = (error: unknown): boolean =>
+  error instanceof Error && /^import .+: timeout$/.test(error.message);
 
 /**
  * Fala 24g: komendy gracza wchodzace w tryb poczty (ich pager jest
@@ -442,10 +451,16 @@ export async function init(api: PluginApi) {
     type OperationSource = "manual" | "auto";
     let replayReviewRequired = false;
     let manualOperations = 0;
+    let manualInterruptionNotified = false;
     const releaseReplayForManual = (): void => {
       if (!replayReviewRequired) return;
       replayReviewRequired = false;
       transport!.setOnline(true);
+    };
+    const notifyManualInterruption = (message: string): void => {
+      if (manualInterruptionNotified) return;
+      manualInterruptionNotified = true;
+      notify(api, message, { level: "warning" });
     };
     const manualOperationBlocked = (): boolean => {
       if (replayReviewRequired) {
@@ -454,6 +469,10 @@ export async function init(api: PluginApi) {
       }
       if (playerMailMode) {
         notify(api, PLAYER_MAIL_MODE_BUSY_MSG, { level: "warning" });
+        return true;
+      }
+      if (transport!.isRecovering()) {
+        notify(api, RECOVERY_BUSY_MSG, { level: "warning" });
         return true;
       }
       if (lock.locked) {
@@ -467,6 +486,7 @@ export async function init(api: PluginApi) {
       source: OperationSource = "manual",
     ): Promise<T> => {
       if (source === "manual") {
+        manualInterruptionNotified = false;
         manualOperations++;
         releaseReplayForManual();
       }
@@ -580,7 +600,7 @@ export async function init(api: PluginApi) {
     })
       .catch((err: unknown) => {
         if (!isOperationCancelled(err)) {
-          notify(api, "Nie udalo sie zaimportowac osob z gry.", { level: "error" });
+          notify(api, isImportTimeout(err) ? OPERATION_TIMEOUT_MSG : "Nie udalo sie zaimportowac osob z gry.", { level: "error" });
         }
       })
       .finally(() => {
@@ -624,7 +644,7 @@ export async function init(api: PluginApi) {
     })
       .catch((err: unknown) => {
         if (!isOperationCancelled(err)) {
-          notify(api, "Nie udalo sie zaimportowac aliasow z gry.", { level: "error" });
+          notify(api, isImportTimeout(err) ? OPERATION_TIMEOUT_MSG : "Nie udalo sie zaimportowac aliasow z gry.", { level: "error" });
         }
       })
       .finally(() => {
@@ -942,10 +962,8 @@ export async function init(api: PluginApi) {
         replayReviewRequired = true;
         cancelConnectionOperations();
         if (interruptedManual) {
-          notify(
-            api,
+          notifyManualInterruption(
             "Wznowienie polaczenia przerwalo poprzednia operacje. Ponow ja, gdy bedziesz gotowy.",
-            { level: "warning" },
           );
         }
         return;
@@ -972,8 +990,11 @@ export async function init(api: PluginApi) {
     }
   };
   const onClientDisconnect = (): void => {
+    const interruptedManual =
+      manualOperations > 0 || playerMailMode || animalSendPending || animalFlight;
     replayReviewRequired = false;
     cancelConnectionOperations();
+    if (interruptedManual) notifyManualInterruption(CONNECTION_INTERRUPTED_MSG);
   };
   const onSystemLogin = (): void => {
     onClientDisconnect();
@@ -1072,6 +1093,7 @@ export async function init(api: PluginApi) {
       if (!awaitingPlayerMailPrompt) armPlayerMailModeIdle();
       return;
     }
+    const interruptedManual = manualOperations > 0 || animalSendPending || animalFlight;
     playerMailMode = true;
     transport!.setPlayerMailMode(true);
     awaitingPlayerMailPrompt = false;
@@ -1092,6 +1114,7 @@ export async function init(api: PluginApi) {
     ui.setLoadAll(null);
     ui.setIndexRun(null);
     ui.setArchiveDownload(null);
+    if (interruptedManual) notifyManualInterruption(PLAYER_MAIL_INTERRUPTED_MSG);
   };
   const awaitPlayerMailPrompt = (): void => {
     if (!playerMailMode) return;
@@ -2332,7 +2355,9 @@ export async function init(api: PluginApi) {
     const generation = connectionGeneration;
     void runExclusive(() => openWithResolve(letter.box, pseudo))
       .catch((err: unknown) => {
-        if (!isOperationCancelled(err)) notify(api, "Nie udalo sie odczytac listu.", { level: "error" });
+        if (!isOperationCancelled(err)) {
+          notify(api, isPagerTimeout(err) ? OPERATION_TIMEOUT_MSG : "Nie udalo sie odczytac listu.", { level: "error" });
+        }
       })
       .finally(() => {
         if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
@@ -2871,7 +2896,9 @@ export async function init(api: PluginApi) {
           }
         })
         .catch((err: unknown) => {
-          if (!isOperationCancelled(err)) notify(api, "Blad kasowania listu.", { level: "error" });
+          if (!isOperationCancelled(err)) {
+            notify(api, isPagerTimeout(err) ? OPERATION_TIMEOUT_MSG : "Blad kasowania listu.", { level: "error" });
+          }
         })
         .finally(() => {
           if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);

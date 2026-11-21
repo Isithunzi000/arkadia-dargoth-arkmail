@@ -131,6 +131,10 @@ test('komenda gracza przerywa aktywna serie listingow i zachowuje prace do wznow
       ['listy odebrane'],
       'wejscie gracza zatrzymuje serie przed druga skrzynka i nie wysyla q',
     );
+    assert.ok(
+      !notifyText(f, 'Reczna poczta w grze przerwala poprzednia operacje ArkMaila.'),
+      'automatyczna operacja pozostaje cicha',
+    );
     f.fire(' [ POCZTA ] Masz nowa poczte od Foo.', 'mail');
     await sleep(300);
     assert.deepEqual(f.sent, ['listy odebrane'], 'nowe zdarzenie pozostaje zaparkowane');
