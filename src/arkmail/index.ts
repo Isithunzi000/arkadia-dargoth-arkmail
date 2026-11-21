@@ -821,6 +821,8 @@ export async function init(api: PluginApi) {
     archiveDownloadFlag = null;
     pendingRefresh.clear();
     drainScheduled = false;
+    for (const timer of delayedInboxTimers) clearTimeout(timer);
+    delayedInboxTimers = [];
     ui.setBusy(null);
     ui.setLoadAll(null);
     ui.setIndexRun(null);
@@ -1049,8 +1051,12 @@ export async function init(api: PluginApi) {
     for (const t of delayedInboxTimers) clearTimeout(t);
     delayedInboxTimers = [];
     if (!ui.state.autoRefreshEnabled) return;
+    const generation = connectionGeneration;
     delayedInboxTimers = DELAYED_INBOX_RETRY_MS.map((ms) =>
-      setTimeout(() => scheduleRefresh(["odebrane", "nieprzeczytane"]), ms),
+      setTimeout(() => {
+        if (generation !== connectionGeneration) return;
+        scheduleRefresh(["odebrane", "nieprzeczytane"]);
+      }, ms),
     );
   };
 

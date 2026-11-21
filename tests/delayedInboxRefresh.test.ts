@@ -67,3 +67,35 @@ test('harness: po nowej poczcie leci refresh natychmiast i opozniony retry', asy
     await stopHarness();
   }
 });
+
+test('reconnect usuwa opoznione odswiezenia poprzedniej sesji', async (context) => {
+  const h = await startHarness();
+  const { f } = h;
+  let mocked = false;
+  const flush = async (): Promise<void> => {
+    for (let i = 0; i < 12; i++) await new Promise((resolve) => setImmediate(resolve));
+  };
+  try {
+    context.mock.timers.enable({ apis: ['setTimeout'] });
+    mocked = true;
+    f.fire(' [ POCZTA ] Masz nowa poczte od Corge.');
+    await flush();
+    assert.deepEqual(f.sent, ['listy odebrane'], 'pierwsza sesja rozpoczela odswiezenie');
+
+    f.fireEvent('client.disconnect', undefined);
+    f.fireEvent('client.connect', undefined);
+    f.fireEvent('gmcp.char.info', { name: 'Tester' });
+    f.fire('> ', 'prompt');
+    await flush();
+    const sentAfterReconnect = [...f.sent];
+
+    context.mock.timers.tick(30_000);
+    await flush();
+    assert.deepEqual(f.sent, sentAfterReconnect, 'zadny stary timer nie wysyla komendy po reconnectcie');
+    assert.ok(!f.sent.includes('q'));
+    assert.ok(!f.sent.includes('~q'));
+  } finally {
+    if (mocked) context.mock.timers.reset();
+    await stopHarness();
+  }
+});
