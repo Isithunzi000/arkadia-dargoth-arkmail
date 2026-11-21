@@ -1,7 +1,7 @@
 # Plan roboczy poprawek ArkMail 1.30.14
 
 Data utworzenia: 2026-11-21.
-Ostatnia aktualizacja: 2026-11-21, reset wskaznika niewyslanych zakonczony.
+Ostatnia aktualizacja: 2026-11-21, etap 2 zakonczony wraz z kontrolami idempotentnosci.
 
 ## Status i zakres
 
@@ -169,7 +169,7 @@ komendy gracza. Nie usuwamy wykrywania aktualnych komend gracza i nie blokujemy
 globalnie ręcznej poczty, poniewaz to psuloby poprawna funkcje. Te ograniczenia
 sa jawne; zadny test ani raport nie moze przedstawiac ich jako rozwiazanych.
 
-## Etap 2 - jeden reset na istniejacej infrastrukturze
+## Etap 2 - zakonczony: jeden reset na istniejacej infrastrukturze
 
 Rozszerzyc istniejaca cancelConnectionOperations zamiast tworzyc rownolegly
 system. Reset wykorzystuje connectionGeneration, SessionScopeRegistry.reconnect
@@ -385,7 +385,7 @@ brak komend naprawczych.
 | Ogolne lub niewidoczne operacja anulowana | 4 i 8 |
 | Zalegly bufor po obudzeniu karty bez ramki kontrolnej | Ograniczenie API opisane w etapie 0; bez falszywej gwarancji wykrycia |
 | Pozne wyniki i stare callbacki zmieniaja nowa operacje | 2 i 3 |
-| Reset musi zachowac dane trwale i tresc formularza | 2, 3 i 6, testy regresji |
+| Reset musi zachowac dane trwale i tresc formularza | Kontrola resetu zakonczona w 2; 3 i 6 pozostaja regresja |
 | Reczne ponowienie bez reloadu, q i komend probnych | 3 i 8 |
 
 Wszystkie zgloszone usterki maja etap naprawczy. Dwie pozycje dotyczace

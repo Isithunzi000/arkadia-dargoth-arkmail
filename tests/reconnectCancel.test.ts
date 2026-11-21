@@ -31,6 +31,82 @@ test('reconnect anuluje stary listing i wznawia odswiezenie po sygnale wznowieni
   }
 });
 
+test('powtorne resety zachowuja formularz, archiwum i ustawienia bez komend', async () => {
+  const h = await startHarness({
+    archive: [{
+      id: 'trwaly-list',
+      box: 'odebrane',
+      number: 1,
+      party: 'Nadawca',
+      subject: 'Trwaly temat',
+      dateRaw: 'Wt, 24 VIII 1999, 00:11:12',
+      sortKey: '1999-08-24 00:11:12',
+      read: true,
+      body: ['Trwala tresc.'],
+    }],
+    notifyEnabled: false,
+    autoRefreshEnabled: false,
+  });
+  const { f, content } = h;
+  try {
+    click(h, '[data-tab="napisz"]');
+    const values: Record<string, string> = {
+      adresat: 'Odbiorca',
+      temat: 'Roboczy temat',
+      dw: 'Osoba',
+      tresc: 'Robocza tresc',
+    };
+    for (const [field, value] of Object.entries(values)) {
+      const input = content.querySelector(`[data-field="${field}"]`) as {
+        value: string;
+        dispatchEvent(event: unknown): void;
+      };
+      input.value = value;
+      input.dispatchEvent(new h.window.Event('input'));
+    }
+    const sentBeforeResets = [...f.sent];
+
+    f.fireEvent('client.disconnect', undefined);
+    f.fireEvent('client.disconnect', undefined);
+    f.fireEvent('client.connect', undefined);
+    f.fireEvent('client.connect', undefined);
+    f.fireEvent('proxy.session', { resumed: true, upstreamClosed: false });
+    f.fireEvent('proxy.session', { resumed: true, upstreamClosed: false });
+    f.fireEvent('gmcp_msg.system.login', {});
+    f.fireEvent('gmcp_msg.system.login', {});
+
+    assert.deepEqual(f.sent, sentBeforeResets, 'zadna powtorzona kontrola nie wysyla komendy');
+    assert.ok(!f.sent.includes('q'));
+    assert.ok(!f.sent.includes('~q'));
+    for (const [field, value] of Object.entries(values)) {
+      assert.equal(
+        (content.querySelector(`[data-field="${field}"]`) as { value: string }).value,
+        value,
+        `formularz zachowuje pole ${field}`,
+      );
+    }
+    click(h, '[data-tab="listy"]');
+    assert.equal(
+      (content.querySelector('.arkmail-auto-refresh-toggle') as { checked: boolean }).checked,
+      false,
+      'ustawienie automatycznego odswiezania zachowane',
+    );
+    assert.equal(
+      (content.querySelector('.arkmail-notify-toggle') as { checked: boolean }).checked,
+      false,
+      'ustawienie powiadomien zachowane',
+    );
+    click(h, '[data-tab="archiwum"]');
+    assert.match(
+      String((content.querySelector('.arkmail-arch-entry') as { textContent?: string }).textContent ?? ''),
+      /Trwaly temat/,
+      'rekord archiwum pozostaje dostepny',
+    );
+  } finally {
+    await stopHarness();
+  }
+});
+
 test('reconnect podczas odczytu odrzuca spozniona odpowiedz bez q i bez otwarcia listu', async () => {
   const h = await startHarness();
   const { f, waitFor, content } = h;
