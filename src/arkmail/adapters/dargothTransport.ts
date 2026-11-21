@@ -90,6 +90,7 @@ export class DargothTransport implements Transport {
   private gagWhen: (() => boolean) | null = null;
   /** Niepotwierdzony koniec odpowiedzi: mail gagowany do promptu gry. */
   private recovering = false;
+  private playerMailMode = false;
   private recoveryTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private readonly api: PluginApi) {}
@@ -140,7 +141,7 @@ export class DargothTransport implements Transport {
     source: CommandSource = 'arkmail',
   ): Promise<void> {
     if (!this.online) return Promise.reject(new Error('transport offline'));
-    if (source === 'arkmail' && this.recovering) {
+    if (source === 'arkmail' && (this.recovering || this.playerMailMode)) {
       return Promise.reject(new Error('operacja anulowana'));
     }
     const generation = this.connectionGeneration;
@@ -150,7 +151,7 @@ export class DargothTransport implements Transport {
       }
       // Sprawdzenie takze w kolejce: timeout mogl nastapic po enqueue,
       // zanim poprzednia komenda zakonczyla sie i zwolnila ten task.
-      if (source === 'arkmail' && this.recovering) {
+      if (source === 'arkmail' && (this.recovering || this.playerMailMode)) {
         throw new Error('operacja anulowana');
       }
       let echoEntry: PendingEcho | undefined;
@@ -202,8 +203,13 @@ export class DargothTransport implements Transport {
     this.pendingEchoSends = [];
   }
 
+  /** Blokuje wylacznie komendy pluginu; ruch gracza przechodzi bez zmian. */
+  setPlayerMailMode(active: boolean): void {
+    this.playerMailMode = active;
+  }
+
   openSession(): SessionScope {
-    if (this.recovering) throw new Error('operacja anulowana');
+    if (this.recovering || this.playerMailMode) throw new Error('operacja anulowana');
     this.armTrigger();
     return this.sessions.openSession();
   }

@@ -21,7 +21,7 @@ import assert from 'node:assert/strict';
 import type { MailBox } from '../src/arkmail/core/protocol/types.js';
 import { PLAYER_MAIL_MODE_IDLE_MS } from '../src/arkmail/index';
 import { parseNotification } from '../src/arkmail/core/protocol/parser';
-import { startHarness, stopHarness, waitRt, type Harness } from './harness';
+import { click, notifyText, startHarness, stopHarness, waitRt, type Harness } from './harness';
 
 const GENITIVE: Record<MailBox, string> = {
   odebrane: 'odebranych',
@@ -224,5 +224,39 @@ test('kasowanie w trybie poczty gracza parkuje, po wyjsciu drenaz 4 skrzynek (Fa
     await waitIdle(h);
   } finally {
     await stopHarness();
+  }
+});
+
+
+test('reczne operacje ArkMaila podczas poczty gracza sa blokowane z jednym jasnym komunikatem', async (context) => {
+  const message = 'Najpierw zakoncz reczna sesje poczty w grze, a potem powtorz operacje w ArkMailu.';
+  const cases = [
+    ['odswiezenie skrzynki', '[data-box="odebrane"]'],
+    ['wysylka zwierzecia', '.arkmail-animal-send'],
+  ] as const;
+  for (const [label, selector] of cases) {
+    await context.test(label, async () => {
+      answered.clear();
+      const h = await startHarness();
+      const { f } = h;
+      try {
+        f.fire('→ listy');
+        f.sent.length = 0;
+        f.shown.length = 0;
+        click(h, selector);
+        await sleep(50);
+        assert.deepEqual(f.sent, [], 'zadna komenda pluginu nie trafia do sesji gracza');
+        assert.equal(
+          f.shown.filter((entry) => String((entry as { text?: string }).text ?? '').includes(message)).length,
+          1,
+          'dokladnie jeden komunikat z instrukcja ponowienia',
+        );
+        assert.equal(notifyText(f, 'Poczta jest otwarta w innym widoku'), false, 'bez mylacego komunikatu o blokadzie');
+      } finally {
+        f.fire('→ q');
+        f.fire('> ', 'prompt');
+        await stopHarness();
+      }
+    });
   }
 });

@@ -276,7 +276,10 @@ for (const closeCommand of ['q', 'x'] as const) {
           const commandsBefore = f.sent.length;
           click(h, '.arkmail-arch-download');
           click(h, '.arkmail-arch-download');
-          assert.ok(notifyText(f, 'Przed pobieraniem tresci zamknij poczte otwarta w grze'), 'pobieranie czeka na prompt');
+          assert.ok(
+            notifyText(f, 'Najpierw zakoncz reczna sesje poczty w grze, a potem powtorz operacje w ArkMailu.'),
+            'pobieranie czeka na prompt',
+          );
           assert.equal(f.sent.length, commandsBefore, 'blokada pobierania nie wysyla komendy');
         }
 

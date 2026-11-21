@@ -1,7 +1,7 @@
 # Plan roboczy poprawek ArkMail 1.30.14
 
 Data utworzenia: 2026-11-21.
-Ostatnia aktualizacja: 2026-11-21, etap 3 zakonczony.
+Ostatnia aktualizacja: 2026-11-21, etap 4 zakonczony.
 
 ## Status i zakres
 
@@ -277,7 +277,7 @@ gwarantujacego rozroznienie kazdego replayowanego echa.
   tests/autoRefreshSettings.test.ts, tests/indexStamp.test.ts,
   tests/reloginCtx.test.ts oraz ten plan.
 
-## Etap 4 - pelna blokada komend pluginu podczas recznej poczty
+## Etap 4 - zakonczony: pelna blokada komend pluginu podczas recznej poczty
 
 Wprowadzic centralne zabezpieczenie transportu dla komend ArkMaila zamiast
 dodawac niezalezne warunki do pojedynczych handlerow. To jest blokada komend
@@ -298,6 +298,29 @@ Test parametryczny przechodzi przez wszystkie publiczne operacje UI i dowodzi:
 zero komend pluginu, brak zmian archiwum, komunikat dla uzytkownika, brak
 powiadomien automatycznych, jedno pozniejsze zbiorcze odswiezenie i nietkniete
 komendy gracza. Istniejace testy playerMailMode.test.ts pozostaja regresja.
+
+### Wynik wykonania
+
+- RED: odswiezenie skrzynki konczylo sie bez wymaganego komunikatu, a przycisk
+  zwierzecia wysylal "wyslij zwierze" do recznej sesji gracza. Oba przypadki
+  padaly na starym kodzie i przechodza po centralnej blokadzie.
+- Transport blokuje otwieranie sesji, pierwsza komende i komende oczekujaca
+  w kolejce. Blokada dotyczy wylacznie zrodla "arkmail"; komendy gracza
+  przechodza bez zmian.
+- GREEN: playerMailMode 11/11, playerMailUiGuard 21/21 (19 operacji UI plus
+  kontrola automatu), adapters 23/23, archiveDownload 4/4.
+- Parametryczna macierz obejmuje odswiezanie, strony, wyszukiwanie, odczyt,
+  kasowanie, przekazywanie, compose, oba importy osob, aliasy, cache,
+  indeksowanie, pobieranie archiwum, reply-all, zbiorcze usuwanie i zwierze.
+  Dla kazdego przypadku: zero komend, jeden komunikat i archiwum bez zmian.
+- Regresje archiveDownload i modalPagerCommands zostaly swiadomie
+  zaktualizowane ze starego, lokalnego komunikatu do wspolnej tresci etapu 4.
+- Pelny zestaw w czterech partiach TypeScript i jednej partii kontrolek MJS:
+  1282 zaliczone, 0 bledow, 0 anulowan, 0 pominiec. Typowanie i build zielone.
+- Zmienione pliki: src/arkmail/index.ts,
+  src/arkmail/adapters/dargothTransport.ts, tests/playerMailMode.test.ts,
+  tests/playerMailUiGuard.test.ts, tests/adapters.test.ts,
+  tests/archiveDownload.test.ts, tests/modalPagerCommands.test.ts oraz ten plan.
 
 ## Etap 5 - pager i timeouty
 
@@ -386,7 +409,7 @@ brak komend naprawczych.
 | recovering przezywa reconnect | 2 i 3, zakonczone |
 | Replayowany prompt zdejmuje blokade | 2 i 3, zakonczone; prompt nie zdejmuje blokady |
 | playerMailMode przezywa reconnect albo powstaje ze starego echa | Reset i blokada replayu zakonczone w 2 i 3; przypadek bez sygnalu pozostaje ograniczeniem z 0 |
-| Komendy pluginu wychodza podczas recznej poczty | 4 |
+| Komendy pluginu wychodza podczas recznej poczty | 4, zakonczone |
 | Pomijane automatyczne odswiezenie po wznowieniu | 3, zakonczone: pusty replay odswieza raz, niepusty i nieznany czekaja na reczna operacje |
 | Stary listing albo pusta odpowiedz zmienia archiwum | 3 i 7 |
 | Stary list o tym samym numerze zostaje zapisany | 3 i 7 |
@@ -397,7 +420,7 @@ brak komend naprawczych.
 | Stare timery odswiezen przezywaja reconnect | 2, zakonczone |
 | Wskaznik niewyslanych i jego timer przezywaja reconnect | 2, zakonczone |
 | Stan zwierzecia reaguje na stare zdarzenia | Reset i komunikat przerwania zakonczone w 2 i 3; przypadek bez sygnalu pozostaje ograniczeniem z 0 |
-| Ogolne lub niewidoczne operacja anulowana | 4 i 8 |
+| Ogolne lub niewidoczne operacja anulowana | Reczna poczta zakonczona w 4; pozostale przyczyny w 8 |
 | Zalegly bufor po obudzeniu karty bez ramki kontrolnej | Ograniczenie API opisane w etapie 0; bez falszywej gwarancji wykrycia |
 | Pozne wyniki i stare callbacki zmieniaja nowa operacje | 2 i 3, zakonczone dla wynikow po resecie |
 | Reset musi zachowac dane trwale i tresc formularza | Kontrola resetu zakonczona w 2; 3 i 6 pozostaja regresja |

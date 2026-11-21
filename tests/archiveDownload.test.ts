@@ -216,7 +216,10 @@ test('archiwum: start pobierania odmowny, gdy gracz ma otwarta poczte w grze (Fa
     f.fire('→ listy');
     clickDownload(h); // uzbrojenie
     clickDownload(h); // start
-    await waitRt(() => notifyText(f, 'zamknij'), 'toast o zamknieciu poczty');
+    await waitRt(
+      () => notifyText(f, 'Najpierw zakoncz reczna sesje poczty w grze, a potem powtorz operacje w ArkMailu.'),
+      'toast o zakonczeniu recznej poczty',
+    );
     assert.ok(
       !f.sent.some((c) => / przed \d+ [IVX]+ \d{4}$/.test(c)),
       'zero re-kotwic pobierania przy otwartej poczcie gracza',

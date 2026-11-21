@@ -195,6 +195,8 @@ export const indexSweepMode = (
  * kopii zdania. Krotko i po ludzku.
  */
 const SESSION_BUSY_MSG = "Poczekaj, az skoncze biezaca operacje.";
+const PLAYER_MAIL_MODE_BUSY_MSG =
+  "Najpierw zakoncz reczna sesje poczty w grze, a potem powtorz operacje w ArkMailu.";
 const OPERATION_TIMEOUT_MSG = "Serwer nie odpowiedzial na czas. Sprobuj ponownie.";
 const SEND_FAILURE_MSG = "Nie udalo sie wyslac listu. Sprobuj ponownie.";
 const FORWARD_FAILURE_MSG = "Nie udalo sie przekazac listu. Sprobuj ponownie.";
@@ -450,7 +452,15 @@ export async function init(api: PluginApi) {
         releaseReplayForManual();
         return false;
       }
-      return lock.locked;
+      if (playerMailMode) {
+        notify(api, PLAYER_MAIL_MODE_BUSY_MSG, { level: "warning" });
+        return true;
+      }
+      if (lock.locked) {
+        notify(api, SESSION_BUSY_MSG, { level: "warning" });
+        return true;
+      }
+      return false;
     };
     const runExclusive = <T,>(
       operation: () => Promise<T>,
@@ -555,10 +565,7 @@ export async function init(api: PluginApi) {
    * import NIE tworzy grup.
    */
   const importPeople = (kind: PeopleImportKind): void => {
-    if (manualOperationBlocked()) {
-      notify(api, SESSION_BUSY_MSG, { level: "warning" });
-      return;
-    }
+    if (manualOperationBlocked()) return;
     const label = kind === "zapamietani" ? "zapamietanych" : "przedstawionych";
     const generation = connectionGeneration;
     ui.setBusy(`Importuje ${label}...`);
@@ -588,10 +595,7 @@ export async function init(api: PluginApi) {
    * dolaczaja do ksiazki adresowej (dedup).
    */
   const importAliases = (): void => {
-    if (manualOperationBlocked()) {
-      notify(api, SESSION_BUSY_MSG, { level: "warning" });
-      return;
-    }
+    if (manualOperationBlocked()) return;
     const generation = connectionGeneration;
     ui.setBusy("Importuje aliasy pocztowe...");
     void runExclusive(async () => {
@@ -853,6 +857,7 @@ export async function init(api: PluginApi) {
     unsentFlashTimer = null;
     ui.setUnsentFlash(false);
     playerMailMode = false;
+    transport!.setPlayerMailMode(false);
     awaitingPlayerMailPrompt = false;
     clearPlayerMailModeTimer();
     animalSendSerial++;
@@ -1045,6 +1050,7 @@ export async function init(api: PluginApi) {
   const exitPlayerMailMode = (): void => {
     if (!playerMailMode) return;
     playerMailMode = false;
+    transport!.setPlayerMailMode(false);
     awaitingPlayerMailPrompt = false;
     clearPlayerMailModeTimer();
     // Fala 24f2: po sesji gracza inbox na pewno wymaga weryfikacji
@@ -1065,6 +1071,7 @@ export async function init(api: PluginApi) {
       return;
     }
     playerMailMode = true;
+    transport!.setPlayerMailMode(true);
     awaitingPlayerMailPrompt = false;
     armPlayerMailModeIdle();
     // Gracz przejmuje poczte natychmiast. Sesje same sprzataja
@@ -1434,10 +1441,7 @@ export async function init(api: PluginApi) {
       cancelFlag(loadAllFlag);
       return;
     }
-    if (manualOperationBlocked()) {
-      notify(api, SESSION_BUSY_MSG, { level: "warning" });
-      return;
-    }
+    if (manualOperationBlocked()) return;
     const flag = { cancelled: false };
     loadAllFlag = flag;
     ui.setLoadAll({ box, pages: 0 });
@@ -1539,10 +1543,7 @@ export async function init(api: PluginApi) {
       cancelFlag(indexFlag);
       return;
     }
-    if (manualOperationBlocked()) {
-      notify(api, SESSION_BUSY_MSG, { level: "warning" });
-      return;
-    }
+    if (manualOperationBlocked()) return;
     const flag = { cancelled: false };
     indexFlag = flag;
     let done = 0;
@@ -1969,21 +1970,7 @@ export async function init(api: PluginApi) {
       cancelFlag(archiveDownloadFlag);
       return;
     }
-    if (manualOperationBlocked()) {
-      notify(api, SESSION_BUSY_MSG, { level: "warning" });
-      return;
-    }
-    // Fala 42: gracz ma otwarta poczte recznie - nasze komendy zjadlyby
-    // jego sesje (pager konsumuje wszystko do "q"). Czekamy na jej
-    // zamkniecie; start odmowny z jasnym powodem.
-    if (playerMailMode) {
-      notify(
-        api,
-        "Przed pobieraniem tresci zamknij poczte otwarta w grze (komenda q).",
-        { level: "warning" },
-      );
-      return;
-    }
+    if (manualOperationBlocked()) return;
     // Kandydat: rekord z pusta trescia. Musi miec prawidlowa date, bo
     // bez niej nie mozna odnalezc listu na serwerze.
     const noBody = ui.state.archive.filter((l) => l.body.length === 0);
@@ -2195,10 +2182,7 @@ export async function init(api: PluginApi) {
     [...numbers].sort((a, b) => a - b).join(",");
 
   const searchForDeletion = (box: MailBox, command: string): void => {
-    if (manualOperationBlocked()) {
-      notify(api, SESSION_BUSY_MSG, { level: "warning" });
-      return;
-    }
+    if (manualOperationBlocked()) return;
     if (ui.state.tab !== "usuwanie") return;
     const revision = ui.state.deletion.revision;
     const generation = connectionGeneration;
@@ -2230,10 +2214,7 @@ export async function init(api: PluginApi) {
   };
 
   const deleteSelectedLetters = (): void => {
-    if (manualOperationBlocked()) {
-      notify(api, SESSION_BUSY_MSG, { level: "warning" });
-      return;
-    }
+    if (manualOperationBlocked()) return;
     const current = ui.state.deletion;
     if (ui.state.tab !== "usuwanie" || current.result?.kind !== "lista" || current.command === null) {
       return;
@@ -2332,10 +2313,7 @@ export async function init(api: PluginApi) {
    * odczytu co klik w liste skrzynki.
    */
   const openArchiveFromServer = (letter: ArchiveLetter): void => {
-    if (manualOperationBlocked()) {
-      notify(api, SESSION_BUSY_MSG, { level: "warning" });
-      return;
-    }
+    if (manualOperationBlocked()) return;
     ui.setBusy(`Czytam list: ${letter.subject}...`);
     const pseudo = archivePseudoEntry(letter);
     const generation = connectionGeneration;
@@ -2360,10 +2338,7 @@ export async function init(api: PluginApi) {
     onDeletionDelete: () => deleteSelectedLetters(),
     onSendAnimal: () => {
       // Jak przy innych operacjach (Fala 12a): zero cichego kolejkowania.
-      if (manualOperationBlocked()) {
-        notify(api, SESSION_BUSY_MSG, { level: "warning" });
-        return;
-      }
+      if (manualOperationBlocked()) return;
       if (animalFlight) {
         notify(api, "Zwierze jest juz w drodze - poczekaj na jego powrot.", { level: "warning" });
         return;
@@ -2402,10 +2377,7 @@ export async function init(api: PluginApi) {
       // Fala 12a: sesje modalne NIE kolejkuja klikow - w trakcie wiszacej
       // operacji kolejna komenda odczytu wpadalaby w sierocy pager
       // ("Nie ma takiej komendy", log 2026-10-18). Komunikat zamiast kolejki.
-      if (manualOperationBlocked()) {
-        notify(api, SESSION_BUSY_MSG, { level: "warning" });
-        return;
-      }
+      if (manualOperationBlocked()) return;
       ui.setBusy(`Czytam list: ${entry.subject}...`);
       const generation = connectionGeneration;
       void runExclusive(() => openWithResolve(box, entry))
@@ -2459,10 +2431,7 @@ export async function init(api: PluginApi) {
         applyRecord(letter);
         return;
       }
-      if (manualOperationBlocked()) {
-        notify(api, SESSION_BUSY_MSG, { level: "warning" });
-        return;
-      }
+      if (manualOperationBlocked()) return;
       if (!letter.dateRaw || !parseMailDate(letter.dateRaw)) {
         notify(
           api,
@@ -2708,10 +2677,7 @@ export async function init(api: PluginApi) {
         return;
       }
       // Fala 12a: jak przy odczycie - zero cichego kolejkowania sesji.
-      if (manualOperationBlocked()) {
-        notify(api, SESSION_BUSY_MSG, { level: "warning" });
-        return;
-      }
+      if (manualOperationBlocked()) return;
       const recipients = {
         adresat: expandLocalGroup(input.adresat, ui.state),
         dw: expandLocalGroup(input.dw, ui.state),
@@ -2787,17 +2753,11 @@ export async function init(api: PluginApi) {
     // sesji). Klik gracza przy zajetej blokadzie: odmowa z toastem,
     // zero cichego kolejkowania komend (audyt race 2026-10-21).
     onRefreshBox: (box) => {
-      if (manualOperationBlocked()) {
-        notify(api, SESSION_BUSY_MSG, { level: "warning" });
-        return;
-      }
+      if (manualOperationBlocked()) return;
       refreshBoxes([box], "sync", "manual");
     },
     onLoadOlder: (box) => {
-      if (manualOperationBlocked()) {
-        notify(api, SESSION_BUSY_MSG, { level: "warning" });
-        return;
-      }
+      if (manualOperationBlocked()) return;
       loadOlder(box);
     },
     onLoadAll: (box) => loadAll(box),
@@ -2807,10 +2767,7 @@ export async function init(api: PluginApi) {
         notify(api, validationError, { level: "error" });
         return;
       }
-      if (manualOperationBlocked()) {
-        notify(api, SESSION_BUSY_MSG, { level: "warning" });
-        return;
-      }
+      if (manualOperationBlocked()) return;
       ui.setBusy(`Szukam w skrzynce ${box}...`);
       const generation = connectionGeneration;
       void runExclusive(async () => {
@@ -2854,10 +2811,7 @@ export async function init(api: PluginApi) {
     // ZACHOWUJE ustawienia (powiadomienia, szablon compose) - one nie
     // sa cache, tylko preferencje.
     onClearCache: () => {
-      if (manualOperationBlocked()) {
-        notify(api, SESSION_BUSY_MSG, { level: "warning" });
-        return;
-      }
+      if (manualOperationBlocked()) return;
       const generation = connectionGeneration;
       ui.setBusy("Czyszcze zapisane dane...");
       void runExclusive(async () => {
@@ -2877,10 +2831,7 @@ export async function init(api: PluginApi) {
     },
     onDeleteLetter: (box, entry) => {
       // Fala 12a: zero cichego kolejkowania sesji modalnych.
-      if (manualOperationBlocked()) {
-        notify(api, SESSION_BUSY_MSG, { level: "warning" });
-        return;
-      }
+      if (manualOperationBlocked()) return;
       ui.setBusy(`Usuwam list: ${entry.subject}...`);
       const generation = connectionGeneration;
       void runExclusive(async () => {
@@ -2914,10 +2865,7 @@ export async function init(api: PluginApi) {
     },
     onForwardLetter: (box, entry, adresat) => {
       // Fala 12a: zero cichego kolejkowania sesji modalnych.
-      if (manualOperationBlocked()) {
-        notify(api, SESSION_BUSY_MSG, { level: "warning" });
-        return;
-      }
+      if (manualOperationBlocked()) return;
       ui.setBusy(`Przekazuje list: ${entry.subject}...`);
       const generation = connectionGeneration;
       void runExclusive(async () => {

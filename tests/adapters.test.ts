@@ -460,3 +460,43 @@ test('adapter: linia brana z originalLine (4. arg) gdy inny trigger ja zmodyfiko
   );
   assert.deepEqual(seen, [{ text: 'Masz nowa poczte od Bar.', cls: '' }]);
 });
+
+test('adapter: reczna poczta blokuje sesje i komendy pluginu, ale nie komende gracza', async () => {
+  const f = new FakeApi();
+  const t = armedTransport(f);
+  t.setPlayerMailMode(true);
+
+  await assert.rejects(t.send('wyslij zwierze'), /operacja anulowana/);
+  assert.throws(() => t.openSession(), /operacja anulowana/);
+  assert.equal(f.sent.length, 0, 'komendy ArkMaila nie trafiaja do recznej sesji gracza');
+
+  t.beginModal();
+  assert.equal(f.hookCb?.('spojrz'), null, 'komenda gracza zostaje odlozona przez modal');
+  t.endModal();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(f.sent.map((entry) => entry.command), ['spojrz'], 'komenda gracza przechodzi bez blokady');
+
+  t.setPlayerMailMode(false);
+  await t.send('listy odebrane');
+  assert.deepEqual(f.sent.map((entry) => entry.command), ['spojrz', 'listy odebrane']);
+});
+
+test('adapter: reczna poczta odrzuca komende pluginu oczekujaca w kolejce', async () => {
+  const f = new FakeApi();
+  let releaseFirst: (() => void) | null = null;
+  const firstPending = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  f.sendImpl = (command) => command === 'pierwsza' ? firstPending : Promise.resolve();
+  const t = armedTransport(f);
+
+  const first = t.send('pierwsza');
+  await new Promise((resolve) => setImmediate(resolve));
+  const second = t.send('druga');
+  t.setPlayerMailMode(true);
+  releaseFirst!();
+
+  await first;
+  await assert.rejects(second, /operacja anulowana/);
+  assert.deepEqual(f.sent.map((entry) => entry.command), ['pierwsza'], 'druga komenda zostaje przed API');
+});
