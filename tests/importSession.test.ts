@@ -97,15 +97,39 @@ test('sesja: brak odpowiedzi - timeout', async () => {
   await assert.rejects(s.fetchPeople('zapamietani'), /timeout/i);
 });
 
-test('sesja: prompt bez danych - pusta lista, nie blad', async () => {
+test('sesja: przedwczesny prompt nie jest poprawna pusta lista osob', async () => {
   const t = new MockTransport();
   const s = new ImportSession(t, OPTS);
   const op = s.fetchPeople('zapamietani');
+  const rejection = assert.rejects(op, /nie rozpoznano odpowiedzi/i);
   await t.replay([
     { cls: 'mail', text: '→ zapamietani', own: true },
-    { cls: 'mail', text: '> ' },
+    { cls: 'prompt', text: '> ' },
   ]);
-  assert.deepEqual(await op, [], 'brak osob = pula pusta');
+  await rejection;
+});
+
+test('sesja: przedwczesny prompt nie jest poprawna pusta lista aliasow', async () => {
+  const t = new MockTransport();
+  const s = new ImportSession(t, OPTS);
+  const op = s.fetchAliases();
+  const rejection = assert.rejects(op, /nie rozpoznano odpowiedzi/i);
+  await t.replay([
+    { cls: 'mail', text: '→ aliasy pocztowe', own: true },
+    { cls: 'prompt', text: '> ' },
+  ]);
+  await rejection;
+});
+
+test('sesja: jawny naglowek bez wpisow jest poprawnym pustym importem aliasow', async () => {
+  const t = new MockTransport();
+  const s = new ImportSession(t, OPTS);
+  const op = s.fetchAliases();
+  await t.replay([
+    { cls: 'mail', text: 'Posiadasz nastepujace zdefiniowane aliasy pocztowe:' },
+    { cls: 'prompt', text: '> ' },
+  ]);
+  assert.deepEqual(await op, []);
 });
 
 

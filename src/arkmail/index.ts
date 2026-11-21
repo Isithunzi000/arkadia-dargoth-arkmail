@@ -662,6 +662,7 @@ export async function init(api: PluginApi) {
     source: "auto" | "manual",
     automatic = false,
   ): Promise<void> => {
+    const generation = connectionGeneration;
     // Flaga automatic dotyczy wylacznie zadan w tle. Operacje powiazane
     // z recznym dzialaniem moga odswiezyc skrzynki takze przy opcji off.
     const autoDisabled = (): boolean => automatic && !ui.state.autoRefreshEnabled;
@@ -684,9 +685,10 @@ export async function init(api: PluginApi) {
         if (isOperationCancelled(error)) parkRemaining();
         throw error;
       }
-      // Wejscie gracza moze nastapic miedzy rozwiazaniem sesji a tym
-      // krokiem. Anulowanego wyniku nie wolno zastosowac do archiwum.
-      // To samo dotyczy wylaczenia zadan w tle podczas ostatniego fetcha.
+      // Zmiana polaczenia albo wejscie gracza moze nastapic miedzy
+      // rozwiazaniem sesji a tym krokiem. Anulowanego wyniku nie wolno
+      // zastosowac do archiwum. To samo dotyczy wylaczenia zadan w tle.
+      if (generation !== connectionGeneration) throw new Error("operacja anulowana");
       if (autoDisabled()) throw new Error("operacja anulowana");
       if (playerMailMode) {
         parkRemaining();
@@ -1337,11 +1339,11 @@ export async function init(api: PluginApi) {
           return { stop: fresh !== null };
         },
       });
-      if (fresh) return fresh;
       if (scan.end === "cancelled") throw new Error("operacja anulowana");
-      if (scan.end === "incomplete") {
+      if (scan.end === "incomplete" || scan.end === "partial") {
         throw new Error("Nie mozna sprawdzic calej listy - sprobuj ponownie.");
       }
+      if (fresh) return fresh;
     } finally {
       offCancel();
     }
@@ -1762,6 +1764,7 @@ export async function init(api: PluginApi) {
    * i w wpis archiwum bez tresci (Fala 16h). WYMAGA locka (caller).
    */
   const openWithResolve = async (box: MailBox, entry: MailboxEntry): Promise<void> => {
+    const generation = connectionGeneration;
     // Fala 16c: blad "listing serwera odpowiedzial nietypowo" (re-login, cudzy
     // listing gracza miedzy operacjami - log 2026-10-19 17:13:14)
     // dostaje JEDNA druga szanse: wymuszamy re-kotwice (bumpCtx
@@ -1771,10 +1774,12 @@ export async function init(api: PluginApi) {
       // Re-kotwiczenie (Fala 9a): numer serwera dopiero ze swiezego
       // kontekstu; brak wpisu = zadna komenda nie wylatuje.
       const fresh = await resolveEntry(box, entry);
+      if (generation !== connectionGeneration) throw new Error("operacja anulowana");
       if (!fresh) return;
       beginPagerModal();
       try {
         const res = await pager.readLetter(fresh.number);
+        if (generation !== connectionGeneration) throw new Error("operacja anulowana");
         ui.openLetter(box, res.letter, fresh);
         // Cache (Fala 8f): tresc listu do archiwum. Swiezy wpis
         // daje zgodnosc id (flaga forwarded) z rekordem z listingu.
@@ -1859,10 +1864,12 @@ export async function init(api: PluginApi) {
     letter: ArchiveLetter,
     opts?: { shouldAbort?: () => boolean; box?: MailBox; retry?: boolean },
   ): Promise<FetchBodyResult> => {
+    const generation = connectionGeneration;
     const box = opts?.box ?? letter.box;
     const pseudo = archivePseudoEntry(letter, box);
     let stage: ArchiveDownloadStage = "kotwiczenie";
-    const aborted = (): boolean => opts?.shouldAbort?.() === true || playerMailMode;
+    const aborted = (): boolean =>
+      opts?.shouldAbort?.() === true || playerMailMode || generation !== connectionGeneration;
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         stage = "kotwiczenie";
@@ -1874,6 +1881,7 @@ export async function init(api: PluginApi) {
         beginPagerModal();
         try {
           const res = await pager.readLetter(fresh.number, opts?.shouldAbort);
+          if (aborted()) return { kind: "anulowano", stage };
           if (res.letter.body.every((line) => line.trim().length === 0)) {
             return { kind: "pusta_tresc", stage: "odczyt" };
           }
@@ -2242,6 +2250,10 @@ export async function init(api: PluginApi) {
           bumpCtx(box);
           return;
         }
+        if (fresh.kind === "lista" && fresh.confirmed === false) {
+          ui.clearDeletionResult("Nie potwierdzono zamkniecia listingu. Wyszukaj listy ponownie.");
+          return;
+        }
         if (fresh.kind === "lista") stampEntries(box, fresh.entries);
         else bumpCtx(box);
         if (fresh.kind !== "lista") {
@@ -2256,6 +2268,7 @@ export async function init(api: PluginApi) {
         ui.setBusy("Usuwam zaznaczone listy...");
         deleteStarted = true;
         const result = await pager.deleteLetters(match.numbers[0], match.range);
+        if (generation !== connectionGeneration) return;
         const confirmed = [...new Set([...result.deletedNumbers, ...result.unexpectedNumbers])]
           .sort((a, b) => a - b);
         const updated = applyConfirmedDeletions(ui.state.archive, box, fresh.entries, confirmed);
@@ -2840,6 +2853,7 @@ export async function init(api: PluginApi) {
           beginPagerModal();
           try {
             const res = await pager.deleteLetters(fresh.number, String(fresh.number));
+            if (generation !== connectionGeneration) return;
             if (res.deleted) {
               // Fala 14e: sesja pagera (d N -> q) kasuje list FAKTYCZNIE
               // przy wyjsciu ("Kasuje: N.") - toast mowi o skutku.
@@ -2874,6 +2888,7 @@ export async function init(api: PluginApi) {
           beginPagerModal();
           try {
             const res = await pager.forwardLetter(fresh.number, adresat);
+            if (generation !== connectionGeneration) return;
             if (res.queued) {
               notify(api, "Przekazany list zapisany w niewyslanych.", { level: "success" });
               refreshBoxes(["niewyslane"]);

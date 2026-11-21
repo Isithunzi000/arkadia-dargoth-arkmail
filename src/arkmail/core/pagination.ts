@@ -196,9 +196,9 @@ export async function scanMailboxPages(options: PageScanOptions): Promise<PageSc
         await options.wait(ANCHOR_RETRY_WAITS_MS[attempt]!);
         if (options.cancelled()) return finish('cancelled');
         const base = await options.fetchPage();
+        if (options.cancelled()) return finish('cancelled');
         observeConfirmation(base);
         options.onBaseRefresh?.(base);
-        if (options.cancelled()) return finish('cancelled');
         // Odswiezona baza bez potwierdzenia takze konczy skan. Jej dane
         // zostaly scalone przez onBaseRefresh, lecz kolejna kotwica moglab
         // zebrac pozny koniec tej samej odpowiedzi.

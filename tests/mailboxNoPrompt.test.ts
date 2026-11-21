@@ -277,6 +277,34 @@ test('skan: niepotwierdzony listing bazowy zostaje scalony i blokuje kolejna kot
   assert.deepEqual(commands, [anchor, anchor, undefined]);
 });
 
+test('skan: anulowanie podczas odswiezania bazy poprzedza zapis wyniku', async () => {
+  const first = scanEntry('Pierwsza', 24, '10:00:00');
+  const base = scanEntry('Bazowa', 25, '10:00:00');
+  const anchor = 'listy odebrane przed 25 VIII 1999';
+  let cancelled = false;
+  let commands = 0;
+  const refreshed: string[] = [];
+  const result = await scanMailboxPages({
+    box: 'odebrane',
+    initialCommand: anchor,
+    cancelled: () => cancelled,
+    fetchPage: async () => {
+      commands += 1;
+      if (commands <= 2) return scanPage([first], true, true);
+      cancelled = true;
+      return scanPage([base], true, true);
+    },
+    wait: async () => {},
+    onBaseRefresh: (value) => {
+      if (value.kind === 'lista') refreshed.push(...value.entries.map((entry) => entry.subject));
+    },
+    onPage: () => ({}),
+  });
+
+  assert.equal(result.end, 'cancelled');
+  assert.deepEqual(refreshed, [], 'anulowana baza nie trafia do widoku ani archiwum');
+});
+
 test('wczytaj starsze: strona bez promptu zostaje w widoku i archiwum bez dawnego bledu', async () => {
   const h = await startHarness();
   try {

@@ -13,6 +13,7 @@ import {
   parseRememberedLine,
 } from '../protocol/parser.js';
 import type { MailAliasDef } from '../protocol/types.js';
+import { AmbiguousResponseError } from './errors.js';
 import { isEchoLine, isPromptLine } from './lines.js';
 import type { ProtoLine, Transport } from './transport.js';
 
@@ -88,7 +89,7 @@ export class ImportSession {
     });
   }
 
-  /** Osoby zapamietane lub ostatnio przedstawione; pula pusta = []. */
+  /** Osoby zapamietane lub ostatnio przedstawione. */
   async fetchPeople(kind: PeopleImportKind): Promise<string[]> {
     const lines = await this.collect(IMPORT_COMMANDS[kind]);
     const parse = kind === 'zapamietani' ? parseRememberedLine : parseIntroducedLine;
@@ -96,7 +97,9 @@ export class ImportSession {
       const names = parse(line);
       if (names !== null) return names;
     }
-    return [];
+    throw new AmbiguousResponseError(
+      `nie rozpoznano odpowiedzi na komende ${IMPORT_COMMANDS[kind]}`,
+    );
   }
 
   /** Alias pocztowe z gry (tylko odczyt; rozstrzyga je serwer). */
@@ -104,6 +107,9 @@ export class ImportSession {
     const lines = await this.collect('aliasy pocztowe');
     // Blok zaczyna sie naglowkiem; wczesniej moze lezec echo komendy.
     const start = lines.findIndex((l) => l.startsWith('Posiadasz nastepujace'));
-    return parseAliasesBlock(start === -1 ? [] : lines.slice(start));
+    if (start === -1) {
+      throw new AmbiguousResponseError('nie rozpoznano odpowiedzi na komende aliasy pocztowe');
+    }
+    return parseAliasesBlock(lines.slice(start));
   }
 }

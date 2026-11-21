@@ -1,7 +1,7 @@
 # Plan roboczy poprawek ArkMail 1.30.14
 
 Data utworzenia: 2026-11-21.
-Ostatnia aktualizacja: 2026-11-21, etap 6 zakonczony.
+Ostatnia aktualizacja: 2026-11-21, etap 7 zakonczony.
 
 ## Status i zakres
 
@@ -382,7 +382,7 @@ Wynik kontroli:
   tests/editorTimeout.test.ts, tests/composeTransport.test.ts,
   tests/uiStage11.test.ts oraz ten plan.
 
-## Etap 7 - import i ochrona archiwum
+## Etap 7 - zakonczony: import i ochrona archiwum
 
 Wczesny prompt bez rozpoznanej odpowiedzi na komende importu nie jest prawidlowa
 pusta lista. Zapis wymaga rozpoznania odpowiedzi, jej aktualnosci i zakonczenia
@@ -401,6 +401,29 @@ Nie powstaje nowy system klasyfikacji odpowiedzi.
 
 Testy: prawidlowy pusty import, przedwczesny prompt, replay pustego listingu,
 niekompletny listing, stary list o tym samym numerze i reconnect przed zapisem.
+
+### Wynik wykonania
+
+- RED: 8 rzeczywistych bledow na starym kodzie, 0 anulowan. Dwa przedwczesne
+  prompty zwracaly pusty import, anulowana baza byla stosowana, niepotwierdzony
+  listing otwieral pager i zbiorcze kasowanie, a wyniki zakonczone tuz przed
+  reconnectem zmienialy widok, archiwum albo otwieraly stary list.
+- Import osob i aliasow odrzuca odpowiedz bez rozpoznanego formatu. Jawny
+  naglowek aliasow bez wpisow pozostaje prawidlowym pustym importem.
+- Paginacja sprawdza anulowanie przed onBaseRefresh. Re-kotwiczenie nie zwraca
+  wpisu ze skanu partial, a zbiorcze kasowanie konczy sie przed pagerem dla
+  confirmed === false.
+- fetchBoxes, openWithResolve, fetchArchiveBody oraz kasowanie i przekazywanie
+  sprawdzaja generacje bezposrednio przed zastosowaniem wyniku. Nie zmieniono
+  parsera pustych odpowiedzi ani scalania uzytecznych stron bez promptu.
+- GREEN: 34/34 kontrolki ukierunkowane i 82/82 powiazane regresje importu,
+  paginacji, archiwum, reconnectu, re-kotwiczenia oraz kasowania.
+- Pelny lokalny zestaw, typowanie i build: zielone przed zapisem etapu.
+- Zmienione pliki: src/arkmail/core/session/importer.ts,
+  src/arkmail/core/pagination.ts, src/arkmail/index.ts,
+  tests/importSession.test.ts, tests/mailboxNoPrompt.test.ts,
+  tests/archiveGeneration.test.ts, tests/deletionFlow.test.ts,
+  tests/groupAliasConflicts.test.ts, tests/sessionRecovery.test.ts oraz ten plan.
 
 ## Etap 8 - komunikaty o anulowaniu i synchronizacji
 
@@ -432,10 +455,10 @@ brak komend naprawczych.
 | playerMailMode przezywa reconnect albo powstaje ze starego echa | Reset i blokada replayu zakonczone w 2 i 3; przypadek bez sygnalu pozostaje ograniczeniem z 0 |
 | Komendy pluginu wychodza podczas recznej poczty | 4, zakonczone |
 | Pomijane automatyczne odswiezenie po wznowieniu | 3, zakonczone: pusty replay odswieza raz, niepusty i nieznany czekaja na reczna operacje |
-| Stary listing albo pusta odpowiedz zmienia archiwum | 3 i 7 |
-| Stary list o tym samym numerze zostaje zapisany | 3 i 7 |
-| Stare prompty uruchamiaja kasowanie/przekazywanie | 3 i 7 |
-| Stare linie koncza compose lub import | 3 i 6 zakonczone dla compose; 7 dla importu |
+| Stary listing albo pusta odpowiedz zmienia archiwum | 3 i 7, zakonczone |
+| Stary list o tym samym numerze zostaje zapisany | 3 i 7, zakonczone |
+| Stare prompty uruchamiaja kasowanie/przekazywanie | 3 i 7, zakonczone |
+| Stare linie koncza compose lub import | 3, 6 i 7, zakonczone |
 | Timeout pagera wysyla q bez dowodu pagera | 5, zakonczone |
 | Timeout compose nie obsluguje otwartego edytora | 6, zakonczone |
 | Stare timery odswiezen przezywaja reconnect | 2, zakonczone |

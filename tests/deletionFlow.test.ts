@@ -233,6 +233,28 @@ test('usuwanie: niezgodny swiezy wynik zatrzymuje operacje przed pagerem', async
   }
 });
 
+test('usuwanie: niepotwierdzony swiezy listing zatrzymuje operacje przed pagerem', async () => {
+  const h = await startHarness({ archive: [archive(rows.a)] });
+  const { f } = h;
+  try {
+    await search(h, [rows.a]);
+    check(h, 1);
+    click(h, '.arkmail-deletion-delete');
+    click(h, '.arkmail-deletion-delete');
+    await h.waitFor(() => f.sent.filter((command) => command === 'listy odebrane').length === 2, 'kontrola');
+    replayListing(h, [rows.a], false);
+    await new Promise((resolve) => setTimeout(resolve, 900));
+
+    assert.ok(!f.sent.some((command) => command.startsWith('przeczytaj list')), 'brak otwarcia pagera');
+    assert.ok(!f.sent.some((command) => command.startsWith('d ')), 'brak komendy kasowania');
+    const kept = await storedArchive();
+    assert.equal(kept.length, 1, 'archiwum pozostaje nietkniete');
+    assert.notEqual(kept[0].missingOnServer, true);
+  } finally {
+    await stopHarness();
+  }
+});
+
 test('usuwanie: brak fizycznego potwierdzenia nie zmienia Archiwum', async () => {
   const h = await startHarness({ archive: [archive(rows.a)] });
   const { f } = h;

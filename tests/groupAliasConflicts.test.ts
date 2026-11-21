@@ -167,6 +167,7 @@ test('handler: import pliku zglasza konflikt, bledny import aliasow jest atomowy
     h.f.sendImpl = null;
     handlers!.onImportAliases!();
     await h.waitFor(() => h.f.sent.filter((line) => line === 'aliasy pocztowe').length === 3, 'kompletny pusty import');
+    h.f.fire('Posiadasz nastepujace zdefiniowane aliasy pocztowe:', 'mail');
     h.f.fire('> ', 'mail');
     await h.waitFor(() => store!.state.importedAliases.length === 0, 'konflikt znika z lustrem');
     assert.deepEqual(store!.state.groups[0], { name: 'Druzyna', members: ['Fred'] });

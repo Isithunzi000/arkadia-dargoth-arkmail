@@ -268,6 +268,9 @@ test('import: cisza bez promptu nie jest pomyslnym zakonczeniem', async () => {
 
   await t.replay([{ cls: 'prompt', text: '> ' }]);
   const next = importer.fetchPeople('zapamietani');
-  await t.replay([{ cls: 'prompt', text: '> ' }]);
-  assert.deepEqual(await next, []);
+  await t.replay([
+    { cls: 'mail', text: '[12] Zapamietane przez ciebie imiona to Corge.' },
+    { cls: 'prompt', text: '> ' },
+  ]);
+  assert.deepEqual(await next, ['Corge']);
 });
