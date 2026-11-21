@@ -863,8 +863,10 @@ export async function init(api: PluginApi) {
   // logowania (powrot buga 3). Flage kasuje wylacznie client.connect
   // albo attach zywej sesji (resumed i brak upstreamClosed).
   let lastUpstreamClosed = false;
+  let emptyReplayHandled = false;
   const onClientConnect = (): void => {
     lastUpstreamClosed = false;
+    emptyReplayHandled = false;
     // Stan GMCP resetuje disconnect/zmiana postaci. Sam connect moze
     // poprzedzac swieza ramke po replayu proxy i nie moze zatrzec jej roznicy.
     cancelConnectionOperations(false);
@@ -888,7 +890,11 @@ export async function init(api: PluginApi) {
     armGameTransport();
   };
   const onProxySession = (session: unknown): void => {
-    const s = session as { resumed?: unknown; upstreamClosed?: unknown } | null | undefined;
+    const s = session as {
+      resumed?: unknown;
+      upstreamClosed?: unknown;
+      replayedBytes?: unknown;
+    } | null | undefined;
     // Fala 27 (blad B): proxy Go wysyla upstreamClosed WYLACZNIE gdy
     // true (json:"upstreamClosed,omitempty", proxy/session.go) - sesja
     // zywa ma klucz POMINIETY, wiec === false nigdy nie przechodzilo
@@ -896,6 +902,10 @@ export async function init(api: PluginApi) {
     // sam uzywa poprawnego !upstreamClosed (PlayerIdentity.ts).
     if (s?.resumed === true && !s?.upstreamClosed) {
       lastUpstreamClosed = false;
+      if (s.replayedBytes === 0) {
+        if (emptyReplayHandled) return;
+        emptyReplayHandled = true;
+      }
       armGameTransport();
       refreshBoxes(["odebrane", "nieprzeczytane", "wyslane", "niewyslane"], "sync", "auto", true);
     } else if (s?.upstreamClosed === true) {
@@ -909,6 +919,7 @@ export async function init(api: PluginApi) {
       // Swiezy attach (brak resumed i upstreamClosed) - czysta sesja
       // na ekranie logowania; zdejmujemy straz anti-replay.
       lastUpstreamClosed = false;
+      emptyReplayHandled = false;
     }
   };
   const onClientDisconnect = (): void => {

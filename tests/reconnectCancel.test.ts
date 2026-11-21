@@ -3,6 +3,42 @@ import assert from 'node:assert/strict';
 
 import { click, loadTruncatedBox, startHarness, stopHarness } from './harness';
 
+test('pusty replay wykonuje jedno odswiezenie mimo powtornych sygnalow', async () => {
+  const h = await startHarness();
+  const { f, waitFor, content } = h;
+  try {
+    f.fireEvent('client.disconnect', undefined);
+    f.fireEvent('client.connect', undefined);
+    f.fireEvent('proxy.session', { resumed: true, upstreamClosed: false, replayedBytes: 0 });
+    const boxes = [
+      ['odebrane', 'odebranych'],
+      ['nieprzeczytane', 'nieprzeczytanych'],
+      ['wyslane', 'wyslanych'],
+      ['niewyslane', 'niewyslanych'],
+    ] as const;
+    for (const [box, genitive] of boxes) {
+      await waitFor(() => f.sent.includes(`listy ${box}`), `pierwsze odswiezenie: ${box}`);
+      f.fire(`Nie masz zadnych ${genitive} listow.`, 'mail');
+    }
+    await waitFor(
+      () => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '',
+      'koniec pierwszego odswiezenia',
+    );
+    const sentAfterRefresh = [...f.sent];
+
+    f.fireEvent('proxy.session', { resumed: true, upstreamClosed: false, replayedBytes: 0 });
+    f.fireEvent('gmcp', { path: 'char.state', value: {} });
+    f.fireEvent('gmcp.char.info', { name: 'Tester' });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    assert.deepEqual(f.sent, sentAfterRefresh, 'powtorne sygnaly nie tworza drugiego odswiezenia');
+    assert.ok(!f.sent.includes('q'));
+    assert.ok(!f.sent.includes('~q'));
+  } finally {
+    await stopHarness();
+  }
+});
+
 test('reconnect anuluje stary listing i wznawia odswiezenie po sygnale wznowienia sesji', async () => {
   const h = await startHarness();
   const { f, waitFor, content } = h;

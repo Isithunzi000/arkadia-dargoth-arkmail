@@ -1,7 +1,7 @@
 # Plan roboczy poprawek ArkMail 1.30.14
 
 Data utworzenia: 2026-11-21.
-Ostatnia aktualizacja: 2026-11-21, etap 2 zakonczony wraz z kontrolami idempotentnosci.
+Ostatnia aktualizacja: 2026-11-21, pojedyncze odswiezenie pustego replayu zakonczone.
 
 ## Status i zakres
 
@@ -372,7 +372,7 @@ brak komend naprawczych.
 | Replayowany prompt zdejmuje blokade | 2 i 3, bez zdejmowania blokady przez prompt |
 | playerMailMode przezywa reconnect albo powstaje ze starego echa | Reset przy reconnectcie zakonczony w 2; replay i przypadek bez sygnalu pozostaja zgodnie z 0 i 3 |
 | Komendy pluginu wychodza podczas recznej poczty | 4 |
-| Pomijane automatyczne odswiezenie po wznowieniu | 2 i 3, jedno odswiezenie przy pustym replayu |
+| Pomijane automatyczne odswiezenie po wznowieniu | Pusty replay zakonczony w 3: dokladnie jedno odswiezenie; pozostale replaye pozostaja w 3 |
 | Stary listing albo pusta odpowiedz zmienia archiwum | 3 i 7 |
 | Stary list o tym samym numerze zostaje zapisany | 3 i 7 |
 | Stare prompty uruchamiaja kasowanie/przekazywanie | 3 i 7 |
