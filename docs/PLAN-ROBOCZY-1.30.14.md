@@ -1,7 +1,7 @@
 # Plan roboczy poprawek ArkMail 1.30.14
 
 Data utworzenia: 2026-11-21.
-Ostatnia aktualizacja: 2026-11-21, reset recovering przy reconnectcie zakonczony.
+Ostatnia aktualizacja: 2026-11-21, utwardzenie testu Chromium po jednorazowym bledzie CI.
 
 ## Status i zakres
 
@@ -24,6 +24,11 @@ Publiczne API nie oznacza pochodzenia kazdej linii ani konca replayu. Dlatego
 zakres 100% dotyczy wszystkich zachowan opisanych w tym planie, a nie
 niemozliwej klasyfikacji kazdej starej i aktualnej linii. Nie potrzebujemy do
 tego zmiany klienta Dargoth.
+
+Kontrola CI wykazala jednorazowy brak wyniku DOM przy kodzie wyjscia 0 w tescie
+pol dat. Wykonawca testu ponawia takie uruchomienie najwyzej trzy razy i zapisuje
+diagnostyke wszystkich prob. Bledne wartosci color-scheme nadal koncza test
+natychmiast. To utwardzenie kontroli, bez zmiany zachowania pluginu.
 
 ## Zasady wiazace
 

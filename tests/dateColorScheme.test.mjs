@@ -31,7 +31,7 @@ function chromium() {
   assert.fail('Brak prawdziwego Chromium; ustaw CHROME_BIN.');
 }
 
-test('Chromium: szesc pol dat dziedziczy motyw w czterech kombinacjach', { timeout: 30000 }, () => {
+test('Chromium: szesc pol dat dziedziczy motyw w czterech kombinacjach', { timeout: 200000 }, () => {
   const css = [...source.matchAll(/[^{}]+\{[^{}]*color-scheme[^{}]*\}/g)]
     .map((match) => match[0])
     .join('\n');
@@ -48,13 +48,23 @@ test('Chromium: szesc pol dat dziedziczy motyw w czterech kombinacjach', { timeo
         </main></body></html>`;
         const file = join(dir, `${system}-${client}.html`);
         writeFileSync(file, html);
-        const run = spawnSync(chromium(), [
-          '--headless', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
-          '--dump-dom', `file://${file}`,
-        ], { encoding: 'utf8', timeout: 15000 });
-        assert.equal(run.status, 0, `Chromium ${system}/${client}: ${run.stderr}`);
-        const match = run.stdout.match(/data-result="([^"]+)"/);
-        assert.ok(match, `Chromium zwrocilo wynik ${system}/${client}`);
+        let match = null;
+        const attempts = [];
+        for (let attempt = 1; attempt <= 3 && !match; attempt++) {
+          const run = spawnSync(chromium(), [
+            '--headless', '--no-sandbox', '--disable-gpu', '--disable-dev-shm-usage',
+            '--dump-dom', `file://${file}`,
+          ], { encoding: 'utf8', timeout: 15000 });
+          match = run.status === 0 ? run.stdout.match(/data-result="([^"]+)"/) : null;
+          if (!match) {
+            attempts.push(
+              `proba ${attempt}: status=${run.status}, signal=${run.signal}, ` +
+              `error=${run.error?.message ?? 'brak'}, stdout=${run.stdout.slice(-2000)}, ` +
+              `stderr=${run.stderr.slice(-2000)}`,
+            );
+          }
+        }
+        assert.ok(match, `Chromium nie zwrocilo wyniku ${system}/${client}\n${attempts.join('\n')}`);
         const actual = JSON.parse(match[1].replaceAll('&quot;', '"'));
         assert.deepEqual(actual, Array(6).fill(client), `system ${system}, klient ${client}`);
       }
