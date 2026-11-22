@@ -97,7 +97,6 @@ export class DargothTransport implements Transport {
   /** Niepotwierdzony koniec odpowiedzi: mail gagowany do promptu gry. */
   private recovering = false;
   private playerMailMode = false;
-  private preservePagerCloseOnRecovery = false;
   private recoveryTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private readonly api: PluginApi) {}
@@ -261,8 +260,7 @@ export class DargothTransport implements Transport {
     this.clearRecoveryTimer();
   }
 
-  beginRecovery(options?: { preservePagerClose?: boolean }): void {
-    if (options?.preservePagerClose) this.preservePagerCloseOnRecovery = true;
+  beginRecovery(): void {
     if (this.recovering) {
       this.armTrigger();
       return;
@@ -301,7 +299,6 @@ export class DargothTransport implements Transport {
     if (this.modalActive) return;
     this.modalActive = true;
     this.pagerModal = options?.pager ?? null;
-    this.preservePagerCloseOnRecovery = false;
     this.pagerOpen = false;
     this.pagerCloseSent = false;
     this.pagerClosePromptSeen = false;
@@ -369,7 +366,6 @@ export class DargothTransport implements Transport {
   private clearPagerCloseLatch(): void {
     this.pagerCloseAttempt++;
     this.pagerModal = null;
-    this.preservePagerCloseOnRecovery = false;
     this.pagerOpen = false;
     this.pagerCloseSent = false;
     this.pagerClosePromptSeen = false;
@@ -387,10 +383,8 @@ export class DargothTransport implements Transport {
     const pagerHooks = this.pagerModal;
     const discardQueue = this.recovering || this.pagerTakenOver;
     this.pagerOpen = false;
-    const keepCloseHook = pagerHooks !== null && this.pagerCloseSent &&
-      !this.pagerClosePromptSeen &&
-      (!this.recovering || this.preservePagerCloseOnRecovery);
-    if (!keepCloseHook) this.clearPagerCloseLatch();
+    // Zakonczona operacja nie moze przechwytywac pozniejszych komend gracza.
+    this.clearPagerCloseLatch();
     const pending = this.queue.splice(0);
     if (!this.online) return;
     let dropped = false;
@@ -439,7 +433,6 @@ export class DargothTransport implements Transport {
     }
     this.modalActive = false;
     this.pagerModal = null;
-    this.preservePagerCloseOnRecovery = false;
     this.pagerOpen = false;
     this.pagerCloseSent = false;
     this.pagerClosePromptSeen = false;

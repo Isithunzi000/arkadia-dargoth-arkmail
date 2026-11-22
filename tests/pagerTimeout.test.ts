@@ -95,7 +95,7 @@ test('pager: timeout po potwierdzonym pagerze wykonuje jedno kontrolowane zamkni
   await assert.rejects(pager.readLetter(1), /operacja anulowana/, 'brak potwierdzenia wymaga synchronizacji');
 });
 
-test('pager: timeout podczas zamykania nie wysyla drugiego q', async (context) => {
+test('pager: odczyt bez zwyklego promptu konczy sie po ciszy i pozwala kontynuowac', async (context) => {
   context.mock.timers.enable({ apis: ['setTimeout'] });
   const transport = new MockTransport();
   const pager = new PagerSession(transport, OPTS);
@@ -103,9 +103,14 @@ test('pager: timeout podczas zamykania nie wysyla drugiego q', async (context) =
   await transport.replay(LETTER);
   assert.deepEqual(transport.sent, ['przeczytaj list 1', 'q']);
 
-  const rejection = assert.rejects(operation, /timeout: pager session list 1/);
+  context.mock.timers.tick(20);
+  const result = await operation;
+  assert.equal(result.letter.body.join('\n').trim(), 'Tresc.');
+  assert.equal(transport.sent.filter((line) => line === 'q').length, 1);
+
+  const next = pager.readLetter(2);
+  assert.deepEqual(transport.sent, ['przeczytaj list 1', 'q', 'przeczytaj list 2']);
+  const rejection = assert.rejects(next, /timeout: pager session list 2/);
   context.mock.timers.tick(100);
   await rejection;
-  assert.equal(transport.sent.filter((line) => line === 'q').length, 1);
-  await assert.rejects(pager.readLetter(1), /operacja anulowana/, 'zamykanie bez promptu wymaga synchronizacji');
 });

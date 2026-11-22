@@ -101,9 +101,8 @@ export interface Transport {
   send(line: string, echo?: boolean): void | Promise<void>;
   /** Otwiera rejestracje rozdzielajaca sesje i generacje polaczenia. */
   openSession(): SessionScope;
-  /** Pozostawia odpowiedzi mail gagowane do potwierdzonego promptu gry.
-   *  Po zwroconym odczycie moze zachowac koalescencje powtornego q/x. */
-  beginRecovery(options?: { preservePagerClose?: boolean }): void;
+  /** Pozostawia odpowiedzi mail gagowane do potwierdzonego promptu gry. */
+  beginRecovery(): void;
   /** Przekazuje potwierdzenie pagera takze wtedy, gdy prompt jest niewidoczny. */
   confirmPagerOpen?(): void;
   /** Globalna subskrypcja linii; zwraca unsubscribe. */

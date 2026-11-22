@@ -6,8 +6,9 @@
  *
  * Przenosnosc: koniec transakcji wykrywamy po klasie 'prompt' ALBO po
  * samej tresci ("> "). Cisza moze pomoc wykryc niewidoczny prompt pagera
- * i wyslac q. Przy kompletnym odczycie brak zwyklego promptu zachowuje
- * tresc, lecz uruchamia recovery; inne akcje nadal wymagaja potwierdzenia.
+ * i wyslac q. Kompletny odczyt bez zwyklego promptu zwraca zebrana tresc
+ * po krotkiej ciszy i zwalnia kolejna operacje; inne akcje nadal wymagaja
+ * potwierdzonego zakonczenia.
  */
 
 import {
@@ -247,8 +248,7 @@ export class PagerSession {
    * Otwiera pager na liscie `numer`, wykonuje akcje, zamyka "q".
    * onPager: odpalane przy pierwszym pager prompt (wyslij akcje).
    * onLine: moze zwrocic 'close' -> wysylamy "q" przy najblizszym
-   * pager prompcie. Zwykly prompt potwierdza kanal. Kompletny odczyt bez
-   * tego promptu zwraca list po krotkim czasie i pozostawia recovery.
+   * pager prompcie. Odczyt konczy zwykly prompt albo krotka cisza po q.
    */
   private run<T>(
     numer: number,
@@ -447,25 +447,23 @@ export class PagerSession {
         }
       }, this.opts.timeoutMs);
 
+      const armCloseIdle = (): void => {
+        if (actions !== null || done) return;
+        if (graceTimer) clearTimeout(graceTimer);
+        graceTimer = setTimeout(() => {
+          if (!done && state === 'closing') finish();
+        }, idleMs);
+      };
+
       const enterClosing = () => {
         wantClose = false;
         idleOpened = false;
         state = 'closing';
         if (quietTimer) clearTimeout(quietTimer);
         send('q');
-        // Odczyt (brak akcji) ma juz kompletna, zwalidowana tresc. Krotki
-        // czas oczekiwania daje promptowi pierwszenstwo. Jego brak nie moze
-        // uniewaznic listu, ale kanal pozostaje zablokowany do promptu albo
-        // reconnectu. Usuwanie i przekazywanie nadal wymagaja potwierdzenia.
-        if (actions === null && !done) {
-          graceTimer = setTimeout(() => {
-            if (done || state !== 'closing') return;
-            // List jest juz zwrocony, ale powtorne q/x wciaz nalezy do tego
-            // samego zamkniecia. Timeout i bledy zdejmuja te koalescencje.
-            this.transport.beginRecovery({ preservePagerClose: true });
-            finish(false);
-          }, Math.max(idleMs, CLOSE_GRACE_MS));
-        }
+        // Odczyt ma juz kompletna tresc. Prompt konczy go od razu, a cisza
+        // zwraca zebrany list i zwalnia kolejna operacje bez recovery.
+        armCloseIdle();
       };
 
       session.subscribe((line: ProtoLine) => {
@@ -481,6 +479,7 @@ export class PagerSession {
             return;
           }
           actions?.onClosingLine?.(line);
+          armCloseIdle();
           return;
         }
 

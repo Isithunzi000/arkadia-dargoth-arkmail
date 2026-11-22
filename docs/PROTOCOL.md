@@ -431,13 +431,12 @@ zapisu. Dawne klucze localStorage sa usuwane bez migracji danych.
 
 ## Konczenie operacji i spojnosc archiwum
 
-- Kompletny odczyt pagera konczy sie na zwyklym promptcie albo po krotkim
-  czasie od wyslania `q`. Bez promptu list jest zwracany, otwierany i zapisywany,
-  a kanal pozostaje w odzyskiwaniu do zwyklego promptu lub reconnectu.
+- Kompletny odczyt pagera konczy sie na zwyklym promptcie albo po krotkiej
+  ciszy od wyslania `q`. Bez promptu list jest zwracany, otwierany i zapisywany,
+  a kolejna operacja moze rozpoczac sie od razu, bez odzyskiwania kanalu.
   Usuwanie, przekazywanie i import nadal wymagaja potwierdzonego zakonczenia.
-  Powtorne reczne `q`/`x` po zwroconym odczycie nalezy do tego samego
-  zamkniecia i nie jest wysylane ponownie. Odswiezenie skrzynki po takim
-  odczycie czeka na zwykly prompt; przed nim nie wysyla kolejnej komendy.
+  Zakonczenie operacji zdejmuje hook modalny, wiec pozniejsze reczne `q`/`x`
+  nalezy do gracza i nie jest przez ArkMail tlumione.
 - Listing konczy sie jako potwierdzony na zwyklym promptcie albo echcie
   kolejnej komendy, takze gdy prompt jest opozniony, ale dociera przed
   limitem ciszy. Domyslnie po 600 ms ciszy poprawny listing wraca jako

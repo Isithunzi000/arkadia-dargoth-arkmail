@@ -179,7 +179,7 @@ test('pager: odrzucenie bezposredniego q gracza nie blokuje ponowienia', async (
   transport.dispose();
 });
 
-test('pager: zwrot listu bez zwyklego promptu zachowuje koalescencje q/x', async () => {
+test('pager: zwrot listu bez zwyklego promptu pozwala recznie zamknac i kontynuowac', async () => {
   const client = new PagerClient();
   const { transport, pager } = setup(client, 1000);
   const operation = pager.readLetter(1);
@@ -189,28 +189,27 @@ test('pager: zwrot listu bez zwyklego promptu zachowuje koalescencje q/x', async
   transport.endModal();
 
   assert.equal(result.letter.body.join('\n').trim(), 'Syntetyczna tresc.');
-  assert.equal(transport.isRecovering(), true);
+  assert.equal(transport.isRecovering(), false);
+  assert.equal(client.hook, null);
   await client.api.command.send('q', true);
-  await client.api.command.send('x', true);
-  assert.deepEqual(client.wire.filter((line) => line === 'q' || line === 'x'), ['q']);
-  assert.throws(() => transport.openSession(), /operacja anulowana/);
+  assert.deepEqual(client.wire.filter((line) => line === 'q' || line === 'x'), ['q', 'q']);
   client.fire('> ', 'prompt');
   const session = transport.openSession();
   session.close();
   transport.dispose();
 });
 
-test('pager: timeout po przyjetym q zdejmuje koalescencje przed recznym ponowieniem', async () => {
+test('pager: krotki timeout nie uniewaznia listu zwroconego po ciszy', async () => {
   const client = new PagerClient();
   const { transport, pager } = setup(client, 20);
   const operation = pager.readLetter(1);
   feedLetter(client, true);
   await waitFor(() => client.wire.includes('q'), 'automatyczne q');
-  await assert.rejects(operation, /timeout/);
+  const result = await operation;
   transport.endModal();
 
-  assert.equal(transport.isRecovering(), true);
-  assert.equal(client.fire('Pozna tresc.'), null);
+  assert.equal(result.letter.body.join('\n').trim(), 'Syntetyczna tresc.');
+  assert.equal(transport.isRecovering(), false);
   await client.api.command.send('x', true);
   assert.deepEqual(client.wire.filter((line) => line === 'q' || line === 'x'), ['q', 'x']);
   client.fire('> ', 'prompt');

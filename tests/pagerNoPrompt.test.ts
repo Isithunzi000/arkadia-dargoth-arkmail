@@ -11,7 +11,7 @@ import {
   waitRt,
 } from './harness';
 
-test('odczyt: kompletny list bez zwyklego promptu otwiera sie bez kolejnej komendy', async () => {
+test('odczyt: kompletny list bez zwyklego promptu otwiera sie i odswieza skrzynke', async () => {
   const h = await startHarness();
   const { f, content } = h;
   try {
@@ -36,21 +36,18 @@ test('odczyt: kompletny list bez zwyklego promptu otwiera sie bez kolejnej komen
     const body = content.querySelector('.arkmail-letter-body') as { textContent?: string } | null;
     assert.ok(body?.textContent?.includes('Tresc bez zwyklego promptu.'));
     assert.ok(!notifyText(f, 'Nie udalo sie odczytac listu.'));
-    assert.equal(f.sent.filter((command) => command === 'listy odebrane').length, 1,
-      'odswiezenie nie moze wyslac komendy przed potwierdzeniem kanalu');
-    assert.deepEqual(f.sent.slice(-2), ['przeczytaj list 1', 'q']);
+    assert.equal(f.sent.filter((command) => command === 'listy odebrane').length, 2,
+      'po zwroceniu listu skrzynka odswieza sie bez recovery');
+    assert.deepEqual(f.sent.slice(-2), ['q', 'listy odebrane']);
 
-    f.fire('> ', 'prompt');
-    await waitRt(() => f.sent.filter((command) => command === 'listy odebrane').length === 2,
-      'odswiezenie odlozone do zwyklego promptu');
     f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
     f.fire(' 1. Temat: najnowszy', 'mail');
     f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
     f.fire('> ', 'prompt');
     await waitRt(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '',
-      'koniec odroczonego odswiezenia');
+      'koniec odswiezenia');
     assert.equal(f.sent.filter((command) => command === 'listy odebrane').length, 2,
-      'dokladnie jedno odswiezenie po prompcie');
+      'dokladnie jedno odswiezenie po odczycie');
   } finally {
     await stopHarness();
   }

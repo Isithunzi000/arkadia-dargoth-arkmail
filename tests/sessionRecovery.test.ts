@@ -226,7 +226,7 @@ test('mailbox: cisza po listingu zwraca wynik niepotwierdzony i zwalnia sesje', 
   assert.equal((await next).kind, 'pusta');
 });
 
-test('pager: cisza po q zwraca list, ale blokuje kolejna komende do promptu', async () => {
+test('pager: cisza po q zwraca list i od razu zwalnia kolejna komende', async () => {
   const t = new MockTransport();
   const pager = new PagerSession(t, { timeoutMs: 1000, idleMs: 20 });
   const operation = pager.readLetter(1);
@@ -235,13 +235,12 @@ test('pager: cisza po q zwraca list, ale blokuje kolejna komende do promptu', as
   assert.equal(unread.letter.number, 1);
   assert.deepEqual(unread.letter.body, ['', 'Syntetyczna tresc.']);
   assert.ok(t.sent.includes('q'));
-  await assert.rejects(pager.readLetter(1), /operacja anulowana/);
 
-  await t.replay([{ cls: 'prompt', text: '> ' }]);
-  const next = pager.readLetter(1);
-  await t.replay(letterLines(1));
+  const next = pager.readLetter(2);
+  assert.deepEqual(t.sent, ['przeczytaj list 1', 'q', 'przeczytaj list 2']);
+  await t.replay(letterLines(2));
   const result = await next;
-  assert.equal(result.letter.number, 1);
+  assert.equal(result.letter.number, 2);
 });
 
 test('editor: pozna odpowiedz po timeoutcie jest gagowana, a nowa wysylka zablokowana', async () => {

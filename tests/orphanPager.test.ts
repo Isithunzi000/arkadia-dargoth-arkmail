@@ -3,8 +3,8 @@
  *
  * Kontrakt:
  * - flaga startuje czysta; suspect/clear dzialaja jak przełacznik;
- * - awaryjny timeout PO POTWIERDZENIU wlasnego pagera STAWIA podejrzenie
- *   ("q" poszlo bez potwierdzenia); cisza przed naglowkami go nie stawia;
+ * - odczyt bez zwyklego promptu konczy sie po ciszy bez podejrzenia;
+ *   cisza przed naglowkami rowniez go nie stawia;
  * - sierocy pager przetrwaly "q" w fetchu STAWIA podejrzenie;
  * - kazdy UDANY fetch/odczyt ZDEJMUJE podejrzenie (komendy dochodza);
  * - straznik w index.ts: podejrzenie + prompt pagera poza blokada ->
@@ -42,21 +42,19 @@ test('timeout przed potwierdzeniem pagera nie stawia podejrzenia sieroty', async
   assert.equal(isPagerOrphanSuspected(), false, 'bez dowodu nie przypisujemy sobie cudzego pagera');
 });
 
-test('timeout po potwierdzeniu wlasnego pagera stawia podejrzenie sieroty', async () => {
+test('odczyt bez zwyklego promptu nie stawia podejrzenia sieroty', async () => {
   clearPagerOrphan();
   const t = new MockTransport();
   const pager = new PagerSession(t, { timeoutMs: 50, idleMs: 20 });
   const p = pager.readLetter(1);
-  const rejection = assert.rejects(p, /timeout/, 'sesja konczy sie timeoutem');
   await t.replay([
     { cls: 'mail', text: 'List : 1' },
     { cls: 'mail', text: 'Data : Wt, 24 VIII 1999, 00:11:12' },
     { cls: 'mail', text: '[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ' },
   ]);
-  assert.ok(t.sent.includes('q'), 'potwierdzony pager dostal q przed porzuceniem');
-  await rejection;
-  assert.equal(isPagerOrphanSuspected(), true, 'q bez zwyklego promptu stawia podejrzenie');
-  clearPagerOrphan();
+  assert.ok(t.sent.includes('q'), 'potwierdzony pager dostal q');
+  await p;
+  assert.equal(isPagerOrphanSuspected(), false, 'zwrot listu po ciszy nie jest awaria');
 });
 
 test('pager nieznanego pochodzenia w fetchu nie stawia podejrzenia', async () => {

@@ -48,7 +48,7 @@ test('mailbox: opozniony prompt przed limitem ciszy potwierdza listing', async (
   assert.equal(result.kind === 'lista' ? result.entries.length : 0, 1);
 });
 
-test('pager: pozny prompt po oddaniu listu zdejmuje recovery', async (context) => {
+test('pager: zwrocony odczyt od razu zwalnia kolejna operacje', async (context) => {
   context.mock.timers.enable({ apis: ['setTimeout'] });
   const transport = new MockTransport();
   const pager = new PagerSession(transport, { timeoutMs: 8000, idleMs: 400 });
@@ -67,10 +67,9 @@ test('pager: pozny prompt po oddaniu listu zdejmuje recovery', async (context) =
   const result = await operation;
   assert.equal(result.letter.number, 1);
   assert.deepEqual(result.letter.body, ['', 'Syntetyczna tresc.']);
-  await assert.rejects(pager.readLetter(2), /operacja anulowana/);
 
-  await transport.replay([{ cls: 'prompt', text: '> ' }]);
   const next = pager.readLetter(2);
+  assert.deepEqual(transport.sent, ['przeczytaj list 1', 'q', 'przeczytaj list 2']);
   await transport.replay([...letterLines(2), { cls: 'prompt', text: '> ' }]);
   assert.equal((await next).letter.number, 2);
 });
@@ -122,8 +121,10 @@ test('pager: brak promptu po q zwraca kompletny list po krotkim czasie', async (
   const result = await operation;
   assert.equal(result.letter.number, 1);
   assert.deepEqual(result.letter.body, ['', 'Syntetyczna tresc.']);
-  await assert.rejects(pager.readLetter(2), /operacja anulowana/);
-  assert.deepEqual(transport.sent, ['przeczytaj list 1', 'q']);
+  const next = pager.readLetter(2);
+  assert.deepEqual(transport.sent, ['przeczytaj list 1', 'q', 'przeczytaj list 2']);
+  await transport.replay([...letterLines(2), { cls: 'prompt', text: '> ' }]);
+  assert.equal((await next).letter.number, 2);
 });
 
 test('import: prompt po limicie ciszy konczy kompletna odpowiedz sukcesem', async (context) => {
