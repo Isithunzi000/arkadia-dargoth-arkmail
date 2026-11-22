@@ -23,15 +23,20 @@ class ComposeClient {
   onWire: ((command: string) => void) | null = null;
   resultAfter = '**';
   reject: string | null = null;
+  rejectOccurrence = 1;
   delay: (command: string) => number = () => 0;
   private finished = false;
+  private rejectSeen = 0;
   private readonly pending = new Set<Promise<void>>();
 
   readonly api = {
     command: {
       send: (command: string, _echo?: boolean, _options?: unknown): Promise<void> => {
         if (command === this.reject) {
-          return Promise.reject(new Error(`syntetyczne odrzucenie: ${command}`));
+          this.rejectSeen++;
+          if (this.rejectSeen === this.rejectOccurrence) {
+            return Promise.reject(new Error(`syntetyczne odrzucenie: ${command}`));
+          }
         }
         const task = this.process(command);
         this.pending.add(task);
@@ -185,6 +190,47 @@ test('compose: odrzucenie pierwszej komendy nie zwalnia adresata', async () => {
 
   assert.deepEqual(client.wire, []);
 });
+
+const FULL_COMPOSE = [...PREFIX, TOP, BODY, BODY, BOTTOM, '**'];
+const composeRejections = [
+  { name: 'pierwszej komendy', command: 'napisz list', occurrence: 1, accepted: 0 },
+  { name: 'adresata', command: 'Foo', occurrence: 1, accepted: 1 },
+  { name: 'tematu', command: 'Temat', occurrence: 1, accepted: 2 },
+  { name: 'DW', command: '', occurrence: 1, accepted: 3 },
+  { name: 'pierwszej linii tresci', command: TOP, occurrence: 1, accepted: 4 },
+  { name: 'drugiej linii tresci', command: BODY, occurrence: 1, accepted: 5 },
+  { name: 'trzeciej linii tresci', command: BODY, occurrence: 2, accepted: 6 },
+  { name: 'czwartej linii tresci', command: BOTTOM, occurrence: 2, accepted: 7 },
+  { name: 'zakonczenia **', command: '**', occurrence: 1, accepted: 8 },
+];
+
+for (const scenario of composeRejections) {
+  test(`compose: odrzucenie ${scenario.name} zabezpiecza nierozstrzygnieta sesje`, async () => {
+    const client = new ComposeClient();
+    client.reject = scenario.command;
+    client.rejectOccurrence = scenario.occurrence;
+    const { transport, operation } = start(client);
+    const rejected = assert.rejects(operation, /syntetyczne odrzucenie/);
+    await rejected;
+
+    assert.deepEqual(client.wire, FULL_COMPOSE.slice(0, scenario.accepted));
+    assert.equal(transport.isRecovering(), scenario.accepted > 0,
+      'recovery obowiazuje dopiero po przyjeciu pierwszej komendy');
+    assert.ok(!client.wire.includes('~q'), 'odrzucenie nie zgaduje edytora przez ~q');
+    if (scenario.accepted > 0) {
+      assert.throws(() => transport.openSession(), /operacja anulowana/,
+        'nowa sesja czeka na zwykly prompt');
+    }
+
+    transport.endModal();
+    client.trigger?.({ text: READY }, null, 'mail');
+    client.trigger?.({ text: 'Adresat: Temat: DW: ' }, null, 'mail');
+    await client.drain();
+    assert.deepEqual(client.wire, FULL_COMPOSE.slice(0, scenario.accepted),
+      'pozne linie nie uruchamiaja kolejnych etapow');
+    transport.dispose();
+  });
+}
 
 test('transport: identyczne komendy pluginu i gracza nie mieszaja kolejek', async () => {
   const client = new ComposeClient();

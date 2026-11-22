@@ -60,6 +60,8 @@ Kontrola RED/GREEN:
 
 ## Etap 3 — edytor
 
+Status: zakonczony lokalnie. Nowe kontrole na starej bazie: 8 bledow dla etapow po przyjeciu napisz list, pierwsza komenda zielona. Po poprawce wszystkie 9 nowych kontroli zielone, powiazane 74/74. Pelny zestaw Node 26: 1335 testow, 1334 zaliczone, 1 pominety, 0 bledow; typecheck i build zielone.
+
 Pliki: src/arkmail/core/session/editor.ts, tests/composeTransport.test.ts, tests/editorTimeout.test.ts.
 
 Implementacja:
