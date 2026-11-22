@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { MockTransport, type ProtoLine } from '../src/arkmail/core/session/transport';
 import { MailboxSession } from '../src/arkmail/core/session/mailbox';
 import { PagerSession } from '../src/arkmail/core/session/pager';
+import { clearPagerOrphan, isPagerOrphanSuspected } from '../src/arkmail/core/session/orphanPager';
 import {
   startHarness,
   stopHarness,
@@ -207,16 +208,25 @@ test('pager: List : N inny niz zadany odrzuca odpowiedz jako niejednoznaczna', a
   assert.equal(t.sent.at(-1), 'q', 'cudzy pager zostaje bezpiecznie zamkniety');
 });
 
-test('pager: niezgodny aktualny numer w prompcie jest niejednoznaczny', async () => {
+test('pager: niezgodny aktualny numer w prompcie odrzuca odpowiedz bez q', async () => {
+  clearPagerOrphan();
   const t = new MockTransport();
   const pager = new PagerSession(t, OPTS);
   const operation = assert.rejects(pager.readLetter(2), /niejednoznaczna_odpowiedz/);
-  const lines = replayLetter(t, 2).map((line) =>
-    line.text.includes('(aktualny:') ? { ...line, text: PAGER_PROMPT } : line,
-  );
+  const lines = replayLetter(t, 2)
+    .map((line) => (line.text.includes('(aktualny:') ? { ...line, text: PAGER_PROMPT } : line))
+    .filter((line) => line.cls !== 'prompt');
   await t.replay(lines);
   await operation;
-  assert.equal(t.sent.at(-1), 'q');
+  assert.deepEqual(t.sent, ['przeczytaj list 2'], 'nieznany pager nie dostaje automatycznego q');
+  assert.equal(isPagerOrphanSuspected(), false, 'kolejny prompt pagera tez nie moze uruchomic q');
+  await assert.rejects(pager.readLetter(2), /operacja anulowana/);
+  assert.deepEqual(t.sent, ['przeczytaj list 2'], 'kolejna komenda czeka na prompt');
+
+  await t.replay([{ cls: 'prompt', text: '> ' }]);
+  const next = pager.readLetter(2);
+  await t.replay(replayLetter(t, 2));
+  assert.equal((await next).letter.number, 2);
 });
 
 test('pager: pozna odpowiedz starej sesji nie konczy pomyslnie nowego odczytu', async () => {

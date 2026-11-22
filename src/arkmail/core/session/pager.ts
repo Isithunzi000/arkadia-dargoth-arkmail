@@ -548,7 +548,12 @@ export class PagerSession {
         if (pp) {
           if (pp.current !== numer) {
             ambiguous = `prompt pagera list ${pp.current} podczas odczytu ${numer}`;
-            enterClosing();
+            // Niezgodny numer nie dowodzi, ze to nasz pager. Nie wolno
+            // zamykac go automatycznie ani uzbrajac pozniejszego q.
+            // Kolejne komendy czekaja na zwykly prompt albo reconnect.
+            this.transport.beginRecovery();
+            cleanup();
+            reject(new AmbiguousResponseError(ambiguous));
             return;
           }
           advances = 0; // prompt pagera = serwer odpowiedzial
