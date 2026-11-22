@@ -460,7 +460,9 @@ export class PagerSession {
         if (actions === null && !done) {
           graceTimer = setTimeout(() => {
             if (done || state !== 'closing') return;
-            this.transport.beginRecovery();
+            // List jest juz zwrocony, ale powtorne q/x wciaz nalezy do tego
+            // samego zamkniecia. Timeout i bledy zdejmuja te koalescencje.
+            this.transport.beginRecovery({ preservePagerClose: true });
             finish(false);
           }, Math.max(idleMs, CLOSE_GRACE_MS));
         }

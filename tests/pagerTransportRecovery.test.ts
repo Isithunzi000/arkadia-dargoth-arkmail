@@ -179,6 +179,27 @@ test('pager: odrzucenie bezposredniego q gracza nie blokuje ponowienia', async (
   transport.dispose();
 });
 
+test('pager: zwrot listu bez zwyklego promptu zachowuje koalescencje q/x', async () => {
+  const client = new PagerClient();
+  const { transport, pager } = setup(client, 1000);
+  const operation = pager.readLetter(1);
+  feedLetter(client, true);
+  await waitFor(() => client.wire.includes('q'), 'automatyczne q');
+  const result = await operation;
+  transport.endModal();
+
+  assert.equal(result.letter.body.join('\n').trim(), 'Syntetyczna tresc.');
+  assert.equal(transport.isRecovering(), true);
+  await client.api.command.send('q', true);
+  await client.api.command.send('x', true);
+  assert.deepEqual(client.wire.filter((line) => line === 'q' || line === 'x'), ['q']);
+  assert.throws(() => transport.openSession(), /operacja anulowana/);
+  client.fire('> ', 'prompt');
+  const session = transport.openSession();
+  session.close();
+  transport.dispose();
+});
+
 test('pager: timeout po przyjetym q zdejmuje koalescencje przed recznym ponowieniem', async () => {
   const client = new PagerClient();
   const { transport, pager } = setup(client, 20);

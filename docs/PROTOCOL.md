@@ -435,6 +435,9 @@ zapisu. Dawne klucze localStorage sa usuwane bez migracji danych.
   czasie od wyslania `q`. Bez promptu list jest zwracany, otwierany i zapisywany,
   a kanal pozostaje w odzyskiwaniu do zwyklego promptu lub reconnectu.
   Usuwanie, przekazywanie i import nadal wymagaja potwierdzonego zakonczenia.
+  Powtorne reczne `q`/`x` po zwroconym odczycie nalezy do tego samego
+  zamkniecia i nie jest wysylane ponownie. Odswiezenie skrzynki po takim
+  odczycie czeka na zwykly prompt; przed nim nie wysyla kolejnej komendy.
 - Listing konczy sie jako potwierdzony na zwyklym promptcie albo echcie
   kolejnej komendy, takze gdy prompt jest opozniony, ale dociera przed
   limitem ciszy. Domyslnie po 600 ms ciszy poprawny listing wraca jako

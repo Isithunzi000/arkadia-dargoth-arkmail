@@ -39,6 +39,18 @@ test('odczyt: kompletny list bez zwyklego promptu otwiera sie bez kolejnej komen
     assert.equal(f.sent.filter((command) => command === 'listy odebrane').length, 1,
       'odswiezenie nie moze wyslac komendy przed potwierdzeniem kanalu');
     assert.deepEqual(f.sent.slice(-2), ['przeczytaj list 1', 'q']);
+
+    f.fire('> ', 'prompt');
+    await waitRt(() => f.sent.filter((command) => command === 'listy odebrane').length === 2,
+      'odswiezenie odlozone do zwyklego promptu');
+    f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
+    f.fire(' 1. Temat: najnowszy', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
+    f.fire('> ', 'prompt');
+    await waitRt(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '',
+      'koniec odroczonego odswiezenia');
+    assert.equal(f.sent.filter((command) => command === 'listy odebrane').length, 2,
+      'dokladnie jedno odswiezenie po prompcie');
   } finally {
     await stopHarness();
   }

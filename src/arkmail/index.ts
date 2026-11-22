@@ -506,6 +506,9 @@ export async function init(api: PluginApi) {
       }, source);
   let connectionGeneration = 0;
   let pendingOpen: { box: MailBox; entry: MailboxEntry; generation: number } | null = null;
+  // Zwrocony odczyt moze zakonczyc sie przed zwyklym promptem. Jego
+  // odswiezenie czeka na odzyskanie kanalu, zamiast zostac utracone.
+  const pendingReadRefresh = new Set<MailBox>();
   let archiveDownloadEta: DownloadEta | null = null;
   const cancelListeners = new Set<() => void>();
   const sessionOpts = {
@@ -860,6 +863,21 @@ export async function init(api: PluginApi) {
       });
   };
 
+  const refreshReadBox = (box: MailBox): void => {
+    if (transport!.isRecovering()) {
+      pendingReadRefresh.add(box);
+      return;
+    }
+    refreshBoxes([box]);
+  };
+
+  const drainPendingReadRefresh = (): void => {
+    if (pendingReadRefresh.size === 0 || transport!.isRecovering() || playerMailMode) return;
+    const boxes = [...pendingReadRefresh];
+    pendingReadRefresh.clear();
+    refreshBoxes(boxes);
+  };
+
   // Fala 16c: reconnect/re-login uniewaznia kontekst listingu serwera.
   // Nowa sesja serwera NIE MA "biezacego listingu" - wpisy sprzed
   // polaczenia musza przejsc re-kotwice, inaczej "przeczytaj list N"
@@ -883,6 +901,7 @@ export async function init(api: PluginApi) {
     indexFlag = null;
     archiveDownloadFlag = null;
     pendingRefresh.clear();
+    pendingReadRefresh.clear();
     drainScheduled = false;
     for (const timer of delayedInboxTimers) clearTimeout(timer);
     delayedInboxTimers = [];
@@ -1830,7 +1849,7 @@ export async function init(api: PluginApi) {
         // przeczytania i badge to prawda serwerowa (plugin niczego
         // nie zaznacza lokalnie). W trybie wynikow szukania pomijamy:
         // refresh czysci selekcje i wywalilby gracza z wynikow.
-        if (ui.state.search?.box !== box) refreshBoxes([box]);
+        if (ui.state.search?.box !== box) refreshReadBox(box);
         return;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -3042,6 +3061,13 @@ export async function init(api: PluginApi) {
     void Promise.resolve(transport!.send("q"))
       .then(() => clearPagerOrphan())
       .catch(() => {});
+  });
+
+  // Transport zdejmuje recovery przed powiadomieniem subskrybentow.
+  // Dopiero ten zwykly prompt pozwala wyslac odlozone odswiezenie.
+  transport.subscribe((line) => {
+    if (line.cls !== "prompt" && !isPromptLine(line.text)) return;
+    drainPendingReadRefresh();
   });
 
   // Powiadomienia pocztowe: odswiezenie + opcjonalny tost.
