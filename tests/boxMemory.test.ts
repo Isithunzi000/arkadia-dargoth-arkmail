@@ -83,6 +83,8 @@ async function loadOlderPage(h: Harness): Promise<void> {
   f.fire('Nadawca: Baz                          Pt, 20 VIII 1999, 09:00:00', 'mail');
   f.fire('> ', 'prompt');
   await waitFor(() => h.content.querySelectorAll('.arkmail-entry').length === 5, '5 wierszy');
+  // Widok moze zaktualizowac sie przed finally zwalniajacym blokade sesji.
+  await new Promise<void>((resolve) => setImmediate(resolve));
 }
 
 test('zakladki: powrot na skrzynke odswieza najnowsza strone (sync zachowuje wczytane)', async () => {

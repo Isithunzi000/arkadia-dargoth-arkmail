@@ -18,6 +18,8 @@ Poza zakresem: marketplace, katalog, Vercel, zmiany klienta, pelne lokalne E2E.
 
 ## Etap 1 — wspolne przejecie pagera i transakcyjne zamykanie
 
+Status: zakonczony lokalnie. Nowe kontrole: 7 bledow na starej bazie, 8/8 po poprawce. Pelny zestaw Node 26: 1320 testow, 1319 zaliczonych, 1 pominety, 0 bledow; typecheck i build zielone. Wyrownano tez istniejacy wyscig w boxMemory.test.ts potwierdzony na czystej bazie 1.30.14.
+
 Pliki: src/arkmail/adapters/dargothTransport.ts, src/arkmail/core/session/pager.ts, tests/modalPagerCommands.test.ts, testy pager/recovery.
 
 Implementacja:

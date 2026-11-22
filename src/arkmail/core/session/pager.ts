@@ -299,6 +299,12 @@ export class PagerSession {
       };
       const fail = (error: unknown): void => {
         if (done) return;
+        const confirmedPager = state === 'pager' || state === 'closing' ||
+          pagerFired || idleOpened || headersDone;
+        if (confirmedPager) {
+          this.transport.beginRecovery();
+          suspectPagerOrphan();
+        }
         cleanup();
         reject(error instanceof Error ? error : new Error(String(error)));
       };
@@ -383,6 +389,10 @@ export class PagerSession {
           state = 'pager';
           pagerFired = true;
           idleOpened = true;
+          // Brak jawnego promptu nie moze omijac kolejki gracza. Transport
+          // moze przejac sesje; wtedy ta maszyna stanow jest juz zamknieta.
+          this.transport.confirmPagerOpen?.();
+          if (done) return;
           if (actions && actions.onPager) {
             actions.onPager();
             if (!done) armQuiet(); // potwierdzenie akcji albo domkniecie po ciszy

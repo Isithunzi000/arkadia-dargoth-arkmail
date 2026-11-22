@@ -103,6 +103,8 @@ export interface Transport {
   openSession(): SessionScope;
   /** Pozostawia odpowiedzi mail gagowane do potwierdzonego promptu gry. */
   beginRecovery(): void;
+  /** Przekazuje potwierdzenie pagera takze wtedy, gdy prompt jest niewidoczny. */
+  confirmPagerOpen?(): void;
   /** Globalna subskrypcja linii; zwraca unsubscribe. */
   subscribe(cb: (line: ProtoLine) => void): () => void;
 }
