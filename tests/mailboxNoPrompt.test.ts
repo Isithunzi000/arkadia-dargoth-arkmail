@@ -247,6 +247,29 @@ test('skan: niepotwierdzona strona zostaje scalona i konczy pobieranie przed kol
   assert.deepEqual(commands, [anchor]);
 });
 
+test('skan: znaleziony wpis na niepotwierdzonej stronie zatrzymuje skan bez kolejnej kotwicy', async () => {
+  const first = scanEntry('Znaleziona', 24, '10:00:00');
+  const anchor = 'listy odebrane przed 25 VIII 1999';
+  const commands: Array<string | undefined> = [];
+  const result = await scanMailboxPages({
+    box: 'odebrane',
+    initialCommand: anchor,
+    cancelled: () => false,
+    fetchPage: async (command) => {
+      commands.push(command);
+      return scanPage([first], true, false);
+    },
+    wait: async () => {},
+    onPage: () => ({ stop: true }),
+  });
+
+  assert.equal(result.end, 'clamped');
+  assert.equal(result.pages, 1);
+  assert.equal(result.unconfirmedPages, 1);
+  assert.deepEqual(result.all, [first]);
+  assert.deepEqual(commands, [anchor]);
+});
+
 test('skan: niepotwierdzony listing bazowy zostaje scalony i blokuje kolejna kotwice', async () => {
   const first = scanEntry('Pierwsza', 24, '10:00:00');
   const base = scanEntry('Bazowa', 25, '10:00:00');

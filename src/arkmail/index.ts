@@ -1376,10 +1376,12 @@ export async function init(api: PluginApi) {
         },
       });
       if (scan.end === "cancelled") throw new Error("operacja anulowana");
+      // Jednoznaczny wpis znaleziony przed zatrzymaniem nie wymaga juz
+      // sprawdzania pozostalych stron. Brak wpisu nadal odrzuca niepelny skan.
+      if (fresh) return fresh;
       if (scan.end === "incomplete" || scan.end === "partial") {
         throw new Error("Nie mozna sprawdzic calej listy - sprobuj ponownie.");
       }
-      if (fresh) return fresh;
     } finally {
       offCancel();
     }

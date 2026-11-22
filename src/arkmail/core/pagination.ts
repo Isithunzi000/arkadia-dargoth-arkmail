@@ -170,7 +170,14 @@ export async function scanMailboxPages(options: PageScanOptions): Promise<PageSc
     // Cisza zwraca uzyteczna strone do scalenia, ale nie potwierdza jej
     // konca. Nie wolno po niej otwierac kolejnej sesji: pozne wpisy, echo
     // lub prompt starej odpowiedzi moglyby zostac przypisane nowej stronie.
-    if (result.confirmed === false) return finish('partial');
+    // Jednoznacznie znaleziony cel nie wymaga juz zadnej kolejnej strony.
+    if (result.confirmed === false) {
+      if (visit.stop) {
+        if (gapDays.length > 0) return incompleteWithGaps();
+        return finish('clamped');
+      }
+      return finish('partial');
+    }
 
     if (!result.header.truncated) {
       if (gapDays.length > 0) return incompleteWithGaps();

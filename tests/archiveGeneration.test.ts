@@ -9,6 +9,7 @@ import {
   loadTruncatedBox,
   startHarness,
   stopHarness,
+  waitRt,
   type Harness,
 } from './harness';
 
@@ -95,22 +96,25 @@ for (const item of [
   });
 }
 
-test('niepotwierdzony listing nie otwiera listu o znalezionym numerze', async () => {
+test('niepotwierdzony listing otwiera jednoznaczny list bez kolejnej rekotwicy', async () => {
   const h = await startHarness();
   try {
     await loadTruncatedBox(h);
     click(h, '.arkmail-entry');
-    await h.waitFor(
-      () => h.f.sent.includes('listy odebrane przed 25 VIII 1999'),
-      'rekotwica przed otwarciem',
-    );
+    const anchor = 'listy odebrane przed 25 VIII 1999';
+    await waitRt(() => h.f.sent.includes(anchor), 'rekotwica przed otwarciem');
     freshListing(h, false);
-    await new Promise((resolve) => setTimeout(resolve, 900));
+    await waitRt(() => h.f.sent.includes('przeczytaj list 1'), 'odczyt znalezionego wpisu');
+    assert.equal(h.f.sent.filter((command) => command === anchor).length, 1);
 
-    assert.ok(
-      !h.f.sent.some((command) => command.startsWith('przeczytaj list')),
-      `niepotwierdzona strona nie uruchamia pagera: ${JSON.stringify(h.f.sent)}`,
-    );
+    h.f.fire('List : 1', 'mail');
+    h.f.fire('Od   : Corge', 'mail');
+    h.f.fire('Temat: najnowszy', 'mail');
+    h.f.fire('Data : Wt, 24 VIII 1999, 00:11:12', 'mail');
+    h.f.fire('Syntetyczna tresc.', 'mail');
+    h.f.fire('[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ', 'mail');
+    h.f.fire('> ', 'prompt');
+    await h.waitFor(() => h.content.querySelector('.arkmail-letter-body') !== null, 'otwarty list');
   } finally {
     await stopHarness();
   }

@@ -440,9 +440,10 @@ zapisu. Dawne klucze localStorage sa usuwane bez migracji danych.
   limitem ciszy. Domyslnie po 600 ms ciszy poprawny listing wraca jako
   `confirmed: false` i zwalnia sesje bez odzyskiwania. Pozniejszy prompt
   nie zmienia wstecznie juz zwroconego statusu.
-- Wynik niepotwierdzony mozna pokazac i scalic z archiwum. Nie przerywa on
-  wielostronicowego skanu: kolejne kotwice sa wyznaczane i wysylane tak samo
-  jak po stronie potwierdzonej az do strukturalnego konca, luki albo bledu.
+- Wynik niepotwierdzony mozna pokazac i scalic z archiwum. Konczy on biezacy
+  skan bez wysylania kolejnej kotwicy. Jednoznaczny wpis znaleziony na tej
+  stronie moze zostac zwrocony mimo niepotwierdzonego zakonczenia; bez takiego
+  wpisu niepelny skan jest odrzucany.
   Skan raportuje osobno wynik strukturalny i liczbe niepotwierdzonych stron,
   lacznie z listingiem bazowym podczas ponawiania kotwicy. Jesli liczba jest
   wieksza od zera, nie wolno zastepowac archiwum, usuwac rekordow, zawezac

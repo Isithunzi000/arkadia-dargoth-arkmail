@@ -44,3 +44,31 @@ test('odczyt: kompletny list bez zwyklego promptu otwiera sie bez kolejnej komen
   }
 });
 
+test('odczyt: wpis znaleziony na niepotwierdzonej stronie nie wymaga kolejnej strony', async () => {
+  const h = await startHarness();
+  const { f, content } = h;
+  try {
+    await loadTruncatedBox(h);
+    click(h, '.arkmail-entry');
+    await waitRt(() => f.sent.includes('listy odebrane przed 25 VIII 1999'), 're-kotwica przed odczytem');
+    f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
+    f.fire(' 1. *R* Temat: najnowszy', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
+
+    await waitRt(() => f.sent.includes('przeczytaj list 1'), 'odczyt po niepotwierdzonej stronie');
+    f.fire('List : 1', 'mail');
+    f.fire('Od   : Corge', 'mail');
+    f.fire('Temat: najnowszy', 'mail');
+    f.fire('Data : Wt, 24 VIII 1999, 00:11:12', 'mail');
+    f.fire('', 'mail');
+    f.fire('Tresc znalezionego listu.', 'mail');
+    f.fire('[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ', 'mail');
+
+    await waitRt(() => !!content.querySelector('.arkmail-letter-body'), 'znaleziony list otwarty');
+    assert.equal(f.sent.filter((command) => command.startsWith('listy odebrane przed')).length, 1);
+    assert.ok(!notifyText(f, 'Nie mozna sprawdzic calej listy'));
+    assert.ok(!notifyText(f, 'Nie udalo sie odczytac listu.'));
+  } finally {
+    await stopHarness();
+  }
+});
