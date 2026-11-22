@@ -79,6 +79,8 @@ Kontrola RED/GREEN:
 
 ## Etap 4 — otwarcie listu podczas automatycznego odswiezania
 
+Status: zakonczony lokalnie. Dwie glowne kontrole padaly na starej bazie; po poprawce wszystkie 9 nowych kontroli zielone, powiazane 43/43. Pelny zestaw Node 26: 1344 testy, 1343 zaliczone, 1 pominety, 0 bledow; typecheck i build zielone. Reczny refresh zachowuje zrodlo operacji i dotychczasowe komunikaty.
+
 Pliki: src/arkmail/index.ts, nowy test integracyjny happy-dom.
 
 Implementacja:

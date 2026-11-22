@@ -494,7 +494,18 @@ export async function init(api: PluginApi) {
         if (source === "manual") manualOperations--;
       });
     };
+    let autoRefreshOperations = 0;
+    const runRefresh = (operation: () => Promise<void>, source: OperationSource): Promise<void> =>
+      runExclusive(async () => {
+        if (source === "auto") autoRefreshOperations++;
+        try {
+          await operation();
+        } finally {
+          if (source === "auto") autoRefreshOperations--;
+        }
+      }, source);
   let connectionGeneration = 0;
+  let pendingOpen: { box: MailBox; entry: MailboxEntry; generation: number } | null = null;
   let archiveDownloadEta: DownloadEta | null = null;
   const cancelListeners = new Set<() => void>();
   const sessionOpts = {
@@ -831,9 +842,7 @@ export async function init(api: PluginApi) {
     ui.clearSearchBoxes(boxes);
     const generation = connectionGeneration;
     let cancelled = false;
-    void runExclusive(async () => {
-      await fetchBoxes(boxes, mode, source, automatic);
-    }, source)
+    void runRefresh(() => fetchBoxes(boxes, mode, source, automatic), source)
       .catch((err: unknown) => {
         cancelled = isOperationCancelled(err);
         if (source === "manual" && !cancelled) {
@@ -847,6 +856,7 @@ export async function init(api: PluginApi) {
         if (generation !== connectionGeneration) return;
         ui.setBusy(null);
         if (cancelled && source === "auto" && pendingRefresh.size > 0) scheduleRefresh([]);
+        drainPendingOpen();
       });
   };
 
@@ -858,6 +868,7 @@ export async function init(api: PluginApi) {
   // Po uniewaznieniu auto-refresh daje widokowi swieze stemple.
   const cancelConnectionOperations = (resetMailState = true): void => {
     connectionGeneration++;
+    pendingOpen = null;
     listingCtx = null;
     if (resetMailState) lastMailState = null;
     clearPagerOrphan();
@@ -1044,7 +1055,7 @@ export async function init(api: PluginApi) {
     if (drainScheduled) return;
     drainScheduled = true;
     const generation = connectionGeneration;
-    void runExclusive(async () => {
+    void runRefresh(async () => {
         // Zadanie moglo czekac na locka w chwili wylaczenia opcji.
         if (!ui.state.autoRefreshEnabled) {
           pendingRefresh.clear();
@@ -1061,6 +1072,7 @@ export async function init(api: PluginApi) {
         ui.setBusy(null);
         drainScheduled = false;
         if (pendingRefresh.size > 0) scheduleRefresh([]);
+        drainPendingOpen();
       });
   };
 
@@ -1089,6 +1101,7 @@ export async function init(api: PluginApi) {
     }, PLAYER_MAIL_MODE_IDLE_MS);
   };
   const enterPlayerMailMode = (): void => {
+    pendingOpen = null;
     if (playerMailMode) {
       if (!awaitingPlayerMailPrompt) armPlayerMailModeIdle();
       return;
@@ -1832,6 +1845,30 @@ export async function init(api: PluginApi) {
     }
   };
 
+  const startOpen = (box: MailBox, entry: MailboxEntry): void => {
+    ui.setBusy(`Czytam list: ${entry.subject}...`);
+    const generation = connectionGeneration;
+    void runExclusive(() => openWithResolve(box, entry))
+      .catch((err: unknown) => {
+        if (!isOperationCancelled(err)) notify(api, "Nie udalo sie odczytac listu.", { level: "error" });
+      })
+      .finally(() => {
+        if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
+      });
+  };
+
+  const drainPendingOpen = (): void => {
+    const pending = pendingOpen;
+    pendingOpen = null;
+    if (
+      !pending || pending.generation !== connectionGeneration || lifecycleDestroyed ||
+      playerMailMode || replayReviewRequired || transport!.isRecovering()
+    ) return;
+    // Zwykla sciezka ponownie kotwiczy wpis; nigdy nie odtwarzamy surowej
+    // komendy ani starego numeru listu.
+    startOpen(pending.box, pending.entry);
+  };
+
   /**
    * Pseudo-wpis skrzynki z rekordu archiwum (Fala 16h): ctx undefined
    * -> resolveEntry zawsze idzie przez re-kotwice po dacie. Wspolne
@@ -2412,19 +2449,20 @@ export async function init(api: PluginApi) {
         });
     },
     onOpenLetter: (box, entry) => {
+      // Wylacznie aktywny auto-refresh moze wstrzymac najnowszy wybor.
+      // Kazda inna zajeta sesja zachowuje dotychczasowy komunikat.
+      if (
+        autoRefreshOperations > 0 && !replayReviewRequired && !playerMailMode &&
+        !transport!.isRecovering()
+      ) {
+        pendingOpen = { box, entry, generation: connectionGeneration };
+        return;
+      }
       // Fala 12a: sesje modalne NIE kolejkuja klikow - w trakcie wiszacej
       // operacji kolejna komenda odczytu wpadalaby w sierocy pager
       // ("Nie ma takiej komendy", log 2026-10-18). Komunikat zamiast kolejki.
       if (manualOperationBlocked()) return;
-      ui.setBusy(`Czytam list: ${entry.subject}...`);
-      const generation = connectionGeneration;
-      void runExclusive(() => openWithResolve(box, entry))
-        .catch((err: unknown) => {
-          if (!isOperationCancelled(err)) notify(api, "Nie udalo sie odczytac listu.", { level: "error" });
-        })
-        .finally(() => {
-          if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
-        });
+      startOpen(box, entry);
     },
     onOpenArchiveLetter: (letter) => {
       // Fala 16h: klikalne archiwum (zgloszenie pkt 9). Wpis z trescia
@@ -2785,7 +2823,10 @@ export async function init(api: PluginApi) {
           if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
         });
     },
-    onCloseLetter: () => ui.closeLetter(),
+    onCloseLetter: () => {
+      pendingOpen = null;
+      ui.closeLetter();
+    },
     // Fala 20e: guardy w handlerach, NIE w refreshBoxes - wewnetrzny
     // refresh po wysylce/kasowaniu kolejkuje celowo (wolany z wnetrza
     // sesji). Klik gracza przy zajetej blokadzie: odmowa z toastem,
