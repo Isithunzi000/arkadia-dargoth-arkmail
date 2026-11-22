@@ -431,8 +431,10 @@ zapisu. Dawne klucze localStorage sa usuwane bez migracji danych.
 
 ## Konczenie operacji i spojnosc archiwum
 
-- Odczyt pagera i import wymagaja jednoznacznego zakonczenia zwyklym
-  promptem. Cisza nie konczy tych operacji ani nie uniewaznia ich.
+- Kompletny odczyt pagera konczy sie na zwyklym promptcie albo po krotkim
+  czasie od wyslania `q`. Bez promptu list jest zwracany, otwierany i zapisywany,
+  a kanal pozostaje w odzyskiwaniu do zwyklego promptu lub reconnectu.
+  Usuwanie, przekazywanie i import nadal wymagaja potwierdzonego zakonczenia.
 - Listing konczy sie jako potwierdzony na zwyklym promptcie albo echcie
   kolejnej komendy, takze gdy prompt jest opozniony, ale dociera przed
   limitem ciszy. Domyslnie po 600 ms ciszy poprawny listing wraca jako

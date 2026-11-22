@@ -196,10 +196,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   abort = true;
   await t.replay([{ cls: 'mail', text: 'kolejna linia tresci' }]);
   await sleep(600);
-  ok('E9a cisza po przerwaniu nie rozstrzyga odczytu', err === null, err?.message ?? 'oczekuje');
+  ok('E9a cisza po przerwaniu konczy odczyt jako przerwany', err !== null && /przerwano/.test(err.message), err?.message ?? 'brak');
   await t.replay([{ cls: 'prompt', text: '> ' }]);
   await p.catch(() => {});
-  ok('E9b prompt po przerwaniu = przerwano', err !== null && /przerwano/.test(err.message), err?.message ?? 'brak');
+  ok('E9b pozny prompt nie zmienia wyniku przerwania', err !== null && /przerwano/.test(err.message), err?.message ?? 'brak');
 }
 
 // --- E10: editor: timeout ------------------------------------------------------

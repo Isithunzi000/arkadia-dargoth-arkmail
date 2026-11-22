@@ -6,7 +6,8 @@
  *
  * Przenosnosc: koniec transakcji wykrywamy po klasie 'prompt' ALBO po
  * samej tresci ("> "). Cisza moze pomoc wykryc niewidoczny prompt pagera
- * i wyslac q, ale nigdy nie potwierdza zamkniecia transakcji.
+ * i wyslac q. Przy kompletnym odczycie brak zwyklego promptu zachowuje
+ * tresc, lecz uruchamia recovery; inne akcje nadal wymagaja potwierdzenia.
  */
 
 import {
@@ -246,8 +247,8 @@ export class PagerSession {
    * Otwiera pager na liscie `numer`, wykonuje akcje, zamyka "q".
    * onPager: odpalane przy pierwszym pager prompt (wyslij akcje).
    * onLine: moze zwrocic 'close' -> wysylamy "q" przy najblizszym
-   * pager prompcie. Konczy sie wylacznie na zwyklym promptcie gry
-   * (klasa albo tresc); brak promptu odrzuca dopiero pelny limit czasu.
+   * pager prompcie. Zwykly prompt potwierdza kanal. Kompletny odczyt bez
+   * tego promptu zwraca list po krotkim czasie i pozostawia recovery.
    */
   private run<T>(
     numer: number,
@@ -452,6 +453,17 @@ export class PagerSession {
         state = 'closing';
         if (quietTimer) clearTimeout(quietTimer);
         send('q');
+        // Odczyt (brak akcji) ma juz kompletna, zwalidowana tresc. Krotki
+        // czas oczekiwania daje promptowi pierwszenstwo. Jego brak nie moze
+        // uniewaznic listu, ale kanal pozostaje zablokowany do promptu albo
+        // reconnectu. Usuwanie i przekazywanie nadal wymagaja potwierdzenia.
+        if (actions === null && !done) {
+          graceTimer = setTimeout(() => {
+            if (done || state !== 'closing') return;
+            this.transport.beginRecovery();
+            finish(false);
+          }, Math.max(idleMs, CLOSE_GRACE_MS));
+        }
       };
 
       session.subscribe((line: ProtoLine) => {

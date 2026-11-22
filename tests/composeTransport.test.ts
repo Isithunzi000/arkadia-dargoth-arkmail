@@ -169,7 +169,10 @@ test('compose: timeout w tresci wysyla jedno ~q i nie zwalnia pozostalych linii'
   const client = new ComposeClient();
   client.delay = (command) => command === TOP ? 40 : command === '**' ? 80 : 0;
   const { transport, operation } = start(client, 15);
-  const outcome = await operation;
+  // Timer zamkniecia edytora jest celowo unref; test musi utrzymac petle
+  // zdarzen do rozstrzygniecia operacji, zamiast konczyc sie jako anulowany.
+  const keepAlive = setInterval(() => {}, 50);
+  const outcome = await operation.finally(() => clearInterval(keepAlive));
   transport.endModal();
   await client.drain();
 

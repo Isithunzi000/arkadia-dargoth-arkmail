@@ -48,7 +48,7 @@ test('mailbox: opozniony prompt przed limitem ciszy potwierdza listing', async (
   assert.equal(result.kind === 'lista' ? result.entries.length : 0, 1);
 });
 
-test('pager: opozniony prompt po q konczy odczyt sukcesem', async (context) => {
+test('pager: pozny prompt po oddaniu listu zdejmuje recovery', async (context) => {
   context.mock.timers.enable({ apis: ['setTimeout'] });
   const transport = new MockTransport();
   const pager = new PagerSession(transport, { timeoutMs: 8000, idleMs: 400 });
@@ -63,12 +63,16 @@ test('pager: opozniony prompt po q konczy odczyt sukcesem', async (context) => {
   assert.equal(transport.sent.at(-1), 'q');
   context.mock.timers.tick(400);
   await flushPromises();
-  assert.equal(settlement, 'pending', 'cisza po q nie rozstrzyga operacji');
-
-  await transport.replay([{ cls: 'prompt', text: '> ' }]);
+  assert.equal(settlement, 'resolved');
   const result = await operation;
   assert.equal(result.letter.number, 1);
   assert.deepEqual(result.letter.body, ['', 'Syntetyczna tresc.']);
+  await assert.rejects(pager.readLetter(2), /operacja anulowana/);
+
+  await transport.replay([{ cls: 'prompt', text: '> ' }]);
+  const next = pager.readLetter(2);
+  await transport.replay([...letterLines(2), { cls: 'prompt', text: '> ' }]);
+  assert.equal((await next).letter.number, 2);
 });
 
 test('mailbox: brak promptu zwraca niepotwierdzony listing po limicie ciszy', async (context) => {
@@ -95,7 +99,7 @@ test('mailbox: brak promptu zwraca niepotwierdzony listing po limicie ciszy', as
   assert.equal(result.kind === 'lista' && result.confirmed, false);
 });
 
-test('pager: brak promptu po q odrzuca odczyt dopiero po pelnym limicie', async (context) => {
+test('pager: brak promptu po q zwraca kompletny list po krotkim czasie', async (context) => {
   context.mock.timers.enable({ apis: ['setTimeout'] });
   const transport = new MockTransport();
   const pager = new PagerSession(transport, { timeoutMs: 8000, idleMs: 400 });
@@ -108,14 +112,18 @@ test('pager: brak promptu po q odrzuca odczyt dopiero po pelnym limicie', async 
 
   await transport.replay(letterLines(1));
   assert.equal(transport.sent.at(-1), 'q');
-  context.mock.timers.tick(7999);
+  context.mock.timers.tick(399);
   await flushPromises();
-  assert.equal(settlement, 'pending', 'przed pelnym limitem nie ma rozstrzygniecia');
+  assert.equal(settlement, 'pending', 'krotki czas oczekiwania na prompt jeszcze trwa');
 
-  const rejection = assert.rejects(operation, /timeout: pager session list 1/);
   context.mock.timers.tick(1);
-  await rejection;
-  assert.equal(settlement, 'rejected');
+  await flushPromises();
+  assert.equal(settlement, 'resolved');
+  const result = await operation;
+  assert.equal(result.letter.number, 1);
+  assert.deepEqual(result.letter.body, ['', 'Syntetyczna tresc.']);
+  await assert.rejects(pager.readLetter(2), /operacja anulowana/);
+  assert.deepEqual(transport.sent, ['przeczytaj list 1', 'q']);
 });
 
 test('import: prompt po limicie ciszy konczy kompletna odpowiedz sukcesem', async (context) => {
