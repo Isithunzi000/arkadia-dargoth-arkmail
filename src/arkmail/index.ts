@@ -97,7 +97,7 @@ import { buildDownloadSummary, buildExportSummary } from "./ui/operationSummary"
 import { PagerSession } from "./core/session/pager";
 import { EditorSession } from "./core/session/editor";
 import { SessionLock } from "./core/sessionLock";
-import { DargothTransport } from "./adapters/dargothTransport";
+import { DargothTransport, MODAL_QUEUE_DROPPED_MESSAGE } from "./adapters/dargothTransport";
 import { cleanupLegacyStorage, openCharStorage, type CharStorage } from "./adapters/storage";
 import { STORAGE_WRITE_ERROR } from "./adapters/writeThroughStorage";
 import { notify } from "./adapters/notify";
@@ -1132,7 +1132,7 @@ export async function init(api: PluginApi) {
         },
         onCommandDropped: () => notify(
           api,
-          "Nie wykonano komendy pocztowej, poniewaz tryb czytania poczty zostal juz zamkniety. Otworz poczte recznie i powtorz komende.",
+          MODAL_QUEUE_DROPPED_MESSAGE,
           { level: "warning" },
         ),
       },

@@ -18,8 +18,8 @@ import {
 
 const PAGER_PROMPT = '[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ';
 const CLOSED_MESSAGE =
-  'Nie wykonano komendy pocztowej, poniewaz tryb czytania poczty zostal juz zamkniety. ' +
-  'Otworz poczte recznie i powtorz komende.';
+  'Nie wykonano komend odlozonych podczas operacji pocztowej. ' +
+  'Powtorz je po powrocie do zwyklego widoku gry.';
 
 const PAGER_COMMANDS = [
   'h',

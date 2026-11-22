@@ -36,6 +36,10 @@ const PENDING_ECHO_TTL_MS = 10_000;
 /** Brak promptu po tym czasie jest widoczny, ale nie otwiera kanalu. */
 const RECOVERY_LIMIT_MS = 10_000;
 
+export const MODAL_QUEUE_DROPPED_MESSAGE =
+  'Nie wykonano komend odlozonych podczas operacji pocztowej. ' +
+  'Powtorz je po powrocie do zwyklego widoku gry.';
+
 type CommandSource = 'arkmail' | 'user';
 
 interface PendingEcho {
@@ -69,6 +73,7 @@ export class DargothTransport implements Transport {
   private pagerCloseSent = false;
   private pagerClosePromptSeen = false;
   private pagerUserClose = false;
+  private pagerTakenOver = false;
   private pagerCloseAttempt = 0;
   private queue: string[] = [];
   private commandQueue: Promise<void> = Promise.resolve();
@@ -157,6 +162,7 @@ export class DargothTransport implements Transport {
       this.pagerOpen = false;
       this.beginRecovery();
     });
+    if (userCommand !== null) this.pagerTakenOver = true;
     if (userCommand !== null && !this.pagerUserClose) {
       this.pagerUserClose = true;
       hooks.onUserCommand(userCommand);
@@ -297,6 +303,7 @@ export class DargothTransport implements Transport {
     this.pagerCloseSent = false;
     this.pagerClosePromptSeen = false;
     this.pagerUserClose = false;
+    this.pagerTakenOver = false;
     this.hookId = this.api.commandHooks.register((command: string) => {
       if (this.sendingOwn) return undefined;
       if (this.pagerModal && isPagerCloseCommand(command)) {
@@ -320,6 +327,7 @@ export class DargothTransport implements Transport {
         const hooks = this.pagerModal;
         // Przejecie najpierw anuluje sesje, wiec PagerSession nie wysle
         // wlasnego q. Komenda gracza idzie raz, z zachowanym zrodlem.
+        this.pagerTakenOver = true;
         hooks.onUserCommand(command);
         void this.enqueue(command, true, 'user').catch(() => {});
       } else {
@@ -350,6 +358,7 @@ export class DargothTransport implements Transport {
       return;
     }
     this.queue.splice(index, 1);
+    this.pagerTakenOver = true;
     hooks.onUserCommand(command);
     void this.enqueue(command, true, 'user').catch(() => {});
   }
@@ -361,6 +370,7 @@ export class DargothTransport implements Transport {
     this.pagerCloseSent = false;
     this.pagerClosePromptSeen = false;
     this.pagerUserClose = false;
+    this.pagerTakenOver = false;
     if (this.hookId !== null) {
       this.api.commandHooks.unregister(this.hookId);
       this.hookId = null;
@@ -371,6 +381,7 @@ export class DargothTransport implements Transport {
     if (!this.modalActive) return;
     this.modalActive = false;
     const pagerHooks = this.pagerModal;
+    const discardQueue = this.recovering || this.pagerTakenOver;
     this.pagerOpen = false;
     const keepCloseHook = pagerHooks !== null && this.pagerCloseSent &&
       !this.pagerClosePromptSeen && !this.recovering;
@@ -378,16 +389,24 @@ export class DargothTransport implements Transport {
     const pending = this.queue.splice(0);
     if (!this.online) return;
     let dropped = false;
-    for (const command of pending) {
-      if (pagerHooks && isPagerCommand(command)) {
-        dropped = true;
-        continue;
+    if (discardQueue) {
+      // Stara intencja nie moze trafic do nierozstrzygnietego pagera ani
+      // edytora. Swieze komendy po zdjeciu modalu nadal przechodza.
+      dropped = pending.length > 0;
+    } else {
+      for (const command of pending) {
+        if (pagerHooks && isPagerCommand(command)) {
+          dropped = true;
+          continue;
+        }
+        // Sukces potwierdzony zachowuje odtwarzanie Z echem i kolejnoscia.
+        void this.enqueue(command, true, 'user').catch(() => {});
       }
-      // Fala 42: odtworzenie Z echem - to komenda gracza, wiec straznik
-      // wejscia w poczte musi ja zobaczyc tak jak wpisana recznie.
-      void this.enqueue(command, true, 'user').catch(() => {});
     }
-    if (dropped) pagerHooks?.onCommandDropped();
+    if (dropped) {
+      if (pagerHooks) pagerHooks.onCommandDropped();
+      else notify(this.api, MODAL_QUEUE_DROPPED_MESSAGE, { level: 'warning' });
+    }
   }
 
   /** Odcina stare wysylki i porzuca kolejke bez drenowania. */
@@ -419,6 +438,7 @@ export class DargothTransport implements Transport {
     this.pagerCloseSent = false;
     this.pagerClosePromptSeen = false;
     this.pagerUserClose = false;
+    this.pagerTakenOver = false;
     this.pagerCloseAttempt++;
     this.queue = [];
   }

@@ -41,6 +41,8 @@ Kontrola RED/GREEN:
 
 ## Etap 2 — bezpieczne kolejki modalne
 
+Status: zakonczony lokalnie. Nowe kontrole: 3 bledy na starej bazie, 6/6 po poprawce. Powiazane kontrole: 33/33. Pelny zestaw Node 26: 1326 testow, 1325 zaliczonych, 1 pominety, 0 bledow; typecheck i build zielone. Warunek porzucania dotyczy wylacznie recovery albo rzeczywistego przejecia pagera, nie samej wczesniejszej flagi recznej poczty.
+
 Pliki: dargothTransport.ts, index.ts lub notify tylko jesli potrzebne, testy modalne.
 
 Implementacja:
