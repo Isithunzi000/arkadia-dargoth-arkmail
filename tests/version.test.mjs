@@ -22,8 +22,8 @@ function metaVersion() {
   return m[1];
 }
 
-test('wydanie: przygotowany numer wersji to 1.30.16', () => {
-  assert.equal(metaVersion(), '1.30.16');
+test('wydanie: przygotowany numer wersji to 1.30.17', () => {
+  assert.equal(metaVersion(), '1.30.17');
 });
 
 function latestZip() {
@@ -148,4 +148,12 @@ test('dokumentacja: walidacja listu i filtrow jest opisana', () => {
   assert.match(protocol, /Temat i treść nie mogą zawierać znaków `;` ani `#`/);
   assert.match(protocol, /Sam szablon lub ramka bez wpisanej treści jest pustym listem/);
   assert.match(protocol, /daty muszą istnieć w kalendarzu/);
+});
+
+test('dokumentacja: zdalna macierz ArkMail jest zapisana', () => {
+  const report = fs.readFileSync(path.join(REPO, 'docs/NAPRAWA-1.30.17.md'), 'utf8');
+  assert.match(report, /## Weryfikacja zdalna/);
+  assert.ok(report.includes('ArkMail E2E: 47/47, 0 błędów, 0 niestabilnych i 0 pominiętych.'));
+  assert.ok(report.includes('Testy pluginow Dargoth: zakończone sukcesem.'));
+  assert.ok(report.includes('E2E Dargoth (prawdziwy klient): zakończone sukcesem.'));
 });

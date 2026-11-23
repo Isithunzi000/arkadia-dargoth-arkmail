@@ -41,6 +41,14 @@ Zachowane zostają interfejs, motywy, odpowiadanie wszystkim, pełne nagłówki,
 - Pierwszy pełny przebieg wykrył dawne oczekiwanie, że ręczna poczta blokuje również lokalne czyszczenie. Operacje serwerowe zachowały blokadę, a czyszczenie otrzymało osobną kontrolę: 21/21.
 - Końcowy pełny zestaw: 1350/1350, 0 błędów, 0 anulowanych i 0 pominiętych. Osobne typowanie, budowanie oraz kontrola opisu commita zakończyły się bez błędów.
 
+## Weryfikacja zdalna
+
+- ArkMail E2E: 47/47, 0 błędów, 0 niestabilnych i 0 pominiętych.
+- Testy pluginow Dargoth: zakończone sukcesem.
+- E2E Dargoth (prawdziwy klient): zakończone sukcesem.
+- Przed zdalnym potwierdzeniem pełny lokalny zestaw repozytorium testów zakończył się wynikiem 694/694, z trzema pominiętymi kontrolami warunkowymi. Wszystkie 256 sekwencji modelu zakończyło się prawidłowo, a 10/10 kontroli negatywnych wykryło celowe błędy.
+- Dwa dawne scenariusze listingów zostały doprecyzowane: pełny listing zatwierdza usunięcia, a strona bez promptu nie przerywa wczytywania kolejnych stron. Osobny scenariusz potwierdza przekazanie ręcznych `q`/`x` do gry po zakończeniu odczytu.
+
 ## Ograniczenie wyniku
 
 Testy syntetyczne i przeglądarkowe nie są testem w realnej grze. Końcowe sprawdzenie na rzeczywistych danych należy do użytkownika po instalacji oficjalnego wydania.
