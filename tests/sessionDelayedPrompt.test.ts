@@ -21,7 +21,7 @@ const flushPromises = async (): Promise<void> => {
   await new Promise<void>((resolve) => { setImmediate(resolve); });
 };
 
-test('mailbox: opozniony prompt przed limitem ciszy potwierdza listing', async (context) => {
+test('mailbox: opozniony prompt przed limitem ciszy konczy listing', async (context) => {
   context.mock.timers.enable({ apis: ['setTimeout'] });
   const transport = new MockTransport();
   const mailbox = new MailboxSession(transport, { timeoutMs: 8000, idleMs: 400 });
@@ -44,7 +44,6 @@ test('mailbox: opozniony prompt przed limitem ciszy potwierdza listing', async (
   await transport.replay([{ cls: 'prompt', text: '> ' }]);
   const result = await operation;
   assert.equal(result.kind, 'lista');
-  assert.equal(result.kind === 'lista' && result.confirmed, true);
   assert.equal(result.kind === 'lista' ? result.entries.length : 0, 1);
 });
 
@@ -74,7 +73,7 @@ test('pager: zwrocony odczyt od razu zwalnia kolejna operacje', async (context) 
   assert.equal((await next).letter.number, 2);
 });
 
-test('mailbox: brak promptu zwraca niepotwierdzony listing po limicie ciszy', async (context) => {
+test('mailbox: brak promptu zwraca zebrany listing po limicie ciszy', async (context) => {
   context.mock.timers.enable({ apis: ['setTimeout'] });
   const transport = new MockTransport();
   const mailbox = new MailboxSession(transport, { timeoutMs: 8000, idleMs: 400 });
@@ -95,7 +94,7 @@ test('mailbox: brak promptu zwraca niepotwierdzony listing po limicie ciszy', as
   assert.equal(settlement, 'resolved', 'cisza zwraca uzyteczny wynik');
   const result = await operation;
   assert.equal(result.kind, 'lista');
-  assert.equal(result.kind === 'lista' && result.confirmed, false);
+  assert.equal(result.kind === 'lista' ? result.entries.length : 0, 1);
 });
 
 test('pager: brak promptu po q zwraca kompletny list po krotkim czasie', async (context) => {

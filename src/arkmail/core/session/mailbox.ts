@@ -5,9 +5,8 @@
  *
  * Przenosnosc: zywy PluginApi daje triggerom SAM tekst linii (bez klas
  * gmcp_msgs), wiec koniec listingu wykrywamy tez po samej tresci:
- * echo komendy ("→ ...") oraz prompt ("> "). Po ciszy zwracamy listing
- * jako niepotwierdzony: mozna go wyswietlic i scalic, ale nie wolno
- * traktowac go jako pelnej prawdy o skrzynce.
+ * echo komendy ("→ ...") oraz prompt ("> "). Po ciszy zwracamy zebrany
+ * listing i konczymy sesje tak samo jak po zwyklym prompcie.
  */
 
 import {
@@ -34,12 +33,12 @@ const MAIL_ERROR_RE = /^Data zostala podana w zlym formacie\./;
 
 /** Retry po komunikacie "Listy sa w tej chwili ladowane." (ms). */
 export const LISTS_LOADING_RETRY_MS = 2000;
-/** Domyslny limit ciszy przed zwroceniem niepotwierdzonego listingu (ms). */
+/** Domyslny limit ciszy przed zwroceniem zebranego listingu (ms). */
 export const DEFAULT_IDLE_FLUSH_MS = 600;
 
 export interface SessionOptions {
   timeoutMs: number;
-  /** Limit ciszy; po nim listing wraca jako niepotwierdzony. */
+  /** Limit ciszy; po nim zebrany listing konczy sesje. */
   idleMs?: number;
   /** Rejestracja natychmiastowego anulowania przy zmianie polaczenia. */
   onCancel?: (cb: () => void) => () => void;
@@ -88,8 +87,6 @@ export type MailboxResult =
       kind: 'lista';
       header: ListingHeader;
       entries: MailboxEntry[];
-      /** Prompt/echo potwierdza koniec; cisza daje tylko wynik do scalenia. */
-      confirmed?: boolean;
     }
   | { kind: 'pusta'; box: MailBox; reason: 'puste' | 'filtr' };
 
@@ -158,7 +155,7 @@ export class MailboxSession {
         if (idleTimer) clearTimeout(idleTimer);
         idleTimer = setTimeout(() => {
           if (done || !header) return;
-          finish({ kind: 'lista', header, entries, confirmed: false });
+          finish({ kind: 'lista', header, entries });
         }, idleMs);
       };
 
@@ -262,7 +259,7 @@ export class MailboxSession {
           isPromptLine(line.text) ||
           isEchoLine(line.text)
         ) {
-          finish({ kind: 'lista', header, entries, confirmed: true });
+          finish({ kind: 'lista', header, entries });
           return;
         }
         armIdle();

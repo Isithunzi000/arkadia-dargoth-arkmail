@@ -506,9 +506,6 @@ export async function init(api: PluginApi) {
       }, source);
   let connectionGeneration = 0;
   let pendingOpen: { box: MailBox; entry: MailboxEntry; generation: number } | null = null;
-  // Zwrocony odczyt moze zakonczyc sie przed zwyklym promptem. Jego
-  // odswiezenie czeka na odzyskanie kanalu, zamiast zostac utracone.
-  const pendingReadRefresh = new Set<MailBox>();
   let archiveDownloadEta: DownloadEta | null = null;
   const cancelListeners = new Set<() => void>();
   const sessionOpts = {
@@ -751,7 +748,7 @@ export async function init(api: PluginApi) {
       let resolvedIds: string[] | undefined;
       if (res.kind === "lista") {
         const listingRecords = recordsOfListing(box, res.entries);
-        if (!res.header.truncated && res.confirmed !== false) {
+        if (!res.header.truncated) {
           const replaced = replaceBoxLetters(ui.state.archive, box, listingRecords);
           ui.setArchive(replaced.letters);
           resolvedIds = replaced.resolvedIds;
@@ -772,7 +769,7 @@ export async function init(api: PluginApi) {
           const merged = mergeListingPage(ui.state.archive, box, listingRecords);
           ui.setArchive(merged.letters);
           resolvedIds = merged.resolvedIds;
-          if (res.confirmed !== false && boundaryDay !== undefined) {
+          if (boundaryDay !== undefined) {
             markGoneFromServerNewerThan(box, merged.freshIds, boundaryDay);
           }
         }
@@ -791,7 +788,7 @@ export async function init(api: PluginApi) {
       // Fala 14f: pusty listing TEZ nadpisuje biezacy kontekst serwera.
       if (res.kind === "lista") stampEntries(box, res.entries, resolvedIds);
       else bumpCtx(box);
-      if (res.kind === "lista" && mode === "sync" && res.confirmed !== false) {
+      if (res.kind === "lista" && mode === "sync") {
         // null = brak widoku / widok pusty -> pelne zastosowanie.
         const synced = ui.syncMailboxPage(box, res.entries, res.header.truncated, boundaryDay);
         if (!synced) ui.applyMailbox(box, res);
@@ -863,21 +860,6 @@ export async function init(api: PluginApi) {
       });
   };
 
-  const refreshReadBox = (box: MailBox): void => {
-    if (transport!.isRecovering()) {
-      pendingReadRefresh.add(box);
-      return;
-    }
-    refreshBoxes([box]);
-  };
-
-  const drainPendingReadRefresh = (): void => {
-    if (pendingReadRefresh.size === 0 || transport!.isRecovering() || playerMailMode) return;
-    const boxes = [...pendingReadRefresh];
-    pendingReadRefresh.clear();
-    refreshBoxes(boxes);
-  };
-
   // Fala 16c: reconnect/re-login uniewaznia kontekst listingu serwera.
   // Nowa sesja serwera NIE MA "biezacego listingu" - wpisy sprzed
   // polaczenia musza przejsc re-kotwice, inaczej "przeczytaj list N"
@@ -901,7 +883,6 @@ export async function init(api: PluginApi) {
     indexFlag = null;
     archiveDownloadFlag = null;
     pendingRefresh.clear();
-    pendingReadRefresh.clear();
     drainScheduled = false;
     for (const timer of delayedInboxTimers) clearTimeout(timer);
     delayedInboxTimers = [];
@@ -1441,7 +1422,7 @@ export async function init(api: PluginApi) {
           },
         });
         if (scan.end === "cancelled") return;
-        if (scan.end === "complete" && scan.pages === 0 && scan.unconfirmedPages === 0) {
+        if (scan.end === "complete" && scan.pages === 0) {
           ui.appendMailboxPage(box, [], false);
           // Fala 25 (blad 1, decyzja D2): pusta odpowiedz na paginacje
           // wstecz = doszlismy do dna skrzynki - cala zawartosc jest
@@ -1458,13 +1439,10 @@ export async function init(api: PluginApi) {
             { title: "Wczytano dostepne listy", level: "warning" },
           );
         } else {
-          const confirmationNote = scan.unconfirmedPages > 0
-            ? ` Nie potwierdzono zamkniecia odpowiedzi: ${scan.unconfirmedPages}. Archiwum zachowano bez usuwania wpisow.`
-            : "";
           notify(
             api,
-            `W widoku: ${ui.state.boxes[box]?.entries.length ?? 0} (dodano: ${scan.addedToView}).${confirmationNote}`,
-            { title: "Wczytano starsze listy", level: scan.unconfirmedPages > 0 ? "warning" : "success" },
+            `W widoku: ${ui.state.boxes[box]?.entries.length ?? 0} (dodano: ${scan.addedToView}).`,
+            { title: "Wczytano starsze listy", level: "success" },
           );
         }
       })
@@ -1541,30 +1519,23 @@ export async function init(api: PluginApi) {
           }
           if (scan.end === "complete") {
             ui.appendMailboxPage(box, [], false);
-            if (scan.unconfirmedPages === 0) {
-              clearArchiveGaps(box);
-              const done = ui.state.boxes[box];
-              if (done && !done.truncated) {
-                // Fala 41: widok = glowa + doklejone strony = pelny zrzut
-                // skrzynki; zastepuje archiwum tej skrzynki wynikiem.
-                const replaced = replaceBoxLetters(ui.state.archive, box, snapshotRecords(box));
-                ui.setArchive(replaced.letters);
-                if (replaced.removedIds.size > 0) pruneGoneFromView(box, replaced.removedIds);
-                ui.setIndexMeta({ ...ui.state.indexMeta, [box]: new Date().toISOString() });
-                persistIndexMeta();
-              }
-              notify(
-                api,
-                `W widoku: ${ui.state.boxes[box]?.entries.length ?? 0} (dodano: ${scan.addedToView}).`,
-                { title: "Wczytano wszystkie", level: "success" },
-              );
-            } else {
-              notify(
-                api,
-                `W widoku: ${ui.state.boxes[box]?.entries.length ?? 0} (dodano: ${scan.addedToView}). Nie potwierdzono zamkniecia odpowiedzi: ${scan.unconfirmedPages}. Archiwum zachowano bez usuwania wpisow.`,
-                { title: "Wczytano wszystkie strony", level: "warning" },
-              );
+            clearArchiveGaps(box);
+            const done = ui.state.boxes[box];
+            if (done && !done.truncated) {
+              // Widok = glowa + doklejone strony = pelny zrzut skrzynki;
+              // zastepuje archiwum tej skrzynki wynikiem.
+              const replaced = replaceBoxLetters(ui.state.archive, box, snapshotRecords(box));
+              ui.setArchive(replaced.letters);
+              persistArchive();
+              if (replaced.removedIds.size > 0) pruneGoneFromView(box, replaced.removedIds);
+              ui.setIndexMeta({ ...ui.state.indexMeta, [box]: new Date().toISOString() });
+              persistIndexMeta();
             }
+            notify(
+              api,
+              `W widoku: ${ui.state.boxes[box]?.entries.length ?? 0} (dodano: ${scan.addedToView}).`,
+              { title: "Wczytano wszystkie", level: "success" },
+            );
           } else {
             notify(
               api,
@@ -1690,7 +1661,7 @@ export async function init(api: PluginApi) {
                 };
               },
             });
-            if ((scan.end === "complete" || scan.end === "clamped") && scan.unconfirmedPages === 0 && !flag.cancelled) {
+            if ((scan.end === "complete" || scan.end === "clamped") && !flag.cancelled) {
               if (scan.end === "complete" && collectedFreshIds.size > 0) {
                 ui.appendMailboxPage(box, [], false);
               }
@@ -1717,9 +1688,7 @@ export async function init(api: PluginApi) {
             } else if (scan.end === "cancelled" || flag.cancelled) {
               break;
             } else {
-              const why = scan.skipWhy ?? (scan.unconfirmedPages > 0
-                ? `nie potwierdzono zamkniecia odpowiedzi: ${scan.unconfirmedPages}`
-                : "niekompletne");
+              const why = scan.skipWhy ?? "niekompletne";
               skipped.push(`${box} (${why})`);
             }
           }
@@ -1849,7 +1818,7 @@ export async function init(api: PluginApi) {
         // przeczytania i badge to prawda serwerowa (plugin niczego
         // nie zaznacza lokalnie). W trybie wynikow szukania pomijamy:
         // refresh czysci selekcje i wywalilby gracza z wynikow.
-        if (ui.state.search?.box !== box) refreshReadBox(box);
+        if (ui.state.search?.box !== box) refreshBoxes([box]);
         return;
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -2329,10 +2298,6 @@ export async function init(api: PluginApi) {
           deletionSelectionKey(ui.state.deletion.selected) !== selectionKey
         ) {
           bumpCtx(box);
-          return;
-        }
-        if (fresh.kind === "lista" && fresh.confirmed === false) {
-          ui.clearDeletionResult("Nie potwierdzono zamkniecia listingu. Wyszukaj listy ponownie.");
           return;
         }
         if (fresh.kind === "lista") stampEntries(box, fresh.entries);
@@ -3067,7 +3032,6 @@ export async function init(api: PluginApi) {
   // Dopiero ten zwykly prompt pozwala wyslac odlozone odswiezenie.
   transport.subscribe((line) => {
     if (line.cls !== "prompt" && !isPromptLine(line.text)) return;
-    drainPendingReadRefresh();
   });
 
   // Powiadomienia pocztowe: odswiezenie + opcjonalny tost.

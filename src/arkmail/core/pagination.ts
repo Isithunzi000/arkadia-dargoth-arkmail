@@ -24,8 +24,6 @@ export interface PageScanResult {
   pages: number;
   addedToView: number;
   archiveAdded: number;
-  /** Strony zakonczone po ciszy, bez promptu lub echa konczacego. */
-  unconfirmedPages: number;
   all: MailboxEntry[];
   oldestSeenDay: string | null;
   gapDays: string[];
@@ -95,7 +93,6 @@ export async function scanMailboxPages(options: PageScanOptions): Promise<PageSc
   let pages = 0;
   let addedToView = 0;
   let archiveAdded = 0;
-  let unconfirmedPages = 0;
   let oldestSeenDay: string | null = null;
   let anchorRetries = 0;
   let wallProbed = false;
@@ -107,12 +104,9 @@ export async function scanMailboxPages(options: PageScanOptions): Promise<PageSc
     end: PageScanEnd,
     skipWhy: string | null = null,
   ): PageScanResult => ({
-    end, pages, addedToView, archiveAdded, unconfirmedPages, all, oldestSeenDay,
+    end, pages, addedToView, archiveAdded, all, oldestSeenDay,
     gapDays: [...gapDays], skipWhy,
   });
-  const observeConfirmation = (value: MailboxResult): void => {
-    if (value.kind === 'lista' && value.confirmed === false) unconfirmedPages += 1;
-  };
   const addGap = (day: string): void => {
     if (gapDays.includes(day)) return;
     gapDays.push(day);
@@ -124,7 +118,6 @@ export async function scanMailboxPages(options: PageScanOptions): Promise<PageSc
 
   for (;;) {
     if (options.cancelled()) return finish('cancelled');
-    observeConfirmation(result);
     if (result.kind !== 'lista') {
       options.onEmpty?.(result);
       if (probePending && probeDay !== null) addGap(probeDay);
@@ -167,18 +160,6 @@ export async function scanMailboxPages(options: PageScanOptions): Promise<PageSc
     addedToView += visit.addedToView ?? 0;
     archiveAdded += visit.archiveAdded ?? 0;
     if (options.cancelled()) return finish('cancelled');
-    // Cisza zwraca uzyteczna strone do scalenia, ale nie potwierdza jej
-    // konca. Nie wolno po niej otwierac kolejnej sesji: pozne wpisy, echo
-    // lub prompt starej odpowiedzi moglyby zostac przypisane nowej stronie.
-    // Jednoznacznie znaleziony cel nie wymaga juz zadnej kolejnej strony.
-    if (result.confirmed === false) {
-      if (visit.stop) {
-        if (gapDays.length > 0) return incompleteWithGaps();
-        return finish('clamped');
-      }
-      return finish('partial');
-    }
-
     if (!result.header.truncated) {
       if (gapDays.length > 0) return incompleteWithGaps();
       return finish('complete');
@@ -204,12 +185,7 @@ export async function scanMailboxPages(options: PageScanOptions): Promise<PageSc
         if (options.cancelled()) return finish('cancelled');
         const base = await options.fetchPage();
         if (options.cancelled()) return finish('cancelled');
-        observeConfirmation(base);
         options.onBaseRefresh?.(base);
-        // Odswiezona baza bez potwierdzenia takze konczy skan. Jej dane
-        // zostaly scalone przez onBaseRefresh, lecz kolejna kotwica moglab
-        // zebrac pozny koniec tej samej odpowiedzi.
-        if (base.kind === 'lista' && base.confirmed === false) return finish('partial');
         result = await options.fetchPage(olderListingCommand(box, nextDay(oldestDuplicate.date)));
         continue;
       }

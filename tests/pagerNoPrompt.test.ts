@@ -53,7 +53,7 @@ test('odczyt: kompletny list bez zwyklego promptu otwiera sie i odswieza skrzynk
   }
 });
 
-test('odczyt: wpis znaleziony na niepotwierdzonej stronie nie wymaga kolejnej strony', async () => {
+test('odczyt: wpis znaleziony na stronie zwroconej po ciszy nie wymaga kolejnej strony', async () => {
   const h = await startHarness();
   const { f, content } = h;
   try {

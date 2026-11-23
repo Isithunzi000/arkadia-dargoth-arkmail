@@ -205,7 +205,7 @@ test('adapter: prompt przed limitem anuluje oczekujacy komunikat', (context) => 
   t.dispose();
 });
 
-test('mailbox: cisza po listingu zwraca wynik niepotwierdzony i zwalnia sesje', async () => {
+test('mailbox: cisza po listingu zwraca zebrane wpisy i zwalnia sesje', async () => {
   const t = new MockTransport();
   const mailbox = new MailboxSession(t, { timeoutMs: 200, idleMs: 20 });
   const operation = mailbox.fetch('odebrane');
@@ -216,7 +216,7 @@ test('mailbox: cisza po listingu zwraca wynik niepotwierdzony i zwalnia sesje', 
   ]);
   const result = await operation;
   assert.equal(result.kind, 'lista');
-  assert.equal(result.kind === 'lista' && result.confirmed, false);
+  assert.equal(result.kind === 'lista' ? result.entries.length : 0, 1);
 
   const next = mailbox.fetch('odebrane');
   await t.replay([

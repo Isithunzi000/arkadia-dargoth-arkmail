@@ -123,14 +123,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   ok('E5b humanize', humanizeMailError(err?.message ?? '') === 'Serwer nie odpowiedzial na czas - sprobuj ponownie.');
 }
 
-// --- E6: wpisy bez promptu -> wynik niepotwierdzony, sesja wolna ------------
+// --- E6: wpisy bez promptu -> zebrany listing, sesja wolna ------------------
 {
   const t = new MockTransport();
   const mb = new MailboxSession(t, { timeoutMs: 3000, idleMs: 300 });
   const p = mb.fetch('odebrane');
   await t.replay(load('listing-odebrane-male.json').slice(3, 10)); // same wpisy, bez promptu
   const result = await p;
-  ok('E6 cisza zwraca niepotwierdzony listing', result.kind === 'lista' && result.confirmed === false);
+  ok('E6 cisza zwraca zebrany listing', result.kind === 'lista' && result.entries.length > 0);
   const next = mb.fetch('odebrane');
   ok('E6b nowa operacja nie czeka na prompt', t.sent.filter((command) => command === 'listy odebrane').length === 2);
   await t.replay([

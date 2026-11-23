@@ -437,22 +437,17 @@ zapisu. Dawne klucze localStorage sa usuwane bez migracji danych.
   Usuwanie, przekazywanie i import nadal wymagaja potwierdzonego zakonczenia.
   Zakonczenie operacji zdejmuje hook modalny, wiec pozniejsze reczne `q`/`x`
   nalezy do gracza i nie jest przez ArkMail tlumione.
-- Listing konczy sie jako potwierdzony na zwyklym promptcie albo echcie
-  kolejnej komendy, takze gdy prompt jest opozniony, ale dociera przed
-  limitem ciszy. Domyslnie po 600 ms ciszy poprawny listing wraca jako
-  `confirmed: false` i zwalnia sesje bez odzyskiwania. Pozniejszy prompt
-  nie zmienia wstecznie juz zwroconego statusu.
-- Wynik niepotwierdzony mozna pokazac i scalic z archiwum. Konczy on biezacy
-  skan bez wysylania kolejnej kotwicy. Jednoznaczny wpis znaleziony na tej
-  stronie moze zostac zwrocony mimo niepotwierdzonego zakonczenia; bez takiego
-  wpisu niepelny skan jest odrzucany.
-  Skan raportuje osobno wynik strukturalny i liczbe niepotwierdzonych stron,
-  lacznie z listingiem bazowym podczas ponawiania kotwicy. Jesli liczba jest
-  wieksza od zera, nie wolno zastepowac archiwum, usuwac rekordow, zawezac
-  zakresow, czyscic luk ani oznaczac indeksacji jako kompletnej. Pobrane wpisy
-  pozostaja zapisane, a indeksacja przechodzi do nastepnej skrzynki z raportem
-  niekompletnym. Dopiero skan bez niepotwierdzonych stron moze wykonac operacje
-  pelnej prawdy.
+- Listing konczy sie na zwyklym promptcie albo echcie kolejnej komendy,
+  takze gdy prompt jest opozniony, ale dociera przed limitem ciszy.
+  Domyslnie po 600 ms ciszy zebrany listing wraca i zwalnia sesje bez
+  odzyskiwania. Pozniejszy prompt nie zmienia juz zwroconego wyniku.
+- Listing zwrocony po ciszy jest traktowany tak samo jak zakonczony
+  promptem: mozna go pokazac, zapisac i zatwierdzic. Ucieta strona otwiera
+  kolejna kotwice, a kompletny skan moze zastapic archiwum, usunac
+  znikniete rekordy, wyczyscic luki i ustawic stempel indeksacji.
+  Indeksacja nie pomija skrzynki z powodu samego braku promptu.
+  Rzeczywiste bledy strukturalne, powtorzenia bez postepu i luki nadal
+  zatrzymuja pelne zatwierdzenie.
 - Brak poprawnej odpowiedzi do pelnego limitu nadal odrzuca operacje
   i uruchamia ograniczone odzyskiwanie kanalu.
 - Lokalny identyfikator sesji lub generacji porzadkuje jedynie zdarzenia

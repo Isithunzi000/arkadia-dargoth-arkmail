@@ -96,7 +96,7 @@ for (const item of [
   });
 }
 
-test('niepotwierdzony listing otwiera jednoznaczny list bez kolejnej rekotwicy', async () => {
+test('listing zwrocony po ciszy otwiera jednoznaczny list bez kolejnej rekotwicy', async () => {
   const h = await startHarness();
   try {
     await loadTruncatedBox(h);
