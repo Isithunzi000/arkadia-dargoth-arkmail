@@ -2876,22 +2876,26 @@ export async function init(api: PluginApi) {
     // ZACHOWUJE ustawienia (powiadomienia, szablon compose) - one nie
     // sa cache, tylko preferencje.
     onClearCache: () => {
-      if (manualOperationBlocked()) return;
+      // Czyszczenie jest wylacznie lokalne. Uniewaznia aktywne operacje,
+      // ale nie czeka na ich blokade i nie wysyla zadnej komendy do gry.
+      const wasOnline = transport!.isOnline();
+      cancelConnectionOperations();
+      if (wasOnline) transport!.setOnline(true);
       const generation = connectionGeneration;
       ui.setBusy("Czyszcze zapisane dane...");
-      void runExclusive(async () => {
+      void trackTask((async () => {
         await storage.clearMailData([INDEX_KEY, ARCHIVE_GAPS_KEY]);
         if (generation !== connectionGeneration) return;
         ui.clearCacheData();
         notify(api, "Zapisane dane wyczyszczone.", { level: "success" });
-      })
+      })())
         .catch((err: unknown) => {
           if (!isOperationCancelled(err)) {
             notify(api, "Nie udalo sie wyczyscic zapisanych danych.", { level: "error" });
           }
         })
         .finally(() => {
-          if (generation === connectionGeneration && !lock.locked) ui.setBusy(null);
+          if (generation === connectionGeneration) ui.setBusy(null);
         });
     },
     onDeleteLetter: (box, entry) => {

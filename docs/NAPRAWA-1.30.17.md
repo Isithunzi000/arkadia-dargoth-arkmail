@@ -33,7 +33,13 @@ Zachowane zostają interfejs, motywy, odpowiadanie wszystkim, pełne nagłówki,
 - Pełne wczytanie zapisuje także usunięcia rekordów po zastąpieniu archiwum widokiem, dzięki czemu stan trwały odpowiada zatwierdzonemu wynikowi.
 - Pełny zestaw: 1348 kontrol, 1347 zaliczonych, 0 błędów i 0 anulowanych. Jedna kontrola opisu commita została pominięta bez zmiennej środowiskowej; po przekazaniu docelowego opisu cały plik kontroli opisów przeszedł 3/3. Osobne typowanie zakończyło się bez błędów.
 
-Kontrole etapu 3 oraz wynik końcowy zostaną dopisane po ich rzeczywistym wykonaniu.
+### Czyszczenie lokalne
+
+- Testy czyszczenia podczas odzyskiwania i aktywnego listingu na kodzie przed poprawką: 7 kontrol, 5 zaliczonych, 2 błędy. W obu przypadkach czyszczenie nie rozpoczynało się. Po poprawce: 7/7.
+- Powiązane kontrole anulowania, reconnectu, ręcznej poczty, odzyskiwania i magazynu: 74/74.
+- Czyszczenie nie korzysta już z blokady sesji. Unieważnia aktywne operacje, zachowuje dotychczasowy stan połączenia, nie wysyła komend i odrzuca późne odpowiedzi. Kolejna operacja po czyszczeniu działa.
+- Pierwszy pełny przebieg wykrył dawne oczekiwanie, że ręczna poczta blokuje również lokalne czyszczenie. Operacje serwerowe zachowały blokadę, a czyszczenie otrzymało osobną kontrolę: 21/21.
+- Końcowy pełny zestaw: 1350/1350, 0 błędów, 0 anulowanych i 0 pominiętych. Osobne typowanie, budowanie oraz kontrola opisu commita zakończyły się bez błędów.
 
 ## Ograniczenie wyniku
 

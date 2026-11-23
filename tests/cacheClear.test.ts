@@ -15,6 +15,7 @@ import { Window } from 'happy-dom';
 
 import { mountMailUi } from '../src/arkmail/ui/render';
 import { MailUiStore } from '../src/arkmail/ui/store';
+import { IndexedDbStorageDriver } from '../src/arkmail/adapters/storageDriver';
 import {
   startHarness,
   stopHarness,
@@ -22,6 +23,8 @@ import {
   click,
   waitRt,
   notifyText,
+  textOf,
+  type Harness,
 } from './harness';
 
 const window = new Window();
@@ -185,3 +188,92 @@ test('harness: czyszczenie kasuje widok i archiwum, ustawienia zostaja', async (
     await stopHarness();
   }
 });
+
+async function readMailData(): Promise<{
+  values: Record<string, string>;
+  letters: Record<string, string>;
+}> {
+  const driver = new IndexedDbStorageDriver(globalThis.indexedDB);
+  const [values, allLetters] = await Promise.all([
+    driver.loadAll(),
+    driver.loadAllLetters(),
+  ]);
+  await driver.close();
+  return { values, letters: allLetters.foo ?? {} };
+}
+
+async function clearDuringOperation(h: Harness): Promise<void> {
+  click(h, '.arkmail-cache-clear');
+  click(h, '.arkmail-cache-clear');
+  await waitRt(
+    () => notifyText(h.f, 'Zapisane dane wyczyszczone'),
+    'czyszczenie mimo aktywnej operacji',
+  );
+}
+
+test('harness: czyszczenie dziala podczas recovery bez komend do gry', async () => {
+  const h = await startHarness();
+  const { f } = h;
+  try {
+    await loadTruncatedBox(h);
+    click(h, '.arkmail-search-go');
+    await h.waitFor(
+      () => f.sent.filter((command) => command === 'listy odebrane').length === 2,
+      'reczny listing przed bledna odpowiedzia',
+    );
+    f.fire('Listy wyslane:', 'mail');
+    await waitRt(() => textOf(h, '.arkmail-busy') === '', 'koniec blednego listingu');
+    assert.ok(notifyText(f, 'Blad odswiezania'), 'bledna odpowiedz zakonczyla odswiezanie');
+
+    const commandsBefore = [...f.sent];
+    await clearDuringOperation(h);
+    assert.deepEqual(f.sent, commandsBefore, 'czyszczenie nie wysyla komend');
+    const stored = await readMailData();
+    assert.deepEqual(stored.letters, {}, 'archiwum wyczyszczone podczas recovery');
+    assert.equal(stored.values['arkmail.foo.indeks'], undefined);
+    assert.equal(stored.values['arkmail.foo.luki-archiwum'], undefined);
+  } finally {
+    await stopHarness();
+  }
+});
+
+test('harness: czyszczenie anuluje listing, a pozna odpowiedz nie odtwarza danych', async () => {
+  const h = await startHarness();
+  const { f, content } = h;
+  try {
+    await loadTruncatedBox(h);
+    click(h, '.arkmail-search-go');
+    await h.waitFor(
+      () => f.sent.filter((command) => command === 'listy odebrane').length === 2,
+      'aktywny listing przed czyszczeniem',
+    );
+    const commandsBefore = [...f.sent];
+    await clearDuringOperation(h);
+    assert.deepEqual(f.sent, commandsBefore, 'czyszczenie nie wysyla q ani innych komend');
+    assert.equal(content.querySelectorAll('.arkmail-entry').length, 0, 'widok pusty');
+
+    f.fire('Listy odebrane:', 'mail');
+    f.fire(' 1. *R* Temat: pozna odpowiedz', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
+    f.fire('> ', 'prompt');
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const stored = await readMailData();
+    assert.deepEqual(stored.letters, {}, 'pozna odpowiedz nie odtwarza archiwum');
+    assert.equal(stored.values['arkmail.foo.indeks'], undefined, 'indeks pozostaje pusty');
+    assert.equal(stored.values['arkmail.foo.luki-archiwum'], undefined, 'luki pozostaja puste');
+    assert.equal(content.querySelectorAll('.arkmail-entry').length, 0, 'widok pozostaje pusty');
+    assert.deepEqual(f.sent, commandsBefore, 'pozna odpowiedz nie uruchamia komend');
+
+    click(h, '.arkmail-search-go');
+    await h.waitFor(
+      () => f.sent.filter((command) => command === 'listy odebrane').length === 3,
+      'kolejna operacja po czyszczeniu',
+    );
+    f.fire('Nie masz zadnych odebranych listow.', 'mail');
+    await waitRt(() => textOf(h, '.arkmail-busy') === '', 'koniec kolejnej operacji');
+  } finally {
+    await stopHarness();
+  }
+});
+

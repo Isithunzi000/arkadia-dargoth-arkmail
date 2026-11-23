@@ -8,8 +8,10 @@ import {
   click,
   clickText,
   loadTruncatedBox,
+  notifyText,
   startHarness,
   stopHarness,
+  waitRt,
   type Harness,
 } from './harness';
 
@@ -182,13 +184,6 @@ const CASES: OperationCase[] = [
     run: (h) => click(h, '[data-import="aliasy"]'),
   },
   {
-    label: 'czyszczenie cache',
-    run: (h) => {
-      click(h, '.arkmail-cache-clear');
-      click(h, '.arkmail-cache-clear');
-    },
-  },
-  {
     label: 'indeksowanie',
     prepare: async (h) => click(h, '[data-tab="archiwum"]'),
     run: (h) => click(h, '.arkmail-index-all'),
@@ -282,6 +277,30 @@ test('reczna poczta blokuje kazda publiczna operacje serwerowa UI', async (conte
         await stopHarness();
       }
     });
+  }
+});
+
+test('reczna poczta nie blokuje lokalnego czyszczenia danych', async () => {
+  const h = await startHarness({ archive: [archiveRecord()] });
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    h.f.fire('→ listy');
+    h.f.sent.length = 0;
+    h.f.shown.length = 0;
+
+    click(h, '.arkmail-cache-clear');
+    click(h, '.arkmail-cache-clear');
+    await waitRt(
+      () => notifyText(h.f, 'Zapisane dane wyczyszczone'),
+      'lokalne czyszczenie podczas recznej poczty',
+    );
+
+    assert.equal(h.f.sent.length, 0, 'zero komend pluginu');
+    assert.ok(!notifyText(h.f, MESSAGE), 'brak komunikatu blokady operacji serwerowej');
+    const stored = JSON.parse(await settledArchiveSnapshot()) as Record<string, unknown>;
+    assert.deepEqual(stored.foo ?? {}, {}, 'archiwum zostaje trwale wyczyszczone');
+  } finally {
+    await stopHarness();
   }
 });
 

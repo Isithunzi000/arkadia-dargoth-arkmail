@@ -472,6 +472,11 @@ zapisu. Dawne klucze localStorage sa usuwane bez migracji danych.
 - Odzyskiwanie ma ograniczony czas, a zwykly prompt konczy je jednokrotnie.
   Nie wolno pozostawiac bezterminowej blokady ani zdejmowac jej automatycznie
   bez synchronizacji kanalu.
+- `Wyczysc zapisane dane` jest operacja wylacznie lokalna i nie korzysta
+  z blokady sesji. Dziala takze podczas odzyskiwania i aktywnej operacji:
+  uniewaznia biezace wyniki, zachowuje dotychczasowy stan polaczenia
+  i nie wysyla komend do gry. Czyszczenie magazynu nastepuje po wczesniejszych
+  zapisach, a pozna odpowiedz anulowanej sesji nie moze odtworzyc danych.
 - Blad lokalnej bazy IndexedDB jest zglaszany jako blad zapisu, nie awaria
   serwera. Nie zwieksza ani nie resetuje serii bledow komunikacji, a rekord
   pozostaje dostepny do ponowienia zapisu.

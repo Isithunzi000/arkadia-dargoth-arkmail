@@ -116,6 +116,11 @@ export class DargothTransport implements Transport {
     return this.recovering;
   }
 
+  /** Lokalna operacja moze zachowac dotychczasowy stan polaczenia przy anulowaniu sesji. */
+  isOnline(): boolean {
+    return this.online;
+  }
+
   /** Usuwa powtorzenia recznego zamkniecia, ale zachowuje jego zdarzenie. */
   private takeQueuedPagerClose(): string | null {
     let first: string | null = null;
