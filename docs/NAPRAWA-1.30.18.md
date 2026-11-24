@@ -25,9 +25,18 @@ Rozszerzone testy integracyjne przechodzą przez rzeczywistą ścieżkę interfe
 - Rozszerzony plik regresji z dwoma przypadkami integracyjnymi: 4/4.
 - Osobny ponowny audyt po przejściowym błędzie odczytu katalogów: 4/4.
 - Końcowy pełny zestaw z Node 26 również dla procesów potomnych oraz z aktywną kontrolą docelowego opisu commita: **1356/1356 zaliczonych, 0 błędów, 0 anulowanych, 0 pominiętych**.
-- Osobne typowanie, bundle i build zakończyły się kodem 0. Zgodnie ze skryptem repozytorium build kontrolny używał ostatniej opublikowanej paczki 1.30.17; paczka 1.30.18 jest osobno sprawdzana podczas wydania.
+- Osobne typowanie, bundle i build zakończyły się kodem 0. Zgodnie ze skryptem repozytorium build kontrolny używał ostatniej opublikowanej paczki 1.30.17; osobna kontrola paczki 1.30.18 jest opisana poniżej.
 
 Wcześniejsze przerwania spowodowane limitem wykonania, błędem systemu plików `EAGAIN` oraz utratą lokalnych zależności po awarii środowiska nie zostały uznane za wynik produktu. Po przywróceniu środowiska powtórzono wymagane kontrole i dopiero kompletny, nieprzerwany przebieg uznano za dowód końcowy.
+
+## Wydanie 1.30.18
+
+- Przed zmianą numeru zaktualizowana kontrola wersji zakończyła się wynikiem 11 kontrolek, 10 zaliczonych i 1 oczekiwany błąd: źródło nadal wskazywało 1.30.17 zamiast 1.30.18.
+- Po zmianie numeru skrypt wydania zsynchronizował `meta.ts`, oba pola wersji w `plugin.json`, datę builda, bundle i paczkę. Kontrola wersji przeszła 11/11.
+- Paczka `arkmail_1_30_18.zip` zawiera dokładnie `index.ts` i `plugin.json`. Dwa kolejne zbudowania dały identyczny SHA-256: `b65e52010747d79c1335272b67213b78bb028b6193518151d63f833559f1c4f1`.
+- Osobne typowanie oraz build z paczki 1.30.18 zakończyły się kodem 0.
+- Bundle w paczce zawiera poprawkę `ownAdvance` i `bodyLengthAtLastAdvance`, a oba pliki ZIP są bajtowo zgodne z katalogiem staging `build/arkmail`.
+- Końcowy pełny zestaw dla dokładnego drzewa wydania, z Node 26 również dla procesów potomnych oraz z aktywną kontrolą docelowego opisu commita: **1356/1356 zaliczonych, 0 błędów, 0 anulowanych, 0 pominiętych**.
 
 ## Ograniczenie wyniku
 
