@@ -285,6 +285,10 @@ export class PagerSession {
       /** Kolejne proby advance po ciszy; zeruje kazda linia body albo
        *  prompt pagera (serwer odpowiada = strona nie czeka). */
       let advances = 0;
+      /** Wlasne puste przejscie moze otworzyc kolejny list. Zapamietujemy
+       *  granice body, zeby nie zwrocic jego naglowkow ani tresci. */
+      let ownAdvance = false;
+      let bodyLengthAtLastAdvance = 0;
       const idleMs = this.opts.idleMs ?? DEFAULT_IDLE_FLUSH_MS;
       let quietTimer: ReturnType<typeof setTimeout> | null = null;
       let graceTimer: ReturnType<typeof setTimeout> | null = null;
@@ -383,6 +387,8 @@ export class PagerSession {
             // wracamy do dawnego zachowania (Fala 12a): cisza = body
             // kompletne.
             advances++;
+            ownAdvance = true;
+            bodyLengthAtLastAdvance = letter.body.length;
             send('');
             if (!done) armQuiet();
             return;
@@ -548,15 +554,27 @@ export class PagerSession {
         const pp = extractPagerPrompt(line.text);
         if (pp) {
           if (pp.current !== numer) {
+            if (ownAdvance) {
+              // Pusty Enter na koncu listu otwiera kolejny. To nadal nasz
+              // pager: odrzucamy dopisane linie kolejnego listu i zamykamy,
+              // zamiast zostawiac kanal w recovery bez q.
+              letter.body.length = bodyLengthAtLastAdvance;
+              ownAdvance = false;
+              state = 'pager';
+              pagerFired = true;
+              enterClosing();
+              return;
+            }
             ambiguous = `prompt pagera list ${pp.current} podczas odczytu ${numer}`;
-            // Niezgodny numer nie dowodzi, ze to nasz pager. Nie wolno
-            // zamykac go automatycznie ani uzbrajac pozniejszego q.
-            // Kolejne komendy czekaja na zwykly prompt albo reconnect.
+            // Bez wlasnego przejscia niezgodny numer nie dowodzi, ze to
+            // nasz pager. Nie wolno zamykac go automatycznie ani uzbrajac
+            // pozniejszego q. Kolejne komendy czekaja na zwykly prompt.
             this.transport.beginRecovery();
             cleanup();
             reject(new AmbiguousResponseError(ambiguous));
             return;
           }
+          ownAdvance = false;
           advances = 0; // prompt pagera = serwer odpowiedzial
           if (quietTimer) clearTimeout(quietTimer);
           pager = pp;

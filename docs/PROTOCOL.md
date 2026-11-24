@@ -237,6 +237,19 @@ ręczne `q` dla tej własnej operacji przywróciło zwykły prompt.
 To obserwacja jednego przypadku, nie ogólna reguła serwera ani dowód poprawki.
 Szczegóły i granice dowodu: `docs/WYNIK-TESTU-GRY-1.30.17.md`.
 
+### Własne przejście do kolejnego listu (test syntetyczny)
+
+ArkMail rozróżnia prompt o niezgodnym numerze po własnym pustym przejściu od
+niejednoznacznego pagera bez takiego przejścia. W pierwszym przypadku odcina
+treść dopisaną po ostatnim własnym przejściu, wysyła dokładnie jedno `q` i
+zwraca wyłącznie żądany list bez uruchamiania odzyskiwania. W drugim zachowuje
+odrzucenie operacji i nie wysyła automatycznego `q`; kolejna komenda czeka na
+zwykły prompt.
+
+Dowód obejmuje `MockTransport` oraz syntetyczny harness interfejsu. Potwierdza
+zachowanie ArkMaila, nie nową regułę serwera ani przyczynę zaobserwowanego
+wcześniej zdarzenia na realnej grze.
+
 ## Compose (`napisz list`)
 
 Przy pipeliningu (wszystkie odpowiedzi naraz) serwer echa promptów skleja:
