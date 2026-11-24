@@ -225,6 +225,18 @@ n [<num>]   zapisz tresc jako notatke
   operacja pagerowa re-kotwiczy wpis na swiezym listingu po dacie
   (Fala 9a).
 
+### Obserwacja stronicowanego odczytu w ArkMail 1.30.17
+
+Jeden kontrolowany odczyt na realnym serwerze zakończył się sekwencją czterech
+pustych komend pagera bez `q`. Pierwszy prompt pagera pojawił się po trzecim
+pustym przejściu, drugi po czwartym. Nie zaobserwowano zwykłego promptu ani
+zwrócenia listu do ArkMaila. Późniejsza komenda listingu również zakończyła się
+promptem pagera, co potwierdza pozostawienie zdalnego pagera aktywnego. Jedno
+ręczne `q` dla tej własnej operacji przywróciło zwykły prompt.
+
+To obserwacja jednego przypadku, nie ogólna reguła serwera ani dowód poprawki.
+Szczegóły i granice dowodu: `docs/WYNIK-TESTU-GRY-1.30.17.md`.
+
 ## Compose (`napisz list`)
 
 Przy pipeliningu (wszystkie odpowiedzi naraz) serwer echa promptów skleja:

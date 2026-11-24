@@ -4,7 +4,7 @@
 
 Test ma sprawdzic zachowanie oficjalnego wydania 1.30.17 w prawdziwym kliencie Dargoth i na realnym serwerze. Punktem wyjscia jest commit `065fc9b9181c103cc325bfa956ac19a0dd129a86`. Test nie jest zmiana produktu, nie zastepuje lokalnych testow regresji i nie jest podstawa do deklarowania naprawy bez osobnej poprawki.
 
-Pierwszym celem jest ustalenie rzeczywistej kolejnosci zdarzen przy kolejnych odczytach, zwlaszcza listow stronicowanych. Dopiero pozniejsze etapy obejmuja pozostale uzgodnione funkcje. Kazdy etap ma osobny wynik i moze zostac przerwany bez kontynuowania kolejnych dzialan.
+Srodowisko i etap odczytow zostaly wykonane, a ich zanonimizowany wynik zapisano w `docs/WYNIK-TESTU-GRY-1.30.17.md`. Ponizej pozostaja wylacznie niewykonane etapy. Kazdy etap ma osobny wynik i moze zostac przerwany bez kontynuowania kolejnych dzialan.
 
 ## Bezpieczenstwo
 
@@ -25,32 +25,17 @@ Dozwolone sa wylacznie zanonimizowane metadane: czas wzgledny, kierunek zdarzeni
 
 Nie rejestruje sie tresci linii, naglowkow listow, nazw, adresatow, tematow, danych logowania, surowych ramek ani identyfikatorow pozwalajacych odtworzyc prywatne dane. Numer listu mozna zapisac tylko jako tymczasowa dana techniczna niezbedna do sprawdzenia zgodnosci odpowiedzi; nie wolno laczyc go z trescia ani zapisujacym go trwalym raportem.
 
-## Etap 1: srodowisko i kontrola ograniczen
+## Etap 3: pozostala indeksacja i archiwum
 
-1. Uruchomic prawdziwego Dargotha i zainstalowac oficjalna paczke ArkMail 1.30.17.
-2. Potwierdzic wersje wtyczki i brak innych wtyczek mogacych zmieniac poczte lub komendy.
-3. Przygotowac kontrole zapisow tak, aby eksporty, logi i dane diagnostyczne nie opuscily pamieci procesu.
-4. Zalogowac sie i poczekac na stabilny zwykly prompt. Nie wykonywac zadnej komendy swiata gry.
-5. Wczytac skrzynki pojedynczo i sprawdzic, czy kanal jest zsynchronizowany przed pierwszym odczytem.
+Wczytanie czterech skrzynek, probe jednej starszej strony, wyswietlenie archiwum i lokalny filtr zapisano w `docs/WYNIK-TESTU-GRY-1.30.17.md`. Proba paginacji nie wyslala komendy i nie byla ponawiana.
 
-## Etap 2: reprodukcja bledu odczytu
-
-1. Wybrac kilka istniejacych listow o roznym rozmiarze bez zapisywania ich tresci.
-2. Odczytywac je pojedynczo, z przerwami, w tym liste stronicowana.
-3. Rejestrowac wylacznie metadane: moment naglowkow, stron, promptu pagera, ciszy, pustej komendy, `q`, zwyklego promptu, zwrotu wyniku i zwolnienia blokady.
-4. Sprawdzic, czy treść nie pojawia sie w glownej konsoli i czy kolejny odczyt rozpoczyna sie od wlasciwego stanu.
-5. Po pierwszym bledzie przerwac ten scenariusz. Nie wykonywac automatycznych ponowien. Stan pagera mozna zamknac tylko w ramach wlasnej operacji odczytu, bez zaznaczania listow do usuniecia.
-6. Ustalic, czy pierwszym nieprawidlowym zdarzeniem bylo zbędne przejscie, przedwczesne zakonczenie po `q`, niezgodnosc numeru, opozniona odpowiedz czy inna sekwencja.
-
-## Etap 3: skrzynki, indeksacja i archiwum
-
-1. Wczytac wszystkie cztery skrzynki i sprawdzic liczby wpisow bez zapisywania ich danych.
-2. Sprawdzic wczytanie starszych stron w ograniczonym zakresie potrzebnym do potwierdzenia funkcji; nie pobierac calej tresci archiwum.
-3. Sprawdzic filtrowanie po stronie serwera i lokalne, wyswietlanie archiwum oraz pobranie kilku lub kilkunastu wybranych listow.
-4. Sprawdzic zgodnosc wynikow, zachowanie nieprzeczytanych, paginacje, zapis lokalny i zachowanie po odswiezeniu.
-5. Nie usuwac zadnych wpisow serwerowych w tym etapie.
+1. Sprawdzic filtrowanie po stronie serwera oraz pobranie kilku lub kilkunastu wybranych listow dopiero po ustaleniu stanu polaczenia.
+2. Sprawdzic zgodnosc wynikow, zachowanie nieprzeczytanych, paginacje, zapis lokalny i zachowanie po odswiezeniu.
+3. Nie usuwac zadnych wpisow serwerowych w tym etapie.
 
 ## Etap 4: niewyslane, odpowiedzi i przekazywanie bez wysylki
+
+Etap pozostaje niewykonany. Warunkiem wstepnym jest jednoznaczne potwierdzenie, ze zakonczenie edytora w biezacym kontekscie pocztowym zapisze list w niewyslanych. Bez takiego potwierdzenia nie wolno rozpoczynac edycji ani wysylac jej zakonczenia, ponieważ kontekst urzedu pocztowego moze spowodowac fizyczna wysylke.
 
 1. Utworzyc kilka listow testowych wylacznie z syntetyczna trescia i pozostawic je w niewyslanych.
 2. Sprawdzic odpowiedz, odpowiedz z cytowaniem i odpowiedz wszystkim dla dostepnych wariantow naglowkow, adresatow i DW.
@@ -59,12 +44,7 @@ Nie rejestruje sie tresci linii, naglowkow listow, nazw, adresatow, tematow, dan
 5. Sprawdzic zaznaczanie, odznaczanie i rozne dostepne sposoby usuwania wylacznie na utworzonych listach testowych.
 6. Usunac wszystkie utworzone listy testowe i potwierdzic ich brak. Nie zmieniac wczesniej istniejacych niewyslanych.
 
-## Etap 5: eksporty i ksiazka adresowa
-
-1. Przechwycic eksport zbiorczy ZIP i eksport pojedynczego listu w pamieci. Sprawdzic sygnature ZIP, mozliwosc rozpakowania, liczbe wpisow, strukture i kompletnosc metadanych bez trwalego zapisu.
-2. W ksiazce adresowej uzyc wylacznie syntetycznych kontaktow. Sprawdzic dostepne importy, eksporty w pamieci, filtrowanie i usuwanie utworzonych wpisow.
-3. Sprawdzic czyszczenie ksiazki dopiero po upewnieniu sie, ze izolowany profil nie zawiera wczesniejszych danych uzytkownika.
-4. Sprawdzic czyszczenie pamieci i zapisanych danych, takze podczas aktywnej operacji lub odzyskiwania, jezeli taki stan wystapi naturalnie. Nie wolno wymuszac niebezpiecznego stanu dodatkowymi komendami.
+Eksporty, syntetyczna ksiazka adresowa i lokalne czyszczenie zostaly wykonane oraz zapisane w `docs/WYNIK-TESTU-GRY-1.30.17.md`.
 
 ## Warunki przerwania
 
