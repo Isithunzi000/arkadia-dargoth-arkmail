@@ -22,8 +22,6 @@ import {
 const TIMEOUT_MESSAGE = 'Serwer nie odpowiedzial na czas. Sprobuj ponownie.';
 const PLAYER_MAIL_INTERRUPTED =
   'Reczna poczta w grze przerwala poprzednia operacje ArkMaila. Zakoncz reczna poczte i wykonaj operacje ponownie.';
-const RECOVERY_BUSY =
-  'ArkMail czeka na potwierdzenie zakonczenia poprzedniej odpowiedzi. Po powrocie zwyklego widoku gry ponow operacje.';
 
 type Notice = { text?: string; level?: string };
 
@@ -111,7 +109,7 @@ test('automatyczny listing przerwany rozlaczeniem pozostaje cichy', async () => 
   }
 });
 
-test('limit czasu: kolejne klikniecie przed promptem wyjasnia synchronizacje i pozwala ponowic', async () => {
+test('limit czasu: kolejne klikniecie od razu wykonuje nowa operacje', async () => {
   const h = await startHarness({ autoRefreshEnabled: false });
   try {
     click(h, '.arkmail-search-go');
@@ -123,19 +121,11 @@ test('limit czasu: kolejne klikniecie przed promptem wyjasnia synchronizacje i p
     assert.equal(h.f.sent.filter((command) => command === 'listy odebrane').length, 1);
 
     click(h, '.arkmail-search-go');
-    await waitRt(() => noticeCount(h, RECOVERY_BUSY) === 1, 'komunikat synchronizacji');
-    assert.equal(
-      h.f.sent.filter((command) => command === 'listy odebrane').length,
-      1,
-      'ponowienie przed promptem nie wysyla komendy',
-    );
-
-    h.f.fire('> ', 'prompt');
-    click(h, '.arkmail-search-go');
     await waitRt(
       () => h.f.sent.filter((command) => command === 'listy odebrane').length === 2,
-      'swiadome ponowienie po zwyklym promptcie',
+      'ponowienie bez oczekiwania na prompt',
     );
+    assert.ok(!notifyText(h.f, 'czeka na potwierdzenie zakonczenia'));
     h.f.fire('Nie masz zadnych odebranych listow.', 'mail');
     await waitRt(() => textOf(h, '.arkmail-busy') === '', 'koniec ponowionego listingu');
     assert.ok(!h.f.sent.includes('q'));

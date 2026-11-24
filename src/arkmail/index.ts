@@ -202,8 +202,6 @@ const CONNECTION_INTERRUPTED_MSG =
   "Polaczenie zostalo przerwane. Poprzednia operacja pocztowa zostala anulowana. Wykonaj ja ponownie po ponownym polaczeniu.";
 const PLAYER_MAIL_INTERRUPTED_MSG =
   "Reczna poczta w grze przerwala poprzednia operacje ArkMaila. Zakoncz reczna poczte i wykonaj operacje ponownie.";
-const RECOVERY_BUSY_MSG =
-  "ArkMail czeka na potwierdzenie zakonczenia poprzedniej odpowiedzi. Po powrocie zwyklego widoku gry ponow operacje.";
 const SEND_FAILURE_MSG = "Nie udalo sie wyslac listu. Sprobuj ponownie.";
 const FORWARD_FAILURE_MSG = "Nie udalo sie przekazac listu. Sprobuj ponownie.";
 
@@ -469,10 +467,6 @@ export async function init(api: PluginApi) {
       }
       if (playerMailMode) {
         notify(api, PLAYER_MAIL_MODE_BUSY_MSG, { level: "warning" });
-        return true;
-      }
-      if (transport!.isRecovering()) {
-        notify(api, RECOVERY_BUSY_MSG, { level: "warning" });
         return true;
       }
       if (lock.locked) {
@@ -1852,7 +1846,7 @@ export async function init(api: PluginApi) {
     pendingOpen = null;
     if (
       !pending || pending.generation !== connectionGeneration || lifecycleDestroyed ||
-      playerMailMode || replayReviewRequired || transport!.isRecovering()
+      playerMailMode || replayReviewRequired
     ) return;
     // Zwykla sciezka ponownie kotwiczy wpis; nigdy nie odtwarzamy surowej
     // komendy ani starego numeru listu.
@@ -2438,8 +2432,7 @@ export async function init(api: PluginApi) {
       // Wylacznie aktywny auto-refresh moze wstrzymac najnowszy wybor.
       // Kazda inna zajeta sesja zachowuje dotychczasowy komunikat.
       if (
-        autoRefreshOperations > 0 && !replayReviewRequired && !playerMailMode &&
-        !transport!.isRecovering()
+        autoRefreshOperations > 0 && !replayReviewRequired && !playerMailMode
       ) {
         pendingOpen = { box, entry, generation: connectionGeneration };
         return;
@@ -3030,12 +3023,6 @@ export async function init(api: PluginApi) {
     void Promise.resolve(transport!.send("q"))
       .then(() => clearPagerOrphan())
       .catch(() => {});
-  });
-
-  // Transport zdejmuje recovery przed powiadomieniem subskrybentow.
-  // Dopiero ten zwykly prompt pozwala wyslac odlozone odswiezenie.
-  transport.subscribe((line) => {
-    if (line.cls !== "prompt" && !isPromptLine(line.text)) return;
   });
 
   // Powiadomienia pocztowe: odswiezenie + opcjonalny tost.

@@ -33,8 +33,6 @@ const MODAL_HOOK_PRIORITY = 100;
 /** Fala 42: pamiec ostatnich wysylek z echem oczekujacych na linie-echo. */
 const PENDING_ECHO_CAP = 10;
 const PENDING_ECHO_TTL_MS = 10_000;
-/** Brak promptu po tym czasie jest widoczny, ale nie otwiera kanalu. */
-const RECOVERY_LIMIT_MS = 10_000;
 
 export const MODAL_QUEUE_DROPPED_MESSAGE =
   'Nie wykonano komend odlozonych podczas operacji pocztowej. ' +
@@ -74,6 +72,7 @@ export class DargothTransport implements Transport {
   private pagerClosePromptSeen = false;
   private pagerUserClose = false;
   private pagerTakenOver = false;
+  private pagerCloseFailed = false;
   private pagerCloseAttempt = 0;
   private queue: string[] = [];
   private commandQueue: Promise<void> = Promise.resolve();
@@ -94,10 +93,7 @@ export class DargothTransport implements Transport {
   private online = false;
   /** Fala 16j: kiedy tlumic linie pocztowe (index.ts: blokada sesji). */
   private gagWhen: (() => boolean) | null = null;
-  /** Niepotwierdzony koniec odpowiedzi: mail gagowany do promptu gry. */
-  private recovering = false;
   private playerMailMode = false;
-  private recoveryTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(private readonly api: PluginApi) {}
 
@@ -109,11 +105,6 @@ export class DargothTransport implements Transport {
    */
   setGagPredicate(pred: () => boolean): void {
     this.gagWhen = pred;
-  }
-
-  /** UI moze wyjasnic blokade bez otwierania nowej sesji podczas synchronizacji. */
-  isRecovering(): boolean {
-    return this.recovering;
   }
 
   /** Lokalna operacja moze zachowac dotychczasowy stan polaczenia przy anulowaniu sesji. */
@@ -165,7 +156,7 @@ export class DargothTransport implements Transport {
       this.pagerClosePromptSeen = false;
       this.pagerUserClose = false;
       this.pagerOpen = false;
-      this.beginRecovery();
+      this.pagerCloseFailed = true;
     });
     if (userCommand !== null) this.pagerTakenOver = true;
     if (userCommand !== null && !this.pagerUserClose) {
@@ -182,7 +173,7 @@ export class DargothTransport implements Transport {
     source: CommandSource = 'arkmail',
   ): Promise<void> {
     if (!this.online) return Promise.reject(new Error('transport offline'));
-    if (source === 'arkmail' && (this.recovering || this.playerMailMode)) {
+    if (source === 'arkmail' && this.playerMailMode) {
       return Promise.reject(new Error('operacja anulowana'));
     }
     const generation = this.connectionGeneration;
@@ -190,9 +181,9 @@ export class DargothTransport implements Transport {
       if (!this.online || generation !== this.connectionGeneration) {
         throw new Error('transport offline: wysylka anulowana');
       }
-      // Sprawdzenie takze w kolejce: timeout mogl nastapic po enqueue,
-      // zanim poprzednia komenda zakonczyla sie i zwolnila ten task.
-      if (source === 'arkmail' && (this.recovering || this.playerMailMode)) {
+      // Sprawdzenie takze w kolejce: reczna poczta mogla rozpoczac sie
+      // po enqueue, zanim poprzednia komenda zakonczyla ten task.
+      if (source === 'arkmail' && this.playerMailMode) {
         throw new Error('operacja anulowana');
       }
       let echoEntry: PendingEcho | undefined;
@@ -250,41 +241,9 @@ export class DargothTransport implements Transport {
   }
 
   openSession(): SessionScope {
-    if (this.recovering || this.playerMailMode) throw new Error('operacja anulowana');
+    if (this.playerMailMode) throw new Error('operacja anulowana');
     this.armTrigger();
     return this.sessions.openSession();
-  }
-
-  private clearRecoveryTimer(): void {
-    if (this.recoveryTimer) clearTimeout(this.recoveryTimer);
-    this.recoveryTimer = null;
-  }
-
-  private finishRecovery(): void {
-    this.recovering = false;
-    this.clearRecoveryTimer();
-  }
-
-  beginRecovery(): void {
-    if (this.recovering) {
-      this.armTrigger();
-      return;
-    }
-    this.recovering = true;
-    this.armTrigger();
-    const generation = this.connectionGeneration;
-    this.recoveryTimer = setTimeout(() => {
-      this.recoveryTimer = null;
-      if (!this.recovering || generation !== this.connectionGeneration) return;
-      notify(
-        this.api,
-        'Nie potwierdzono zakonczenia poprzedniej odpowiedzi. Poczekaj na powrot zwyklego widoku gry lub polacz ponownie.',
-        { title: 'Brak synchronizacji z gra', level: 'error' },
-      );
-      // Sam uplyw czasu nie dowodzi synchronizacji. Blokada i gag
-      // pozostaja do zwyklego promptu albo ponownego polaczenia.
-    }, RECOVERY_LIMIT_MS);
-    (this.recoveryTimer as unknown as { unref?: () => void }).unref?.();
   }
 
   subscribe(cb: (line: ProtoLine) => void): () => void {
@@ -309,6 +268,7 @@ export class DargothTransport implements Transport {
     this.pagerClosePromptSeen = false;
     this.pagerUserClose = false;
     this.pagerTakenOver = false;
+    this.pagerCloseFailed = false;
     this.hookId = this.api.commandHooks.register((command: string) => {
       if (this.sendingOwn) return undefined;
       if (this.pagerModal && isPagerCloseCommand(command)) {
@@ -376,6 +336,7 @@ export class DargothTransport implements Transport {
     this.pagerClosePromptSeen = false;
     this.pagerUserClose = false;
     this.pagerTakenOver = false;
+    this.pagerCloseFailed = false;
     if (this.hookId !== null) {
       this.api.commandHooks.unregister(this.hookId);
       this.hookId = null;
@@ -386,7 +347,7 @@ export class DargothTransport implements Transport {
     if (!this.modalActive) return;
     this.modalActive = false;
     const pagerHooks = this.pagerModal;
-    const discardQueue = this.recovering || this.pagerTakenOver;
+    const discardQueue = this.pagerTakenOver || this.pagerCloseFailed;
     this.pagerOpen = false;
     // Zakonczona operacja nie moze przechwytywac pozniejszych komend gracza.
     this.clearPagerCloseLatch();
@@ -415,20 +376,9 @@ export class DargothTransport implements Transport {
 
   /** Odcina stare wysylki i porzuca kolejke bez drenowania. */
   setOnline(online: boolean): void {
-    const wasOnline = this.online;
     this.online = online;
-    if (online) {
-      // Tylko rzeczywiste przejscie offline -> online konczy odzyskiwanie
-      // starego polaczenia. Powtorny sygnal obecnosci podczas timeoutu
-      // nadal nie zdejmuje blokady przed zwyklym promptem.
-      if (!wasOnline) this.finishRecovery();
-      return;
-    }
+    if (online) return;
     this.connectionGeneration++;
-    const needsRecovery = this.recovering || this.sessions.hasActive;
-    this.recovering = false;
-    this.clearRecoveryTimer();
-    if (needsRecovery) this.beginRecovery();
     this.sessions.reconnect();
     this.commandQueue = Promise.resolve();
     this.clearPendingEchoes();
@@ -443,6 +393,7 @@ export class DargothTransport implements Transport {
     this.pagerClosePromptSeen = false;
     this.pagerUserClose = false;
     this.pagerTakenOver = false;
+    this.pagerCloseFailed = false;
     this.pagerCloseAttempt++;
     this.queue = [];
   }
@@ -459,7 +410,6 @@ export class DargothTransport implements Transport {
     this.sessions.closeAll();
     this.queue = [];
     this.clearPendingEchoes();
-    this.finishRecovery();
     this.connectionGeneration++;
     this.commandQueue = Promise.resolve();
   }
@@ -476,10 +426,6 @@ export class DargothTransport implements Transport {
       // (Fala 8a, dowod: Triggers.ts TriggerCallback + newMail.ts).
       (line: AnsiAwareBuffer, _matches: RegExpMatchArray, type: string, originalLine?: string) => {
         const proto: ProtoLine = { text: originalLine ?? line.text, cls: type ?? '' };
-        // Zwykly prompt potwierdza koniec strumienia i zdejmuje odzyskiwanie.
-        if (this.recovering && (proto.cls === 'prompt' || isPromptLine(proto.text))) {
-          this.finishRecovery();
-        }
         // Fala 42: echo wlasnej komendy (wysylka z echem) oznaczamy own
         // po dopasowaniu FIFO do zarejestrowanego tekstu - hook wejscia
         // w poczte gracza rozroznia wtedy gracza od pluginu takze pod
@@ -525,7 +471,7 @@ export class DargothTransport implements Transport {
         // Fala 16j: subskrybenci (parser) dostaja linie ZAWSZE; zwrot
         // null tlumi tylko wyswietlanie w glownym oknie gry, i to
         // wylacznie podczas operacji pluginowej (blokada sesji).
-        if (type === 'mail' && (this.recovering || this.gagWhen?.())) return null;
+        if (type === 'mail' && this.gagWhen?.()) return null;
         return line;
       },
       'arkmail',

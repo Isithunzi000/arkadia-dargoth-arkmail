@@ -4,8 +4,6 @@
  * odtwarzajacy golden fixtures. Port WWW/Mudlet: wlasna implementacja.
  */
 
-import { isPromptLine } from './lines.js';
-
 export interface ProtoLine {
   cls: string;
   text: string;
@@ -101,8 +99,6 @@ export interface Transport {
   send(line: string, echo?: boolean): void | Promise<void>;
   /** Otwiera rejestracje rozdzielajaca sesje i generacje polaczenia. */
   openSession(): SessionScope;
-  /** Pozostawia odpowiedzi mail gagowane do potwierdzonego promptu gry. */
-  beginRecovery(): void;
   /** Przekazuje potwierdzenie pagera takze wtedy, gdy prompt jest niewidoczny. */
   confirmPagerOpen?(): void;
   /** Globalna subskrypcja linii; zwraca unsubscribe. */
@@ -115,26 +111,18 @@ export class MockTransport implements Transport {
   readonly sentEcho: boolean[] = [];
   private subs = new Set<(line: ProtoLine) => void>();
   private readonly sessions = new SessionScopeRegistry();
-  private recovering = false;
 
   send(line: string, echo = false): void {
-    if (this.recovering) throw new Error('operacja anulowana');
     this.sent.push(line);
     this.sentEcho.push(echo);
   }
 
   openSession(): SessionScope {
-    if (this.recovering) throw new Error('operacja anulowana');
     return this.sessions.openSession();
-  }
-
-  beginRecovery(): void {
-    this.recovering = true;
   }
 
   setOnline(online: boolean): void {
     if (online) return;
-    if (this.sessions.hasActive) this.beginRecovery();
     this.sessions.reconnect();
   }
 
@@ -146,9 +134,6 @@ export class MockTransport implements Transport {
   }
 
   emit(line: ProtoLine): void {
-    if (this.recovering && (line.cls === 'prompt' || isPromptLine(line.text))) {
-      this.recovering = false;
-    }
     for (const cb of [...this.subs]) cb(line);
     this.sessions.dispatch(line);
   }

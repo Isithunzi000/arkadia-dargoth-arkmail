@@ -180,7 +180,7 @@ test('integracja: po wlasnym przejsciu Wczytaj starsze dziala bez odzyskiwania',
   }
 });
 
-test('integracja: niejednoznacznosc blokuje starsza strone tylko do zwyklego promptu', async () => {
+test('integracja: niejednoznacznosc nie blokuje kolejnej starszej strony', async () => {
   const h = await startHarness();
   const { f } = h;
   try {
@@ -192,14 +192,9 @@ test('integracja: niejednoznacznosc blokuje starsza strone tylko do zwyklego pro
     assert.ok(notifyText(f, 'Nie udalo sie odczytac listu.'));
     assert.ok(!f.sent.includes('q'), 'cudzego pagera nie zamykamy');
 
-    const sentBefore = f.sent.length;
     click(h, '.arkmail-older');
-    assert.ok(notifyText(f, 'czeka na potwierdzenie zakonczenia'));
-    assert.equal(f.sent.length, sentBefore, 'przed promptem brak komendy starszej strony');
-
-    f.fire('> ', 'prompt');
-    click(h, '.arkmail-older');
-    await waitRt(() => f.sent.includes('listy odebrane przed 23 VIII 1999'), 'odblokowana starsza strona');
+    await waitRt(() => f.sent.includes('listy odebrane przed 23 VIII 1999'), 'natychmiastowa starsza strona');
+    assert.ok(!notifyText(f, 'czeka na potwierdzenie zakonczenia'));
     fireOlderPage(h);
     f.fire('> ', 'prompt');
     await waitRt(() => notifyText(f, 'Wczytano starsze listy'), 'starsza strona po potwierdzeniu');

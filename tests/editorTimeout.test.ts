@@ -72,7 +72,10 @@ for (const scenario of beforeEditorCases) {
     const sentAfterTimeout = [...transport.sent];
     await transport.replay([mail(READY), mail('Temat: '), mail('DW: ')]);
     assert.deepEqual(transport.sent, sentAfterTimeout, 'pozne linie nie wysylaja tresci ani ~q');
-    await assert.rejects(editor.send(INPUT), /operacja anulowana/);
+    const next = editor.send(INPUT);
+    await transport.replay([mail('Zaniechane.')]);
+    assert.deepEqual(await next, { result: 'zaniechany' });
+    assert.equal(transport.sent.filter((line) => line === 'napisz list').length, 2);
   });
 }
 
@@ -122,7 +125,7 @@ test('editor: timeout po ** konczy sie dopiero po Zaniechane i zwyklym prompcie'
   assert.deepEqual(await next, { result: 'blad', error: { kind: 'timeout' } });
 });
 
-test('editor: brak potwierdzenia zamkniecia po ~q wymaga synchronizacji', async (context) => {
+test('editor: brak potwierdzenia zamkniecia po ~q konczy tylko biezaca operacje', async (context) => {
   context.mock.timers.enable({ apis: ['setTimeout'] });
   const transport = new MockTransport();
   const { editor, operation, settlement } = await reachEditor(transport);
@@ -138,13 +141,12 @@ test('editor: brak potwierdzenia zamkniecia po ~q wymaga synchronizacji', async 
   assert.deepEqual(await operation, { result: 'blad', error: { kind: 'timeout' } });
   assert.equal(transport.sent.filter((line) => line === '~q').length, 1, 'brak drugiego ~q');
 
-  await assert.rejects(editor.send(INPUT), /operacja anulowana/, 'komendy pluginu czekaja na synchronizacje');
-  await transport.replay([prompt()]);
   const next = editor.send(INPUT);
   await flushPromises();
-  assert.equal(transport.sent.filter((line) => line === 'napisz list').length, 2, 'prompt odblokowuje ponowienie');
-  context.mock.timers.tick(100);
-  assert.deepEqual(await next, { result: 'blad', error: { kind: 'timeout' } });
+  assert.equal(transport.sent.filter((line) => line === 'napisz list').length, 2, 'ponowienie nie czeka na prompt');
+  await transport.replay([mail('Zaniechane.')]);
+  assert.deepEqual(await next, { result: 'zaniechany' });
+  assert.equal(transport.sent.filter((line) => line === '~q').length, 1, 'nowa operacja nie powtarza starego ~q');
 });
 
 test('editor: Zaniechane bez zwyklego promptu nie jest potwierdzonym zamknieciem', async (context) => {
@@ -159,7 +161,10 @@ test('editor: Zaniechane bez zwyklego promptu nie jest potwierdzonym zamknieciem
   context.mock.timers.tick(400);
   assert.deepEqual(await operation, { result: 'blad', error: { kind: 'timeout' } });
   assert.equal(transport.sent.filter((line) => line === '~q').length, 1);
-  await assert.rejects(editor.send(INPUT), /operacja anulowana/);
+  const next = editor.send(INPUT);
+  await transport.replay([mail('Zaniechane.')]);
+  assert.deepEqual(await next, { result: 'zaniechany' });
+  assert.equal(transport.sent.filter((line) => line === 'napisz list').length, 2);
 });
 
 test('editor: prompt przed Zaniechane nie jest potwierdzeniem zamkniecia', async (context) => {
@@ -174,7 +179,10 @@ test('editor: prompt przed Zaniechane nie jest potwierdzeniem zamkniecia', async
   context.mock.timers.tick(400);
   assert.deepEqual(await operation, { result: 'blad', error: { kind: 'timeout' } });
   assert.equal(transport.sent.filter((line) => line === '~q').length, 1);
-  await assert.rejects(editor.send(INPUT), /operacja anulowana/);
+  const next = editor.send(INPUT);
+  await transport.replay([mail('Zaniechane.')]);
+  assert.deepEqual(await next, { result: 'zaniechany' });
+  assert.equal(transport.sent.filter((line) => line === 'napisz list').length, 2);
 });
 
 test('editor: wspolny reset i rozlaczenie nie wysylaja ~q', async (context) => {

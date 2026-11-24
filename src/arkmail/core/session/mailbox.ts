@@ -126,11 +126,7 @@ export class MailboxSession {
       };
       const fail = (error: unknown): void => {
         if (done) return;
-        // Odpowiedz bez pewnego zrodla zamyka te sesje, ale nie dowodzi,
-        // ze kanal jest juz pusty. Nowa komenda czeka na zwykly prompt.
-        if (error instanceof AmbiguousResponseError || error instanceof UnknownPagerError) {
-          this.transport.beginRecovery();
-        }
+        // Blad konczy wylacznie biezaca sesje; kolejna operacja jest niezalezna.
         cleanup();
         reject(error instanceof Error ? error : new Error(String(error)));
       };
@@ -160,7 +156,6 @@ export class MailboxSession {
       };
 
       const timer = setTimeout(() => {
-        this.transport.beginRecovery();
         cleanup();
         reject(new Error(`timeout: mailbox fetch ${box}`));
       }, this.opts.timeoutMs);

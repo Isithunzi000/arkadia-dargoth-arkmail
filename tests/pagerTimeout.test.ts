@@ -64,7 +64,7 @@ test('pager: pozne linie po timeoutcie przed naglowkami nie wywoluja zadnych kom
   assert.deepEqual(transport.sent, ['przeczytaj list 1']);
 });
 
-test('pager: timeout po potwierdzonym pagerze wykonuje jedno kontrolowane zamkniecie', async (context) => {
+test('pager: timeout po potwierdzonym pagerze wykonuje jedno q i zwalnia kolejny odczyt', async (context) => {
   context.mock.timers.enable({ apis: ['setTimeout'] });
   const transport = new MockTransport();
   const pager = new PagerSession(transport, OPTS);
@@ -92,7 +92,15 @@ test('pager: timeout po potwierdzonym pagerze wykonuje jedno kontrolowane zamkni
   context.mock.timers.tick(1);
   await assert.rejects(operation, /timeout: pager session list 1/);
   assert.equal(transport.sent.filter((line) => line === 'q').length, 1);
-  await assert.rejects(pager.readLetter(1), /operacja anulowana/, 'brak potwierdzenia wymaga synchronizacji');
+  const next = pager.readLetter(2);
+  assert.deepEqual(
+    transport.sent,
+    ['przeczytaj list 1', 'f Corge', 'q', 'przeczytaj list 2'],
+    'kolejny odczyt nie czeka na prompt',
+  );
+  const nextRejection = assert.rejects(next, /timeout: pager session list 2/);
+  context.mock.timers.tick(100);
+  await nextRejection;
 });
 
 test('pager: odczyt bez zwyklego promptu konczy sie po ciszy i pozwala kontynuowac', async (context) => {

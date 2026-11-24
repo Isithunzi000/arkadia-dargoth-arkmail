@@ -208,7 +208,7 @@ const composeRejections = [
 ];
 
 for (const scenario of composeRejections) {
-  test(`compose: odrzucenie ${scenario.name} zabezpiecza nierozstrzygnieta sesje`, async () => {
+  test(`compose: odrzucenie ${scenario.name} konczy tylko biezaca wysylke`, async () => {
     const client = new ComposeClient();
     client.reject = scenario.command;
     client.rejectOccurrence = scenario.occurrence;
@@ -217,13 +217,9 @@ for (const scenario of composeRejections) {
     await rejected;
 
     assert.deepEqual(client.wire, FULL_COMPOSE.slice(0, scenario.accepted));
-    assert.equal(transport.isRecovering(), scenario.accepted > 0,
-      'recovery obowiazuje dopiero po przyjeciu pierwszej komendy');
     assert.ok(!client.wire.includes('~q'), 'odrzucenie nie zgaduje edytora przez ~q');
-    if (scenario.accepted > 0) {
-      assert.throws(() => transport.openSession(), /operacja anulowana/,
-        'nowa sesja czeka na zwykly prompt');
-    }
+    const session = transport.openSession();
+    session.close();
 
     transport.endModal();
     client.trigger?.({ text: READY }, null, 'mail');

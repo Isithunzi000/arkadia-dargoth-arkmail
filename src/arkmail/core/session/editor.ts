@@ -48,7 +48,6 @@ export class EditorSession {
       const session = this.transport.openSession();
       let stage: Stage = 'adresat';
       let done = false;
-      let startAccepted = false;
       let editorReady = false;
       let bodyStarted = false;
       let closingEditor = false;
@@ -73,9 +72,6 @@ export class EditorSession {
       };
       const fail = (error: unknown) => {
         if (done) return;
-        // Przyjecie "napisz list" oznacza, ze kolejne odrzucenie moze
-        // zostawic nierozstrzygniety edytor. Przed tym nie zgadujemy recovery.
-        if (startAccepted) this.transport.beginRecovery();
         cleanup();
         reject(error);
       };
@@ -88,7 +84,6 @@ export class EditorSession {
       };
       const finishTimeout = () => {
         if (done) return;
-        this.transport.beginRecovery();
         finish({ result: 'blad', error: { kind: 'timeout' } });
       };
       const closeConfirmedEditor = async (): Promise<void> => {
@@ -216,7 +211,6 @@ export class EditorSession {
         // polecenia do gry.
         transition = (async () => {
           await this.transport.send('napisz list', true);
-          startAccepted = true;
           if (!done) await this.transport.send(input.adresat, true);
         })();
         transition.catch(fail);

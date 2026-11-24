@@ -76,7 +76,6 @@ export class ImportSession {
         lines.push(text);
       });
       const timeout = setTimeout(() => {
-        this.transport.beginRecovery();
         fail(new Error(`import ${command}: timeout`));
       }, this.opts.timeoutMs);
       cancelUnsub = this.opts.onCancel?.(() => {

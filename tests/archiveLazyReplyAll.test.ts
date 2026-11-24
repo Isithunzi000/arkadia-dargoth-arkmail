@@ -140,7 +140,7 @@ function replyAll(h: Harness, scope: 'all' | 'to' | 'cc' = 'all', quote = false)
   click(h, '.arkmail-reply-all-continue');
 }
 
-async function beginRecovery(h: Harness): Promise<void> {
+async function beginReplyAllAnchor(h: Harness): Promise<void> {
   replyAll(h);
   await waitRt(
     () => h.f.sent.some((command) => command.startsWith('listy odebrane przed')),
@@ -212,7 +212,7 @@ test('reply-all: jeden odczyt zapisuje komplet przed prefillem, a kolejne otwarc
   try {
     seedDraft(h);
     await openCached(h);
-    await beginRecovery(h);
+    await beginReplyAllAnchor(h);
     assert.equal(h.content.querySelector('[data-field="adresat"]'), null, 'prefill czeka na odczyt');
     replayListing(h);
     await waitRt(() => h.f.sent.includes('przeczytaj list 3'), 'jedyny odczyt pagera');
@@ -250,7 +250,7 @@ test('reply-all: blad numeru nie ponawia odczytu i nie nadpisuje recznego draftu
   try {
     seedDraft(h);
     await openCached(h);
-    await beginRecovery(h);
+    await beginReplyAllAnchor(h);
     replayListing(h);
     await waitRt(() => h.f.sent.includes('przeczytaj list 3'), 'odczyt przed bledem');
     h.f.fire('Zly numer listu: 3.', 'mail');
@@ -285,7 +285,7 @@ test('reply-all: brak listu na serwerze nie kasuje tresci ani nie tworzy prefill
   try {
     seedDraft(h);
     await openCached(h);
-    await beginRecovery(h);
+    await beginReplyAllAnchor(h);
     h.f.fire('Nie masz zadnych odebranych listow.', 'mail');
     h.f.fire('> ', 'prompt');
     await waitRt(() => notifyText(h.f, 'Listu nie ma w skrzynce'), 'koniec bez listu');
@@ -303,7 +303,7 @@ test('reply-all: reconnect odrzuca pozny wynik i pozostawia compose bez zmian', 
   try {
     seedDraft(h);
     await openCached(h);
-    await beginRecovery(h);
+    await beginReplyAllAnchor(h);
     replayListing(h);
     await waitRt(() => h.f.sent.includes('przeczytaj list 3'), 'odczyt przed reconnectem');
     h.f.fireEvent('client.disconnect', undefined);
@@ -323,7 +323,7 @@ test('reply-all: zmiana postaci odrzuca wynik i nie przenosi prefillu', async ()
   try {
     seedDraft(h);
     await openCached(h);
-    await beginRecovery(h);
+    await beginReplyAllAnchor(h);
     replayListing(h);
     await waitRt(() => h.f.sent.includes('przeczytaj list 3'), 'odczyt przed zmiana postaci');
     assert.equal(h.content.querySelector('[data-field="adresat"]'), null);
@@ -350,7 +350,7 @@ test('reply-all: blizniak i replika nie zyskuja naglowkow cudzego archiveId', as
   const h = await startHarness({ archive: [record(), otherTwin, otherReplica] });
   try {
     await openCached(h, 0);
-    await beginRecovery(h);
+    await beginReplyAllAnchor(h);
     replayListing(h);
     await waitRt(() => h.f.sent.includes('przeczytaj list 3'), 'odczyt wlasciwego blizniaka');
     replayLetter(h);
@@ -382,7 +382,7 @@ test('reply-all: blad trwalego zapisu nie daje prefillu ani trwalego kompletu', 
   try {
     seedDraft(h);
     await openCached(h);
-    await beginRecovery(h);
+    await beginReplyAllAnchor(h);
     replayListing(h);
     await waitRt(() => h.f.sent.includes('przeczytaj list 3'), 'odczyt przed bledem zapisu');
     replayLetter(h);
@@ -453,7 +453,7 @@ test('reply-all: zamkniecie listu odrzuca pozny wynik i chroni reczny draft', as
   try {
     seedDraft(h);
     await openCached(h);
-    await beginRecovery(h);
+    await beginReplyAllAnchor(h);
     replayListing(h);
     await waitRt(() => h.f.sent.includes('przeczytaj list 3'), 'odczyt przed zamknieciem listu');
     const close = h.content.querySelector('.arkmail-letter-close, button.arkmail-older') as

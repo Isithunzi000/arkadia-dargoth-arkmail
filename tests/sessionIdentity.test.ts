@@ -79,9 +79,6 @@ test('transport: sesje maja odrebne identyfikatory, a reconnect zamyka stara gen
   scoped.setOnline(false);
   scoped.setOnline(true);
   assert.equal(second.active, false, 'reconnect logicznie zamyka stara sesje');
-  assert.throws(() => open(), /operacja anulowana/);
-  await t.replay([{ cls: 'prompt', text: '> ' }]);
-
   const third = open();
   assert.ok(third.generation > second.generation, 'nowa sesja ma nowa generacje polaczenia');
   await t.replay([{ cls: 'mail', text: 'po reconnectcie' }]);
@@ -139,7 +136,7 @@ test('mailbox: stara odpowiedz w nowej sesji jest niejednoznaczna', async () => 
   await currentOperation;
 });
 
-test('mailbox: niejednoznaczna odpowiedz blokuje kolejna komende do promptu', async () => {
+test('mailbox: niejednoznaczna odpowiedz konczy tylko biezace pobranie', async () => {
   const t = new MockTransport();
   const mailbox = new MailboxSession(t, OPTS);
   const ambiguous = assert.rejects(
@@ -152,51 +149,33 @@ test('mailbox: niejednoznaczna odpowiedz blokuje kolejna komende do promptu', as
   await ambiguous;
   assert.deepEqual(t.sent, ['listy wyslane']);
 
-  await assert.rejects(mailbox.fetch('wyslane'), /operacja anulowana/);
-  assert.deepEqual(t.sent, ['listy wyslane'], 'przed promptem nie ma nowej komendy');
-
-  await t.replay([
-    { cls: 'mail', text: 'Listy wyslane (prezentowane jest pierwsze 50):' },
-    { cls: 'mail', text: ' 1. *R* Temat: spozniony' },
-    { cls: 'mail', text: 'Odbiorca: Foo                       Wt, 24 VIII 1999, 00:11:12' },
-  ]);
-  await t.replay([{ cls: 'prompt', text: '> ' }]);
-
   const current = mailbox.fetch('wyslane');
+  assert.deepEqual(t.sent, ['listy wyslane', 'listy wyslane'], 'ponowienie nie czeka na prompt');
   await t.replay([
     { cls: 'mail', text: 'Listy wyslane (prezentowane jest pierwsze 50):' },
     { cls: 'prompt', text: '> ' },
   ]);
   const result = await current;
   assert.equal(result.kind, 'lista');
-  if (result.kind === 'lista') {
-    assert.deepEqual(result.entries, [], 'spoznione wpisy nie trafia do nowego wyniku');
-  }
-  assert.deepEqual(t.sent, ['listy wyslane', 'listy wyslane']);
+  if (result.kind === 'lista') assert.deepEqual(result.entries, []);
 });
 
-test('mailbox: nieznany pager blokuje kolejna komende do zwyklego promptu', async () => {
+test('mailbox: nieznany pager konczy tylko biezace pobranie i nie dostaje q', async () => {
   const t = new MockTransport();
   const mailbox = new MailboxSession(t, OPTS);
   const unknownPager = assert.rejects(mailbox.fetch('odebrane'), /nieznany_pager/);
   await t.replay([{ cls: 'mail', text: PAGER_PROMPT }]);
   await unknownPager;
+  assert.ok(!t.sent.includes('q'));
 
-  await assert.rejects(mailbox.fetch('wyslane'), /operacja anulowana/);
-  assert.deepEqual(t.sent, ['listy odebrane'], 'bez q, ponowienia i komendy przed promptem');
-
-  await t.replay([
-    { cls: 'mail', text: 'Listy odebrane (prezentowane jest pierwsze 50):' },
-    { cls: 'prompt', text: '> ' },
-  ]);
   const current = mailbox.fetch('odebrane');
+  assert.deepEqual(t.sent, ['listy odebrane', 'listy odebrane'], 'ponowienie nie czeka na prompt');
   await t.replay([
     { cls: 'mail', text: 'Listy odebrane (prezentowane jest pierwsze 50):' },
     { cls: 'prompt', text: '> ' },
   ]);
   const result = await current;
   assert.equal(result.kind, 'lista');
-  assert.deepEqual(t.sent, ['listy odebrane', 'listy odebrane']);
 });
 
 test('pager: List : N inny niz zadany odrzuca odpowiedz jako niejednoznaczna', async () => {
@@ -220,11 +199,12 @@ test('pager: niezgodny aktualny numer w prompcie odrzuca odpowiedz bez q', async
   await operation;
   assert.deepEqual(t.sent, ['przeczytaj list 2'], 'nieznany pager nie dostaje automatycznego q');
   assert.equal(isPagerOrphanSuspected(), false, 'kolejny prompt pagera tez nie moze uruchomic q');
-  await assert.rejects(pager.readLetter(2), /operacja anulowana/);
-  assert.deepEqual(t.sent, ['przeczytaj list 2'], 'kolejna komenda czeka na prompt');
-
-  await t.replay([{ cls: 'prompt', text: '> ' }]);
   const next = pager.readLetter(2);
+  assert.deepEqual(
+    t.sent,
+    ['przeczytaj list 2', 'przeczytaj list 2'],
+    'kolejna komenda nie czeka na prompt',
+  );
   await t.replay(replayLetter(t, 2));
   assert.equal((await next).letter.number, 2);
 });

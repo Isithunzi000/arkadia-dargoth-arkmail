@@ -2,12 +2,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { DargothTransport } from '../src/arkmail/adapters/dargothTransport';
-import { FakeApi, notifyText } from './harness';
+import { FakeApi } from './harness';
 
 const PAGER_PROMPT = '[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ';
-const DROPPED_MESSAGE =
-  'Nie wykonano komend odlozonych podczas operacji pocztowej. ' +
-  'Powtorz je po powrocie do zwyklego widoku gry.';
 
 function armed(f: FakeApi): DargothTransport {
   const transport = new DargothTransport(f.api);
@@ -45,7 +42,8 @@ test('kolejka modalna: odrzucenie q nie odtwarza starych komend do nieznanego pa
   assert.ok(!f.sent.includes('spojrz'));
   assert.equal(transport.modalQueueLength, 0);
   assert.equal(dropped, 1);
-  assert.equal(transport.isRecovering(), true);
+  const session = transport.openSession();
+  session.close();
   f.sendImpl = null;
   await f.api.command.send('spojrz', true);
   assert.equal(f.sent.filter((command) => command === 'spojrz').length, 1, 'swieza komenda przechodzi raz');
@@ -68,24 +66,6 @@ test('kolejka modalna: przejecie przez r porzuca stara kolejke i zglasza to raz'
   assert.equal(dropped, 1);
   await f.api.command.send('spojrz', true);
   assert.deepEqual(f.sent, ['r', 'spojrz']);
-  transport.dispose();
-});
-
-test('kolejka modalna: recovery porzuca komendy edytora i pokazuje jeden komunikat', async () => {
-  const f = new FakeApi();
-  const transport = armed(f);
-  transport.beginModal();
-  await f.api.command.send('spojrz', true);
-  await f.api.command.send('pomoc', true);
-  transport.beginRecovery();
-  transport.endModal();
-  await drain();
-
-  assert.deepEqual(f.sent, []);
-  assert.equal(notifyText(f, DROPPED_MESSAGE), true);
-  assert.equal(f.shown.length, 1);
-  await f.api.command.send('spojrz', true);
-  assert.deepEqual(f.sent, ['spojrz']);
   transport.dispose();
 });
 

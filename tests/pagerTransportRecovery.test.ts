@@ -114,7 +114,6 @@ for (const closeCommand of ['q', 'x'] as const) {
     assert.equal(client.wire.filter((line) => line === 'q' || line === 'x').length, 1);
     assert.equal(client.wire.at(-1), closeCommand);
     assert.equal(client.wireEcho.at(-1), true);
-    assert.equal(transport.isRecovering(), false);
     transport.dispose();
   });
 }
@@ -136,7 +135,7 @@ test('pager bez jawnego promptu: odlozone r trafia do gry bez automatycznego q',
   transport.dispose();
 });
 
-test('pager: odrzucenie automatycznego q zdejmuje blokade i pozwala graczowi ponowic', async () => {
+test('pager: odrzucenie automatycznego q konczy operacje i pozwala graczowi ponowic', async () => {
   const client = new PagerClient();
   client.reject = 'q';
   const { transport, pager } = setup(client);
@@ -145,9 +144,9 @@ test('pager: odrzucenie automatycznego q zdejmuje blokade i pozwala graczowi pon
   await assert.rejects(operation, /syntetyczne odrzucenie: q/);
   transport.endModal();
 
-  assert.equal(transport.isRecovering(), true);
-  assert.equal(client.fire('Pozna tresc.'), null);
-  assert.throws(() => transport.openSession(), /operacja anulowana/);
+  assert.deepEqual(client.fire('Pozna tresc.'), { text: 'Pozna tresc.' });
+  const nextSession = transport.openSession();
+  nextSession.close();
   client.reject = null;
   await client.api.command.send('q', true);
   assert.equal(client.wire.filter((line) => line === 'q').length, 1);
@@ -172,7 +171,6 @@ test('pager: odrzucenie bezposredniego q gracza nie blokuje ponowienia', async (
   await new Promise((resolve) => setImmediate(resolve));
   transport.endModal();
 
-  assert.equal(transport.isRecovering(), true);
   client.reject = null;
   await client.api.command.send('q', true);
   assert.deepEqual(client.wire, ['q']);
@@ -189,7 +187,6 @@ test('pager: zwrot listu bez zwyklego promptu pozwala recznie zamknac i kontynuo
   transport.endModal();
 
   assert.equal(result.letter.body.join('\n').trim(), 'Syntetyczna tresc.');
-  assert.equal(transport.isRecovering(), false);
   assert.equal(client.hook, null);
   await client.api.command.send('q', true);
   assert.deepEqual(client.wire.filter((line) => line === 'q' || line === 'x'), ['q', 'q']);
@@ -209,7 +206,6 @@ test('pager: krotki timeout nie uniewaznia listu zwroconego po ciszy', async () 
   transport.endModal();
 
   assert.equal(result.letter.body.join('\n').trim(), 'Syntetyczna tresc.');
-  assert.equal(transport.isRecovering(), false);
   await client.api.command.send('x', true);
   assert.deepEqual(client.wire.filter((line) => line === 'q' || line === 'x'), ['q', 'x']);
   client.fire('> ', 'prompt');
@@ -218,7 +214,7 @@ test('pager: krotki timeout nie uniewaznia listu zwroconego po ciszy', async () 
   transport.dispose();
 });
 
-test('pager: odrzucenie akcji po potwierdzeniu pagera uruchamia odzyskiwanie', async () => {
+test('pager: odrzucenie akcji po potwierdzeniu pagera konczy tylko te operacje', async () => {
   const client = new PagerClient();
   client.reject = 'f Corge';
   const { transport, pager } = setup(client);
@@ -226,9 +222,9 @@ test('pager: odrzucenie akcji po potwierdzeniu pagera uruchamia odzyskiwanie', a
   feedLetter(client, true);
   await assert.rejects(operation, /syntetyczne odrzucenie: f Corge/);
 
-  assert.equal(transport.isRecovering(), true);
-  assert.equal(client.fire('Pozna tresc.'), null);
-  assert.throws(() => transport.openSession(), /operacja anulowana/);
+  assert.deepEqual(client.fire('Pozna tresc.'), { text: 'Pozna tresc.' });
+  const session = transport.openSession();
+  session.close();
   transport.dispose();
 });
 
@@ -238,7 +234,6 @@ test('pager: odrzucenie przed odpowiedzia serwera nie zgaduje otwartego pagera',
   const { transport, pager } = setup(client);
   await assert.rejects(pager.readLetter(1), /syntetyczne odrzucenie: przeczytaj list 1/);
 
-  assert.equal(transport.isRecovering(), false);
   assert.deepEqual(client.wire, []);
   transport.dispose();
 });

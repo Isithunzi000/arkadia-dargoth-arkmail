@@ -1,5 +1,5 @@
 /**
- * Sekcja 16, krok 3: potwierdzony koniec odpowiedzi i odzyskiwanie.
+ * Zakonczenie pojedynczej operacji i niezaleznosc kolejnej sesji.
  * Wszystkie dane protokolowe sa syntetyczne.
  */
 import { test } from 'node:test';
@@ -70,26 +70,23 @@ function letterLines(number: number, normalPrompt = true): ProtoLine[] {
   ];
 }
 
-test('adapter: timeout utrzymuje gag i blokuje nowa sesje do zwyklego promptu', async () => {
+test('adapter: timeout nie gaguje poznych linii i nie blokuje nowej sesji', async () => {
   const f = new FakeApi();
   const t = armedTransport(f);
   const mailbox = new MailboxSession(t, { timeoutMs: 30, idleMs: 10 });
   await assert.rejects(mailbox.fetch('odebrane'), /timeout/);
 
-  assert.equal(f.fire('List : 1', 'mail'), null, 'pozna linia mail pozostaje gagowana');
+  assert.deepEqual(f.fire('List : 1', 'mail'), { text: 'List : 1' });
   assert.deepEqual(f.fire('Zwykly dialog.', 'other'), { text: 'Zwykly dialog.' });
-  assert.throws(() => t.openSession(), /operacja anulowana/);
-  await assert.rejects(t.send('listy odebrane'), /operacja anulowana/);
-
-  assert.deepEqual(f.fire('> ', 'prompt'), { text: '> ' });
   const session = t.openSession();
   session.close();
   await t.send('listy odebrane');
+  assert.deepEqual(f.sent, ['listy odebrane', 'listy odebrane']);
   assert.deepEqual(f.fire('Listy odebrane:', 'mail'), { text: 'Listy odebrane:' });
   t.dispose();
 });
 
-test('adapter: odzyskiwanie zatrzymuje komende pluginu oczekujaca w kolejce', async () => {
+test('adapter: reczna poczta zatrzymuje komende pluginu oczekujaca w kolejce', async () => {
   const f = new FakeApi();
   let release: () => void = () => {};
   const gate = new Promise<void>((resolve) => { release = resolve; });
@@ -102,7 +99,7 @@ test('adapter: odzyskiwanie zatrzymuje komende pluginu oczekujaca w kolejce', as
   await Promise.resolve();
   assert.deepEqual(f.sent, ['pierwsza']);
 
-  t.beginRecovery();
+  t.setPlayerMailMode(true);
   release();
   await first;
   await secondCheck;
@@ -123,85 +120,6 @@ test('adapter: reconnect otwiera nowa operacje bez starego promptu', async () =>
   second.close();
   await t.send('listy odebrane');
   assert.deepEqual(f.sent, ['listy odebrane']);
-  t.dispose();
-});
-
-test('adapter: powtorne sygnaly obecnosci nie koncza odzyskiwania bez reconnectu', () => {
-  const f = new FakeApi();
-  const t = armedTransport(f);
-  const first = t.openSession();
-  first.close();
-  t.beginRecovery();
-  t.setOnline(true);
-
-  assert.equal(f.fire('Spozniona odpowiedz.', 'mail'), null);
-  assert.deepEqual(f.fire('Dialog uzytkownika.', 'other'), { text: 'Dialog uzytkownika.' });
-  assert.throws(() => t.openSession(), /operacja anulowana/);
-
-  f.fire('> ', 'prompt');
-  const second = t.openSession();
-  assert.ok(second.id > first.id);
-  second.close();
-  t.dispose();
-});
-
-test('adapter: limit odzyskiwania zglasza blad bez zdejmowania blokady', async (context) => {
-  context.mock.timers.enable({ apis: ['setTimeout'] });
-  const f = new FakeApi();
-  const t = armedTransport(f);
-  t.beginRecovery();
-
-  context.mock.timers.tick(9_999);
-  assert.equal(f.shown.length, 0, 'przed limitem nie ma bledu');
-  context.mock.timers.tick(1);
-  assert.equal(f.shown.length, 1, 'limit ma widoczny wynik');
-  assert.equal(f.shown[0]?.title, 'Brak synchronizacji z gra');
-  assert.equal(f.shown[0]?.level, 'error');
-  assert.equal(
-    f.shown[0]?.text,
-    'Nie potwierdzono zakonczenia poprzedniej odpowiedzi. Poczekaj na powrot zwyklego widoku gry lub polacz ponownie.',
-  );
-
-  assert.equal(f.fire('Pozna odpowiedz.', 'mail'), null, 'blad nie zdejmuje gaga');
-  assert.throws(() => t.openSession(), /operacja anulowana/);
-  await assert.rejects(t.send('listy odebrane'), /operacja anulowana/);
-  context.mock.timers.tick(20_000);
-  assert.equal(f.shown.length, 1, 'limit nie powtarza komunikatu');
-
-  f.fire('> ', 'prompt');
-  const session = t.openSession();
-  session.close();
-  t.dispose();
-});
-
-test('adapter: reconnect czysci stary limit, a dispose anuluje kolejny timer', (context) => {
-  context.mock.timers.enable({ apis: ['setTimeout'] });
-  const f = new FakeApi();
-  const t = armedTransport(f);
-  t.beginRecovery();
-  context.mock.timers.tick(6_000);
-
-  t.setOnline(false);
-  t.setOnline(true);
-  context.mock.timers.tick(20_000);
-  assert.equal(f.shown.length, 0, 'stary timer nie zglasza bledu po reconnectcie');
-  const session = t.openSession();
-  session.close();
-
-  t.beginRecovery();
-  t.dispose();
-  context.mock.timers.tick(20_000);
-  assert.equal(f.shown.length, 0, 'dispose anuluje kolejny limit');
-});
-
-test('adapter: prompt przed limitem anuluje oczekujacy komunikat', (context) => {
-  context.mock.timers.enable({ apis: ['setTimeout'] });
-  const f = new FakeApi();
-  const t = armedTransport(f);
-  t.beginRecovery();
-  f.fire('> ', 'prompt');
-  context.mock.timers.tick(20_000);
-  assert.equal(f.shown.length, 0);
   t.dispose();
 });
 
@@ -243,19 +161,22 @@ test('pager: cisza po q zwraca list i od razu zwalnia kolejna komende', async ()
   assert.equal(result.letter.number, 2);
 });
 
-test('editor: pozna odpowiedz po timeoutcie jest gagowana, a nowa wysylka zablokowana', async () => {
+test('editor: pozna odpowiedz po timeoutcie nie blokuje kolejnej wysylki', async () => {
   const f = new FakeApi();
   const t = armedTransport(f);
   const editor = new EditorSession(t, { timeoutMs: 30, idleMs: 10 });
   const result = await editor.send({ adresat: 'Corge', temat: 'Test', linie: ['Tresc.'] });
   assert.deepEqual(result, { result: 'blad', error: { kind: 'timeout' } });
 
-  assert.equal(f.fire('List jest gotowy do wyslania.', 'mail'), null);
-  await assert.rejects(
-    editor.send({ adresat: 'Corge', temat: 'Drugi', linie: ['Nowa tresc.'] }),
-    /operacja anulowana/,
+  assert.deepEqual(
+    f.fire('List jest gotowy do wyslania.', 'mail'),
+    { text: 'List jest gotowy do wyslania.' },
   );
-  f.fire('> ', 'prompt');
+  const next = editor.send({ adresat: 'Corge', temat: 'Drugi', linie: ['Nowa tresc.'] });
+  await new Promise((resolve) => setImmediate(resolve));
+  f.fire('Zaniechane.', 'mail');
+  assert.deepEqual(await next, { result: 'zaniechany' });
+  assert.equal(f.sent.filter((command) => command === 'napisz list').length, 2);
   t.dispose();
 });
 
@@ -265,9 +186,6 @@ test('import: cisza bez promptu nie jest pomyslnym zakonczeniem', async () => {
   const operation = importer.fetchPeople('zapamietani');
   await t.replay([{ cls: 'mail', text: 'Zapamietani: Corge.' }]);
   await assert.rejects(operation, /timeout/);
-  await assert.rejects(importer.fetchPeople('zapamietani'), /operacja anulowana/);
-
-  await t.replay([{ cls: 'prompt', text: '> ' }]);
   const next = importer.fetchPeople('zapamietani');
   await t.replay([
     { cls: 'mail', text: '[12] Zapamietane przez ciebie imiona to Corge.' },

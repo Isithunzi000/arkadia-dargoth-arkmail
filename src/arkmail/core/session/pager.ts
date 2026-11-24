@@ -306,10 +306,7 @@ export class PagerSession {
         if (done) return;
         const confirmedPager = state === 'pager' || state === 'closing' ||
           pagerFired || idleOpened || headersDone;
-        if (confirmedPager) {
-          this.transport.beginRecovery();
-          suspectPagerOrphan();
-        }
+        if (confirmedPager) suspectPagerOrphan();
         cleanup();
         reject(error instanceof Error ? error : new Error(String(error)));
       };
@@ -433,7 +430,6 @@ export class PagerSession {
         // podejrzenie: przy najblizszym promptcie pagera poza sesja
         // domknie sierote (bez podejrzenia prompt = sesja gracza).
         if (state === 'closing') {
-          this.transport.beginRecovery();
           suspectPagerOrphan();
           cleanup();
           reject(new Error(`timeout: pager session list ${numer}`));
@@ -445,7 +441,6 @@ export class PagerSession {
         send('q');
         if (!done) {
           graceTimer = setTimeout(() => {
-            this.transport.beginRecovery();
             suspectPagerOrphan();
             cleanup();
             reject(new Error(`timeout: pager session list ${numer}`));
@@ -567,9 +562,8 @@ export class PagerSession {
             }
             ambiguous = `prompt pagera list ${pp.current} podczas odczytu ${numer}`;
             // Bez wlasnego przejscia niezgodny numer nie dowodzi, ze to
-            // nasz pager. Nie wolno zamykac go automatycznie ani uzbrajac
-            // pozniejszego q. Kolejne komendy czekaja na zwykly prompt.
-            this.transport.beginRecovery();
+            // nasz pager. Nie wolno zamykac go automatycznie. Konczymy tylko
+            // biezaca operacje; kolejna sesja pozostaje niezalezna.
             cleanup();
             reject(new AmbiguousResponseError(ambiguous));
             return;
