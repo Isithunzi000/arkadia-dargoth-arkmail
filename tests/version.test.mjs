@@ -157,3 +157,16 @@ test('dokumentacja: zdalna macierz ArkMail jest zapisana', () => {
   assert.ok(report.includes('Testy pluginow Dargoth: zakończone sukcesem.'));
   assert.ok(report.includes('E2E Dargoth (prawdziwy klient): zakończone sukcesem.'));
 });
+
+test('dokumentacja: plan bezpiecznego odczytu wynikow wyszukiwania jest zapisany', () => {
+  const plan = fs.readFileSync(path.join(REPO, 'docs/PLAN-1.30.20.md'), 'utf8');
+  assert.match(plan, /## Ustalenia z analizy/);
+  assert.match(plan, /## Zatwierdzony zakres/);
+  assert.match(plan, /500 ms/);
+  assert.match(plan, /wszystkich skrzynek/);
+  assert.match(plan, /archiveId/);
+  assert.match(plan, /najwyżej jedną ponowną kotwicę/);
+  assert.match(plan, /Gagowanie pozostaje bez zmian/);
+  assert.match(plan, /Nie wykonujemy testów na realnej grze/);
+  assert.match(plan, /Publikacja ogranicza się do GitHuba/);
+});
