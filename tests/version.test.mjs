@@ -22,8 +22,8 @@ function metaVersion() {
   return m[1];
 }
 
-test('wydanie: przygotowany numer wersji to 1.30.19', () => {
-  assert.equal(metaVersion(), '1.30.19');
+test('wydanie: przygotowany numer wersji to 1.30.20', () => {
+  assert.equal(metaVersion(), '1.30.20');
 });
 
 function latestZip() {
@@ -158,15 +158,17 @@ test('dokumentacja: zdalna macierz ArkMail jest zapisana', () => {
   assert.ok(report.includes('E2E Dargoth (prawdziwy klient): zakończone sukcesem.'));
 });
 
-test('dokumentacja: plan bezpiecznego odczytu wynikow wyszukiwania jest zapisany', () => {
-  const plan = fs.readFileSync(path.join(REPO, 'docs/PLAN-1.30.20.md'), 'utf8');
-  assert.match(plan, /## Ustalenia z analizy/);
-  assert.match(plan, /## Zatwierdzony zakres/);
-  assert.match(plan, /500 ms/);
-  assert.match(plan, /wszystkich skrzynek/);
-  assert.match(plan, /archiveId/);
-  assert.match(plan, /najwyżej jedną ponowną kotwicę/);
-  assert.match(plan, /Gagowanie pozostaje bez zmian/);
-  assert.match(plan, /Nie wykonujemy testów na realnej grze/);
-  assert.match(plan, /Publikacja ogranicza się do GitHuba/);
+test('dokumentacja: wykonana naprawa bezpiecznego odczytu jest zapisana', () => {
+  const report = fs.readFileSync(path.join(REPO, 'docs/NAPRAWA-1.30.20.md'), 'utf8');
+  assert.match(report, /## Zakres poprawki/);
+  assert.match(report, /## Dowody lokalne/);
+  assert.match(report, /## Weryfikacja zdalna/);
+  assert.match(report, /500 ms/);
+  assert.match(report, /wszystkich skrzynek/);
+  assert.match(report, /archiveId/);
+  assert.match(report, /najwyżej jedna ponowna kotwica/);
+  assert.match(report, /Gagowanie pozostaje bez zmian/);
+  assert.match(report, /Nie wykonano testów na realnej grze/);
+  assert.match(report, /GitHub Release/);
+  assert.equal(fs.existsSync(path.join(REPO, 'docs/PLAN-1.30.20.md')), false);
 });
