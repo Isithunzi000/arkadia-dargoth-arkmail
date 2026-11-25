@@ -23,6 +23,7 @@ import type {
   MailBox,
   MailDate,
 } from '../protocol/types.js';
+import type { ListingSearch } from '../protocol/commands.js';
 import { isEchoLine, isPromptLine } from './lines.js';
 import { clearPagerOrphan } from './orphanPager.js';
 import { AmbiguousResponseError, UnknownPagerError } from './errors.js';
@@ -49,9 +50,18 @@ export interface SessionOptions {
  * Serwer ma JEDEN globalny "biezacy listing" - kazda komenda listujaca
  * go nadpisuje, takze pusta; stamp rosnie przy kazdym listingu pluginu.
  */
+export interface ListingSearchCtx {
+  /** Pierwotne zapytanie zachowane wylacznie w pamieci. */
+  query: ListingSearch;
+  /** Dokladna komenda uzyta do pierwotnego i kazdego kolejnego listingu. */
+  command: string;
+}
+
 export interface ListingCtx {
   box: MailBox;
   stamp: number;
+  /** Obecnosc filtra wymusza swieza kotwice przed kazdym odczytem. */
+  search?: ListingSearchCtx;
 }
 
 export interface MailboxEntry extends ListingEntry {
@@ -76,6 +86,16 @@ export interface MailboxEntry extends ListingEntry {
    * nie trafia do storage.
    */
   archiveId?: string;
+}
+
+/** Zwraca wpis tylko wtedy, gdy archiveId ma dokladnie jedno dopasowanie. */
+export function uniqueEntryByArchiveId(
+  entries: readonly MailboxEntry[],
+  archiveId: string | undefined,
+): MailboxEntry | null {
+  if (archiveId === undefined) return null;
+  const matches = entries.filter((entry) => entry.archiveId === archiveId);
+  return matches.length === 1 ? matches[0]! : null;
 }
 
 /** Klucz deduplikacji wpisu: strona, temat, przekaz, surowa data. */

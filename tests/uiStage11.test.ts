@@ -429,7 +429,7 @@ test('etap 11 S44: brak mozliwosci odnalezienia listu ma jeden neutralny komunik
     );
     assert.equal(h.f.sent.length, before, 'brak komendy bez pewnej lokalizacji listu');
     const source = readFileSync(join(process.cwd(), 'src/arkmail/index.ts'), 'utf8');
-    assert.equal((source.match(/Nie mozna odnalezc tego listu - odswiez skrzynke\./g) ?? []).length, 2);
+    assert.equal((source.match(/Nie mozna odnalezc tego listu - odswiez skrzynke\./g) ?? []).length, 3);
     assert.doesNotMatch(source, /Nie moge znalezc tego listu|Nie ma tego listu na liscie/);
   } finally {
     await restore();

@@ -29,6 +29,7 @@ import {
   searchDescription,
   isValidPersonName,
   validateListingSearch,
+  type ListingSearch,
 } from "./core/protocol/commands";
 import type { LetterTemplate } from "./core/letterRender";
 import { unknownRecipients, validateCompose } from "./core/composeValidation";
@@ -81,7 +82,14 @@ import {
   knownRecipientNames,
   replyAllEmptyMessage,
 } from "./core/replyRecipients";
-import { MailboxSession, type ListingCtx, type MailboxEntry, type MailboxResult } from "./core/session/mailbox";
+import {
+  MailboxSession,
+  uniqueEntryByArchiveId,
+  type ListingCtx,
+  type ListingSearchCtx,
+  type MailboxEntry,
+  type MailboxResult,
+} from "./core/session/mailbox";
 import { AmbiguousResponseError } from "./core/session/errors";
 import { humanizeMailError, isOperationCancelled } from "./core/errors";
 import {
@@ -112,7 +120,7 @@ const POPUP_ID = "arkmail";
 const FOOTER_BUTTON_ID = "arkmail";
 const FOOTER_STATE = "arkmail-poczta";
 const ALIAS_REGEX = /^\/arkmail$/i;
-const SESSION_OPTS = { timeoutMs: 8000, idleMs: 400 };
+const SESSION_OPTS = { timeoutMs: 8000, idleMs: 500 };
 /** Prog szerokosci popupu dla ukladu dwupanelowego (Fala 10): >= 900px
  *  lista z lewej + podglad z prawej, nizej jeden panel (komorka). */
 export const WIDE_MIN_WIDTH = 900;
@@ -1261,9 +1269,9 @@ export async function init(api: PluginApi) {
    * Bump kontekstu po KAZDYM listingu (Fala 14f) - takze pustym, bo
    * serwer nadpisuje swoj biezacy listing kazda komenda listujaca.
    */
-  const bumpCtx = (box: MailBox): void => {
+  const bumpCtx = (box: MailBox, search?: ListingSearchCtx): void => {
     listingCtxSeq += 1;
-    listingCtx = { box, stamp: listingCtxSeq };
+    listingCtx = { box, stamp: listingCtxSeq, ...(search ? { search } : {}) };
   };
 
   /**
@@ -1272,10 +1280,15 @@ export async function init(api: PluginApi) {
    * przekazywane rownolegle (resolvedIds z mergeListingPage - dla
    * wpisu dopasowanego po tresci to ID ISTNIEJACEGO rekordu).
    */
-  const stampEntries = (box: MailBox, entries: MailboxEntry[], ids?: string[]): void => {
-    bumpCtx(box);
+  const stampEntries = (
+    box: MailBox,
+    entries: MailboxEntry[],
+    ids?: string[],
+    search?: ListingSearchCtx,
+  ): void => {
+    bumpCtx(box, search);
     for (let i = 0; i < entries.length; i++) {
-      entries[i]!.ctx = { box, stamp: listingCtxSeq };
+      entries[i]!.ctx = { box, stamp: listingCtxSeq, ...(search ? { search } : {}) };
       const id = ids?.[i];
       if (id !== undefined) entries[i]!.archiveId = id;
     }
@@ -1307,14 +1320,34 @@ export async function init(api: PluginApi) {
   };
 
   /**
-   * Swiezy wpis do operacji pagerowej (Fala 9a). Wpis z biezacego
-   * kontekstu idzie od razu; stary -> re-kotwica: listing po dacie listu
-   * (serwerowe "przed" wyklucza dzien graniczny, wiec dzien PO dacie)
-   * i odnalezienie wpisu po tozsamosci. Numer NIGDY nie leci do serwera
-   * bezposrednio z UI - zawsze z tego tlumaczenia. Null = nie znaleziono
-   * (komunikat dla gracza, zadna komenda nie wylatuje na slepo).
+   * Swiezy wpis do operacji pagerowej. Wynik wyszukiwania zawsze ponawia
+   * pierwotny filtr i wybiera jednoznaczny wpis po archiveId. Zwykly wpis
+   * z biezacego kontekstu idzie od razu; stary -> re-kotwica po dacie
+   * (serwerowe "przed" wyklucza dzien graniczny, wiec dzien PO dacie).
+   * Numer NIGDY nie leci do serwera bezposrednio z UI - zawsze z tego
+   * tlumaczenia. Null = nie znaleziono (komunikat dla gracza, zadna
+   * komenda nie wylatuje na slepo).
    */
   const resolveEntry = async (box: MailBox, entry: MailboxEntry): Promise<MailboxEntry | null> => {
+    const search = entry.ctx?.box === box ? entry.ctx.search : undefined;
+    if (search !== undefined) {
+      // Wynik wyszukiwania nigdy nie uzywa starego numeru. Nawet zgodny
+      // lokalny kontekst wymaga ponowienia dokladnie pierwotnego filtra.
+      const res = await mailbox.fetch(box, search.command);
+      if (res.kind === "lista") {
+        const records = recordsOfListing(box, res.entries);
+        const merged = mergeListingPage(ui.state.archive, box, records);
+        ui.setArchive(merged.letters);
+        persistArchive();
+        stampEntries(box, res.entries, merged.resolvedIds, search);
+        const fresh = uniqueEntryByArchiveId(res.entries, entry.archiveId);
+        if (fresh !== null) return fresh;
+      } else {
+        bumpCtx(box, search);
+      }
+      notify(api, "Nie mozna odnalezc tego listu - odswiez skrzynke.", { level: "warning" });
+      return null;
+    }
     if (
       entry.ctx !== undefined &&
       listingCtx !== null &&
@@ -2826,24 +2859,33 @@ export async function init(api: PluginApi) {
         return;
       }
       if (manualOperationBlocked()) return;
+      const originalQuery: ListingSearch = {
+        ...query,
+        ...(query.odDaty !== undefined ? { odDaty: { ...query.odDaty } } : {}),
+        ...(query.doDaty !== undefined ? { doDaty: { ...query.doDaty } } : {}),
+      };
+      const search: ListingSearchCtx = {
+        query: originalQuery,
+        command: searchListingCommand(box, originalQuery),
+      };
       ui.setBusy(`Szukam w skrzynce ${box}...`);
       const generation = connectionGeneration;
       void runExclusive(async () => {
-          const res = await mailbox.fetch(box, searchListingCommand(box, query));
+          const res = await mailbox.fetch(box, search.command);
           // Fala 41: wyniki szukania tez wklejane pod tozsamoscia
           // przebiegu (numeracja selekcji nie koliduje z pelnymi
           // listinguami - inny scanKey).
           const searchRecords = res.kind === "lista" ? recordsOfListing(box, res.entries) : undefined;
           // Fala 14f: puste wyniki szukania tez nadpisuja kontekst serwera.
-          if (res.kind !== "lista") bumpCtx(box);
-          ui.setSearch({ box, label: searchDescription(box, query) });
+          if (res.kind !== "lista") bumpCtx(box, search);
+          ui.setSearch({ box, label: searchDescription(box, originalQuery) });
           ui.applySearchResults(box, res);
           if (res.kind === "lista" && searchRecords !== undefined) {
             // Cache (jak przy kazdym listingu): wyniki tez do archiwum,
             // wpisy dostaja archiveId rozwiazanych rekordow.
             const merged = mergeListingPage(ui.state.archive, box, searchRecords);
             ui.setArchive(merged.letters);
-            stampEntries(box, res.entries, merged.resolvedIds);
+            stampEntries(box, res.entries, merged.resolvedIds, search);
             finalizeArchiveChange();
             notify(api, `Wyniki szukania (${formatListCount(res.entries.length)}).`, { level: "success" });
           } else {
