@@ -21,7 +21,7 @@ import {
 import type { MailBox, MailError } from "./core/protocol/types";
 import { parseNotification, extractPagerPrompt, parseMailDate } from "./core/protocol/parser";
 import { isEchoLine, isPromptLine } from "./core/session/lines";
-import { clearPagerOrphan, isPagerOrphanSuspected } from "./core/session/orphanPager";
+import { clearPagerOrphan } from "./core/session/orphanPager";
 import {
   olderListingCommand,
   nextDay,
@@ -229,8 +229,8 @@ const isImportTimeout = (error: unknown): boolean =>
   error instanceof Error && /^import .+: timeout$/.test(error.message);
 
 /**
- * Fala 24g: komendy gracza wchodzace w tryb poczty (ich pager jest
- * legalny - straznik sierot go nie rusza). Wersje skrocone obslugiwane
+ * Komendy gracza wchodzace w tryb poczty (jego pager jest legalny
+ * i nie dostaje automatycznego q). Wersje skrocone obslugiwane
  * przez serwer: "list N" (log 2026-10-21), "listy <skrzynka>",
  * "przeczytaj list N", "poczta". Dopasowanie po prefiksie slowa.
  */
@@ -1042,9 +1042,8 @@ export async function init(api: PluginApi) {
    * blokada; wyjscie: przechwycone q/x albo jego echo ustawia
    * oczekiwanie, a zwykly prompt konczy tryb. Bezczynnosc
    * (PLAYER_MAIL_MODE_IDLE_MS) pozostaje awaryjnym wyjsciem. W trakcie trybu scheduleRefresh
-   * PARKUJE - pager gracza zjadlby komende listujaca, a straznik
-   * desynchronizacji moglby odpowiedziec "q" i zabic jego sesje
-   * (mechanika Fali 17a/24g).
+   * PARKUJE - pager gracza zjadlby komende listujaca. Zadna pozna
+   * linia poza operacja nie moze odpowiedziec "q" i zabic jego sesji.
    */
   let playerMailMode = false;
   let awaitingPlayerMailPrompt = false;
@@ -1108,6 +1107,7 @@ export async function init(api: PluginApi) {
     }, idleMs);
   };
   const enterPlayerMailMode = (): void => {
+    clearPagerOrphan();
     pendingOpen = null;
     if (playerMailMode) {
       if (!awaitingPlayerMailPrompt) armPlayerMailModeIdle();
@@ -1313,6 +1313,17 @@ export async function init(api: PluginApi) {
     return entries.map((e, i) => fromMailboxEntry(box, e, scanKey, i));
   };
 
+  const hasAmbiguousIdentity = (entries: readonly MailboxEntry[], entry: MailboxEntry): boolean =>
+    entries.filter((item) => entryKey(item) === entryKey(entry)).length > 1;
+
+  const notifyAmbiguousIdentity = (): void => {
+    notify(
+      api,
+      "Nie mozna bezpiecznie ustalic numeru listu - nowy listing zawiera identyczne wpisy. Odswiez skrzynke.",
+      { level: "warning" },
+    );
+  };
+
   /**
    * Fala 41: pelny zrzut skrzynki z widoku - rekordy archiwum wskazywane
    * przez archiveId wpisow widoku (glowa + doklejone strony). Uzywane,
@@ -1329,19 +1340,27 @@ export async function init(api: PluginApi) {
   };
 
   /**
-   * Swiezy wpis do operacji pagerowej. Wynik wyszukiwania zawsze ponawia
-   * pierwotny filtr i wybiera jednoznaczny wpis po archiveId. Zwykly wpis
-   * z biezacego kontekstu idzie od razu; stary -> re-kotwica po dacie
-   * (serwerowe "przed" wyklucza dzien graniczny, wiec dzien PO dacie).
-   * Numer NIGDY nie leci do serwera bezposrednio z UI - zawsze z tego
-   * tlumaczenia. Null = nie znaleziono (komunikat dla gracza, zadna
-   * komenda nie wylatuje na slepo).
+   * Swiezy wpis do operacji pagerowej. Wpis z biezacego kontekstu serwera
+   * idzie od razu, takze pochodzacy z filtra. Dopiero stary wynik wyszukiwania
+   * ponawia pierwotny filtr i wybiera jednoznaczny wpis po archiveId. Inny
+   * stary wpis dostaje re-kotwice po dacie (serwerowe "przed" wyklucza dzien
+   * graniczny, wiec dzien PO dacie). Numer NIGDY nie leci do serwera
+   * bezposrednio z UI - zawsze z tego tlumaczenia. Null = nie znaleziono
+   * (komunikat dla gracza, zadna komenda nie wylatuje na slepo).
    */
   const resolveEntry = async (box: MailBox, entry: MailboxEntry): Promise<MailboxEntry | null> => {
+    if (
+      entry.ctx !== undefined &&
+      listingCtx !== null &&
+      entry.ctx.stamp === listingCtx.stamp &&
+      entry.ctx.box === listingCtx.box
+    ) {
+      return entry;
+    }
     const search = entry.ctx?.box === box ? entry.ctx.search : undefined;
     if (search !== undefined) {
-      // Wynik wyszukiwania nigdy nie uzywa starego numeru. Nawet zgodny
-      // lokalny kontekst wymaga ponowienia dokladnie pierwotnego filtra.
+      // Dopiero utrata zgodnosci kontekstu wymaga ponowienia dokladnie
+      // pierwotnego filtra i jednoznacznego dopasowania rekordu.
       const res = await mailbox.fetch(box, search.command, { filtered: true });
       if (res.kind === "lista") {
         const numbers = res.entries.map((item) => item.number).sort((a, b) => a - b);
@@ -1352,6 +1371,11 @@ export async function init(api: PluginApi) {
             "Nie mozna bezpiecznie ustalic numeru listu - wyniki maja niespojna numeracje. Odswiez skrzynke.",
             { level: "warning" },
           );
+          return null;
+        }
+        if (hasAmbiguousIdentity(res.entries, entry)) {
+          bumpCtx(box, search);
+          notifyAmbiguousIdentity();
           return null;
         }
         const records = recordsOfListing(box, res.entries);
@@ -1367,14 +1391,6 @@ export async function init(api: PluginApi) {
       notify(api, "Nie mozna odnalezc tego listu - odswiez skrzynke.", { level: "warning" });
       return null;
     }
-    if (
-      entry.ctx !== undefined &&
-      listingCtx !== null &&
-      entry.ctx.stamp === listingCtx.stamp &&
-      entry.ctx.box === listingCtx.box
-    ) {
-      return entry;
-    }
     if (!entry.date) {
       notify(api, "Nie mozna odnalezc tego listu - odswiez skrzynke.", { level: "warning" });
       return null;
@@ -1385,6 +1401,7 @@ export async function init(api: PluginApi) {
       cancelFlag(flag);
     });
     let fresh: MailboxEntry | null = null;
+    let ambiguousIdentity = false;
     try {
       const scan = await scanMailboxPages({
         box,
@@ -1396,6 +1413,11 @@ export async function init(api: PluginApi) {
         onEmpty: () => bumpCtx(box),
         onGap: (day) => recordArchiveGap(box, day),
         onPage: (res) => {
+          if (hasAmbiguousIdentity(res.entries, entry)) {
+            ambiguousIdentity = true;
+            bumpCtx(box);
+            return { stop: true };
+          }
           // Fala 41: wklejanie strony ze stala tozsamoscia tresci;
           // wpisy dostaja archiveId rozwiazanych rekordow.
           const records = recordsOfListing(box, res.entries);
@@ -1422,6 +1444,10 @@ export async function init(api: PluginApi) {
         },
       });
       if (scan.end === "cancelled") throw new Error("operacja anulowana");
+      if (ambiguousIdentity) {
+        notifyAmbiguousIdentity();
+        return null;
+      }
       // Jednoznaczny wpis znaleziony przed zatrzymaniem nie wymaga juz
       // sprawdzania pozostalych stron. Brak wpisu nadal odrzuca niepelny skan.
       if (fresh) return fresh;
@@ -3030,19 +3056,10 @@ export async function init(api: PluginApi) {
     },
   };
 
-  // Straznik sierocych pagerow (Fala 11g, przebudowa Fala 24g).
-  // Sierocy pager (po awarii NASZEJ sesji) konsumuje WSZYSTKIE komendy
-  // gracza az do "q" - zamykamy go automatycznie. Ale prompt pagera
-  // serwera jest identyczny z promptem trybu czytania poczty otwartego
-  // RECZNIE przez gracza ("[1-50 ...] (aktualny: N) -- ") - Fala 11g
-  // strzelala "q" na sam widok promptu i zabijala reczne sesje (log
-  // 2026-10-21: "d" ladowalo jako ruch na dol, "?" dawalo pomoc gry
-  // zamiast pomocy edytora; gracz musial odinstalowac wtyczke, zeby
-  // skasowac list). Dlatego straznik odpala "q" WYLACZNIE przy
-  // pozytywnym podejrzeniu (core/session/orphanPager.ts): flage stawiaja
-  // awaryjne konce wlasnych sesji, zdejmuje kazda udana transakcja,
-  // echo komendy pocztowej gracza i wyslanie "q" przez straznika.
-  let lastWatchdogQ = 0;
+  // Obsluga ech i promptow poczty gracza. Podejrzenie wlasnej sieroty
+  // jest konsumowane wylacznie przez lokalna sesje Mailbox/Pager, ktora
+  // utrzymuje blokade do zwyklego promptu. Pozne linie poza operacja
+  // nigdy nie uruchamiaja globalnego q.
   transport.subscribe((line) => {
     if (line.cls === "command" || isEchoLine(line.text)) {
       // Uwaga: stan zakladki usuwanie NIE jest tu kasowany. Gracz z
@@ -3051,9 +3068,9 @@ export async function init(api: PluginApi) {
       // Listy tego nie robi (parzystosc, zgloszenie 2026-10-30).
       // Bezpieczenstwo dubla nadal stoi: deleteSelectedLetters bierze
       // swiezy listing i dopasowuje po kluczach tresci, nie numerach.
-      // Komenda gracza wchodzaca w tryb poczty: jego pager jest legalny
-      // (a gdyby sierota istniala, zjadlaby te komende i straznik
-      // domknie ja przy promptcie - tutaj czyscimy tylko prewencyjnie).
+      // Komenda gracza wchodzaca w tryb poczty: jego pager jest legalny.
+      // Przejecie czysci stare podejrzenie, aby nie bylo uzyte przeciwko
+      // nowej sesji gracza; zadne globalne q nie jest wysylane.
       const cmd = isEchoLine(line.text) ? line.text.replace(/^→\s*/, "") : line.text;
       if (MAIL_ENTRY_CMD_RE.test(cmd)) {
         clearPagerOrphan();
@@ -3082,16 +3099,6 @@ export async function init(api: PluginApi) {
     // Fala 24f2: prompt pagera w trybie gracza = aktywnosc, przedluza
     // wygasanie trybu (timer uzbroila juz komenda wejsciowa).
     if (playerMailMode) armPlayerMailModeIdle();
-    if (lock.locked) return; // legalna sesja pagerowa pod blokada
-    if (!isPagerOrphanSuspected()) return; // sesja gracza - nietknieta
-    const now = Date.now();
-    if (now - lastWatchdogQ < 2000) return; // cooldown: jedno q na serie
-    lastWatchdogQ = now;
-    // Flaga znika dopiero po przyjeciu q. Odrzucenie zostawia podejrzenie
-    // do kolejnej proby i nie moze trafic do nieobslugonego rejection.
-    void Promise.resolve(transport!.send("q"))
-      .then(() => clearPagerOrphan())
-      .catch(() => {});
   });
 
   // Powiadomienia pocztowe: odswiezenie + opcjonalny tost.

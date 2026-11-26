@@ -148,9 +148,9 @@ async function beginReplyAllAnchor(h: Harness): Promise<void> {
   );
 }
 
-function replayListing(h: Harness): void {
+function replayListing(h: Harness, entries: readonly MailboxEntry[] = [PAGE[0]!]): void {
   h.f.fire('Listy odebrane:', 'mail');
-  for (const entry of PAGE) {
+  for (const entry of entries) {
     h.f.fire(` ${entry.number}. *R* Temat: ${entry.subject}`, 'mail');
     h.f.fire(`Nadawca: Listing nadawcy                ${DATE_RAW}`, 'mail');
   }
@@ -344,26 +344,23 @@ test('reply-all: zmiana postaci odrzuca wynik i nie przenosi prefillu', async ()
   }
 });
 
-test('reply-all: blizniak i replika nie zyskuja naglowkow cudzego archiveId', async () => {
+test('reply-all: blizniacy na nowej kotwicy przerywaja przed odczytem bez zmian naglowkow', async () => {
   const otherTwin = twin();
   const otherReplica = replica();
   const h = await startHarness({ archive: [record(), otherTwin, otherReplica] });
   try {
     await openCached(h, 0);
     await beginReplyAllAnchor(h);
-    replayListing(h);
-    await waitRt(() => h.f.sent.includes('przeczytaj list 3'), 'odczyt wlasciwego blizniaka');
-    replayLetter(h);
-    await waitRt(() => {
-      const element = h.content.querySelector('[data-field="adresat"]') as Field | null;
-      return element?.value === 'Nadawca, Pierwszy';
-    }, 'prefill wlasciwego rekordu');
+    replayListing(h, PAGE);
+    await waitRt(
+      () => notifyText(h.f, 'Nie mozna bezpiecznie ustalic numeru listu'),
+      'komunikat o niejednoznacznych blizniakach',
+    );
+    await ticks();
+    assert.ok(!h.f.sent.includes('przeczytaj list 3'), 'brak zgadywania numeru blizniaka');
     const saved = await readBack();
-    assert.deepEqual(saved[TARGET_ID]?.headers, {
-      from: 'Nadawca',
-      to: 'Foo, Pierwszy',
-      cc: 'Trzeci',
-    });
+    assert.equal(saved[TARGET_ID]?.headers, undefined);
+    assert.deepEqual(saved[TARGET_ID]?.body, [BODY]);
     assert.equal(saved[TWIN_ID]?.headers, undefined);
     assert.deepEqual(saved[TWIN_ID]?.body, ['Tresc blizniaka.']);
     assert.equal(saved[otherReplica.id]?.headers, undefined);

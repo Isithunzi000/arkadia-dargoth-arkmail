@@ -12,7 +12,6 @@ import {
   notifyText,
   startHarness,
   stopHarness,
-  textOf,
   waitRt,
   type Harness,
 } from './harness';
@@ -102,17 +101,6 @@ function seedArchive(): ArchiveLetter[] {
   });
 }
 
-function replayLetter(h: Harness, number: number): void {
-  h.f.fire(`List : ${number}`, 'mail');
-  h.f.fire('Od   : Fred', 'mail');
-  h.f.fire('Temat: blizniak', 'mail');
-  h.f.fire('Data : So, 7 VIII 1999, 10:00:00', 'mail');
-  h.f.fire('', 'mail');
-  h.f.fire('Tresc starszego listu.', 'mail');
-  h.f.fire(`[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: ${number}) -- `, 'mail');
-  h.f.fire('> ', 'prompt');
-}
-
 test('po relogu przeczes inkrementalny odtwarza starsze wiersze z archiwum bez dodatkowych stron', async () => {
   let h = await startHarness();
   let snapshot: Awaited<ReturnType<typeof storageSnapshot>>;
@@ -186,10 +174,15 @@ test('po relogu przeczes inkrementalny odtwarza starsze wiersze z archiwum bez d
     olderRow.dispatchEvent(new h.window.Event('click'));
     await waitRt(() => h.f.sent.includes('listy odebrane przed 8 VIII 1999'), 're-kotwica starszego wpisu');
     fireLines(h, TAIL);
-    await waitRt(() => h.f.sent.some((command) => /^przeczytaj list [12]$/.test(command)), 'odczyt po re-kotwicy');
-    const read = h.f.sent.find((command) => /^przeczytaj list [12]$/.test(command))!;
-    replayLetter(h, Number(read.split(' ').pop()));
-    await waitRt(() => textOf(h, '.arkmail-letter-body').includes('Tresc starszego listu.'), 'tresc starszego listu');
+    await waitRt(
+      () => notifyText(h.f, 'Nie mozna bezpiecznie ustalic numeru listu'),
+      'blizniaki na nowej kotwicy sa niejednoznaczne',
+    );
+    assert.ok(
+      !h.f.sent.some((command) => /^przeczytaj list [12]$/.test(command)),
+      'brak zgadywania numeru blizniaka',
+    );
+    assert.deepEqual(comparableArchive((await storageSnapshot()).archive), archiveBefore, 'odrzucenie nie zmienia archiwum');
   } finally {
     await stopHarness();
   }

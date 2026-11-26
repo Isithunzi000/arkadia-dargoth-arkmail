@@ -104,16 +104,19 @@ for (const closeCommand of ['q', 'x'] as const) {
     const operation = pager.readLetter(1);
     const cancelled = assert.rejects(operation, /operacja anulowana/);
     await client.api.command.send(closeCommand, true);
-    assert.deepEqual(client.wire, ['przeczytaj list 1']);
-
-    feedLetter(client, false);
-    await waitFor(() => client.wire.includes(closeCommand), `${closeCommand} po ciszy`);
     await cancelled;
     transport.endModal();
 
-    assert.equal(client.wire.filter((line) => line === 'q' || line === 'x').length, 1);
-    assert.equal(client.wire.at(-1), closeCommand);
-    assert.equal(client.wireEcho.at(-1), true);
+    assert.deepEqual(client.wire, [closeCommand]);
+    assert.deepEqual(client.wireEcho, [true]);
+
+    // Opozniona odpowiedz serwera nie moze wznowic odczytu ani wyslac kopii q/x.
+    feedLetter(client, false);
+    client.fire(PAGER_PROMPT);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+
+    assert.deepEqual(client.wire, [closeCommand]);
+    assert.deepEqual(client.wireEcho, [true]);
     transport.dispose();
   });
 }
@@ -167,13 +170,14 @@ test('pager: odrzucenie bezposredniego q gracza nie blokuje ponowienia', async (
   });
   client.fire(PAGER_PROMPT);
   client.reject = 'q';
-  await client.api.command.send('q', true);
+  await assert.rejects(client.api.command.send('q', true), /syntetyczne odrzucenie: q/);
   await new Promise((resolve) => setImmediate(resolve));
   transport.endModal();
 
   client.reject = null;
   await client.api.command.send('q', true);
   assert.deepEqual(client.wire, ['q']);
+  assert.deepEqual(client.wireEcho, [true]);
   transport.dispose();
 });
 

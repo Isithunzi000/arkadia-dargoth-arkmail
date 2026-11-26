@@ -148,6 +148,42 @@ test('re-kotwiczenie: wpis nie znaleziony na swiezym listingu -> komunikat, brak
   }
 });
 
+test('re-kotwiczenie: blizniacze wpisy na swiezym listingu przerywaja przed odczytem', async () => {
+  const h = await startHarness();
+  const { f, waitFor } = h;
+  try {
+    await loadTruncatedBox(h);
+    await loadOlderPage(h);
+
+    click(h, '.arkmail-entry');
+    await waitFor(
+      () => f.sent.includes('listy odebrane przed 25 VIII 1999'),
+      're-kotwica przed niejednoznacznym odczytem',
+    );
+    f.fire('Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
+    f.fire(' 3. *R* Temat: najnowszy', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
+    f.fire(' 2. *R* Temat: najnowszy', 'mail');
+    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
+    f.fire(' 1. *R* Temat: inny', 'mail');
+    f.fire('Nadawca: Grault                         Wt, 24 VIII 1999, 01:00:00', 'mail');
+    f.fire('> ', 'prompt');
+
+    await waitFor(
+      () => notifyText(f, 'identyczne wpisy') || f.sent.some((command) => command.startsWith('przeczytaj list')),
+      'zakonczenie niejednoznacznej kotwicy',
+    );
+    assert.ok(notifyText(f, 'identyczne wpisy'), 'komunikat o niejednoznacznej kotwicy');
+    assert.equal(
+      f.sent.filter((command) => command.startsWith('przeczytaj list')).length,
+      0,
+      'nie wolno zgadywac numeru jednego z blizniakow',
+    );
+  } finally {
+    await stopHarness();
+  }
+});
+
 test('re-kotwiczenie: kasowanie po zmianie kontekstu uzywa swiezego numeru', async () => {
   const h = await startHarness();
   const { f, waitFor } = h;

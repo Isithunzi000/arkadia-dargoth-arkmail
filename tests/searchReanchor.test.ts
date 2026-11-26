@@ -40,14 +40,41 @@ const emptyLine: Record<MailBox, string> = {
 const searchCommand = (box: MailBox, person = 'corge'): string =>
   `listy ${box} ${box === 'odebrane' || box === 'nieprzeczytane' ? 'od' : 'do'} ${person}`;
 
-function replyListing(h: Harness, box: MailBox, rows: readonly Row[], prompt = true): void {
-  h.f.fire(`Wybrane listy ${box}:`, 'mail');
+function replyListing(
+  h: Harness,
+  box: MailBox,
+  rows: readonly Row[],
+  prompt = true,
+  filtered = true,
+): void {
+  h.f.fire(filtered ? `Wybrane listy ${box}:` : `Listy ${box} (prezentowane jest pierwsze 50):`, 'mail');
   for (const row of rows) {
     h.f.fire(` ${row.number}. ${row.read === false ? '' : '*R* '}Temat: ${row.subject ?? 'wybrany'}`, 'mail');
     const label = box === 'odebrane' || box === 'nieprzeczytane' ? 'Nadawca' : 'Odbiorca';
     h.f.fire(`${label}: ${row.party ?? 'Corge'}                       ${DATE}`, 'mail');
   }
   if (prompt) h.f.fire('> ', 'prompt');
+}
+
+async function expireServerListing(h: Harness, resultBox: MailBox): Promise<void> {
+  const incoming = resultBox === 'wyslane' || resultBox === 'niewyslane';
+  const boxes = incoming
+    ? ['odebrane', 'nieprzeczytane'] as const
+    : ['niewyslane', 'wyslane'] as const;
+  h.f.fireEvent('gmcp.mail.state', {
+    unread: incoming,
+    unreceived: incoming,
+    unsent: !incoming,
+  });
+  for (const box of boxes) {
+    await h.waitFor(() => h.f.sent.includes(`listy ${box}`), `listing zmieniajacy kontekst: ${box}`);
+    h.f.fire(emptyLine[box], 'mail');
+    h.f.fire('> ', 'prompt');
+  }
+  await h.waitFor(() => {
+    const busy = h.content.querySelector('.arkmail-busy') as { textContent?: string } | null;
+    return busy?.textContent === '';
+  }, 'koniec listingu zmieniajacego kontekst');
 }
 
 async function selectEmptyBox(h: Harness, box: MailBox): Promise<void> {
@@ -91,15 +118,16 @@ function replayLetter(h: Harness, number: number): void {
 
 test('wyszukiwanie: kazda skrzynka ponawia pierwotny filtr i czyta dopiero swiezy numer', async () => {
   for (const box of BOXES) {
-    const h = await startHarness({ autoRefreshEnabled: false });
+    const h = await startHarness();
     try {
-      await preparePersonSearch(h, box, [
+      const initialRows = [
         { number: 2, subject: 'inny' },
         { number: 1, subject: 'wybrany' },
-      ]);
+      ] as const;
+      await preparePersonSearch(h, box, initialRows);
       setInput(h, '[data-search="osoba"]', 'Waldo');
       setInput(h, '[data-search="temat"]', 'pozniejsza zmiana');
-
+      await expireServerListing(h, box);
       click(h, '.arkmail-entry[data-number="1"]');
       await h.waitFor(
         () => h.f.sent.filter((command) => command === searchCommand(box)).length === 2,
@@ -122,9 +150,10 @@ test('wyszukiwanie: kazda skrzynka ponawia pierwotny filtr i czyta dopiero swiez
 });
 
 test('wyszukiwanie: znikniecie wpisu po archiveId przerywa bez odczytu', async () => {
-  const h = await startHarness({ autoRefreshEnabled: false });
+  const h = await startHarness();
   try {
     await preparePersonSearch(h, 'odebrane');
+    await expireServerListing(h, 'odebrane');
     click(h, '.arkmail-entry');
     await h.waitFor(
       () => h.f.sent.filter((command) => command === searchCommand('odebrane')).length === 2,
@@ -138,8 +167,8 @@ test('wyszukiwanie: znikniecie wpisu po archiveId przerywa bez odczytu', async (
   }
 });
 
-test('wyszukiwanie: blizniacze wpisy zachowuja archiveId po zmianie numerow', async () => {
-  const h = await startHarness({ autoRefreshEnabled: false });
+test('wyszukiwanie: blizniacze wpisy na swiezej kotwicy przerywaja przed odczytem', async () => {
+  const h = await startHarness();
   try {
     await selectEmptyBox(h, 'odebrane');
     setInput(h, '[data-search="osoba"]', 'Corge');
@@ -151,7 +180,7 @@ test('wyszukiwanie: blizniacze wpisy zachowuja archiveId po zmianie numerow', as
       { number: 1, subject: 'blizniak' },
     ]);
     await h.waitFor(() => h.content.querySelectorAll('.arkmail-entry').length === 3, 'dwa blizniaki');
-
+    await expireServerListing(h, 'odebrane');
     click(h, '.arkmail-entry[data-number="1"]');
     await h.waitFor(
       () => h.f.sent.filter((command) => command === searchCommand('odebrane')).length === 2,
@@ -162,18 +191,26 @@ test('wyszukiwanie: blizniacze wpisy zachowuja archiveId po zmianie numerow', as
       { number: 2, subject: 'blizniak' },
       { number: 1, subject: 'inny' },
     ]);
-    await h.waitFor(() => h.f.sent.includes('przeczytaj list 2'), 'odczyt tego samego archiveId');
-    assert.ok(!h.f.sent.includes('przeczytaj list 3'));
-    assert.ok(!h.f.sent.includes('przeczytaj list 1'));
+    await h.waitFor(
+      () => notifyText(h.f, 'identyczne wpisy') || h.f.sent.some((command) => command.startsWith('przeczytaj list')),
+      'zakonczenie niejednoznacznej kotwicy',
+    );
+    assert.ok(notifyText(h.f, 'identyczne wpisy'), 'komunikat o niejednoznacznej kotwicy');
+    assert.equal(
+      h.f.sent.filter((command) => command.startsWith('przeczytaj list')).length,
+      0,
+      'nie wolno zgadywac numeru jednego z blizniakow',
+    );
   } finally {
     await stopHarness();
   }
 });
 
 test('wyszukiwanie: pierwszy zly numer daje jedna ponowna kotwice, drugi konczy bez trzeciej', async () => {
-  const h = await startHarness({ autoRefreshEnabled: false });
+  const h = await startHarness();
   try {
     await preparePersonSearch(h, 'odebrane');
+    await expireServerListing(h, 'odebrane');
     click(h, '.arkmail-entry');
     await h.waitFor(
       () => h.f.sent.filter((command) => command === searchCommand('odebrane')).length === 2,
@@ -206,9 +243,10 @@ test('wyszukiwanie: pierwszy zly numer daje jedna ponowna kotwice, drugi konczy 
 });
 
 test('wyszukiwanie: utrata wyboru listingu ponawia filtr i odczytuje swiezy numer', async () => {
-  const h = await startHarness({ autoRefreshEnabled: false });
+  const h = await startHarness();
   try {
     await preparePersonSearch(h, 'odebrane');
+    await expireServerListing(h, 'odebrane');
     click(h, '.arkmail-entry');
     await h.waitFor(
       () => h.f.sent.filter((command) => command === searchCommand('odebrane')).length === 2,
@@ -232,8 +270,8 @@ test('wyszukiwanie: utrata wyboru listingu ponawia filtr i odczytuje swiezy nume
   }
 });
 
-test('produkcja: prompt konczy od razu, cisza po 500 ms, klik i druga kotwica bez 8000 ms', async (context) => {
-  const h = await startHarness({ autoRefreshEnabled: false });
+test('produkcja: prompt i cisza koncza listing, a aktualny wynik czyta bez drugiej kotwicy', async (context) => {
+  const h = await startHarness();
   context.mock.timers.enable({ apis: ['setTimeout'] });
   const flush = async (): Promise<void> => {
     await new Promise<void>((resolve) => { setImmediate(resolve); });
@@ -259,20 +297,14 @@ test('produkcja: prompt konczy od razu, cisza po 500 ms, klik i druga kotwica be
     await h.waitFor(() => h.content.querySelector('.arkmail-entry[data-number="2"]') !== null, 'wynik przy 500 ms');
 
     click(h, '.arkmail-entry[data-number="2"]');
-    await h.waitFor(
-      () => h.f.sent.filter((command) => command === searchCommand('odebrane', 'waldo')).length === 2,
-      'natychmiastowa swieza kotwica',
+    await h.waitFor(() => h.f.sent.includes('przeczytaj list 2'), 'odczyt aktualnego wyniku');
+    assert.equal(
+      h.f.sent.filter((command) => command === searchCommand('odebrane', 'waldo')).length,
+      1,
+      'aktualny kontekst nie dostaje drugiego listingu',
     );
-    assert.ok(!h.f.sent.some((command) => command.startsWith('przeczytaj list')));
-    replyListing(h, 'odebrane', [
-      { number: 2, subject: 'po ciszy' },
-      { number: 1, subject: 'inny' },
-    ], false);
-    context.mock.timers.tick(499);
-    await flush();
-    assert.ok(!h.f.sent.includes('przeczytaj list 2'), 'druga kotwica czeka przez 499 ms');
-    context.mock.timers.tick(1);
-    await h.waitFor(() => h.f.sent.includes('przeczytaj list 2'), 'druga kotwica konczy przy 500 ms');
+    replayLetter(h, 2);
+    await h.waitFor(() => h.content.querySelector('.arkmail-letter-body') !== null, 'otwarty list');
   } finally {
     context.mock.timers.reset();
     await stopHarness();

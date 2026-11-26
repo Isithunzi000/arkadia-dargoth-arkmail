@@ -5,6 +5,11 @@ import type PluginApi from 'plugin-api';
 import { DargothTransport } from '../src/arkmail/adapters/dargothTransport';
 import type { ProtoLine } from '../src/arkmail/core/session/transport';
 import {
+  clearPagerOrphan,
+  isPagerOrphanSuspected,
+  suspectPagerOrphan,
+} from '../src/arkmail/core/session/orphanPager';
+import {
   FakeApi,
   startHarness,
   stopHarness,
@@ -105,7 +110,7 @@ test('modal pagera: kazda komenda czytania trafia raz do otwartego pagera jako k
 });
 
 test('modal pagera: komenda czytania po zamkniciu pagera jest odrzucana, nie odtwarzana do gry', async () => {
-  for (const command of PAGER_COMMANDS) {
+  for (const command of PAGER_COMMANDS.filter((value) => value !== 'q' && value !== 'x')) {
     const f = new FakeApi();
     const transport = armedTransport(f);
     let takeovers = 0;
@@ -158,6 +163,66 @@ test('modal pagera: komendy niezalezne i wykrzyknik zachowuja kolejnosc, prefiks
   assert.equal(dropped, 0);
   transport.dispose();
 });
+
+for (const closeCommand of ['q', 'x'] as const) {
+  test(`modal pagera: reczne ${closeCommand} przed promptem przechodzi od razu i nie jest koalescencja`, async () => {
+    const f = new FakeApi();
+    const transport = armedTransport(f);
+    const taken: string[] = [];
+    try {
+      beginPagerModal(transport, {
+        onUserCommand: (command) => {
+          taken.push(command);
+          transport.setPlayerMailMode(true);
+        },
+        onCommandDropped: () => {},
+      });
+      await f.api.command.send(closeCommand, true);
+      await f.api.command.send(closeCommand, true);
+      await drain();
+
+      assert.deepEqual(f.sent, [closeCommand, closeCommand], 'kazde reczne polecenie przechodzi raz');
+      assert.deepEqual(f.sentEcho, [true, true]);
+      assert.deepEqual(taken, [closeCommand, closeCommand], 'kazde zamkniecie wstrzymuje automatyzacje');
+      assert.equal(transport.modalQueueLength, 0, 'reczne zamkniecie nie trafia do kolejki');
+      await assert.rejects(transport.send('listy odebrane'), /operacja anulowana/);
+      f.fire(PAGER_PROMPT, 'mail');
+      await drain();
+      assert.deepEqual(f.sent, [closeCommand, closeCommand], 'pozny prompt nie wytwarza drugiej kopii');
+    } finally {
+      transport.setOnline(false);
+      transport.dispose();
+    }
+  });
+
+  test(`modal pagera: reczne ${closeCommand} po automatycznym q przechodzi bez echa i bez koalescencji`, async () => {
+    const f = new FakeApi();
+    const transport = armedTransport(f);
+    const taken: string[] = [];
+    try {
+      beginPagerModal(transport, {
+        onUserCommand: (command) => {
+          taken.push(command);
+          transport.setPlayerMailMode(true);
+        },
+        onCommandDropped: () => {},
+      });
+      f.fire(PAGER_PROMPT, 'mail');
+      await transport.send('q');
+      await drain();
+      await f.api.command.send(closeCommand, false);
+      await drain();
+
+      assert.deepEqual(f.sent, ['q', closeCommand], 'automatyczne q nie polyka polecenia gracza');
+      assert.deepEqual(f.sentEcho, [false, false]);
+      assert.deepEqual(taken, [closeCommand]);
+      assert.equal(transport.modalQueueLength, 0);
+    } finally {
+      transport.setOnline(false);
+      transport.dispose();
+    }
+  });
+}
 
 async function startRead(h: Harness): Promise<void> {
   const { f } = h;
@@ -221,10 +286,12 @@ for (const closeCommand of ['q', 'x'] as const) {
     try {
       await startRead(h);
       const listingsBefore = f.sent.filter((command) => command === 'listy odebrane').length;
+      suspectPagerOrphan();
       await f.api.command.send(closeCommand, true);
+      assert.equal(isPagerOrphanSuspected(), false, 'przejecie przez gracza czysci stare podejrzenie');
       f.fire(PAGER_PROMPT, 'mail');
       await waitRt(() => f.sent.includes(closeCommand), `${closeCommand} gracza`);
-      await drain(); // modal konczy sie przed zdjeciem koalescencji q/x do promptu
+      await drain(); // dajemy zakonczyc przetwarzanie poznego promptu
       assert.equal(f.sent.filter((command) => command === closeCommand).length, 1, 'jedno zamkniecie');
       assert.equal(f.sentEcho[f.sent.indexOf(closeCommand)], true, 'zamkniecie pochodzi od gracza');
       f.fire(`→ ${closeCommand}`, 'info');
@@ -251,7 +318,7 @@ for (const closeCommand of ['q', 'x'] as const) {
 }
 
 for (const closeCommand of ['q', 'x'] as const) {
-    test(`automatyczny odczyt: kolejkowane ${closeCommand} bez echa konczy sie dopiero zwyklym promptem`, async () => {
+    test(`automatyczny odczyt: reczne ${closeCommand} bez echa konczy sie dopiero zwyklym promptem`, async () => {
       const h = await startHarness();
       const { f } = h;
       try {
@@ -260,7 +327,7 @@ for (const closeCommand of ['q', 'x'] as const) {
         await f.api.command.send(closeCommand, true);
         f.fire(PAGER_PROMPT, 'mail');
         await waitRt(() => f.sent.includes(closeCommand), `${closeCommand} gracza bez echa`);
-        await drain(); // modal konczy sie przed zdjeciem koalescencji q/x do promptu
+        await drain(); // dajemy zakonczyc przetwarzanie poznego promptu
         assert.equal(f.sent.filter((command) => command === closeCommand).length, 1, 'jedno zamkniecie');
         f.fire(PAGER_PROMPT, 'mail');
         await new Promise((resolve) => setTimeout(resolve, 300));
@@ -332,7 +399,7 @@ test('automatyczny odczyt: prompt przed echem q konczy tryb, a pozne i powtorzon
     await f.api.command.send('q', true);
     f.fire(PAGER_PROMPT, 'mail');
     await waitRt(() => f.sent.includes('q'), 'q gracza');
-    await drain(); // modal konczy sie przed zdjeciem koalescencji q/x do promptu
+    await drain(); // dajemy zakonczyc przetwarzanie poznego promptu
     f.fire('> ', 'prompt');
     await waitRt(
       () => f.sent.filter((command) => command === 'listy odebrane').length > listingsBefore,
@@ -352,7 +419,7 @@ test('automatyczny odczyt: prompt przed echem q konczy tryb, a pozne i powtorzon
 
 for (const closeCommand of ['q', 'x'] as const) {
   for (const withEcho of [false, true]) {
-    test(`automatyczny odczyt: reczne ${closeCommand} po automatycznym q jest wspolnym zamknieciem (echo=${withEcho})`, async () => {
+    test(`automatyczny odczyt: reczne ${closeCommand} po automatycznym q jest osobna komenda (echo=${withEcho})`, async () => {
       const h = await startHarness();
       const { f } = h;
       try {
@@ -364,15 +431,14 @@ for (const closeCommand of ['q', 'x'] as const) {
         await f.api.command.send(closeCommand, true);
         if (withEcho) f.fire(`→ ${closeCommand}`, 'info');
         f.fire('> ', 'prompt');
-        await waitRt(() => f.hookCb === null, 'koniec modalu po wspolnym zamknieciu');
-        await waitRt(
-          () => textOf(h, '.arkmail-letter-body').includes('Tresc pierwszego.'),
-          'pierwotny odczyt konczy sie po wspolnym zamknieciu',
-        );
+        await waitRt(() => f.hookCb === null, 'koniec modalu po przejeciu');
         await drain();
 
-        assert.equal(f.sent.filter((command) => command === 'q' || command === 'x').length, 1, 'jedno wspolne zamkniecie');
+        const closes = f.sent.filter((command) => command === 'q' || command === 'x');
+        assert.deepEqual(closes, ['q', closeCommand], 'automatyczne i reczne zamkniecie to osobne komendy');
+        assert.equal(f.sentEcho[f.sent.lastIndexOf(closeCommand)], true, 'echo zostaje przy recznej komendzie');
         assert.ok(!notifyText(f, CLOSED_MESSAGE), 'reczne zamkniecie nie jest odrzucane');
+        assert.ok(!textOf(h, '.arkmail-letter-body').includes('Tresc pierwszego.'), 'przejecie anuluje automatyczny odczyt');
         await waitRt(
           () => f.sent.filter((command) => command === 'listy odebrane').length > listingsBefore,
           'wznowienie po recznym zamknieciu',
@@ -387,7 +453,7 @@ for (const closeCommand of ['q', 'x'] as const) {
     });
   }
 
-  test(`automatyczny odczyt: pozny prompt i powtorzone ${closeCommand} nie wysylaja drugiego zamkniecia`, async () => {
+  test(`automatyczny odczyt: pozny prompt nie zmienia dwoch recznych ${closeCommand} po automatycznym q`, async () => {
     const h = await startHarness();
     const { f } = h;
     try {
@@ -398,14 +464,14 @@ for (const closeCommand of ['q', 'x'] as const) {
       await f.api.command.send(closeCommand, true);
       f.fire(PAGER_PROMPT, 'mail');
       await drain();
-      assert.equal(f.sent.filter((command) => command === 'q' || command === 'x').length, 1, 'brak drugiego zamkniecia');
+      assert.equal(
+        f.sent.filter((command) => command === 'q' || command === 'x').length,
+        3,
+        'automatyczne q i oba reczne polecenia przechodza bez koalescencji',
+      );
 
       f.fire('> ', 'prompt');
       await waitRt(() => f.hookCb === null, 'koniec modalu po poznym prompcie');
-      await waitRt(
-        () => textOf(h, '.arkmail-letter-body').includes('Tresc pierwszego.'),
-        'pierwotny odczyt konczy sie po poznym prompcie',
-      );
       await drain();
       assert.ok(!notifyText(f, CLOSED_MESSAGE), 'powtorzone zamkniecie nie jest odrzucane');
     } finally {
@@ -414,20 +480,26 @@ for (const closeCommand of ['q', 'x'] as const) {
     }
   });
 
-  test(`automatyczny odczyt: powtorzone ${closeCommand} przed rozpoznaniem pagera nie jest odrzucane`, async () => {
+  test(`automatyczny odczyt: powtorzone ${closeCommand} przed rozpoznaniem pagera przechodzi od razu`, async () => {
     const h = await startHarness();
     const { f } = h;
     try {
       await startRead(h);
       await f.api.command.send(closeCommand, true);
       await f.api.command.send(closeCommand, true);
-      assert.ok(!f.sent.includes(closeCommand), 'zamkniecie czeka na pager');
+      assert.equal(
+        f.sent.filter((command) => command === closeCommand).length,
+        2,
+        'oba polecenia przechodza przed promptem',
+      );
       f.fire(PAGER_PROMPT, 'mail');
-      await waitRt(() => f.sent.includes(closeCommand), 'zamkniecie po rozpoznaniu pagera');
-      await drain(); // modal konczy sie przed zdjeciem koalescencji q/x do promptu
       await drain();
-      assert.equal(f.sent.filter((command) => command === 'q' || command === 'x').length, 1, 'jedno zamkniecie gracza');
-      assert.ok(!notifyText(f, CLOSED_MESSAGE), 'drugie identyczne zamkniecie jest koalescencja, nie bledem');
+      assert.equal(
+        f.sent.filter((command) => command === 'q' || command === 'x').length,
+        2,
+        'pozny prompt nie wytwarza automatycznego q',
+      );
+      assert.ok(!notifyText(f, CLOSED_MESSAGE), 'powtorzone reczne zamkniecie nie jest bledem');
     } finally {
       f.fire('> ', 'prompt');
       await stopHarness();

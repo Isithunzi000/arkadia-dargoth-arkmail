@@ -1,43 +1,39 @@
 /**
- * Podejrzenie sierocego pagera (Fala 24g).
+ * Podejrzenie wlasnego sierocego pagera, ograniczone do generacji polaczenia.
  *
- * Sierocy pager (otwarty na serwerze po awarii NASZEJ sesji) konsumuje
- * wszystkie komendy gracza az do "q" - straznik w index.ts zamyka go
- * automatycznie. Ale prompt pagera serwera jest NIEROZROZNIALNY od
- * promptu trybu czytania poczty, ktory gracz otworzyl recznie
- * ("[1-50 ...] (aktualny: N) -- "), wiec straznik NIE MOZE strzelac
- * na sam widok promptu (Fala 11g zabijala reczne sesje gracza - log
- * 2026-10-21: "d" ladowalo jako ruch na dol, "?" dawalo pomoc gry
- * zamiast pomocy edytora poczty).
+ * Flage stawia wylacznie wlasna sesja po potwierdzonej odpowiedzi pagera,
+ * gdy zakonczenie nie dowiodlo powrotu do zwyklego promptu. Sam prompt pagera
+ * poza operacja nigdy nie uruchamia automatycznego "q": moze nalezec do gracza.
  *
- * Rozwiazanie: straznik reaguje tylko na POZYTYWNE podejrzenie - flage
- * stawiaja wylacznie wlasne sesje, ktore zakonczyly sie awaryjnie
- * z potencjalnie otwartym pagerem (timeout sesji pagerowej, sierocy
- * pager przetrwaly "q" w fetchu). Flage zdejmuje:
- * - kazda UDANA transakcja (listing/odczyt doszedl = komendy dochodza,
- *   sieroty nie ma),
- * - echo komendy gracza wchodzacej w tryb poczty (jego sesja jest
- *   legalna; gdyby sierota istniala, straznik i tak domknie ja przy
- *   najblizszym fetchu - mechanizm 17a w mailbox.ts),
- * - wyslanie "q" przez straznika ("q" to komenda-wyjscie pagera -
- *   po niej sieroty juz nie ma).
+ * Podejrzenie konsumuje lokalna sesja Mailbox/Pager. Moze ona wyslac jedno
+ * "q", poczekac na zwykly prompt i ponowic operacje raz. Sama cisza ani
+ * wyslanie "q" nie potwierdzaja zamkniecia. Stan zdejmuje udana transakcja,
+ * zwykly prompt, przejecie poczty przez gracza albo zmiana generacji.
  *
- * Stan w RAM (podejrzenie dotyczy biezacej sesji serwera), bez storage.
+ * Stan jest wylacznie w RAM i nie trafia do storage.
  */
 
-let suspected = false;
+/** null = stan bez przypisanej generacji, uzywany przez jawne wywolania globalne. */
+let suspectedGeneration: number | null | undefined;
 
 /** Stawia podejrzenie: awaryjny koniec wlasnej sesji z pagera na serwerze. */
-export function suspectPagerOrphan(): void {
-  suspected = true;
+export function suspectPagerOrphan(generation?: number): void {
+  suspectedGeneration = generation ?? null;
 }
 
-/** Zdejmuje podejrzenie (udana transakcja / sesja gracza / q straznika). */
-export function clearPagerOrphan(): void {
-  suspected = false;
+/** Zdejmuje podejrzenie wylacznie w tej samej generacji; bez argumentu czysci globalnie. */
+export function clearPagerOrphan(generation?: number): void {
+  if (suspectedGeneration === undefined) return;
+  if (
+    generation !== undefined &&
+    suspectedGeneration !== null &&
+    suspectedGeneration !== generation
+  ) return;
+  suspectedGeneration = undefined;
 }
 
-/** Czy straznik ma pozytywne podejrzenie sierocego pagera. */
-export function isPagerOrphanSuspected(): boolean {
-  return suspected;
+/** Czy biezaca generacja ma pozytywne podejrzenie sierocego pagera. */
+export function isPagerOrphanSuspected(generation?: number): boolean {
+  if (suspectedGeneration === undefined) return false;
+  return generation === undefined || suspectedGeneration === null || suspectedGeneration === generation;
 }

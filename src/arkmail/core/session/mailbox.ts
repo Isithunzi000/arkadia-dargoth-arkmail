@@ -25,7 +25,7 @@ import type {
 } from '../protocol/types.js';
 import type { ListingSearch } from '../protocol/commands.js';
 import { isEchoLine, isPromptLine } from './lines.js';
-import { clearPagerOrphan } from './orphanPager.js';
+import { clearPagerOrphan, isPagerOrphanSuspected } from './orphanPager.js';
 import { AmbiguousResponseError, UnknownPagerError } from './errors.js';
 import type { ProtoLine, Transport } from './transport.js';
 
@@ -137,6 +137,9 @@ export class MailboxSession {
        *  ladowane." (serwer nie zdazyl zbudowac listingu). */
       let loadRetried = false;
       let loadRetryTimer: ReturnType<typeof setTimeout> | null = null;
+      /** Jedna kontrolowana proba zamkniecia wlasnej sieroty i jedno ponowienie. */
+      let orphanRetried = false;
+      let recoveringOrphan = false;
       const idleMs = this.opts.idleMs ?? DEFAULT_IDLE_FLUSH_MS;
       let idleTimer: ReturnType<typeof setTimeout> | null = null;
       let cancelUnsub: () => void = () => {};
@@ -167,9 +170,9 @@ export class MailboxSession {
       };
       const finish = (r: MailboxResult) => {
         cleanup();
-        // Fala 24g: listing doszedl = komendy docieraja do serwera,
-        // sieroty nie ma - zdejmij podejrzenie straznika.
-        clearPagerOrphan();
+        // Listing doszedl = komendy docieraja do serwera, sieroty nie ma.
+        // Zdejmij podejrzenie wylacznie w tej generacji polaczenia.
+        clearPagerOrphan(session.generation);
         resolve(r);
       };
       const armIdle = () => {
@@ -187,6 +190,18 @@ export class MailboxSession {
 
       session.subscribe((line: ProtoLine) => {
         if (done) return;
+
+        if (recoveringOrphan) {
+          // Pager moze powtarzac wlasny prompt. Jedynie zwykly prompt
+          // potwierdza q i zezwala na dokladnie jedno ponowienie listingu.
+          if (extractPagerPrompt(line.text)) return;
+          if (line.cls === 'prompt' || isPromptLine(line.text)) {
+            recoveringOrphan = false;
+            clearPagerOrphan(session.generation);
+            send(cmd);
+          }
+          return;
+        }
 
         // Linia-blad serwera (np. "Data zostala podana w zlym formacie...")
         // konczy transakcje od razu - bez cichego czekania na timeout.
@@ -217,11 +232,17 @@ export class MailboxSession {
         if (!header) {
           // Echo wlasnej komendy: po klasie albo po samej tresci.
           if (line.cls === 'command' || isEchoLine(line.text)) return;
-          // Prompt pagera bez potwierdzonego zrodla moze nalezec do
-          // gracza. Listing przerywamy bez q, retry i oznaczania sieroty.
           if (extractPagerPrompt(line.text)) {
-            // To nie jest zwykle anulowanie: reczna operacja musi wyjasnic,
-            // dlaczego stanela, ale nie wolno wyslac q do cudzego pagera.
+            // Tylko wczesniejsza awaria wlasnej sesji w tej samej generacji
+            // daje podstawe do jednego q. Pager gracza pozostaje nietkniety.
+            if (!orphanRetried && isPagerOrphanSuspected(session.generation)) {
+              orphanRetried = true;
+              recoveringOrphan = true;
+              send('q');
+              return;
+            }
+            // Brak potwierdzonego pochodzenia albo wyczerpane ponowienie:
+            // konczymy bez q i bez kolejnej proby.
             fail(new UnknownPagerError());
             return;
           }

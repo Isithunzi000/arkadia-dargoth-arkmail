@@ -11,7 +11,11 @@ import assert from 'node:assert/strict';
 
 import { MockTransport, type ProtoLine } from '../src/arkmail/core/session/transport';
 import { PagerSession } from '../src/arkmail/core/session/pager';
-import { suspectPagerOrphan, clearPagerOrphan } from '../src/arkmail/core/session/orphanPager';
+import {
+  suspectPagerOrphan,
+  clearPagerOrphan,
+  isPagerOrphanSuspected,
+} from '../src/arkmail/core/session/orphanPager';
 import {
   startHarness,
   stopHarness,
@@ -121,7 +125,9 @@ test('odczyt listu stronicowanego: cisza po stronie = advance, pelna tresc bez o
   );
 });
 
-test('sklejona linia prompt+odrzucenie: wykrycie, q i ponowienie odczytu', async () => {
+test('sklejona linia prompt+odrzucenie: wykrycie wlasnej sieroty, q i ponowienie odczytu', async () => {
+  clearPagerOrphan();
+  suspectPagerOrphan();
   const t = new MockTransport();
   const s = new PagerSession(t, OPTS);
   const op = settle(s.readLetter(1));
@@ -171,23 +177,20 @@ test('timeout sesji bez potwierdzonego pagera konczy sie bez q', async () => {
   );
 });
 
-test('straznik: sklejony prompt pagera przy podejrzeniu sieroty -> automatyczne q', async () => {
+test('poza operacja: sklejony prompt pagera przy podejrzeniu nie dostaje q', async () => {
   const h = await startHarness();
-  const { f, waitFor } = h;
+  const { f } = h;
   try {
     await loadTruncatedBox(h);
-    // Fala 24g: straznik odpala q WYLACZNIE przy pozytywnym podejrzeniu
-    // (prompt bez podejrzenia = reczna sesja gracza, nietknieta).
     suspectPagerOrphan();
     const qBefore = f.sent.filter((c) => c === 'q').length;
     f.fire(
       '[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- Nie ma takiej komendy. Wpisz "?", zeby uzyskac pomoc albo "q", zeby wyjsc.',
       'mail',
     );
-    await waitFor(
-      () => f.sent.filter((c) => c === 'q').length === qBefore + 1,
-      'straznik wyslal q na sklejony prompt',
-    );
+    await new Promise((r) => setTimeout(r, 50));
+    assert.equal(f.sent.filter((c) => c === 'q').length, qBefore, 'bez globalnego q');
+    assert.equal(isPagerOrphanSuspected(), true, 'podejrzenie czeka na lokalna operacje');
   } finally {
     clearPagerOrphan();
     await stopHarness();

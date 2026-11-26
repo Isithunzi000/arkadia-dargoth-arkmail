@@ -134,8 +134,8 @@ export class MockTransport implements Transport {
   }
 
   emit(line: ProtoLine): void {
-    for (const cb of [...this.subs]) cb(line);
     this.sessions.dispatch(line);
+    for (const cb of [...this.subs]) cb(line);
   }
 
   /** Odtwarzanie fixture'a: po kazdej linii oddaje sterowanie do

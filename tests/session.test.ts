@@ -16,6 +16,11 @@ import {
 import { MailboxSession } from '../src/arkmail/core/session/mailbox';
 import { PagerSession } from '../src/arkmail/core/session/pager';
 import { EditorSession } from '../src/arkmail/core/session/editor';
+import {
+  clearPagerOrphan,
+  isPagerOrphanSuspected,
+  suspectPagerOrphan,
+} from '../src/arkmail/core/session/orphanPager';
 
 const FIXTURES = path.join(process.cwd(), 'tests/fixtures');
 
@@ -277,14 +282,18 @@ const ORPHAN_REJECTION: ProtoLine[] = [
   { cls: 'prompt', text: '> ' },
 ];
 
-test('pager recovery: sierocy pager odrzuca komende - q i ponowienie', async () => {
+test('pager recovery: wlasny sierocy pager odrzuca komende - q i ponowienie', async () => {
+  clearPagerOrphan();
+  suspectPagerOrphan();
   const t = new MockTransport();
   const s = new PagerSession(t, OPTS);
   const op = s.readLetter(1);
+  void op.catch(() => {});
   assert.deepEqual(t.sent, ['przeczytaj list 1']);
   await t.replay(ORPHAN_REJECTION);
-  // Po odrzuceniu: zamkniecie sieroty (q) i ponowienie odczytu.
+  // Po odrzuceniu: jedno q; dopiero zwykly prompt potwierdza zamkniecie.
   assert.deepEqual(t.sent, ['przeczytaj list 1', 'q', 'przeczytaj list 1']);
+  assert.equal(isPagerOrphanSuspected(), false, 'zwykly prompt zdejmuje podejrzenie');
   await t.replay(fixture('listing-odebrane-male'));
   const res = await op;
   assert.equal(res.letter.from, 'Corge');
@@ -292,16 +301,19 @@ test('pager recovery: sierocy pager odrzuca komende - q i ponowienie', async () 
   assert.deepEqual(t.sent.at(-1), 'q');
 });
 
-test('pager recovery: podwojne odrzucenie konczy sie bledem', async () => {
+test('pager recovery: podwojne odrzucenie konczy sie bez drugiego q', async () => {
+  clearPagerOrphan();
+  suspectPagerOrphan();
   const t = new MockTransport();
   const s = new PagerSession(t, OPTS);
   const op = s.readLetter(1);
+  void op.catch(() => {});
   await t.replay(ORPHAN_REJECTION);
   const assertion = assert.rejects(op, /pager/i); // handler przed replay
   await t.replay(ORPHAN_REJECTION); // ponowiona komenda tez odrzucona
   await assertion;
-  // Kazde odrzucenie zamknelismy q (sierota nie zostaje po nas).
-  assert.deepEqual(t.sent, ['przeczytaj list 1', 'q', 'przeczytaj list 1', 'q']);
+  assert.deepEqual(t.sent, ['przeczytaj list 1', 'q', 'przeczytaj list 1']);
+  clearPagerOrphan();
 });
 
 // --- EditorSession ----------------------------------------------------------

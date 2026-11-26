@@ -19,7 +19,11 @@ import {
 } from '../protocol/parser.js';
 import type { MailError, PagerPrompt } from '../protocol/types.js';
 import { isEchoLine, isPromptLine } from './lines.js';
-import { clearPagerOrphan, suspectPagerOrphan } from './orphanPager.js';
+import {
+  clearPagerOrphan,
+  isPagerOrphanSuspected,
+  suspectPagerOrphan,
+} from './orphanPager.js';
 import { AmbiguousResponseError, MailCommandError } from './errors.js';
 import type { ProtoLine, Transport } from './transport.js';
 import type { SessionOptions } from './mailbox.js';
@@ -308,7 +312,7 @@ export class PagerSession {
         if (done) return;
         const confirmedPager = state === 'pager' || state === 'closing' ||
           pagerFired || idleOpened || headersDone;
-        if (confirmedPager) suspectPagerOrphan();
+        if (confirmedPager) suspectPagerOrphan(session.generation);
         cleanup();
         reject(error instanceof Error ? error : new Error(String(error)));
       };
@@ -333,15 +337,15 @@ export class PagerSession {
           return;
         }
         if (ambiguous !== null) {
-          if (confirmed) clearPagerOrphan();
-          else suspectPagerOrphan();
+          if (confirmed) clearPagerOrphan(session.generation);
+          else suspectPagerOrphan(session.generation);
           reject(new AmbiguousResponseError(ambiguous));
           return;
         }
-        // Fala 24g: czyste zamkniecie transakcji = komendy dochodza,
-        // sieroty po nas nie ma - zdejmij podejrzenie straznika.
-        if (confirmed) clearPagerOrphan();
-        else suspectPagerOrphan();
+        // Potwierdzone zamkniecie transakcji = komendy dochodza,
+        // sieroty po nas nie ma - zdejmij podejrzenie tej generacji.
+        if (confirmed) clearPagerOrphan(session.generation);
+        else suspectPagerOrphan(session.generation);
         resolve(build(letter, pager));
       };
 
@@ -433,12 +437,11 @@ export class PagerSession {
           reject(new Error(`timeout: pager session list ${numer}`));
           return;
         }
-        // Fala 24g: timeout z pagerem (byc moze) otwartym na serwerze -
-        // "q" wyslane, ale bez potwierdzenia. Straznik dostaje
-        // podejrzenie: przy najblizszym promptcie pagera poza sesja
-        // domknie sierote (bez podejrzenia prompt = sesja gracza).
+        // Timeout z pagerem otwartym na serwerze: q jest wyslane, ale bez
+        // potwierdzenia. Podejrzenie skonsumuje wylacznie lokalna sesja;
+        // pozne prompty poza operacja pozostaja nietkniete.
         if (state === 'closing') {
-          suspectPagerOrphan();
+          suspectPagerOrphan(session.generation);
           cleanup();
           reject(new Error(`timeout: pager session list ${numer}`));
           return;
@@ -449,7 +452,7 @@ export class PagerSession {
         send('q');
         if (!done) {
           graceTimer = setTimeout(() => {
-            suspectPagerOrphan();
+            suspectPagerOrphan(session.generation);
             cleanup();
             reject(new Error(`timeout: pager session list ${numer}`));
           }, Math.max(idleMs, CLOSE_GRACE_MS));
@@ -460,7 +463,9 @@ export class PagerSession {
         if (actions !== null || done) return;
         if (graceTimer) clearTimeout(graceTimer);
         graceTimer = setTimeout(() => {
-          if (!done && state === 'closing') finish();
+          // Cisza zwraca zebrana tresc, ale nie dowodzi zamkniecia pagera.
+          // Podejrzenie wlasnej sieroty zdejmie dopiero zwykly prompt.
+          if (!done && state === 'closing') finish(false);
         }, idleMs);
       };
 
@@ -496,26 +501,25 @@ export class PagerSession {
         // na prompt gry po naszym "q" i ponawiamy komende odczytu.
         if (state === 'recovering') {
           if (line.cls === 'prompt' || isPromptLine(line.text)) {
+            // Dopiero zwykly prompt potwierdza zamkniecie wlasnej sieroty.
+            clearPagerOrphan(session.generation);
             state = 'letter';
             send(`przeczytaj list ${numer}`);
           }
           return;
         }
         if (state === 'letter' && !headersDone && PAGER_REJECTION_RE.test(line.text)) {
-          // Kazde odrzucenie zamykamy "q" - sierota nie zostaje po nas.
-          send('q');
-          if (done) return;
-          if (retried) {
-            // Fala 24g: drugie odrzucenie = pager przetrwal pierwsze
-            // "q"; drugie wlasnie poszlo bez potwierdzenia - sierota
-            // moze trwac. Podejrzenie dla straznika.
-            suspectPagerOrphan();
-            cleanup();
-            reject(new Error(`pager session list ${numer}: odrzucono przez sierocy pager`));
+          // Samo odrzucenie nie dowodzi wlasnego pochodzenia pagera.
+          // Jedno q i jedno ponowienie wymagaja wczesniejszego podejrzenia.
+          if (retried || !isPagerOrphanSuspected(session.generation)) {
+            fail(new AmbiguousResponseError(
+              `odrzucenie komendy list ${numer} przez pager nieznanego pochodzenia`,
+            ));
             return;
           }
           retried = true;
           state = 'recovering';
+          send('q');
           return;
         }
 

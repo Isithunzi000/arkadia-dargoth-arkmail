@@ -1,24 +1,17 @@
 /**
- * Fala 41 (commit 2): pobieranie tresci PER REKORD.
+ * Pobieranie tresci PER REKORD.
  *
- * Regula wlasciciela: kazdy list wylistowany przez Arkadie to osobny
- * rekord - nawet przy identycznych metadanych (temat/nadawca/data).
- * Skoro rekordy blizniacze sa osobne, kazdy z nich musi dostac WLASNA
- * tresc: osobny odczyt ze swojego wiersza listingu, a tresc laduje
- * DOKLADNIE w tym rekordzie (zadnego wypelniania calej grupy jednym
- * odczytem).
+ * Kazdy wpis listingu pozostaje osobnym rekordem archiwum, takze przy
+ * identycznych metadanych. Wpis z biezacego kontekstu zachowuje swoj numer.
+ * Stary kontekst wymaga nowej kotwicy; identyczne wpisy na takiej kotwicy
+ * sa niejednoznaczne, wiec operacja konczy sie przed odczytem.
  *
  * Kontrakt:
- *  - kandydat = rekord z pusta trescia i prawidlowa data (zero grupowania
- *    po kluczu tresci, zero slotow occurrences),
- *  - re-kotwica strony po dacie: wpis wybierany po archiveId rekordu
- *    (padnie do metadanych + numeru wiersza tylko jako fallback),
- *  - 'missing' czysci WYLACZNIE rekord, ktorego wiersza nie ma na
- *    swiezym listingu - blizniak zostaje nietkniety,
- *  - circuit breaker (3 bledy z rzedu) i ETA zostaja jak w Fali 31a.
- *
- * Ten plik zastepuje downloadOccurrences.test.ts (Fala 35c) - maszyneria
- * occurrences/multis wypada z runtime'u razem z ta fala.
+ *  - kandydat = rekord z pusta trescia i prawidlowa data,
+ *  - nowa kotwica z blizniakami nie zgaduje numeru i nie zmienia tresci,
+ *  - na jednoznacznym listingu 'missing' czysci WYLACZNIE rekord, ktorego
+ *    tozsamosci nie ma na swiezym listingu,
+ *  - circuit breaker (3 bledy z rzedu) i ETA pozostaja bez zmian.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -124,7 +117,16 @@ const TWIN_LISTING = [
   'Nadawca: Corge                       Wt, 24 VIII 1999, 11:00:00',
 ];
 
-/** Swiezy listing, na ktorym blizniak 2 ZNIKNAL (zostal skasowany). */
+/** Jednoznaczny listing do pierwszego odczytu scenariusza missing. */
+const FIRST_SINGLE_LISTING = [
+  'Listy odebrane:',
+  ' 3. *R* Temat: Raport',
+  `Nadawca: Goniec                       ${TWIN_DATE}`,
+  ' 1. *R* Temat: Inny',
+  'Nadawca: Corge                       Wt, 24 VIII 1999, 11:00:00',
+];
+
+/** Swiezy listing, na ktorym zostal tylko drugi wpis o tych metadanych. */
 const SINGLE_LISTING = [
   'Listy odebrane:',
   ' 2. *R* Temat: Raport',
@@ -197,34 +199,26 @@ const readBack = async (): Promise<Record<string, ArchiveLetter>> => {
   );
 };
 
-test('blizniaki: kazdy rekord pobiera WLASNA tresc ze swojego wiersza', async () => {
+test('blizniaki: nowa kotwica przerywa pobieranie przed zgadnieciem wiersza', async () => {
   const h = await startHarness({ archive: twinRecords() });
   try {
     click(h, '[data-tab="archiwum"]');
     const anchorsBefore = anchorCount(h);
     clickDownloadTwice(h);
 
-    // Rekord 1 (wiersz 3): re-kotwica po dacie + odczyt wiersza 3.
     await waitRt(() => anchorCount(h) > anchorsBefore, 're-kotwica: rekord 1');
     replayListing(h, TWIN_LISTING);
-    await waitRt(() => h.f.sent.includes('przeczytaj list 3'), 'odczyt wiersza 3 (rekord 1)');
-    replayLetter(h, 3, 'Tresc pierwszego.');
+    await waitRt(
+      () => notifyText(h.f, 'Nie mozna bezpiecznie ustalic numeru listu'),
+      'komunikat o niejednoznacznych blizniakach',
+    );
+    for (let i = 0; i < 12; i++) await new Promise((resolve) => setImmediate(resolve));
 
-    // Rekord 2 (wiersz 2): OSOBNA re-kotwica + odczyt wiersza 2.
-    await waitRt(() => anchorCount(h) > anchorsBefore + 1, 're-kotwica: rekord 2');
-    replayListing(h, TWIN_LISTING);
-    await waitRt(() => h.f.sent.includes('przeczytaj list 2'), 'odczyt wiersza 2 (rekord 2)');
-    replayLetter(h, 2, 'Tresc drugiego.');
-
-    await waitRt(() => notifyText(h.f, 'Pobrano tresci'), 'toast podsumowania');
-
+    assert.ok(!h.f.sent.includes('przeczytaj list 3'), 'brak zgadywania pierwszego wiersza');
+    assert.ok(!h.f.sent.includes('przeczytaj list 2'), 'brak zgadywania drugiego wiersza');
     const stored = await readBack();
-    const body1 = stored[ID_TWIN_1]?.body.join('\n') ?? '';
-    const body2 = stored[ID_TWIN_2]?.body.join('\n') ?? '';
-    assert.ok(body1.includes('Tresc pierwszego.'), 'rekord 1 dostal tresc wiersza 3');
-    assert.ok(!body1.includes('Tresc drugiego.'), 'rekord 1 NIE dostal tresci blizniaka');
-    assert.ok(body2.includes('Tresc drugiego.'), 'rekord 2 dostal tresc wiersza 2');
-    assert.ok(!body2.includes('Tresc pierwszego.'), 'rekord 2 NIE dostal tresci blizniaka');
+    assert.deepEqual(stored[ID_TWIN_1]?.body, [], 'pierwszy rekord bez przypisanej tresci');
+    assert.deepEqual(stored[ID_TWIN_2]?.body, [], 'drugi rekord bez przypisanej tresci');
   } finally {
     await stopHarness();
   }
@@ -237,13 +231,13 @@ test('blizniaki: missing czysci TYLKO rekord, ktorego wiersza nie ma na listingu
     const anchorsBefore = anchorCount(h);
     clickDownloadTwice(h);
 
-    // Rekord 1: normalny odczyt.
+    // Rekord 1: jednoznaczny listing pozwala na normalny odczyt.
     await waitRt(() => anchorCount(h) > anchorsBefore, 're-kotwica: rekord 1');
-    replayListing(h, TWIN_LISTING);
+    replayListing(h, FIRST_SINGLE_LISTING);
     await waitRt(() => h.f.sent.includes('przeczytaj list 3'), 'odczyt wiersza 3 (rekord 1)');
     replayLetter(h, 3, 'Tresc pierwszego.');
 
-    // Rekord 2: swiezy listing pokazuje, ze wiersz 2 zniknal.
+    // Rekord 2: jednoznaczny listing nie zawiera tozsamosci tego rekordu.
     await waitRt(() => anchorCount(h) > anchorsBefore + 1, 're-kotwica: rekord 2');
     replayListing(h, SINGLE_LISTING);
     // 'missing' z odebranych = petla probuje pozostale skrzynki (replica

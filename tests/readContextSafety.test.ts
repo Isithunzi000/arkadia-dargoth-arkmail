@@ -65,6 +65,23 @@ async function prepareSearch(h: Harness, rows: readonly Row[]): Promise<void> {
   );
 }
 
+async function expireServerListing(h: Harness): Promise<void> {
+  h.f.fireEvent('gmcp.mail.state', { unread: false, unreceived: false, unsent: true });
+  const empty = {
+    niewyslane: 'Nie masz zadnych niewyslanych listow.',
+    wyslane: 'Nie masz zadnych wyslanych listow.',
+  } as const;
+  for (const box of ['niewyslane', 'wyslane'] as const) {
+    await h.waitFor(() => h.f.sent.includes(`listy ${box}`), `listing zmieniajacy kontekst: ${box}`);
+    h.f.fire(empty[box], 'mail');
+    h.f.fire('> ', 'prompt');
+  }
+  await h.waitFor(() => {
+    const busy = h.content.querySelector('.arkmail-busy') as { textContent?: string } | null;
+    return busy?.textContent === '';
+  }, 'koniec listingu zmieniajacego kontekst');
+}
+
 function replayLetter(h: Harness, number: number): void {
   h.f.fire(`List : ${number}`, 'mail');
   h.f.fire('Od   : Corge', 'mail');
@@ -77,12 +94,13 @@ function replayLetter(h: Harness, number: number): void {
 }
 
 test('wyszukiwanie: dwa wpisy z kandydatem numer 3 koncza operacje przed odczytem', async () => {
-  const h = await startHarness({ autoRefreshEnabled: false });
+  const h = await startHarness();
   try {
     await prepareSearch(h, [
       { number: 2, subject: 'inny' },
       { number: 1, subject: 'wybrany' },
     ]);
+    await expireServerListing(h);
     click(h, '.arkmail-entry[data-number="1"]');
     await waitRt(() => h.f.sent.filter((command) => command === SEARCH).length === 2, 'swieze wyszukiwanie');
 
@@ -101,7 +119,7 @@ test('wyszukiwanie: dwa wpisy z kandydatem numer 3 koncza operacje przed odczyte
 });
 
 test('wyszukiwanie: pelny listing jest odrzucany juz przy pierwszym filtrze', async () => {
-  const h = await startHarness({ autoRefreshEnabled: false });
+  const h = await startHarness();
   try {
     click(h, '[data-box="odebrane"]');
     await waitRt(() => h.f.sent.includes('listy odebrane'), 'poczatkowy listing');
@@ -127,9 +145,10 @@ test('wyszukiwanie: pelny listing jest odrzucany juz przy pierwszym filtrze', as
 });
 
 test('wyszukiwanie: pelny listing nie moze zastapic odpowiedzi na filtr', async () => {
-  const h = await startHarness({ autoRefreshEnabled: false });
+  const h = await startHarness();
   try {
     await prepareSearch(h, [{ number: 1, subject: 'wybrany' }]);
+    await expireServerListing(h);
     click(h, '.arkmail-entry');
     await waitRt(() => h.f.sent.filter((command) => command === SEARCH).length === 2, 'swieze wyszukiwanie');
 
@@ -144,9 +163,10 @@ test('wyszukiwanie: pelny listing nie moze zastapic odpowiedzi na filtr', async 
 });
 
 test('wyszukiwanie: zly numer i pozny prompt pagera nie powoduja drugiego listingu ani q', async () => {
-  const h = await startHarness({ autoRefreshEnabled: false });
+  const h = await startHarness();
   try {
     await prepareSearch(h, [{ number: 1, subject: 'wybrany' }]);
+    await expireServerListing(h);
     click(h, '.arkmail-entry');
     await waitRt(() => h.f.sent.filter((command) => command === SEARCH).length === 2, 'swieze wyszukiwanie');
     replyListing(h, [{ number: 1, subject: 'wybrany' }]);
@@ -171,9 +191,10 @@ test('wyszukiwanie: zly numer i pozny prompt pagera nie powoduja drugiego listin
 });
 
 test('wyszukiwanie: dopiero zwykly prompt po zlym numerze pozwala na jedna ponowna probe', async () => {
-  const h = await startHarness({ autoRefreshEnabled: false });
+  const h = await startHarness();
   try {
     await prepareSearch(h, [{ number: 1, subject: 'wybrany' }]);
+    await expireServerListing(h);
     click(h, '.arkmail-entry');
     await waitRt(() => h.f.sent.filter((command) => command === SEARCH).length === 2, 'swieze wyszukiwanie');
     replyListing(h, [{ number: 1, subject: 'wybrany' }]);

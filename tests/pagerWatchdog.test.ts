@@ -1,18 +1,10 @@
 /**
- * Straznik sierocych pagerow (Fala 11g, przebudowa Fala 24g).
+ * Ochrona recznej sesji poczty przed automatycznym zamykaniem.
  *
- * Fala 11g: kazdy prompt pagera poza blokada sesji dostawal automatyczne
- * "q" - ale tryb czytania poczty GRACZA ma identyczny prompt
- * ("[1-50 ...] (aktualny: N) -- "), wiec straznik zabijal reczne sesje
- * (log 2026-10-21: gracz wpisal "d" w trybie poczty i wyszedl na dol,
- * "?" dawalo pomoc gry zamiast pomocy edytora; zarzadzanie listami
- * recznie bylo niemozliwe bez odinstalowania wtyczki).
- *
- * Fala 24g: straznik odpala "q" WYLACZNIE przy pozytywnym podejrzeniu
- * sieroty (flaga stawiana przez wlasne awaryjne sesje pagera/listingu -
- * patrz core/session/orphanPager.ts). Prompt bez podejrzenia to sesja
- * gracza - nietknieta. Echo komendy wchodzacej w tryb poczty ("list",
- * "listy", "przeczytaj", "poczta") czysci podejrzenie prewencyjnie.
+ * Prompt pagera gracza jest nierozroznialny od promptu wlasnej sieroty.
+ * Dlatego sam prompt poza operacja nigdy nie powoduje wyslania "q".
+ * Podejrzenie wlasnej sieroty konsumuje wylacznie lokalna sesja
+ * Mailbox/Pager; echo komendy gracza wchodzacej w poczte czysci stary stan.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -32,28 +24,28 @@ function replayLetter(h: Harness, n: number): void {
   f.fire('> ', 'prompt');
 }
 
-test('straznik: prompt pagera bez podejrzenia sieroty zostaje nietkniety (reczna sesja gracza)', async () => {
+test('ochrona: prompt pagera bez podejrzenia sieroty zostaje nietkniety (reczna sesja gracza)', async () => {
   const h = await startHarness();
   const { f } = h;
   try {
     await loadTruncatedBox(h);
     const qBefore = f.sent.filter((c) => c === 'q').length;
     // Gracz sam wszedl w tryb czytania poczty - prompt pagera poza
-    // transakcja pluginu, ale BEZ podejrzenia sieroty. Straznik NIE
+    // transakcja pluginu, ale BEZ podejrzenia sieroty. Plugin NIE
     // wysyla q (Fala 24g: to zabijalo reczne sesje, log 2026-10-21).
     f.fire('[1-50 adefFhHmnqrsRux.!?-+<>] (aktualny: 1) -- ', 'mail');
     await new Promise((r) => setTimeout(r, 400));
     assert.equal(
       f.sent.filter((c) => c === 'q').length,
       qBefore,
-      'bez podejrzenia sieroty straznik nie wysyla q',
+      'bez podejrzenia sieroty plugin nie wysyla q',
     );
   } finally {
     await stopHarness();
   }
 });
 
-test('straznik: echo komendy pocztowej gracza + prompt pagera -> bez q', async () => {
+test('ochrona: echo komendy pocztowej gracza + prompt pagera -> bez q', async () => {
   const h = await startHarness();
   const { f } = h;
   try {
@@ -78,7 +70,7 @@ test('straznik: echo komendy pocztowej gracza + prompt pagera -> bez q', async (
   }
 });
 
-test('straznik: prompt pagera pod blokada (legalny odczyt) bez dodatkowego q', async () => {
+test('ochrona: prompt pagera pod blokada (legalny odczyt) bez dodatkowego q', async () => {
   const h = await startHarness();
   const { f, waitFor, content } = h;
   try {
@@ -105,7 +97,7 @@ test('straznik: prompt pagera pod blokada (legalny odczyt) bez dodatkowego q', a
     f.fire('> ', 'prompt');
     await waitFor(() => ((content.querySelector('.arkmail-busy') as { textContent?: string | null } | null)?.textContent ?? 'missing') === '', 'koniec refreshu');
     await new Promise((r) => setTimeout(r, 300));
-    // Dokladnie jedno q - z legalnej sesji; straznik nie dorzucil swojego.
+    // Dokladnie jedno q - z legalnej sesji; plugin nie dorzucil swojego.
     assert.equal(f.sent.filter((c) => c === 'q').length, 1, 'tylko q z sesji odczytu');
   } finally {
     await stopHarness();

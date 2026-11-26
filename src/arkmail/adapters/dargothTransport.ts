@@ -70,7 +70,6 @@ export class DargothTransport implements Transport {
   private pagerOpen = false;
   private pagerCloseSent = false;
   private pagerClosePromptSeen = false;
-  private pagerUserClose = false;
   private pagerTakenOver = false;
   private pagerCloseFailed = false;
   private pagerCloseAttempt = 0;
@@ -112,58 +111,42 @@ export class DargothTransport implements Transport {
     return this.online;
   }
 
-  /** Usuwa powtorzenia recznego zamkniecia, ale zachowuje jego zdarzenie. */
-  private takeQueuedPagerClose(): string | null {
-    let first: string | null = null;
-    this.queue = this.queue.filter((command) => {
-      if (!isPagerCloseCommand(command)) return true;
-      first ??= command;
-      return false;
-    });
-    return first;
-  }
-
   send(line: string, echo = false): Promise<void> {
     if (!this.pagerModal || !isPagerCloseCommand(line)) return this.enqueue(line, echo);
     if (this.pagerCloseSent) return Promise.resolve();
-    const queued = this.takeQueuedPagerClose();
-    // Odlozone q/x gracza zastepuje automatyczne q. Na drucie trafia
-    // dokladnie jedna komenda i zachowuje zrodlo oraz widoczne echo.
-    if (queued !== null) {
-      return this.startPagerClose(queued, true, 'user', queued);
-    }
-    return this.startPagerClose(line, echo, 'arkmail', null);
+    return this.startPagerClose(line, echo);
   }
 
-  /** Ustawia koalescencje od razu, ale cofa ja przy odrzuceniu wysylki. */
-  private startPagerClose(
-    line: string,
-    echo: boolean,
-    source: CommandSource,
-    userCommand: string | null,
-  ): Promise<void> {
-    const hooks = this.pagerModal;
-    if (!hooks) return this.enqueue(line, echo, source);
+  /** Automatyczne q jest pojedyncze dla danego pagera; reczne q/x omija te sciezke. */
+  private startPagerClose(line: string, echo: boolean): Promise<void> {
+    if (!this.pagerModal) return this.enqueue(line, echo);
     this.pagerOpen = false;
     this.pagerCloseSent = true;
     this.pagerClosePromptSeen = false;
     const attempt = ++this.pagerCloseAttempt;
-    const result = this.enqueue(line, echo, source);
+    const result = this.enqueue(line, echo, 'arkmail');
     void result.catch(() => {
       if (attempt !== this.pagerCloseAttempt || this.pagerClosePromptSeen) return;
       this.pagerCloseAttempt++;
       this.pagerCloseSent = false;
       this.pagerClosePromptSeen = false;
-      this.pagerUserClose = false;
       this.pagerOpen = false;
       this.pagerCloseFailed = true;
     });
-    if (userCommand !== null) this.pagerTakenOver = true;
-    if (userCommand !== null && !this.pagerUserClose) {
-      this.pagerUserClose = true;
-      hooks.onUserCommand(userCommand);
-    }
     return result;
+  }
+
+  /** Reczne q/x przechodzi przez oryginalny kanal klienta, bez kopii i kolejki. */
+  private takeOverPagerClose(command: string): void {
+    const hooks = this.pagerModal;
+    if (!hooks) return;
+    this.pagerCloseAttempt++;
+    this.pagerOpen = false;
+    this.pagerCloseSent = true;
+    this.pagerClosePromptSeen = false;
+    this.pagerTakenOver = true;
+    this.pagerCloseFailed = false;
+    hooks.onUserCommand(command);
   }
 
   /** Jedna komenda czeka na zakonczenie przetwarzania poprzedniej. */
@@ -266,27 +249,17 @@ export class DargothTransport implements Transport {
     this.pagerOpen = false;
     this.pagerCloseSent = false;
     this.pagerClosePromptSeen = false;
-    this.pagerUserClose = false;
     this.pagerTakenOver = false;
     this.pagerCloseFailed = false;
     this.hookId = this.api.commandHooks.register((command: string) => {
       if (this.sendingOwn) return undefined;
       if (this.pagerModal && isPagerCloseCommand(command)) {
-        const hooks = this.pagerModal;
-        if (this.pagerOpen && !this.pagerCloseSent) {
-          void this.startPagerClose(command, true, 'user', command).catch(() => {});
-        } else if (this.pagerCloseSent) {
-          // Zamkniecie jest juz w toku. Powtorzone q/x nalezy do tej
-          // samej operacji: nie wysyla duplikatu, nie odrzuca komendy
-          // i nie anuluje odczytu, ktory konczy sie na zwyklym prompcie.
-        } else if (!this.queue.some(isPagerCloseCommand)) {
-          // Przed promptem pagera q/x czeka na potwierdzenie jego
-          // otwarcia. Powtorzenie tej samej intencji jest koalescencja.
-          this.queue.push(command);
-        }
+        // Kazde reczne q/x wraca do klienta jako oryginalna komenda.
+        // Plugin jedynie konczy wlasna sesje i wstrzymuje automatyzacje.
+        this.takeOverPagerClose(command);
+        return undefined;
       } else if (!this.modalActive) {
-        // Po zamknieciu modalu hook zachowuje wylacznie koalescencje
-        // q/x do promptu. Kazda inna komenda wraca do zwyklego klienta.
+        // Po zamknieciu modalu kazda komenda wraca do zwyklego klienta.
         return undefined;
       } else if (this.pagerModal && this.pagerOpen && isPagerCommand(command)) {
         const hooks = this.pagerModal;
@@ -317,11 +290,6 @@ export class DargothTransport implements Transport {
     if (index < 0) return;
     const command = this.queue[index]!;
     const hooks = this.pagerModal;
-    if (isPagerCloseCommand(command)) {
-      const queued = this.takeQueuedPagerClose()!;
-      void this.startPagerClose(queued, true, 'user', queued).catch(() => {});
-      return;
-    }
     this.queue.splice(index, 1);
     this.pagerTakenOver = true;
     hooks.onUserCommand(command);
@@ -334,7 +302,6 @@ export class DargothTransport implements Transport {
     this.pagerOpen = false;
     this.pagerCloseSent = false;
     this.pagerClosePromptSeen = false;
-    this.pagerUserClose = false;
     this.pagerTakenOver = false;
     this.pagerCloseFailed = false;
     if (this.hookId !== null) {
@@ -391,7 +358,6 @@ export class DargothTransport implements Transport {
     this.pagerOpen = false;
     this.pagerCloseSent = false;
     this.pagerClosePromptSeen = false;
-    this.pagerUserClose = false;
     this.pagerTakenOver = false;
     this.pagerCloseFailed = false;
     this.pagerCloseAttempt++;
@@ -459,6 +425,13 @@ export class DargothTransport implements Transport {
             }
           } else if (proto.cls === 'prompt' || isPromptLine(proto.text)) {
             this.pagerOpen = false;
+            if (this.pagerCloseSent && this.pagerClosePromptSeen) {
+              // Zwykly prompt konczy poprzednie zamykanie. Ponowiona operacja
+              // moze otworzyc nowy pager i musi moc zamknac go niezaleznie.
+              this.pagerCloseAttempt++;
+              this.pagerCloseSent = false;
+              this.pagerClosePromptSeen = false;
+            }
           }
         }
         // Najpierw wlasciciel sesji. Globalny subskrybent moze ja zamknac

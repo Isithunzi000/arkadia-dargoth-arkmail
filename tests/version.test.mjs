@@ -172,3 +172,14 @@ test('dokumentacja: wykonana naprawa bezpiecznego odczytu jest zapisana', () => 
   assert.match(report, /GitHub Release/);
   assert.equal(fs.existsSync(path.join(REPO, 'docs/PLAN-1.30.20.md')), false);
 });
+
+test('dokumentacja: analiza regresji i aktywny plan naprawy sa zapisane', () => {
+  const analysis = fs.readFileSync(path.join(REPO, 'docs/ANALIZA-1.30.5-1.30.21.md'), 'utf8');
+  const plan = fs.readFileSync(path.join(REPO, 'docs/PLAN-1.30.22.md'), 'utf8');
+  assert.match(analysis, /## Potwierdzone mechanizmy regresji/);
+  assert.match(analysis, /kolejności `\[1,2\]`/);
+  assert.match(analysis, /Nie jest to dowód przyczyny konkretnego zdarzenia/);
+  assert.match(plan, /## Zakres i decyzje/);
+  assert.match(plan, /## Etapy wykonania/);
+  assert.match(plan, /Bez testów live/);
+});

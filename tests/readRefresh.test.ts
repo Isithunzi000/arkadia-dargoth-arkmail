@@ -131,16 +131,12 @@ test('odczyt w trybie wynikow szukania NIE odswieza (wyniki zostaja)', async () 
     await waitFor(() => content.querySelectorAll('.arkmail-entry').length === 1, 'wynik w widoku');
 
     click(h, '.arkmail-entry');
-    await waitFor(
-      () => f.sent.filter((command) => command === 'listy odebrane od corge').length === 2,
-      'swieza kotwica pierwotnego filtra',
+    await waitFor(() => f.sent.includes('przeczytaj list 1'), 'przeczytaj aktualny wynik');
+    assert.equal(
+      f.sent.filter((command) => command === 'listy odebrane od corge').length,
+      1,
+      'aktualny wynik nie uruchamia drugiego listingu',
     );
-    assert.ok(!f.sent.some((command) => command.startsWith('przeczytaj list')), 'brak odczytu przed swiezym listingiem');
-    f.fire('Wybrane listy odebrane:', 'mail');
-    f.fire(' 1. *R* Temat: najnowszy', 'mail');
-    f.fire('Nadawca: Corge                       Wt, 24 VIII 1999, 00:11:12', 'mail');
-    f.fire('> ', 'prompt');
-    await waitFor(() => f.sent.includes('przeczytaj list 1'), 'przeczytaj z wynikow');
     const fullListingsBeforeRead = f.sent.filter((command) => command === 'listy odebrane').length;
     replayLetter(h, 1);
     await waitFor(() => !!content.querySelector('.arkmail-letter-body'), 'list otwarty');

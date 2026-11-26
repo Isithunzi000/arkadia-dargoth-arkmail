@@ -87,6 +87,23 @@ test('transport: sesje maja odrebne identyfikatory, a reconnect zamyka stara gen
   third.close();
 });
 
+test('transport: sesja reaguje przed globalnymi subskrybentami jak w produkcji', () => {
+  const t = new MockTransport();
+  const session = t.openSession();
+  const events: string[] = [];
+  session.subscribe(() => {
+    events.push('sesja');
+    session.close();
+  });
+  t.subscribe(() => {
+    events.push(`subskrybent:${session.active ? 'aktywna' : 'zamknieta'}`);
+  });
+
+  t.emit({ cls: 'mail', text: 'syntetyczna linia' });
+
+  assert.deepEqual(events, ['sesja', 'subskrybent:zamknieta']);
+});
+
 test('transport: druga rownolegla sesja jest odrzucona do zamkniecia pierwszej', async () => {
   const t = new MockTransport();
   const scoped = t as unknown as ScopedTransport;
