@@ -22,8 +22,8 @@ function metaVersion() {
   return m[1];
 }
 
-test('wydanie: przygotowany numer wersji to 1.30.22', () => {
-  assert.equal(metaVersion(), '1.30.22');
+test('wydanie: przygotowany numer wersji to 1.30.23', () => {
+  assert.equal(metaVersion(), '1.30.23');
 });
 
 function latestZip() {
@@ -187,4 +187,20 @@ test('dokumentacja: analiza regresji i wykonana naprawa sa zapisane', () => {
   assert.match(report, /Nieznany pager gracza pozostaje nietknięty/);
   assert.match(report, /Nie wykonano testów na realnej grze/);
   assert.equal(fs.existsSync(path.join(REPO, 'docs/PLAN-1.30.22.md')), false);
+});
+
+test('dokumentacja: naprawa numerow wynikow wyszukiwania jest zapisana', () => {
+  const analysis = fs.readFileSync(path.join(REPO, 'docs/ANALIZA-1.30.23.md'), 'utf8');
+  const report = fs.readFileSync(path.join(REPO, 'docs/NAPRAWA-1.30.23.md'), 'utf8');
+  assert.match(analysis, /uniewaznia wczesniejsze/);
+  assert.match(analysis, /6 kontrolek: 4 zaliczone i 2 bledy/);
+  assert.match(analysis, /1392\/1392/);
+  assert.match(report, /## Zakres poprawki/);
+  assert.match(report, /## Dowody lokalne/);
+  assert.match(report, /## Weryfikacja zdalna/);
+  assert.match(report, /`przeczytaj list 2`/);
+  assert.match(report, /Nieznany pager gracza pozostaje nietknięty/);
+  assert.match(report, /Nie wykonano nowego testu na realnej grze/);
+  assert.match(report, /1392\/1392/);
+  assert.equal(fs.existsSync(path.join(REPO, 'docs/PLAN-1.30.23.md')), false);
 });

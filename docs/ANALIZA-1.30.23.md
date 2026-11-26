@@ -75,7 +75,12 @@ niejednoznacznosci i braku zgadywania numeru pozostaly aktywne.
 - Dokladne scenariusze zgloszenia: **6/6** po poprawce.
 - Powiazany zestaw wyszukiwania, ponownej kotwicy, odczytu, archiwum i
   pagera: **55/55**.
-- Pelny zestaw, typowanie i budowanie sa uzupełniane po ich zakonczeniu.
+- Pelny zestaw przed commitem naprawy: **1392/1392**, bez bledow,
+  anulowanych i pominietych kontrolek.
+- Osobne typowanie i budowanie zakonczyly sie sukcesem.
+- Commit naprawy `0035c98578a71b457ff05dd32fefce93fab3380a` przeszedl
+  zdalny `Build plugins` w przebiegu `45869052316`; zadania `build` i
+  `deploy` zakonczyly sie sukcesem.
 
 ## Granice dowodu
 
