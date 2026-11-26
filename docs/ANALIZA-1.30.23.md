@@ -1,5 +1,10 @@
 # Analiza blednego numeru w wynikach wyszukiwania
 
+> Korekta po kolejnym tescie realnej gry: wersja 1.30.23 nadal wysyla
+> `przeczytaj list 3`, a reczne `q` nie odblokowuje interfejsu. Wnioski o
+> naprawie przez normalizacje zostaly obalone. Zielone testy syntetyczne nie
+> rozstrzygaly zgodnosci z wykonaniem w realnym kliencie.
+
 ## Zgloszenie z realnej gry
 
 Wersja 1.30.22 nadal wysylala bledny numer po zawężeniu listy do dwoch

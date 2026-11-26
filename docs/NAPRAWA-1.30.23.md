@@ -1,5 +1,10 @@
 # Naprawa ArkMail 1.30.23
 
+> Korekta po kolejnym tescie realnej gry: objaw blednego numeru i blokady po
+> recznym `q` nadal wystepuje. Tytul i dawne wnioski o skutecznosci poprawki
+> pozostaja ponizej wylacznie jako historia. Nie stanowia one potwierdzenia
+> naprawy. Aktualny zakres prac opisuje `PLAN-1.30.24.md`.
+
 ## Zakres poprawki
 
 1. Wyniki wyszukiwania otrzymuja numery komend zgodnie z pozycja w selekcji: ostatni odebrany wpis ma numer 1, przedostatni numer 2 itd. Surowa liczba wypisana przez serwer przy wyniku nie jest juz automatycznie numerem polecenia odczytu.
