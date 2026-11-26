@@ -16,7 +16,6 @@ import {
 
 const DATE = 'Wt, 24 VIII 1999, 00:11:12';
 const SEARCH = 'listy odebrane od corge';
-const INVALID_NUMBERING = 'Nie mozna bezpiecznie ustalic numeru listu';
 
 interface Row {
   number: number;
@@ -93,7 +92,7 @@ function replayLetter(h: Harness, number: number): void {
   h.f.fire('> ', 'prompt');
 }
 
-test('wyszukiwanie: dwa wpisy z kandydatem numer 3 koncza operacje przed odczytem', async () => {
+test('wyszukiwanie: ponowna kotwica 3,2 czyta wybrany wpis numerem 2 selekcji', async () => {
   const h = await startHarness();
   try {
     await prepareSearch(h, [
@@ -108,11 +107,13 @@ test('wyszukiwanie: dwa wpisy z kandydatem numer 3 koncza operacje przed odczyte
       { number: 3, subject: 'wybrany' },
       { number: 2, subject: 'inny' },
     ]);
-    await drain();
+    await waitRt(() => h.f.sent.includes('przeczytaj list 2'), 'odczyt numeru pozycji selekcji');
 
-    assert.ok(notifyText(h.f, INVALID_NUMBERING), 'jasny blad niezgodnej numeracji');
-    assert.equal(h.f.sent.filter((command) => command.startsWith('przeczytaj list')).length, 0);
+    assert.ok(!notifyText(h.f, 'Nie mozna bezpiecznie ustalic numeru listu'), 'etykiety 3,2 nie sa bledem');
+    assert.ok(!h.f.sent.includes('przeczytaj list 3'), 'surowa etykieta nie trafia do komendy');
     assert.ok(!h.f.sent.includes('q'), 'bez zgadywanego zamkniecia pagera');
+    replayLetter(h, 2);
+    await h.waitFor(() => h.content.querySelector('.arkmail-letter-body') !== null, 'otwarty list');
   } finally {
     await stopHarness();
   }

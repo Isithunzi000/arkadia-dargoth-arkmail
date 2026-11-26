@@ -1313,6 +1313,21 @@ export async function init(api: PluginApi) {
     return entries.map((e, i) => fromMailboxEntry(box, e, scanKey, i));
   };
 
+  /**
+   * Wynik filtra ma numeracje komend 1..N wzgledem selekcji, niezaleznie
+   * od etykiet wypisanych przez serwer. Listing przychodzi od najstarszego
+   * do najnowszego, wiec ostatni wpis dostaje 1. Normalizacja przed dalsza
+   * obrobka obejmuje tez ponowienie filtra i ponowna kotwice po bledzie.
+   */
+  const normalizeSearchResult = (res: MailboxResult): MailboxResult => {
+    if (res.kind === "lista") {
+      for (let i = 0; i < res.entries.length; i++) {
+        res.entries[i]!.number = res.entries.length - i;
+      }
+    }
+    return res;
+  };
+
   const hasAmbiguousIdentity = (entries: readonly MailboxEntry[], entry: MailboxEntry): boolean =>
     entries.filter((item) => entryKey(item) === entryKey(entry)).length > 1;
 
@@ -1361,18 +1376,8 @@ export async function init(api: PluginApi) {
     if (search !== undefined) {
       // Dopiero utrata zgodnosci kontekstu wymaga ponowienia dokladnie
       // pierwotnego filtra i jednoznacznego dopasowania rekordu.
-      const res = await mailbox.fetch(box, search.command, { filtered: true });
+      const res = normalizeSearchResult(await mailbox.fetch(box, search.command, { filtered: true }));
       if (res.kind === "lista") {
-        const numbers = res.entries.map((item) => item.number).sort((a, b) => a - b);
-        if (!numbers.every((number, index) => number === index + 1)) {
-          bumpCtx(box, search);
-          notify(
-            api,
-            "Nie mozna bezpiecznie ustalic numeru listu - wyniki maja niespojna numeracje. Odswiez skrzynke.",
-            { level: "warning" },
-          );
-          return null;
-        }
         if (hasAmbiguousIdentity(res.entries, entry)) {
           bumpCtx(box, search);
           notifyAmbiguousIdentity();
@@ -2919,7 +2924,7 @@ export async function init(api: PluginApi) {
       ui.setBusy(`Szukam w skrzynce ${box}...`);
       const generation = connectionGeneration;
       void runExclusive(async () => {
-          const res = await mailbox.fetch(box, search.command, { filtered: true });
+          const res = normalizeSearchResult(await mailbox.fetch(box, search.command, { filtered: true }));
           // Fala 41: wyniki szukania tez wklejane pod tozsamoscia
           // przebiegu (numeracja selekcji nie koliduje z pelnymi
           // listinguami - inny scanKey).
