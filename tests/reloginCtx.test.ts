@@ -173,6 +173,7 @@ test('re-login: "Zadne listy nie zostaly wybrane" = re-kotwica i druga szansa', 
       'pierwsza proba odczytu',
     );
     f.fire('Zadne listy nie zostaly wybrane.', 'mail');
+    f.fire('> ', 'prompt');
     await waitFor(
       () => f.sent.slice(base).includes('listy odebrane przed 25 VIII 1999'),
       'wymuszona re-kotwica po bledzie',
@@ -207,6 +208,7 @@ test('re-login: powtorka bledu = toast, dokladnie dwie proby odczytu', async () 
       'pierwsza proba odczytu',
     );
     f.fire('Zadne listy nie zostaly wybrane.', 'mail');
+    f.fire('> ', 'prompt');
     await waitFor(
       () => f.sent.slice(base).includes('listy odebrane przed 25 VIII 1999'),
       're-kotwica po pierwszym bledzie',
@@ -217,6 +219,7 @@ test('re-login: powtorka bledu = toast, dokladnie dwie proby odczytu', async () 
       'druga proba odczytu',
     );
     f.fire('Zadne listy nie zostaly wybrane.', 'mail');
+    f.fire('> ', 'prompt');
     await waitFor(
       () => notifyText(f, 'Nie udalo sie odczytac listu.'),
       'toast bledu po powtorce',
@@ -242,6 +245,7 @@ test('re-login: "Zly numer listu" (desynchronizacja) tez dostaje druga szanse', 
       'pierwsza proba odczytu',
     );
     f.fire('Zly numer listu: 1.', 'mail');
+    f.fire('> ', 'prompt');
     await waitFor(
       () => f.sent.slice(base).includes('listy odebrane przed 25 VIII 1999'),
       'wymuszona re-kotwica po zlym numerze',

@@ -435,6 +435,51 @@ for (const closeCommand of ['q', 'x'] as const) {
   });
 }
 
+test('automatyczny odczyt: reczne q bez zwyklego promptu odblokowuje po 500 ms ciszy, a pager przedluza cisze', async (context) => {
+  const h = await startHarness();
+  const { f } = h;
+  let mocked = false;
+  try {
+    await startRead(h);
+    const listingsBefore = f.sent.filter((command) => command === 'listy odebrane').length;
+    context.mock.timers.enable({ apis: ['setTimeout'] });
+    mocked = true;
+
+    await f.api.command.send('q', true);
+    f.fire(PAGER_PROMPT, 'mail');
+    await drain();
+    assert.equal(f.sent.filter((command) => command === 'q').length, 1, 'jedno reczne q');
+
+    context.mock.timers.tick(499);
+    await drain();
+    assert.equal(
+      f.sent.filter((command) => command === 'listy odebrane').length,
+      listingsBefore,
+      'przed uplywem ciszy nadal bez komend pluginu',
+    );
+
+    f.fire(PAGER_PROMPT, 'mail');
+    context.mock.timers.tick(499);
+    await drain();
+    assert.equal(
+      f.sent.filter((command) => command === 'listy odebrane').length,
+      listingsBefore,
+      'kolejny prompt pagera odracza odblokowanie',
+    );
+
+    context.mock.timers.tick(1);
+    await drain();
+    assert.ok(
+      f.sent.filter((command) => command === 'listy odebrane').length > listingsBefore,
+      '500 ms ciszy po ostatnim prompcie pagera konczy blokade',
+    );
+  } finally {
+    if (mocked) context.mock.timers.reset();
+    f.fire('> ', 'prompt');
+    await stopHarness();
+  }
+});
+
 // Kontrola typu na wypadek przypadkowej zmiany podpisow API w tescie.
 const _apiTypeCheck: PluginApi = new FakeApi().api;
 void _apiTypeCheck;

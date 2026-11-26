@@ -148,8 +148,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const p = pg.readLetter(4);
   let err = null;
   p.catch((e) => { err = e; });
-  // Blad PRZED naglowkami (jak tests/listingCtx.test.ts:36): od razu, bez q.
-  await t.replay([{ cls: 'mail', text: 'Zly numer listu: 4.' }]);
+  // Blad PRZED naglowkami konczy sie na zwyklym prompcie, bez q.
+  await t.replay([
+    { cls: 'mail', text: 'Zly numer listu: 4.' },
+    { cls: 'prompt', text: '> ' },
+  ]);
   await sleep(50);
   ok('E7 zly numer reject', err !== null && /Zly numer listu: 4/.test(err.message), err?.message);
   ok('E7b humanize tnie prefiks', humanizeMailError(err?.message ?? '') === 'Zly numer listu: 4.',

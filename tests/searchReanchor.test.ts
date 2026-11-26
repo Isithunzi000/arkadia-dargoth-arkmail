@@ -61,13 +61,17 @@ async function selectEmptyBox(h: Harness, box: MailBox): Promise<void> {
   }, `koniec poczatkowego listingu ${box}`);
 }
 
-async function preparePersonSearch(h: Harness, box: MailBox): Promise<void> {
+async function preparePersonSearch(
+  h: Harness,
+  box: MailBox,
+  rows: readonly Row[] = [{ number: 1 }],
+): Promise<void> {
   await selectEmptyBox(h, box);
   setInput(h, '[data-search="osoba"]', 'Corge');
   click(h, '.arkmail-search-go');
   await h.waitFor(() => h.f.sent.includes(searchCommand(box)), `wyszukiwanie ${box}`);
-  replyListing(h, box, [{ number: 7 }]);
-  await h.waitFor(() => h.content.querySelectorAll('.arkmail-entry').length === 1, `wynik ${box}`);
+  replyListing(h, box, rows);
+  await h.waitFor(() => h.content.querySelectorAll('.arkmail-entry').length === rows.length, `wynik ${box}`);
   await h.waitFor(() => {
     const busy = h.content.querySelector('.arkmail-busy') as { textContent?: string } | null;
     return busy?.textContent === '';
@@ -89,11 +93,14 @@ test('wyszukiwanie: kazda skrzynka ponawia pierwotny filtr i czyta dopiero swiez
   for (const box of BOXES) {
     const h = await startHarness({ autoRefreshEnabled: false });
     try {
-      await preparePersonSearch(h, box);
+      await preparePersonSearch(h, box, [
+        { number: 2, subject: 'inny' },
+        { number: 1, subject: 'wybrany' },
+      ]);
       setInput(h, '[data-search="osoba"]', 'Waldo');
       setInput(h, '[data-search="temat"]', 'pozniejsza zmiana');
 
-      click(h, '.arkmail-entry');
+      click(h, '.arkmail-entry[data-number="1"]');
       await h.waitFor(
         () => h.f.sent.filter((command) => command === searchCommand(box)).length === 2,
         `ponowna kotwica pierwotnego filtra ${box}`,
@@ -101,9 +108,12 @@ test('wyszukiwanie: kazda skrzynka ponawia pierwotny filtr i czyta dopiero swiez
       assert.equal(h.f.sent.filter((command) => command.startsWith('przeczytaj list')).length, 0);
       assert.ok(!h.f.sent.some((command) => command.includes('przed 25 VIII 1999')));
 
-      replyListing(h, box, [{ number: 11 }]);
-      await h.waitFor(() => h.f.sent.includes('przeczytaj list 11'), `swiezy odczyt ${box}`);
-      assert.ok(!h.f.sent.includes('przeczytaj list 7'), `stary numer nie jest uzyty ${box}`);
+      replyListing(h, box, [
+        { number: 2, subject: 'wybrany' },
+        { number: 1, subject: 'inny' },
+      ]);
+      await h.waitFor(() => h.f.sent.includes('przeczytaj list 2'), `swiezy odczyt ${box}`);
+      assert.ok(!h.f.sent.includes('przeczytaj list 1'), `stary numer nie jest uzyty ${box}`);
       assert.ok(!h.f.sent.some((command) => command.includes('waldo')));
     } finally {
       await stopHarness();
@@ -120,7 +130,7 @@ test('wyszukiwanie: znikniecie wpisu po archiveId przerywa bez odczytu', async (
       () => h.f.sent.filter((command) => command === searchCommand('odebrane')).length === 2,
       'ponowna kotwica',
     );
-    replyListing(h, 'odebrane', [{ number: 3, subject: 'inny wpis' }]);
+    replyListing(h, 'odebrane', [{ number: 1, subject: 'inny wpis' }]);
     await h.waitFor(() => notifyText(h.f, 'Nie mozna odnalezc tego listu'), 'komunikat o zniknieciu');
     assert.ok(!h.f.sent.some((command) => command.startsWith('przeczytaj list')));
   } finally {
@@ -136,10 +146,11 @@ test('wyszukiwanie: blizniacze wpisy zachowuja archiveId po zmianie numerow', as
     click(h, '.arkmail-search-go');
     await h.waitFor(() => h.f.sent.includes(searchCommand('odebrane')), 'pierwotne wyszukiwanie');
     replyListing(h, 'odebrane', [
-      { number: 2, subject: 'blizniak' },
+      { number: 3, subject: 'blizniak' },
+      { number: 2, subject: 'inny' },
       { number: 1, subject: 'blizniak' },
     ]);
-    await h.waitFor(() => h.content.querySelectorAll('.arkmail-entry').length === 2, 'dwa blizniaki');
+    await h.waitFor(() => h.content.querySelectorAll('.arkmail-entry').length === 3, 'dwa blizniaki');
 
     click(h, '.arkmail-entry[data-number="1"]');
     await h.waitFor(
@@ -147,11 +158,12 @@ test('wyszukiwanie: blizniacze wpisy zachowuja archiveId po zmianie numerow', as
       'kotwica blizniaka',
     );
     replyListing(h, 'odebrane', [
-      { number: 4, subject: 'blizniak' },
       { number: 3, subject: 'blizniak' },
+      { number: 2, subject: 'blizniak' },
+      { number: 1, subject: 'inny' },
     ]);
-    await h.waitFor(() => h.f.sent.includes('przeczytaj list 3'), 'odczyt tego samego archiveId');
-    assert.ok(!h.f.sent.includes('przeczytaj list 4'));
+    await h.waitFor(() => h.f.sent.includes('przeczytaj list 2'), 'odczyt tego samego archiveId');
+    assert.ok(!h.f.sent.includes('przeczytaj list 3'));
     assert.ok(!h.f.sent.includes('przeczytaj list 1'));
   } finally {
     await stopHarness();
@@ -167,24 +179,26 @@ test('wyszukiwanie: pierwszy zly numer daje jedna ponowna kotwice, drugi konczy 
       () => h.f.sent.filter((command) => command === searchCommand('odebrane')).length === 2,
       'pierwsza kotwica',
     );
-    replyListing(h, 'odebrane', [{ number: 9 }]);
-    await h.waitFor(() => h.f.sent.includes('przeczytaj list 9'), 'pierwszy odczyt');
-    h.f.fire('Zly numer listu: 9.', 'mail');
+    replyListing(h, 'odebrane', [{ number: 1 }]);
+    await h.waitFor(() => h.f.sent.includes('przeczytaj list 1'), 'pierwszy odczyt');
+    h.f.fire('Zly numer listu: 1.', 'mail');
+    h.f.fire('> ', 'prompt');
 
     await h.waitFor(
       () => h.f.sent.filter((command) => command === searchCommand('odebrane')).length === 3,
       'jedyna ponowna kotwica po bledzie',
     );
     assert.equal(h.f.sent.filter((command) => command.startsWith('przeczytaj list')).length, 1);
-    replyListing(h, 'odebrane', [{ number: 4 }]);
-    await h.waitFor(() => h.f.sent.includes('przeczytaj list 4'), 'drugi odczyt');
-    h.f.fire('Zly numer listu: 4.', 'mail');
+    replyListing(h, 'odebrane', [{ number: 1 }]);
+    await h.waitFor(() => h.f.sent.filter((command) => command === 'przeczytaj list 1').length === 2, 'drugi odczyt');
+    h.f.fire('Zly numer listu: 1.', 'mail');
+    h.f.fire('> ', 'prompt');
     await h.waitFor(() => notifyText(h.f, 'Nie udalo sie odczytac listu.'), 'koniec po drugim bledzie');
 
     assert.equal(h.f.sent.filter((command) => command === searchCommand('odebrane')).length, 3);
     assert.deepEqual(
       h.f.sent.filter((command) => command.startsWith('przeczytaj list')),
-      ['przeczytaj list 9', 'przeczytaj list 4'],
+      ['przeczytaj list 1', 'przeczytaj list 1'],
     );
   } finally {
     await stopHarness();
@@ -200,17 +214,18 @@ test('wyszukiwanie: utrata wyboru listingu ponawia filtr i odczytuje swiezy nume
       () => h.f.sent.filter((command) => command === searchCommand('odebrane')).length === 2,
       'pierwsza kotwica',
     );
-    replyListing(h, 'odebrane', [{ number: 8 }]);
-    await h.waitFor(() => h.f.sent.includes('przeczytaj list 8'), 'pierwszy odczyt');
+    replyListing(h, 'odebrane', [{ number: 1 }]);
+    await h.waitFor(() => h.f.sent.includes('przeczytaj list 1'), 'pierwszy odczyt');
     h.f.fire('Zadne listy nie zostaly wybrane.', 'mail');
+    h.f.fire('> ', 'prompt');
 
     await h.waitFor(
       () => h.f.sent.filter((command) => command === searchCommand('odebrane')).length === 3,
       'kotwica po utracie wyboru',
     );
-    replyListing(h, 'odebrane', [{ number: 2 }]);
-    await h.waitFor(() => h.f.sent.includes('przeczytaj list 2'), 'odczyt po ponownej kotwicy');
-    replayLetter(h, 2);
+    replyListing(h, 'odebrane', [{ number: 1 }]);
+    await h.waitFor(() => h.f.sent.filter((command) => command === 'przeczytaj list 1').length === 2, 'odczyt po ponownej kotwicy');
+    replayLetter(h, 1);
     await h.waitFor(() => h.content.querySelector('.arkmail-letter-body') !== null, 'otwarty list');
   } finally {
     await stopHarness();
@@ -233,27 +248,33 @@ test('produkcja: prompt konczy od razu, cisza po 500 ms, klik i druga kotwica be
     setInput(h, '[data-search="osoba"]', 'Waldo');
     click(h, '.arkmail-search-go');
     await h.waitFor(() => h.f.sent.includes(searchCommand('odebrane', 'waldo')), 'wyszukiwanie bez promptu');
-    replyListing(h, 'odebrane', [{ number: 8, subject: 'po ciszy' }], false);
+    replyListing(h, 'odebrane', [
+      { number: 2, subject: 'po ciszy' },
+      { number: 1, subject: 'inny' },
+    ], false);
     context.mock.timers.tick(499);
     await flush();
-    assert.equal(h.content.querySelector('.arkmail-entry[data-number="8"]'), null, '499 ms nadal czeka');
+    assert.equal(h.content.querySelector('.arkmail-entry[data-number="2"]'), null, '499 ms nadal czeka');
     context.mock.timers.tick(1);
-    await h.waitFor(() => h.content.querySelector('.arkmail-entry[data-number="8"]') !== null, 'wynik przy 500 ms');
+    await h.waitFor(() => h.content.querySelector('.arkmail-entry[data-number="2"]') !== null, 'wynik przy 500 ms');
 
-    click(h, '.arkmail-entry[data-number="8"]');
+    click(h, '.arkmail-entry[data-number="2"]');
     await h.waitFor(
       () => h.f.sent.filter((command) => command === searchCommand('odebrane', 'waldo')).length === 2,
       'natychmiastowa swieza kotwica',
     );
     assert.ok(!h.f.sent.some((command) => command.startsWith('przeczytaj list')));
-    replyListing(h, 'odebrane', [{ number: 9, subject: 'po ciszy' }], false);
+    replyListing(h, 'odebrane', [
+      { number: 2, subject: 'po ciszy' },
+      { number: 1, subject: 'inny' },
+    ], false);
     context.mock.timers.tick(499);
     await flush();
-    assert.ok(!h.f.sent.includes('przeczytaj list 9'), 'druga kotwica czeka przez 499 ms');
+    assert.ok(!h.f.sent.includes('przeczytaj list 2'), 'druga kotwica czeka przez 499 ms');
     context.mock.timers.tick(1);
-    await h.waitFor(() => h.f.sent.includes('przeczytaj list 9'), 'druga kotwica konczy przy 500 ms');
-    assert.ok(!h.f.sent.includes('przeczytaj list 8'));
+    await h.waitFor(() => h.f.sent.includes('przeczytaj list 2'), 'druga kotwica konczy przy 500 ms');
   } finally {
+    context.mock.timers.reset();
     await stopHarness();
   }
 });

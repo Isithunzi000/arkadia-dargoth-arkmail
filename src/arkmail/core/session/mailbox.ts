@@ -119,9 +119,14 @@ export class MailboxSession {
   /**
    * Pobiera listing skrzynki. command: wlasna komenda (paginacja wstecz
    * "listy <skrzynka> przed <data>", patrz protocol/commands.ts);
-   * domyslnie "listy <skrzynka>".
+   * domyslnie "listy <skrzynka>". filtered wymaga odpowiedzi "Wybrane
+   * listy" i pustego wyniku filtra, zamiast akceptowac pelny listing.
    */
-  fetch(box: MailBox, command?: string): Promise<MailboxResult> {
+  fetch(
+    box: MailBox,
+    command?: string,
+    options?: { filtered?: boolean },
+  ): Promise<MailboxResult> {
     return new Promise((resolve, reject) => {
       const session = this.transport.openSession();
       const cmd = command ?? `listy ${box}`;
@@ -235,6 +240,10 @@ export class MailboxSession {
               ));
               return;
             }
+            if (options?.filtered === true && empty.reason !== 'filtr') {
+              fail(new AmbiguousResponseError(`pelna pusta odpowiedz podczas filtra ${box}`));
+              return;
+            }
             if (empty.reason === 'puste' && empty.boxes.length > 1) {
               fail(new AmbiguousResponseError(
                 `pusta ${empty.boxes.join('/')} bez jednej skrzynki podczas fetch ${box}`,
@@ -247,6 +256,10 @@ export class MailboxSession {
           }
           const h = parseListingHeader(line.text);
           if (h) {
+            if (options?.filtered === true && !line.text.startsWith('Wybrane ')) {
+              fail(new AmbiguousResponseError(`pelny listing podczas filtra ${box}`));
+              return;
+            }
             if (h.box !== box) {
               fail(new AmbiguousResponseError(`listing ${h.box} podczas fetch ${box}`));
               return;

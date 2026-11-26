@@ -16,7 +16,8 @@
  *  - wpis ze starego kontekstu NIGDY nie strzela numerem na slepo -
  *    zawsze re-kotwica po dacie;
  *  - pager w stanie 'letter' (przed naglowkami) odrzuca linie-bledy
- *    serwera OD RAZU i BEZ wysylania "q" (pager nie zostal otwarty).
+ *    dopiero na zwyklym prompcie i BEZ wysylania "q" (pager nie zostal
+ *    otwarty); sam komunikat nie jest jeszcze granica odpowiedzi.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -33,24 +34,30 @@ import {
 
 const OPTS = { timeoutMs: 500 };
 
-test('pager: "Zly numer listu" przed naglowkami odrzuca od razu, bez q', async () => {
+test('pager: "Zly numer listu" przed naglowkami odrzuca na zwyklym prompcie, bez q', async () => {
   const t = new MockTransport();
   const s = new PagerSession(t, OPTS);
   const op = s.readLetter(7);
   assert.deepEqual(t.sent, ['przeczytaj list 7']);
   // Handler PRZED replay - inaczej reject wpada jako unhandledRejection.
   const assertion = assert.rejects(op, /Zly numer listu: 7/);
-  await t.replay([{ text: 'Zly numer listu: 7.', cls: '' }]);
+  await t.replay([
+    { text: 'Zly numer listu: 7.', cls: '' },
+    { text: '> ', cls: 'prompt' },
+  ]);
   await assertion;
   assert.ok(!t.sent.includes('q'), 'bez q - pager nie zostal otwarty');
 });
 
-test('pager: "Zadne listy nie zostaly wybrane." odrzuca od razu, bez q', async () => {
+test('pager: "Zadne listy nie zostaly wybrane." odrzuca na zwyklym prompcie, bez q', async () => {
   const t = new MockTransport();
   const s = new PagerSession(t, OPTS);
   const op = s.readLetter(3);
   const assertion = assert.rejects(op, /Zadne listy nie zostaly wybrane/);
-  await t.replay([{ text: 'Zadne listy nie zostaly wybrane.', cls: '' }]);
+  await t.replay([
+    { text: 'Zadne listy nie zostaly wybrane.', cls: '' },
+    { text: '> ', cls: 'prompt' },
+  ]);
   await assertion;
   assert.ok(!t.sent.includes('q'), 'bez q - pager nie zostal otwarty');
 });

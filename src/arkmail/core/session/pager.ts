@@ -20,7 +20,7 @@ import {
 import type { MailError, PagerPrompt } from '../protocol/types.js';
 import { isEchoLine, isPromptLine } from './lines.js';
 import { clearPagerOrphan, suspectPagerOrphan } from './orphanPager.js';
-import { AmbiguousResponseError } from './errors.js';
+import { AmbiguousResponseError, MailCommandError } from './errors.js';
 import type { ProtoLine, Transport } from './transport.js';
 import type { SessionOptions } from './mailbox.js';
 import { DEFAULT_IDLE_FLUSH_MS, LISTS_LOADING_RETRY_MS } from './mailbox.js';
@@ -282,6 +282,8 @@ export class PagerSession {
       let loadRetryTimer: ReturnType<typeof setTimeout> | null = null;
       let done = false;
       let ambiguous: string | null = null;
+      /** Blad komendy czeka na prompt albo cisze; sama linia nie jest granica. */
+      let pendingMailError: string | null = null;
       /** Kolejne proby advance po ciszy; zeruje kazda linia body albo
        *  prompt pagera (serwer odpowiada = strona nie czeka). */
       let advances = 0;
@@ -375,6 +377,12 @@ export class PagerSession {
         if (done) return;
         checkAbort(); // Fala 17a: cisza po Przerwij tez domyka sesje
         if (done || aborted) return;
+        if (state === 'letter' && pendingMailError !== null) {
+          const detail = pendingMailError;
+          cleanup();
+          reject(new MailCommandError(`pager session list ${numer}: ${detail}`, false));
+          return;
+        }
         if (state === 'letter' && headersDone) {
           if (advances < ADVANCE_MAX_TRIES) {
             // Cisza po burstcie tresci: serwer moze stronicowac list i
@@ -513,10 +521,10 @@ export class PagerSession {
 
         // Fala 14f: linia-blad serwera na "przeczytaj list N" (np. "Zly
         // numer listu: N." po zmianie kontekstu listingu, albo "Zadne
-        // listy nie zostaly wybrane." po pustym listingu - log
-        // 2026-10-19 04:22:39). Pager NIE zostal otwarty, wiec odrzucamy
-        // od razu i BEZ "q" (q bez pagera = smieciowa komenda; stary kod
-        // ignorowal te linie i sesja wisiala do timeoutu ~8 s).
+        // listy nie zostaly wybrane."). Pager NIE zostal otwarty, wiec
+        // nigdy nie wysylamy "q". Sama linia bledu nie rozstrzyga jednak,
+        // czy za nia przyjdzie zwykly prompt, czy cudzy pager. Czekamy na
+        // te granice; dopiero zwykly prompt zezwoli na jedna ponowke.
         if (state === 'letter' && !headersDone) {
           // Fala 16b: throttle serwera "Listy sa w tej chwili ladowane."
           // tez przy odczycie (klik w list zaraz po logowaniu - cisza
@@ -538,16 +546,35 @@ export class PagerSession {
           }
           const mailErr = parseMailError(line.text);
           if (mailErr) {
-            cleanup();
-            reject(new Error(`pager session list ${numer}: ${line.text.trim()}`));
+            pendingMailError = line.text.trim();
+            armQuiet();
             return;
           }
         }
 
+        // Klasa prompt nie rozstrzyga rodzaju promptu. Najpierw wykryj
+        // pager, zeby jego prompt nigdy nie dawal zgody na ponowienie.
+        const pp = extractPagerPrompt(line.text);
+        if (
+          state === 'letter' && pendingMailError !== null && pp === null &&
+          (line.cls === 'prompt' || isPromptLine(line.text))
+        ) {
+          const detail = pendingMailError;
+          cleanup();
+          reject(new MailCommandError(`pager session list ${numer}: ${detail}`, true));
+          return;
+        }
+
         // Fala 12a: extractPagerPrompt znajduje tez prompt sklejony
         // z inna trescia w jednej linii (isPagerPrompt bylby slepy).
-        const pp = extractPagerPrompt(line.text);
         if (pp) {
+          if (pendingMailError !== null) {
+            cleanup();
+            reject(new AmbiguousResponseError(
+              `prompt pagera list ${pp.current} po bledzie odczytu ${numer}`,
+            ));
+            return;
+          }
           if (pp.current !== numer) {
             if (ownAdvance) {
               // Pusty Enter na koncu listu otwiera kolejny. To nadal nasz
@@ -566,6 +593,16 @@ export class PagerSession {
             // biezaca operacje; kolejna sesja pozostaje niezalezna.
             cleanup();
             reject(new AmbiguousResponseError(ambiguous));
+            return;
+          }
+          if (actions === null && state === 'letter' && !headersDone) {
+            // Czysty odczyt: zgodny numer nie zastepuje naglowkow. To moze
+            // byc cudzy pager; bez q i bez pustej tresci jako sukcesu.
+            // Operacje delete/forward moga zaczac od samego promptu pagera.
+            cleanup();
+            reject(new AmbiguousResponseError(
+              `prompt pagera list ${pp.current} przed naglowkami odczytu ${numer}`,
+            ));
             return;
           }
           ownAdvance = false;

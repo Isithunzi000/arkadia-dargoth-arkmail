@@ -90,7 +90,7 @@ import {
   type MailboxEntry,
   type MailboxResult,
 } from "./core/session/mailbox";
-import { AmbiguousResponseError } from "./core/session/errors";
+import { AmbiguousResponseError, MailCommandError } from "./core/session/errors";
 import { humanizeMailError, isOperationCancelled } from "./core/errors";
 import {
   archiveExportEntries,
@@ -175,6 +175,8 @@ export const INDEX_ANCHOR_RETRY_WAITS_MS = ANCHOR_RETRY_WAITS_MS;
  * prompt pagera albo kolejna komenda pocztowa.
  */
 export const PLAYER_MAIL_MODE_IDLE_MS = 180_000;
+/** Zamkniecie pagera przejetego z modalu konczy blokade po krotkiej ciszy. */
+export const MODAL_PLAYER_MAIL_CLOSE_IDLE_MS = 500;
 /**
  * Fala 24e: wiek stampa indexMeta, po ktorym skrzynke przeczesujemy
  * znowu w calosci. Swiezszy stamp = przeczes incrementalny do klamry
@@ -894,6 +896,7 @@ export async function init(api: PluginApi) {
     playerMailMode = false;
     transport!.setPlayerMailMode(false);
     awaitingPlayerMailPrompt = false;
+    modalPlayerMailClose = false;
     clearPlayerMailModeTimer();
     animalSendSerial++;
     animalSendPending = false;
@@ -1045,6 +1048,7 @@ export async function init(api: PluginApi) {
    */
   let playerMailMode = false;
   let awaitingPlayerMailPrompt = false;
+  let modalPlayerMailClose = false;
   const scheduleRefresh = (boxes: MailBox[]): void => {
     if (replayReviewRequired) return;
     // Wylaczenie nie parkuje nowych zadan na pozniej: zdarzenia w tle
@@ -1089,18 +1093,19 @@ export async function init(api: PluginApi) {
     playerMailMode = false;
     transport!.setPlayerMailMode(false);
     awaitingPlayerMailPrompt = false;
+    modalPlayerMailClose = false;
     clearPlayerMailModeTimer();
     // Fala 24f2: po sesji gracza inbox na pewno wymaga weryfikacji
     // (mogl czytac/kasowac) + drenaz wszystkiego, co zaparkowane
     // (pendingRefresh zbiera tez skrzynki z Fali 24f3).
     scheduleRefresh(["odebrane", "nieprzeczytane"]);
   };
-  const armPlayerMailModeIdle = (): void => {
+  const armPlayerMailModeIdle = (idleMs = PLAYER_MAIL_MODE_IDLE_MS): void => {
     clearPlayerMailModeTimer();
     playerMailModeTimer = setTimeout(() => {
       playerMailModeTimer = null;
       exitPlayerMailMode();
-    }, PLAYER_MAIL_MODE_IDLE_MS);
+    }, idleMs);
   };
   const enterPlayerMailMode = (): void => {
     pendingOpen = null;
@@ -1112,6 +1117,7 @@ export async function init(api: PluginApi) {
     playerMailMode = true;
     transport!.setPlayerMailMode(true);
     awaitingPlayerMailPrompt = false;
+    modalPlayerMailClose = false;
     armPlayerMailModeIdle();
     // Gracz przejmuje poczte natychmiast. Sesje same sprzataja
     // subskrypcje i timery; petle dostaja flage stop przed kolejna
@@ -1131,19 +1137,22 @@ export async function init(api: PluginApi) {
     ui.setArchiveDownload(null);
     if (interruptedManual) notifyManualInterruption(PLAYER_MAIL_INTERRUPTED_MSG);
   };
-  const awaitPlayerMailPrompt = (): void => {
+  const awaitPlayerMailPrompt = (fromModal = false): void => {
     if (!playerMailMode) return;
+    if (fromModal) modalPlayerMailClose = true;
     awaitingPlayerMailPrompt = true;
-    // Zwykly prompt jest potwierdzeniem zamkniecia, ale jego brak nie
-    // moze zostawic trybu gracza bez ograniczonego czasowo wyjscia.
-    armPlayerMailModeIdle();
+    // Zwykly prompt konczy od razu. Po q/x przejetym z modalu wystarczy
+    // 500 ms ciszy; zwykla reczna poczta zachowuje dlugi limit awaryjny.
+    armPlayerMailModeIdle(
+      modalPlayerMailClose ? MODAL_PLAYER_MAIL_CLOSE_IDLE_MS : PLAYER_MAIL_MODE_IDLE_MS,
+    );
   };
   const beginPagerModal = (): void => {
     transport!.beginModal({
       pager: {
         onUserCommand: (command) => {
           enterPlayerMailMode();
-          if (/^(?:q|x)$/i.test(command.trim())) awaitPlayerMailPrompt();
+          if (/^(?:q|x)$/i.test(command.trim())) awaitPlayerMailPrompt(true);
         },
         onCommandDropped: () => notify(
           api,
@@ -1333,8 +1342,18 @@ export async function init(api: PluginApi) {
     if (search !== undefined) {
       // Wynik wyszukiwania nigdy nie uzywa starego numeru. Nawet zgodny
       // lokalny kontekst wymaga ponowienia dokladnie pierwotnego filtra.
-      const res = await mailbox.fetch(box, search.command);
+      const res = await mailbox.fetch(box, search.command, { filtered: true });
       if (res.kind === "lista") {
+        const numbers = res.entries.map((item) => item.number).sort((a, b) => a - b);
+        if (!numbers.every((number, index) => number === index + 1)) {
+          bumpCtx(box, search);
+          notify(
+            api,
+            "Nie mozna bezpiecznie ustalic numeru listu - wyniki maja niespojna numeracje. Odswiez skrzynke.",
+            { level: "warning" },
+          );
+          return null;
+        }
         const records = recordsOfListing(box, res.entries);
         const merged = mergeListingPage(ui.state.archive, box, records);
         ui.setArchive(merged.letters);
@@ -1850,6 +1869,7 @@ export async function init(api: PluginApi) {
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         const listingGone =
+          err instanceof MailCommandError && err.retryAllowed &&
           /nie zostaly wybrane|Zly numer listu/.test(msg);
         if (attempt === 0 && listingGone) {
           bumpCtx(box); // wymuszenie re-kotwicy w drugiej probie
@@ -1989,7 +2009,9 @@ export async function init(api: PluginApi) {
       } catch (err) {
         if (aborted()) return { kind: "anulowano", stage };
         const msg = err instanceof Error ? err.message : String(err);
-        const listingGone = /nie zostaly wybrane|Zly numer listu/.test(msg);
+        const listingGone =
+          err instanceof MailCommandError && err.retryAllowed &&
+          /nie zostaly wybrane|Zly numer listu/.test(msg);
         if (attempt === 0 && listingGone && opts?.retry !== false) {
           bumpCtx(box); // wymuszenie re-kotwicy w drugiej probie
           continue;
@@ -2871,7 +2893,7 @@ export async function init(api: PluginApi) {
       ui.setBusy(`Szukam w skrzynce ${box}...`);
       const generation = connectionGeneration;
       void runExclusive(async () => {
-          const res = await mailbox.fetch(box, search.command);
+          const res = await mailbox.fetch(box, search.command, { filtered: true });
           // Fala 41: wyniki szukania tez wklejane pod tozsamoscia
           // przebiegu (numeracja selekcji nie koliduje z pelnymi
           // listinguami - inny scanKey).
@@ -3048,7 +3070,12 @@ export async function init(api: PluginApi) {
       return;
     }
     if (awaitingPlayerMailPrompt) {
-      if (line.cls === "prompt" || isPromptLine(line.text)) exitPlayerMailMode();
+      if (line.cls === "prompt" || isPromptLine(line.text)) {
+        exitPlayerMailMode();
+      } else if (modalPlayerMailClose) {
+        // Kazda odpowiedz, w tym kolejny prompt pagera, odracza koniec ciszy.
+        armPlayerMailModeIdle(MODAL_PLAYER_MAIL_CLOSE_IDLE_MS);
+      }
       return;
     }
     if (!extractPagerPrompt(line.text)) return;

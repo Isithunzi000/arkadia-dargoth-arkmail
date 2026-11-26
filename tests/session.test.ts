@@ -252,13 +252,14 @@ test('pager: forward z subdialogiem DW i bledami adresata', async () => {
   assert.deepEqual(t.sent, ['przeczytaj list 23', 'f bar', '', 'q']);
 });
 
-test('pager: zly numer listu w pagerze nie wywraca sesji', async () => {
+test('pager: niejednoznaczny odczyt przed naglowkami konczy sie bez q', async () => {
   const t = new MockTransport();
   const s = new PagerSession(t, OPTS);
   const op = s.readLetter(3);
+  const rejection = assert.rejects(op, /prompt pagera list 3 przed naglowkami odczytu 3/);
   await t.replay(fixture('zly-numer'));
-  const res = await op;
-  assert.deepEqual(t.sent.at(-1), 'q');
+  await rejection;
+  assert.deepEqual(t.sent, ['przeczytaj list 3']);
 });
 
 // --- Fala 11g: odbudowa po sierocym pagerze ---------------------------------

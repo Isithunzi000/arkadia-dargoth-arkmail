@@ -8,6 +8,19 @@ export class AmbiguousResponseError extends Error {
   }
 }
 
+/** Serwer odrzucil komende pocztowa. Ponowienie wymaga zwyklego promptu. */
+export class MailCommandError extends Error {
+  readonly code = 'blad_komendy_poczty' as const;
+
+  constructor(
+    message: string,
+    readonly retryAllowed: boolean,
+  ) {
+    super(message);
+    this.name = 'MailCommandError';
+  }
+}
+
 /** Listing zatrzymal pager, ktorego nie wolno automatycznie zamknac. */
 export class UnknownPagerError extends Error {
   readonly code = 'nieznany_pager' as const;
