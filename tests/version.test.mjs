@@ -22,8 +22,8 @@ function metaVersion() {
   return m[1];
 }
 
-test('wydanie: przygotowany numer wersji to 1.30.21', () => {
-  assert.equal(metaVersion(), '1.30.21');
+test('wydanie: przygotowany numer wersji to 1.30.22', () => {
+  assert.equal(metaVersion(), '1.30.22');
 });
 
 function latestZip() {
@@ -173,13 +173,18 @@ test('dokumentacja: wykonana naprawa bezpiecznego odczytu jest zapisana', () => 
   assert.equal(fs.existsSync(path.join(REPO, 'docs/PLAN-1.30.20.md')), false);
 });
 
-test('dokumentacja: analiza regresji i aktywny plan naprawy sa zapisane', () => {
+test('dokumentacja: analiza regresji i wykonana naprawa sa zapisane', () => {
   const analysis = fs.readFileSync(path.join(REPO, 'docs/ANALIZA-1.30.5-1.30.21.md'), 'utf8');
-  const plan = fs.readFileSync(path.join(REPO, 'docs/PLAN-1.30.22.md'), 'utf8');
+  const report = fs.readFileSync(path.join(REPO, 'docs/NAPRAWA-1.30.22.md'), 'utf8');
   assert.match(analysis, /## Potwierdzone mechanizmy regresji/);
   assert.match(analysis, /kolejności `\[1,2\]`/);
   assert.match(analysis, /Nie jest to dowód przyczyny konkretnego zdarzenia/);
-  assert.match(plan, /## Zakres i decyzje/);
-  assert.match(plan, /## Etapy wykonania/);
-  assert.match(plan, /Bez testów live/);
+  assert.match(report, /## Zakres poprawki/);
+  assert.match(report, /## Dowody lokalne/);
+  assert.match(report, /## Weryfikacja zdalna/);
+  assert.match(report, /bez drugiego listingu/);
+  assert.match(report, /najwyżej jedno ponowienie/);
+  assert.match(report, /Nieznany pager gracza pozostaje nietknięty/);
+  assert.match(report, /Nie wykonano testów na realnej grze/);
+  assert.equal(fs.existsSync(path.join(REPO, 'docs/PLAN-1.30.22.md')), false);
 });
