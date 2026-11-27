@@ -22,8 +22,8 @@ function metaVersion() {
   return m[1];
 }
 
-test('wydanie: przygotowany numer wersji to 1.30.24', () => {
-  assert.equal(metaVersion(), '1.30.24');
+test('wydanie: przygotowany numer wersji to 1.30.25', () => {
+  assert.equal(metaVersion(), '1.30.25');
 });
 
 function latestZip() {
@@ -218,4 +218,18 @@ test('dokumentacja: numery serwera i reczne zamykanie sa zapisane', () => {
   assert.match(report, /Nie wykonano testow na realnej grze/);
   assert.match(report, /GitHub Release/);
   assert.equal(fs.existsSync(path.join(REPO, 'docs/PLAN-1.30.24.md')), false);
+});
+
+test('dokumentacja: naprawa echa i recznego zamykania jest zapisana', () => {
+  const report = fs.readFileSync(path.join(REPO, 'docs/NAPRAWA-1.30.25.md'), 'utf8');
+  assert.match(report, /## Zakres poprawki/);
+  assert.match(report, /## Dowody lokalne/);
+  assert.match(report, /## Weryfikacja zdalna/);
+  assert.match(report, /echo=false/);
+  assert.match(report, /Osobny, nietlumacy hook wejscia/);
+  assert.match(report, /bez dodatkowych timerow|Nie dodaja nowych timerow/);
+  assert.match(report, /Nie przywrocono automatycznego `q`/);
+  assert.match(report, /Nie wykonano testow na realnej grze/);
+  assert.match(report, /GitHub Release/);
+  assert.equal(fs.existsSync(path.join(REPO, 'docs/PLAN-1.30.25.md')), false);
 });
