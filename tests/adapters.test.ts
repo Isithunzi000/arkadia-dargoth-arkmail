@@ -21,6 +21,7 @@ class FakeApi {
   triggerCb: TriggerCb | null = null;
   triggerTag: string | null = null;
   hookCb: HookCb | null = null;
+  inputHookCb: HookCb | null = null;
   hookPriority: number | null = null;
   emitted: { event: string; args: unknown[] }[] = [];
   shown: unknown[] = [];
@@ -29,8 +30,11 @@ class FakeApi {
   readonly api = {
     command: {
       send: (command: string, echo?: boolean, options?: { preserveCase?: boolean }): Promise<void> => {
-        this.sent.push(options === undefined ? { command, echo } : { command, echo, options });
-        return this.sendImpl?.(command) ?? Promise.resolve();
+        const observed = this.inputHookCb?.(command);
+        if (observed === null) return Promise.resolve();
+        const delivered = typeof observed === 'string' ? observed : command;
+        this.sent.push(options === undefined ? { command: delivered, echo } : { command: delivered, echo, options });
+        return this.sendImpl?.(delivered) ?? Promise.resolve();
       },
       addSuggestions: () => {},
       removeSuggestions: () => {},
@@ -46,11 +50,19 @@ class FakeApi {
     },
     commandHooks: {
       register: (cb: HookCb, priority?: number) => {
+        if (priority === 101) {
+          this.inputHookCb = cb;
+          return 'input-hook';
+        }
         this.hookCb = cb;
         this.hookPriority = priority ?? null;
         return 'hook-1';
       },
       unregister: (id: string) => {
+        if (id === 'input-hook') {
+          this.inputHookCb = null;
+          return true;
+        }
         if (id !== 'hook-1') return false;
         this.hookCb = null;
         return true;
@@ -232,25 +244,51 @@ test('adapter: modal-guard tlumi komendy gracza, przepuszcza wlasne', async () =
   assert.equal(t.modalQueueLength, 0);
 });
 
-test('adapter: echo wlasnej wysylki (echo=true) oznaczane own; echo gracza nie', async () => {
+test('adapter: kazde wlasne echo ma own, a reczne wejscie rozpoznaje osobny hook', async () => {
   const f = new FakeApi();
   const t = armedTransport(f);
   const seen: ProtoLine[] = [];
   t.subscribe((l) => seen.push(l));
-  // Wysylka pluginu Z echem (compose, "wyslij zwierze"): jej echo w
-  // strumieniu musi byc rozpoznane jako wlasne (hook wejscia w poczte
-  // gracza nie wolno odpalic na wlasnym echu).
   t.send('napisz list', true);
   await new Promise((r) => setImmediate(r));
   f.fireLine('→ napisz list', 'info');
-  // Wysylka bez echa NIE rejestruje oczekujacego echa: identyczny
-  // tekst wpisany recznie przez gracza nie wolno dostac own.
+
+  // Klient moze dostarczyc linie takze dla wysylki z echo=false.
   t.send('listy odebrane');
   await new Promise((r) => setImmediate(r));
+  // Identyczna komenda wpisana przez gracza jest rozpoznana przez hook
+  // wejscia, zanim pozniejsza linia echa zostanie dopasowana do wysylki.
+  await f.api.command.send('listy odebrane', false);
   f.fireLine('→ listy odebrane', 'info');
-  assert.equal(seen.length, 2);
-  assert.equal(seen[0]!.own, true, 'echo wlasnej komendy oznaczone own');
-  assert.equal(seen[1]!.own, undefined, 'echo gracza bez own');
+
+  assert.equal(seen.length, 3);
+  assert.equal(seen[0]!.own, true, 'echo wlasnej komendy z echem');
+  assert.equal(seen[1]!.own, undefined, 'reczne wejscie nie jest wysylka pluginu');
+  assert.equal(seen[1]!.cls, 'command');
+  assert.equal(seen[2]!.own, true, 'echo wlasnej komendy bez flagi echa');
+  t.dispose();
+});
+
+test('adapter: dopasowanie echa bez flagi wygasa bez dodatkowego timera', async (context) => {
+  const f = new FakeApi();
+  const t = armedTransport(f);
+  const seen: ProtoLine[] = [];
+  t.subscribe((line) => seen.push(line));
+  context.mock.timers.enable({ apis: ['setTimeout', 'Date'] });
+  try {
+    await t.send('listy odebrane');
+    context.mock.timers.tick(9_999);
+    f.fireLine('→ listy odebrane', 'info');
+    assert.equal(seen[0]?.own, true, 'echo przed terminem jest rozpoznane');
+
+    await t.send('listy odebrane');
+    context.mock.timers.tick(10_000);
+    f.fireLine('→ listy odebrane', 'info');
+    assert.equal(seen[1]?.own, undefined, 'po terminie linia nie jest dopasowana');
+  } finally {
+    context.mock.timers.reset();
+    t.dispose();
+  }
 });
 
 test('adapter: odrzucona wysylka usuwa tylko wlasny wpis echa', async (context) => {

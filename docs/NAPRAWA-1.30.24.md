@@ -1,5 +1,11 @@
 # Naprawa ArkMail 1.30.24
 
+> Test w realnej grze obalil skutecznosc tej wersji: wlasne echo moglo
+> przerwac odczyt, a reczne `q` bez echa zostawialo blokade. Dawne wyniki
+> ponizej opisuja wylacznie kontrole syntetyczna i wydanie, nie potwierdzaja
+> poprawnego dzialania w grze. Naprawe tego obszaru opisuje
+> `NAPRAWA-1.30.25.md`.
+
 ## Zakres poprawki
 
 1. Odczyt uzywa numerow z aktualnego listingu serwera bez przeliczania pozycji wynikow filtra ani numerow wizualnych wierszy interfejsu.

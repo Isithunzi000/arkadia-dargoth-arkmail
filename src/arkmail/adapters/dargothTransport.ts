@@ -30,7 +30,7 @@ export interface PagerModalHooks {
 /** Priorytet hooka modalnego: wysoko, zanim aliasy/inne wtyczki. */
 const MODAL_HOOK_PRIORITY = 100;
 
-/** Fala 42: pamiec ostatnich wysylek z echem oczekujacych na linie-echo. */
+/** Ograniczona pamiec ostatnich wysylek oczekujacych na linie echa. */
 const PENDING_ECHO_CAP = 10;
 const PENDING_ECHO_TTL_MS = 10_000;
 
@@ -44,7 +44,8 @@ interface PendingEcho {
   id: number;
   line: string;
   source: CommandSource;
-  timer: ReturnType<typeof setTimeout>;
+  expiresAt: number;
+  timer: ReturnType<typeof setTimeout> | null;
 }
 
 /** Komendy z pomocy trybu czytania. Wykrzyknik jawnie wykonuje komende
@@ -66,6 +67,7 @@ export class DargothTransport implements Transport {
   private triggerArmed = false;
   private modalActive = false;
   private hookId: string | null = null;
+  private inputHookId: string | null = null;
   private pagerModal: PagerModalHooks | null = null;
   private pagerOpen = false;
   private pagerCloseSent = false;
@@ -77,10 +79,10 @@ export class DargothTransport implements Transport {
   private commandQueue: Promise<void> = Promise.resolve();
   private connectionGeneration = 0;
   private sendingOwn = false;
-  /** Fala 42: teksty wysylek z echem (echo=true) czekajacych na
-   *  linie-echo w strumieniu. FIFO z limitem. Wysylka bez echa NIE
-   *  rejestruje sie - identyczny tekst wpisany recznie przez gracza
-   *  nigdy nie dostanie znacznika own. */
+  /** Teksty ostatnich wysylek czekajacych na ewentualna linie echa.
+   *  Rejestrujemy kazda wysylke: klient moze pokazac komende mimo
+   *  echo=false. Rzeczywiste wejscie gracza rozpoznaje osobny hook,
+   *  wiec pozniejsze dopasowanie echa nie zaciemnia jego zrodla. */
   private pendingEchoSends: PendingEcho[] = [];
   private nextEchoId = 1;
   // Fala 25 (blad 3): transport startuje ROZBROJONY. Brama otwiera
@@ -169,22 +171,26 @@ export class DargothTransport implements Transport {
       if (source === 'arkmail' && this.playerMailMode) {
         throw new Error('operacja anulowana');
       }
-      let echoEntry: PendingEcho | undefined;
+      // Kazda operacja ma wlasna tozsamosc, takze przy identycznym tekscie.
+      // Termin ogranicza dopasowanie do pozniejszych linii strumienia.
+      const entry: PendingEcho = {
+        id: this.nextEchoId++,
+        line,
+        source,
+        expiresAt: Date.now() + PENDING_ECHO_TTL_MS,
+        timer: null,
+      };
+      // Wysylki z jawnie zamowionym echem zachowuja dawny timer. Dla
+      // pozostalych wystarczy termin sprawdzany przy odczycie strumienia;
+      // nie dodaja one nowego timera do operacji pobierania i paginacji.
       if (echo) {
-        // Kazda operacja ma wlasna tozsamosc, takze przy identycznym tekscie.
-        // Termin ogranicza pomylke z pozniejsza, reczna komenda gracza.
-        const entry: PendingEcho = {
-          id: this.nextEchoId++,
-          line,
-          source,
-          timer: setTimeout(() => this.removePendingEcho(entry), PENDING_ECHO_TTL_MS),
-        };
+        entry.timer = setTimeout(() => this.removePendingEcho(entry), PENDING_ECHO_TTL_MS);
         (entry.timer as unknown as { unref?: () => void }).unref?.();
-        echoEntry = entry;
-        this.pendingEchoSends.push(entry);
-        if (this.pendingEchoSends.length > PENDING_ECHO_CAP) {
-          this.removePendingEcho(this.pendingEchoSends[0]!);
-        }
+      }
+      const echoEntry: PendingEcho = entry;
+      this.pendingEchoSends.push(entry);
+      if (this.pendingEchoSends.length > PENDING_ECHO_CAP) {
+        this.removePendingEcho(this.pendingEchoSends[0]!);
       }
       try {
         // Hook jest wywolywany synchronicznie przez api.command.send. Flaga
@@ -210,11 +216,13 @@ export class DargothTransport implements Transport {
     const index = this.pendingEchoSends.findIndex((candidate) => candidate.id === entry.id);
     if (index < 0) return;
     this.pendingEchoSends.splice(index, 1);
-    clearTimeout(entry.timer);
+    if (entry.timer !== null) clearTimeout(entry.timer);
   }
 
   private clearPendingEchoes(): void {
-    for (const entry of this.pendingEchoSends) clearTimeout(entry.timer);
+    for (const entry of this.pendingEchoSends) {
+      if (entry.timer !== null) clearTimeout(entry.timer);
+    }
     this.pendingEchoSends = [];
   }
 
@@ -368,6 +376,10 @@ export class DargothTransport implements Transport {
   dispose(): void {
     this.endModal();
     this.clearPagerCloseLatch();
+    if (this.inputHookId !== null) {
+      this.api.commandHooks.unregister(this.inputHookId);
+      this.inputHookId = null;
+    }
     if (this.triggerArmed) {
       this.api.triggers.removeByTag('arkmail');
       this.triggerArmed = false;
@@ -383,6 +395,15 @@ export class DargothTransport implements Transport {
   private armTrigger(): void {
     if (this.triggerArmed) return;
     this.triggerArmed = true;
+    // Wejscie gracza jest sygnalem niezaleznym od echa. Ten hook niczego
+    // nie tlumi i nie uruchamia sie dla wysylek pluginu ani podczas modalu;
+    // wtedy wlasciwy stan obsluguje hook modalny.
+    this.inputHookId = this.api.commandHooks.register((command: string) => {
+      if (!this.online || this.sendingOwn || this.modalActive) return undefined;
+      const proto: ProtoLine = { text: command, cls: 'command' };
+      for (const cb of [...this.subscribers]) cb(proto);
+      return undefined;
+    }, MODAL_HOOK_PRIORITY + 1);
     this.api.triggers.register(
       /^/,
       // 4. argument (originalLine) niesie dziewiczy tekst linii z gry -
@@ -392,10 +413,12 @@ export class DargothTransport implements Transport {
       // (Fala 8a, dowod: Triggers.ts TriggerCallback + newMail.ts).
       (line: AnsiAwareBuffer, _matches: RegExpMatchArray, type: string, originalLine?: string) => {
         const proto: ProtoLine = { text: originalLine ?? line.text, cls: type ?? '' };
-        // Fala 42: echo wlasnej komendy (wysylka z echem) oznaczamy own
-        // po dopasowaniu FIFO do zarejestrowanego tekstu - hook wejscia
-        // w poczte gracza rozroznia wtedy gracza od pluginu takze pod
-        // blokada sesji.
+        for (const entry of [...this.pendingEchoSends]) {
+          if (entry.expiresAt <= Date.now()) this.removePendingEcho(entry);
+        }
+        // Echo wlasnej komendy oznaczamy own po dopasowaniu FIFO do
+        // zarejestrowanego tekstu. Dotyczy takze wysylki z echo=false,
+        // ktorej linie klient moze mimo to dostarczyc do strumienia.
         if (this.pendingEchoSends.length > 0) {
           const echoed = proto.text.startsWith('→ ')
             ? proto.text.slice(2)

@@ -20,6 +20,7 @@ export class FakeApi {
   sent: string[] = [];
   triggerCb: TriggerCb | null = null;
   hookCb: HookCb | null = null;
+  inputHookCb: HookCb | null = null;
   emitted: { event: string; args: unknown[] }[] = [];
   shown: unknown[] = [];
   popupConfig: {
@@ -56,9 +57,12 @@ export class FakeApi {
   readonly api = {
     command: {
       send: (command: string, echo?: boolean): Promise<void> => {
-        const hooked = this.hookCb?.(command, echo ?? false);
+        const observed = this.inputHookCb?.(command, echo ?? false);
+        if (observed === null) return Promise.resolve();
+        const observedCommand = typeof observed === 'string' ? observed : command;
+        const hooked = this.hookCb?.(observedCommand, echo ?? false);
         if (hooked === null) return Promise.resolve();
-        const delivered = typeof hooked === 'string' ? hooked : command;
+        const delivered = typeof hooked === 'string' ? hooked : observedCommand;
         this.sent.push(delivered);
         this.sentEcho.push(echo ?? false);
         return this.sendImpl?.(delivered) ?? Promise.resolve();
@@ -75,11 +79,19 @@ export class FakeApi {
       removeByTag: () => {},
     },
     commandHooks: {
-      register: (cb: HookCb) => {
+      register: (cb: HookCb, priority?: number) => {
+        if (priority === 101) {
+          this.inputHookCb = cb;
+          return 'input-hook';
+        }
         this.hookCb = cb;
         return 'hook-1';
       },
-      unregister: () => {
+      unregister: (id: string) => {
+        if (id === 'input-hook') {
+          this.inputHookCb = null;
+          return true;
+        }
         this.hookCb = null;
         return true;
       },

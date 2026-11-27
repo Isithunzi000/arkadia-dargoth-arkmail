@@ -494,6 +494,17 @@ zapisu. Dawne klucze localStorage sa usuwane bez migracji danych.
 - Przechwycona komenda gracza `q`/`x` ustawia oczekiwanie na zwykly prompt
   takze bez echa. Echo jest sygnalem dodatkowym, a pozne lub powtorzone echo
   po zwyklym prompcie nie przywraca trybu poczty gracza.
+- `DargothTransport` ma staly, nietlumacy hook wejscia o priorytecie 101.
+  Poza modalem przekazuje rzeczywista komende gracza subskrybentom jako
+  `cls: command` takze bez pozniejszej linii echa. Pomija wlasne synchroniczne
+  wysylki i aktywny modal, ktorym zarzadza osobny hook. `dispose()` usuwa oba
+  hooki, wiec ponowne zaladowanie nie zostawia zduplikowanego obserwatora.
+- Kazda wlasna wysylka, takze z `echo=false`, ma przez najwyzej 10 sekund
+  dopasowanie do ewentualnej linii echa. Dopasowanie FIFO oznacza ja `own`,
+  dzieki czemu echo wlasnego odczytu nie jest traktowane jako poczta gracza.
+  Pamiec obejmuje najwyzej 10 wpisow. Timer wygasza wysylki z jawnym echem;
+  pozostale uzywaja terminu sprawdzanego przy kolejnej linii strumienia, bez
+  dodatkowych timerow w pauzach pobierania i paginacji.
 - Odzyskiwanie ma ograniczony czas, a zwykly prompt konczy je jednokrotnie.
   Nie wolno pozostawiac bezterminowej blokady ani zdejmowac jej automatycznie
   bez synchronizacji kanalu.
