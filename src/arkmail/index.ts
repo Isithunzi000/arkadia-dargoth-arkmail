@@ -174,8 +174,6 @@ export const INDEX_ANCHOR_RETRY_WAITS_MS = ANCHOR_RETRY_WAITS_MS;
  * prompt pagera albo kolejna komenda pocztowa.
  */
 export const PLAYER_MAIL_MODE_IDLE_MS = 180_000;
-/** Zamkniecie pagera przejetego z modalu konczy blokade po krotkiej ciszy. */
-export const MODAL_PLAYER_MAIL_CLOSE_IDLE_MS = 500;
 /**
  * Fala 24e: wiek stampa indexMeta, po ktorym skrzynke przeczesujemy
  * znowu w calosci. Swiezszy stamp = przeczes incrementalny do klamry
@@ -703,11 +701,11 @@ export async function init(api: PluginApi) {
     for (let index = 0; index < boxes.length; index++) {
       const box = boxes[index]!;
       const parkRemaining = (): void => {
-        if (source !== "auto" || !playerMailMode) return;
+        if (source !== "auto" || !automaticMailCommandsBlocked) return;
         for (const pending of boxes.slice(index)) pendingRefresh.add(pending);
       };
       if (autoDisabled()) throw new Error("operacja anulowana");
-      if (playerMailMode) {
+      if (source === "auto" && automaticMailCommandsBlocked) {
         parkRemaining();
         throw new Error("operacja anulowana");
       }
@@ -724,7 +722,7 @@ export async function init(api: PluginApi) {
       // zastosowac do archiwum. To samo dotyczy wylaczenia zadan w tle.
       if (generation !== connectionGeneration) throw new Error("operacja anulowana");
       if (autoDisabled()) throw new Error("operacja anulowana");
-      if (playerMailMode) {
+      if (source === "auto" && automaticMailCommandsBlocked) {
         parkRemaining();
         throw new Error("operacja anulowana");
       }
@@ -893,9 +891,9 @@ export async function init(api: PluginApi) {
     unsentFlashTimer = null;
     ui.setUnsentFlash(false);
     playerMailMode = false;
+    automaticMailCommandsBlocked = false;
     transport!.setPlayerMailMode(false);
     awaitingPlayerMailPrompt = false;
-    modalPlayerMailClose = false;
     clearPlayerMailModeTimer();
     animalSendSerial++;
     animalSendPending = false;
@@ -1038,15 +1036,17 @@ export async function init(api: PluginApi) {
    * Fala 24f2: reczny tryb czytania poczty gracza (zgloszenie
    * 2026-10-21: "ArkMail blokowal wpisywanie komend jak sie wyswietla
    * list recznie"). Wejscie: echo komendy pocztowej gracza poza
-   * blokada; wyjscie: przechwycone q/x albo jego echo ustawia
-   * oczekiwanie, a zwykly prompt konczy tryb. Bezczynnosc
-   * (PLAYER_MAIL_MODE_IDLE_MS) pozostaje awaryjnym wyjsciem. W trakcie trybu scheduleRefresh
-   * PARKUJE - pager gracza zjadlby komende listujaca. Zadna pozna
-   * linia poza operacja nie moze odpowiedziec "q" i zabic jego sesji.
+   * blokada. Przechwycone q/x albo jego echo natychmiast odblokowuje
+   * dzialania uzytkownika, a zwykly prompt odblokowuje automatyzacje.
+   * Bezczynnosc przed q/x pozostaje awaryjnym wyjsciem. scheduleRefresh
+   * PARKUJE do zwyklego promptu - pager gracza zjadlby komende listujaca.
+   * Zadna pozna linia poza operacja nie moze odpowiedziec "q" i zabic sesji.
    */
+  // Blokada interfejsu i blokada automatyzacji to rozne stany. Reczne q/x
+  // natychmiast zdejmuje pierwsza; druga znika dopiero na zwyklym prompcie.
   let playerMailMode = false;
+  let automaticMailCommandsBlocked = false;
   let awaitingPlayerMailPrompt = false;
-  let modalPlayerMailClose = false;
   const scheduleRefresh = (boxes: MailBox[]): void => {
     if (replayReviewRequired) return;
     // Wylaczenie nie parkuje nowych zadan na pozniej: zdarzenia w tle
@@ -1055,7 +1055,7 @@ export async function init(api: PluginApi) {
     for (const b of boxes) pendingRefresh.add(b);
     // Fala 24f2: w recznym trybie poczty gracza zadna komenda pluginu
     // nie wychodzi - parkujemy do jego wyjscia z trybu.
-    if (playerMailMode) return;
+    if (automaticMailCommandsBlocked) return;
     if (drainScheduled) return;
     drainScheduled = true;
     const generation = connectionGeneration;
@@ -1087,11 +1087,11 @@ export async function init(api: PluginApi) {
     }
   };
   const exitPlayerMailMode = (): void => {
-    if (!playerMailMode) return;
+    if (!playerMailMode && !automaticMailCommandsBlocked) return;
     playerMailMode = false;
+    automaticMailCommandsBlocked = false;
     transport!.setPlayerMailMode(false);
     awaitingPlayerMailPrompt = false;
-    modalPlayerMailClose = false;
     clearPlayerMailModeTimer();
     // Fala 24f2: po sesji gracza inbox na pewno wymaga weryfikacji
     // (mogl czytac/kasowac) + drenaz wszystkiego, co zaparkowane
@@ -1108,15 +1108,15 @@ export async function init(api: PluginApi) {
   const enterPlayerMailMode = (): void => {
     clearPagerOrphan();
     pendingOpen = null;
-    if (playerMailMode) {
-      if (!awaitingPlayerMailPrompt) armPlayerMailModeIdle();
+    if (automaticMailCommandsBlocked) {
+      if (playerMailMode && !awaitingPlayerMailPrompt) armPlayerMailModeIdle();
       return;
     }
     const interruptedManual = manualOperations > 0 || animalSendPending || animalFlight;
     playerMailMode = true;
+    automaticMailCommandsBlocked = true;
     transport!.setPlayerMailMode(true);
     awaitingPlayerMailPrompt = false;
-    modalPlayerMailClose = false;
     armPlayerMailModeIdle();
     // Gracz przejmuje poczte natychmiast. Sesje same sprzataja
     // subskrypcje i timery; petle dostaja flage stop przed kolejna
@@ -1136,22 +1136,22 @@ export async function init(api: PluginApi) {
     ui.setArchiveDownload(null);
     if (interruptedManual) notifyManualInterruption(PLAYER_MAIL_INTERRUPTED_MSG);
   };
-  const awaitPlayerMailPrompt = (fromModal = false): void => {
-    if (!playerMailMode) return;
-    if (fromModal) modalPlayerMailClose = true;
+  const closePlayerMailModeLocally = (): void => {
+    if (!playerMailMode && !automaticMailCommandsBlocked) return;
+    // q/x jest wystarczajacym sygnalem do odblokowania dzialan uzytkownika.
+    // Nie czekamy na prompt ani zaden limit czasu. Automatyzacja pozostaje
+    // wstrzymana, bo echo ani prompt pagera nie dowodza zamkniecia pagera.
+    playerMailMode = false;
+    transport!.setPlayerMailMode(false);
     awaitingPlayerMailPrompt = true;
-    // Zwykly prompt konczy od razu. Po q/x przejetym z modalu wystarczy
-    // 500 ms ciszy; zwykla reczna poczta zachowuje dlugi limit awaryjny.
-    armPlayerMailModeIdle(
-      modalPlayerMailClose ? MODAL_PLAYER_MAIL_CLOSE_IDLE_MS : PLAYER_MAIL_MODE_IDLE_MS,
-    );
+    clearPlayerMailModeTimer();
   };
   const beginPagerModal = (): void => {
     transport!.beginModal({
       pager: {
         onUserCommand: (command) => {
           enterPlayerMailMode();
-          if (/^(?:q|x)$/i.test(command.trim())) awaitPlayerMailPrompt(true);
+          if (/^(?:q|x)$/i.test(command.trim())) closePlayerMailModeLocally();
         },
         onCommandDropped: () => notify(
           api,
@@ -3043,19 +3043,16 @@ export async function init(api: PluginApi) {
         // prawa do jego sesji; echo pluginu ma znacznik own z transportu
         // i trybu nie wlacza).
         if (!line.own) enterPlayerMailMode();
-      } else if (playerMailMode && !line.own && /^(?:q|x)$/i.test(cmd.trim())) {
-        // Samo echo q/x nie dowodzi, ze serwer zamknal pager. Wznowienie
-        // czeka na zwykly prompt gry; kolejny prompt pagera go nie zastepuje.
-        awaitPlayerMailPrompt();
+      } else if (automaticMailCommandsBlocked && !line.own && /^(?:q|x)$/i.test(cmd.trim())) {
+        // Samo echo q/x odblokowuje interfejs od razu. Automatyzacja czeka
+        // na zwykly prompt gry; kolejny prompt pagera go nie zastepuje.
+        closePlayerMailModeLocally();
       }
       return;
     }
     if (awaitingPlayerMailPrompt) {
       if (line.cls === "prompt" || isPromptLine(line.text)) {
         exitPlayerMailMode();
-      } else if (modalPlayerMailClose) {
-        // Kazda odpowiedz, w tym kolejny prompt pagera, odracza koniec ciszy.
-        armPlayerMailModeIdle(MODAL_PLAYER_MAIL_CLOSE_IDLE_MS);
       }
       return;
     }

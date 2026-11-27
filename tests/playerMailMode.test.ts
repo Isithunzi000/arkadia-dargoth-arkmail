@@ -6,8 +6,8 @@
  * recznie skasowac list. Fala 24g zdjela auto-"q" straznika; Fala 24f
  * domyka temat odswiezan: w recznym trybie poczty gracza ZADNA
  * komenda pluginu nie wychodzi (pager gracza zjadlby ja), odswiezenia
- * parkuja, a po wyjsciu (echo q/x albo bezczynnosc) leci drenaz i
- * obowiazkowy refresh inboxa.
+ * parkuja. Reczne q/x odblokowuje interfejs od razu, a drenaz i
+ * obowiazkowy refresh inboxa czekaja na zwykly prompt.
  *
  * f1: powrot zwierzecia odswieza tez niewyslane+wyslane (moglo
  *     dostarczyc niewyslane, ktore przechodza do wyslanych).
@@ -150,7 +150,7 @@ test('komenda gracza przerywa aktywna serie listingow i zachowuje prace do wznow
   }
 });
 
-test('wyjscie q bez zwyklego promptu konczy tryb po limicie awaryjnym', async (context) => {
+test('wyjscie q bez zwyklego promptu nie wznawia automatyzacji po limicie ciszy', async (context) => {
   answered.clear();
   const h = await startHarness();
   const { f } = h;
@@ -163,15 +163,13 @@ test('wyjscie q bez zwyklego promptu konczy tryb po limicie awaryjnym', async (c
     mocked = true;
     f.fire('→ listy');
     f.fire('→ q');
-    context.mock.timers.tick(PLAYER_MAIL_MODE_IDLE_MS - 1);
+    context.mock.timers.tick(PLAYER_MAIL_MODE_IDLE_MS);
     await flush();
-    assert.deepEqual(f.sent, [], 'przed limitem tryb nadal blokuje komendy pluginu');
+    assert.deepEqual(f.sent, [], 'limit ciszy nie zastepuje zwyklego promptu');
 
-    context.mock.timers.tick(1);
-    await flush();
-    assert.deepEqual(f.sent, ['listy odebrane'], 'limit konczy oczekiwanie i uruchamia odzyskiwanie');
     context.mock.timers.reset();
     mocked = false;
+    f.fire('> ', 'prompt');
     await answerEmpty(h, 'odebrane');
     await answerEmpty(h, 'nieprzeczytane');
     await waitIdle(h);

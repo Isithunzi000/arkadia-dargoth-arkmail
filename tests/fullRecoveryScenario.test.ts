@@ -146,11 +146,13 @@ test('pelny scenariusz: reczne q przed odpowiedzia przechodzi raz i odblokowuje 
     assert.equal(count(h, 'q'), 1, 'pozna odpowiedz nie wytwarza drugiego q');
     assert.equal(count(h, 'przeczytaj list 2'), 1, 'przejecie anuluje automatyczny odczyt');
 
-    f.fire('> ', 'prompt');
-    await waitRt(() => f.hookCb === null, 'koniec blokady modalnej po zwyklym prompcie');
+    await waitRt(() => f.hookCb === null, 'koniec blokady modalnej od razu po recznym q');
     click(h, '.arkmail-entry[data-number="1"]');
-    await waitRt(() => count(h, 'przeczytaj list 1') === 1, 'nowy odczyt po recznym odblokowaniu');
+    await waitRt(() => count(h, 'przeczytaj list 1') === 1, 'nowy odczyt przed zwyklym promptem');
     assert.equal(count(h, SEARCH), 1, 'odblokowanie nie wymusza drugiego wyszukiwania');
+    f.fire('> ', 'prompt');
+    await drain();
+    assert.equal(count(h, 'przeczytaj list 1'), 1, 'pozny prompt nie powtarza odczytu');
   } finally {
     f.fire('> ', 'prompt');
     await stopHarness();

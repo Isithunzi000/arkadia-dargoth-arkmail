@@ -280,7 +280,7 @@ test('automatyczny odczyt: po zamknieciu pagera r nie trafia do zwyklego trybu g
 });
 
 for (const closeCommand of ['q', 'x'] as const) {
-  test(`automatyczny odczyt: ${closeCommand} gracza wykonuje sie raz i wznowienie czeka na prompt`, async () => {
+  test(`automatyczny odczyt: ${closeCommand} gracza odblokowuje UI od razu, a automatyzacja czeka na prompt`, async () => {
     const h = await startHarness();
     const { f } = h;
     try {
@@ -302,6 +302,27 @@ for (const closeCommand of ['q', 'x'] as const) {
         listingsBefore,
         'bez wznowienia przed zwyklym promptem',
       );
+      if (closeCommand === 'q') {
+        click(h, '[data-tab="archiwum"]');
+        click(h, '.arkmail-arch-download');
+        click(h, '.arkmail-arch-download');
+        await waitRt(
+          () => f.sent.includes('listy odebrane przed 25 VIII 1999'),
+          'reczna operacja startuje od razu po echu q',
+        );
+        assert.ok(
+          !notifyText(f, 'Najpierw zakoncz reczna sesje poczty w grze, a potem powtorz operacje w ArkMailu.'),
+          'samo echo odblokowuje lokalna operacje',
+        );
+        assert.equal(
+          f.sent.filter((command) => command === 'listy odebrane').length,
+          listingsBefore,
+          'reczna operacja nie wznawia automatycznego odswiezania',
+        );
+        click(h, '.arkmail-arch-download');
+        f.fire('Nie masz zadnych odebranych listow.', 'mail');
+        await waitRt(() => textOf(h, '.arkmail-busy') === '', 'koniec recznego pobierania przed wznowieniem');
+      }
       f.fire('> ', 'prompt');
       await waitRt(
         () => f.sent.filter((command) => command === 'listy odebrane').length > listingsBefore,
@@ -318,7 +339,7 @@ for (const closeCommand of ['q', 'x'] as const) {
 }
 
 for (const closeCommand of ['q', 'x'] as const) {
-    test(`automatyczny odczyt: reczne ${closeCommand} bez echa konczy sie dopiero zwyklym promptem`, async () => {
+    test(`automatyczny odczyt: reczne ${closeCommand} bez echa odblokowuje UI, a automatyzacja czeka na prompt`, async () => {
       const h = await startHarness();
       const { f } = h;
       try {
@@ -344,10 +365,25 @@ for (const closeCommand of ['q', 'x'] as const) {
           click(h, '.arkmail-arch-download');
           click(h, '.arkmail-arch-download');
           assert.ok(
-            notifyText(f, 'Najpierw zakoncz reczna sesje poczty w grze, a potem powtorz operacje w ArkMailu.'),
-            'pobieranie czeka na prompt',
+            !notifyText(f, 'Najpierw zakoncz reczna sesje poczty w grze, a potem powtorz operacje w ArkMailu.'),
+            'przejecie q/x natychmiast odblokowuje lokalna operacje',
           );
-          assert.equal(f.sent.length, commandsBefore, 'blokada pobierania nie wysyla komendy');
+          await waitRt(
+            () => f.sent.length > commandsBefore,
+            'reczna operacja przechodzi bez czekania na prompt',
+          );
+          assert.ok(
+            f.sent.includes('listy odebrane przed 25 VIII 1999'),
+            'odblokowana operacja wysyla wlasna kotwice',
+          );
+          assert.equal(
+            f.sent.filter((command) => command === 'listy odebrane').length,
+            listingsBefore,
+            'automatyczny listing nadal czeka na zwykly prompt',
+          );
+          click(h, '.arkmail-arch-download');
+          f.fire('Nie masz zadnych odebranych listow.', 'mail');
+          await waitRt(() => textOf(h, '.arkmail-busy') === '', 'koniec recznego pobierania bez echa');
         }
 
         // Swiadomie bez linii "→ q/x": komenda z hooka jest jedynym sygnalem zamkniecia.
@@ -507,43 +543,48 @@ for (const closeCommand of ['q', 'x'] as const) {
   });
 }
 
-test('automatyczny odczyt: reczne q bez zwyklego promptu odblokowuje po 500 ms ciszy, a pager przedluza cisze', async (context) => {
+test('automatyczny odczyt: reczne q odblokowuje UI od razu, a automatyzacja nie zalezy od limitu ciszy', async (context) => {
   const h = await startHarness();
   const { f } = h;
   let mocked = false;
   try {
     await startRead(h);
     const listingsBefore = f.sent.filter((command) => command === 'listy odebrane').length;
-    context.mock.timers.enable({ apis: ['setTimeout'] });
-    mocked = true;
 
     await f.api.command.send('q', true);
     f.fire(PAGER_PROMPT, 'mail');
     await drain();
     assert.equal(f.sent.filter((command) => command === 'q').length, 1, 'jedno reczne q');
 
-    context.mock.timers.tick(499);
-    await drain();
-    assert.equal(
-      f.sent.filter((command) => command === 'listy odebrane').length,
-      listingsBefore,
-      'przed uplywem ciszy nadal bez komend pluginu',
-    );
-
-    f.fire(PAGER_PROMPT, 'mail');
-    context.mock.timers.tick(499);
-    await drain();
-    assert.equal(
-      f.sent.filter((command) => command === 'listy odebrane').length,
-      listingsBefore,
-      'kolejny prompt pagera odracza odblokowanie',
-    );
-
-    context.mock.timers.tick(1);
+    click(h, '[data-tab="archiwum"]');
+    click(h, '.arkmail-arch-download');
+    click(h, '.arkmail-arch-download');
     await drain();
     assert.ok(
-      f.sent.filter((command) => command === 'listy odebrane').length > listingsBefore,
-      '500 ms ciszy po ostatnim prompcie pagera konczy blokade',
+      f.sent.includes('listy odebrane przed 25 VIII 1999'),
+      'reczna operacja nie czeka na prompt ani limit czasu',
+    );
+    click(h, '.arkmail-arch-download');
+    f.fire('Nie masz zadnych odebranych listow.', 'mail');
+    await waitRt(() => textOf(h, '.arkmail-busy') === '', 'koniec recznego pobierania przed cisza');
+
+    context.mock.timers.enable({ apis: ['setTimeout'] });
+    mocked = true;
+    f.fire(PAGER_PROMPT, 'mail');
+    context.mock.timers.tick(180_000);
+    await drain();
+    assert.equal(
+      f.sent.filter((command) => command === 'listy odebrane').length,
+      listingsBefore,
+      'zadna cisza nie wznawia automatyzacji bez zwyklego promptu',
+    );
+
+    context.mock.timers.reset();
+    mocked = false;
+    f.fire('> ', 'prompt');
+    await waitRt(
+      () => f.sent.filter((command) => command === 'listy odebrane').length > listingsBefore,
+      'dopiero zwykly prompt wznawia automatyzacje',
     );
   } finally {
     if (mocked) context.mock.timers.reset();
