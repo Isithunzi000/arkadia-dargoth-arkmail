@@ -22,8 +22,8 @@ function metaVersion() {
   return m[1];
 }
 
-test('wydanie: przygotowany numer wersji to 1.30.23', () => {
-  assert.equal(metaVersion(), '1.30.23');
+test('wydanie: przygotowany numer wersji to 1.30.24', () => {
+  assert.equal(metaVersion(), '1.30.24');
 });
 
 function latestZip() {
@@ -203,4 +203,19 @@ test('dokumentacja: naprawa numerow wynikow wyszukiwania jest zapisana', () => {
   assert.match(report, /Nie wykonano nowego testu na realnej grze/);
   assert.match(report, /1392\/1392/);
   assert.equal(fs.existsSync(path.join(REPO, 'docs/PLAN-1.30.23.md')), false);
+});
+
+test('dokumentacja: numery serwera i reczne zamykanie sa zapisane', () => {
+  const report = fs.readFileSync(path.join(REPO, 'docs/NAPRAWA-1.30.24.md'), 'utf8');
+  assert.match(report, /## Zakres poprawki/);
+  assert.match(report, /## Dowody lokalne/);
+  assert.match(report, /## Weryfikacja zdalna/);
+  assert.match(report, /numerow z aktualnego listingu serwera/);
+  assert.match(report, /bez przeliczania/);
+  assert.match(report, /archiveId/);
+  assert.match(report, /natychmiast/);
+  assert.match(report, /automatyczne komendy/i);
+  assert.match(report, /Nie wykonano testow na realnej grze/);
+  assert.match(report, /GitHub Release/);
+  assert.equal(fs.existsSync(path.join(REPO, 'docs/PLAN-1.30.24.md')), false);
 });
