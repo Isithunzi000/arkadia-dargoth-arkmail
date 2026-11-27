@@ -84,7 +84,6 @@ import {
 } from "./core/replyRecipients";
 import {
   MailboxSession,
-  uniqueEntryByArchiveId,
   type ListingCtx,
   type ListingSearchCtx,
   type MailboxEntry,
@@ -1313,21 +1312,6 @@ export async function init(api: PluginApi) {
     return entries.map((e, i) => fromMailboxEntry(box, e, scanKey, i));
   };
 
-  /**
-   * Wynik filtra ma numeracje komend 1..N wzgledem selekcji, niezaleznie
-   * od etykiet wypisanych przez serwer. Listing przychodzi od najstarszego
-   * do najnowszego, wiec ostatni wpis dostaje 1. Normalizacja przed dalsza
-   * obrobka obejmuje tez ponowienie filtra i ponowna kotwice po bledzie.
-   */
-  const normalizeSearchResult = (res: MailboxResult): MailboxResult => {
-    if (res.kind === "lista") {
-      for (let i = 0; i < res.entries.length; i++) {
-        res.entries[i]!.number = res.entries.length - i;
-      }
-    }
-    return res;
-  };
-
   const hasAmbiguousIdentity = (entries: readonly MailboxEntry[], entry: MailboxEntry): boolean =>
     entries.filter((item) => entryKey(item) === entryKey(entry)).length > 1;
 
@@ -1356,12 +1340,11 @@ export async function init(api: PluginApi) {
 
   /**
    * Swiezy wpis do operacji pagerowej. Wpis z biezacego kontekstu serwera
-   * idzie od razu, takze pochodzacy z filtra. Dopiero stary wynik wyszukiwania
-   * ponawia pierwotny filtr i wybiera jednoznaczny wpis po archiveId. Inny
-   * stary wpis dostaje re-kotwice po dacie (serwerowe "przed" wyklucza dzien
-   * graniczny, wiec dzien PO dacie). Numer NIGDY nie leci do serwera
-   * bezposrednio z UI - zawsze z tego tlumaczenia. Null = nie znaleziono
-   * (komunikat dla gracza, zadna komenda nie wylatuje na slepo).
+   * zachowuje numer nadany przez serwer, rowniez pochodzacy z filtra. Kazdy
+   * nieaktualny wpis dostaje re-kotwice po dacie (serwerowe "przed" wyklucza
+   * dzien graniczny, wiec dzien PO dacie) i jest wybierany po archiveId.
+   * Numer NIGDY nie leci do serwera bezposrednio z UI - zawsze z tego
+   * tlumaczenia. Null = nie znaleziono (zadna komenda nie wylatuje na slepo).
    */
   const resolveEntry = async (box: MailBox, entry: MailboxEntry): Promise<MailboxEntry | null> => {
     if (
@@ -1371,30 +1354,6 @@ export async function init(api: PluginApi) {
       entry.ctx.box === listingCtx.box
     ) {
       return entry;
-    }
-    const search = entry.ctx?.box === box ? entry.ctx.search : undefined;
-    if (search !== undefined) {
-      // Dopiero utrata zgodnosci kontekstu wymaga ponowienia dokladnie
-      // pierwotnego filtra i jednoznacznego dopasowania rekordu.
-      const res = normalizeSearchResult(await mailbox.fetch(box, search.command, { filtered: true }));
-      if (res.kind === "lista") {
-        if (hasAmbiguousIdentity(res.entries, entry)) {
-          bumpCtx(box, search);
-          notifyAmbiguousIdentity();
-          return null;
-        }
-        const records = recordsOfListing(box, res.entries);
-        const merged = mergeListingPage(ui.state.archive, box, records);
-        ui.setArchive(merged.letters);
-        persistArchive();
-        stampEntries(box, res.entries, merged.resolvedIds, search);
-        const fresh = uniqueEntryByArchiveId(res.entries, entry.archiveId);
-        if (fresh !== null) return fresh;
-      } else {
-        bumpCtx(box, search);
-      }
-      notify(api, "Nie mozna odnalezc tego listu - odswiez skrzynke.", { level: "warning" });
-      return null;
     }
     if (!entry.date) {
       notify(api, "Nie mozna odnalezc tego listu - odswiez skrzynke.", { level: "warning" });
@@ -2924,7 +2883,7 @@ export async function init(api: PluginApi) {
       ui.setBusy(`Szukam w skrzynce ${box}...`);
       const generation = connectionGeneration;
       void runExclusive(async () => {
-          const res = normalizeSearchResult(await mailbox.fetch(box, search.command, { filtered: true }));
+          const res = await mailbox.fetch(box, search.command, { filtered: true });
           // Fala 41: wyniki szukania tez wklejane pod tozsamoscia
           // przebiegu (numeracja selekcji nie koliduje z pelnymi
           // listinguami - inny scanKey).

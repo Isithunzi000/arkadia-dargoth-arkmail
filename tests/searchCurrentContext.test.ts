@@ -1,13 +1,8 @@
-/** Aktualny kontekst wyszukiwania nie wymaga drugiego listingu. Dane syntetyczne. */
+/** Aktualny wynik wyszukiwania zachowuje numer nadany przez serwer. Dane syntetyczne. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import {
-  click,
-  startHarness,
-  stopHarness,
-  type Harness,
-} from './harness';
+import { click, startHarness, stopHarness, type Harness } from './harness';
 
 const DATE = 'Wt, 24 VIII 1999, 00:11:12';
 const SEARCH = 'listy odebrane od corge';
@@ -64,68 +59,24 @@ function clickVisibleRow(h: Harness, index: number): void {
 const readCommands = (h: Harness): string[] =>
   h.f.sent.filter((command) => command.startsWith('przeczytaj list'));
 
-for (const rows of [[1, 2], [2, 1]] as const) {
-  for (const selected of rows) {
-    test(`aktualny wynik ${rows.join(',')}: wiersz ${selected} czyta od razu wlasciwy numer`, async () => {
-      const h = await startHarness({ autoRefreshEnabled: false });
-      try {
-        await prepareSearch(h, rows);
-        click(h, `.arkmail-entry[data-number="${selected}"]`);
-        await drain();
+for (const [visibleIndex, serverNumber] of [[0, 4], [1, 9]] as const) {
+  test(`aktualny wynik: widoczny wiersz ${visibleIndex + 1} czyta numer serwera ${serverNumber}`, async () => {
+    const h = await startHarness({ autoRefreshEnabled: false });
+    try {
+      await prepareSearch(h, [9, 4]);
+      const rows = h.content.querySelectorAll('.arkmail-entry');
+      const row = rows[visibleIndex] as unknown as {
+        querySelector(selector: string): { textContent: string | null } | null;
+      };
+      assert.equal(row.querySelector('.arkmail-entry-num')?.textContent, `${visibleIndex + 1}.`);
 
-        assert.equal(h.f.sent.filter((command) => command === SEARCH).length, 1, 'bez drugiego listingu');
-        assert.deepEqual(
-          readCommands(h),
-          [`przeczytaj list ${selected}`],
-          'numer pochodzi z kliknietego aktualnego wiersza',
-        );
-      } finally {
-        await stopHarness();
-      }
-    });
-  }
+      clickVisibleRow(h, visibleIndex);
+      await drain();
+
+      assert.equal(h.f.sent.filter((command) => command === SEARCH).length, 1, 'bez drugiego listingu');
+      assert.deepEqual(readCommands(h), [`przeczytaj list ${serverNumber}`]);
+    } finally {
+      await stopHarness();
+    }
+  });
 }
-
-test('aktualny wynik 3,2: drugi widoczny wiersz czyta numer 2 selekcji, nie etykiete 3', async () => {
-  const h = await startHarness({ autoRefreshEnabled: false });
-  try {
-    await prepareSearch(h, [3, 2]);
-    const rows = h.content.querySelectorAll('.arkmail-entry');
-    assert.equal(rows.length, 2);
-    const secondRow = rows[1] as unknown as {
-      querySelector(selector: string): { textContent: string | null } | null;
-    };
-    assert.equal(secondRow.querySelector('.arkmail-entry-num')?.textContent, '2.');
-
-    clickVisibleRow(h, 1);
-    await drain();
-
-    assert.equal(h.f.sent.filter((command) => command === SEARCH).length, 1, 'bez drugiego listingu');
-    assert.deepEqual(readCommands(h), ['przeczytaj list 2']);
-  } finally {
-    await stopHarness();
-  }
-});
-
-test('wynik 3,2 po bledzie: ponowiony filtr takze tlumaczy drugi widoczny wiersz na 2', async () => {
-  const h = await startHarness({ autoRefreshEnabled: false });
-  try {
-    await prepareSearch(h, [3, 2]);
-    clickVisibleRow(h, 1);
-    await h.waitFor(() => readCommands(h).length === 1, 'pierwszy odczyt');
-
-    h.f.fire('Zly numer listu: 2.', 'mail');
-    h.f.fire('> ', 'prompt');
-    await h.waitFor(
-      () => h.f.sent.filter((command) => command === SEARCH).length === 2,
-      'ponowienie pierwotnego filtra',
-    );
-    replySearch(h, [3, 2]);
-    await drain();
-
-    assert.deepEqual(readCommands(h), ['przeczytaj list 2', 'przeczytaj list 2']);
-    assert.ok(!h.f.sent.includes('przeczytaj list 3'), 'surowa etykieta nie jest numerem komendy');
-  } finally {
-    await stopHarness();
-  }
-});

@@ -159,7 +159,7 @@ test('stringi klasa B: poprawione, naturalne polskie (ASCII)', () => {
   assert.ok(!index.includes('Trwa inna operacja pocztowa'), '13 kopii toastu - jest SESSION_BUSY_MSG');
   assert.ok(!index.includes('Kasuje list'), '"Kasuje" - jest "Usuwam"');
   // Nowe wersje obecne:
-  assert.equal(index.split('Nie mozna odnalezc tego listu - odswiez skrzynke.').length - 1, 3, 'wspolny komunikat wyszukiwania, re-kotwicy i braku daty');
+  assert.equal(index.split('Nie mozna odnalezc tego listu - odswiez skrzynke.').length - 1, 2, 'wspolny komunikat re-kotwicy i braku daty');
   assert.ok(index.includes('Poczekaj, az skoncze biezaca operacje.'), 'SESSION_BUSY_MSG');
   assert.ok(index.includes('Zapisane dane wyczyszczone.'), 'toast czyszczenia bez zargonu');
   // Fala 21b: anglicyzmy, zargon i niezgrabnosci zakazane:

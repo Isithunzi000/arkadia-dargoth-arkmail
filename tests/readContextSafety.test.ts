@@ -36,7 +36,7 @@ const setInput = (h: Harness, selector: string, value: string): void => {
 };
 
 function replyListing(h: Harness, rows: readonly Row[], selected = true): void {
-  h.f.fire(`${selected ? 'Wybrane listy' : 'Listy'} odebrane:`, 'mail');
+  h.f.fire(selected ? 'Wybrane listy odebrane:' : 'Listy odebrane (prezentowane jest pierwsze 50):', 'mail');
   for (const row of rows) {
     h.f.fire(` ${row.number}. *R* Temat: ${row.subject}`, 'mail');
     h.f.fire(`Nadawca: Corge                       ${DATE}`, 'mail');
@@ -92,7 +92,7 @@ function replayLetter(h: Harness, number: number): void {
   h.f.fire('> ', 'prompt');
 }
 
-test('wyszukiwanie: ponowna kotwica 3,2 czyta wybrany wpis numerem 2 selekcji', async () => {
+test('wyszukiwanie: ponowna kotwica po dacie zachowuje swiezy numer serwera', async () => {
   const h = await startHarness();
   try {
     await prepareSearch(h, [
@@ -101,18 +101,18 @@ test('wyszukiwanie: ponowna kotwica 3,2 czyta wybrany wpis numerem 2 selekcji', 
     ]);
     await expireServerListing(h);
     click(h, '.arkmail-entry[data-number="1"]');
-    await waitRt(() => h.f.sent.filter((command) => command === SEARCH).length === 2, 'swieze wyszukiwanie');
+    await waitRt(() => h.f.sent.includes('listy odebrane przed 25 VIII 1999'), 'kotwica po dacie');
 
     replyListing(h, [
       { number: 3, subject: 'wybrany' },
       { number: 2, subject: 'inny' },
-    ]);
-    await waitRt(() => h.f.sent.includes('przeczytaj list 2'), 'odczyt numeru pozycji selekcji');
+    ], false);
+    await waitRt(() => h.f.sent.includes('przeczytaj list 3'), 'odczyt numeru serwera');
 
-    assert.ok(!notifyText(h.f, 'Nie mozna bezpiecznie ustalic numeru listu'), 'etykiety 3,2 nie sa bledem');
-    assert.ok(!h.f.sent.includes('przeczytaj list 3'), 'surowa etykieta nie trafia do komendy');
+    assert.ok(!notifyText(h.f, 'Nie mozna bezpiecznie ustalic numeru listu'));
+    assert.ok(!h.f.sent.includes('przeczytaj list 1'), 'stary numer nie trafia do komendy');
     assert.ok(!h.f.sent.includes('q'), 'bez zgadywanego zamkniecia pagera');
-    replayLetter(h, 2);
+    replayLetter(h, 3);
     await h.waitFor(() => h.content.querySelector('.arkmail-letter-body') !== null, 'otwarty list');
   } finally {
     await stopHarness();
@@ -145,45 +145,27 @@ test('wyszukiwanie: pelny listing jest odrzucany juz przy pierwszym filtrze', as
   }
 });
 
-test('wyszukiwanie: pelny listing nie moze zastapic odpowiedzi na filtr', async () => {
-  const h = await startHarness();
-  try {
-    await prepareSearch(h, [{ number: 1, subject: 'wybrany' }]);
-    await expireServerListing(h);
-    click(h, '.arkmail-entry');
-    await waitRt(() => h.f.sent.filter((command) => command === SEARCH).length === 2, 'swieze wyszukiwanie');
-
-    replyListing(h, [{ number: 1, subject: 'wybrany' }], false);
-    await drain();
-
-    assert.ok(notifyText(h.f, 'Nie udalo sie odczytac listu.'), 'nieoczekiwany listing konczy operacje');
-    assert.equal(h.f.sent.filter((command) => command.startsWith('przeczytaj list')).length, 0);
-  } finally {
-    await stopHarness();
-  }
-});
-
 test('wyszukiwanie: zly numer i pozny prompt pagera nie powoduja drugiego listingu ani q', async () => {
   const h = await startHarness();
   try {
     await prepareSearch(h, [{ number: 1, subject: 'wybrany' }]);
     await expireServerListing(h);
     click(h, '.arkmail-entry');
-    await waitRt(() => h.f.sent.filter((command) => command === SEARCH).length === 2, 'swieze wyszukiwanie');
-    replyListing(h, [{ number: 1, subject: 'wybrany' }]);
+    await waitRt(() => h.f.sent.includes('listy odebrane przed 25 VIII 1999'), 'kotwica po dacie');
+    replyListing(h, [{ number: 1, subject: 'wybrany' }], false);
     await waitRt(() => h.f.sent.includes('przeczytaj list 1'), 'pierwszy odczyt');
 
     h.f.fire('Zly numer listu: 1.', 'mail');
     await drain();
     assert.equal(
-      h.f.sent.filter((command) => command === SEARCH).length,
-      2,
-      'przed granica odpowiedzi nie wolno ponawiac filtra',
+      h.f.sent.filter((command) => command === 'listy odebrane przed 25 VIII 1999').length,
+      1,
+      'przed granica odpowiedzi nie wolno ponawiac listingu',
     );
 
     h.f.fire('[1-2 adefFhHmnqrsRux.!?-+<>] (aktualny: 2) -- ', 'prompt');
     await h.waitFor(() => notifyText(h.f, 'Nie udalo sie odczytac listu.'), 'koniec po prompcie pagera');
-    assert.equal(h.f.sent.filter((command) => command === SEARCH).length, 2, 'bez ponowienia w pagerze');
+    assert.equal(h.f.sent.filter((command) => command === 'listy odebrane przed 25 VIII 1999').length, 1, 'bez ponowienia w pagerze');
     assert.equal(h.f.sent.filter((command) => command.startsWith('przeczytaj list')).length, 1);
     assert.ok(!h.f.sent.includes('q'), 'pager nieznanego pochodzenia nie jest zamykany');
   } finally {
@@ -197,17 +179,17 @@ test('wyszukiwanie: dopiero zwykly prompt po zlym numerze pozwala na jedna ponow
     await prepareSearch(h, [{ number: 1, subject: 'wybrany' }]);
     await expireServerListing(h);
     click(h, '.arkmail-entry');
-    await waitRt(() => h.f.sent.filter((command) => command === SEARCH).length === 2, 'swieze wyszukiwanie');
-    replyListing(h, [{ number: 1, subject: 'wybrany' }]);
+    await waitRt(() => h.f.sent.includes('listy odebrane przed 25 VIII 1999'), 'pierwsza kotwica');
+    replyListing(h, [{ number: 1, subject: 'wybrany' }], false);
     await waitRt(() => h.f.sent.includes('przeczytaj list 1'), 'pierwszy odczyt');
 
     h.f.fire('Zly numer listu: 1.', 'mail');
     await drain();
-    assert.equal(h.f.sent.filter((command) => command === SEARCH).length, 2, 'blad sam nie ponawia filtra');
+    assert.equal(h.f.sent.filter((command) => command === 'listy odebrane przed 25 VIII 1999').length, 1, 'blad sam nie ponawia listingu');
 
     h.f.fire('> ', 'prompt');
-    await waitRt(() => h.f.sent.filter((command) => command === SEARCH).length === 3, 'ponowienie po prompcie');
-    replyListing(h, [{ number: 1, subject: 'wybrany' }]);
+    await waitRt(() => h.f.sent.filter((command) => command === 'listy odebrane przed 25 VIII 1999').length === 2, 'ponowienie po zwyklym prompcie');
+    replyListing(h, [{ number: 1, subject: 'wybrany' }], false);
     await waitRt(
       () => h.f.sent.filter((command) => command === 'przeczytaj list 1').length === 2,
       'drugi odczyt',
